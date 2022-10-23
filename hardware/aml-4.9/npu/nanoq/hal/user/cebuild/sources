@@ -1,0 +1,64 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+
+TARGETNAME = hal.user
+TARGETTYPE = LIBRARY
+
+SOURCES = \
+    ../gc_hal_user.c \
+    ../gc_hal_user_brush.c \
+    ../gc_hal_user_brush_cache.c \
+    ../gc_hal_user_buffer.c \
+    ../gc_hal_user_dump.c \
+    ../gc_hal_user_hash.c \
+    ../gc_hal_user_heap.c \
+    ../gc_hal_user_profiler.c \
+    ../gc_hal_user_queue.c \
+    ../gc_hal_user_raster.c \
+    ../gc_hal_user_rect.c \
+    ../gc_hal_user_surface.c \
+    ../gc_hal_user_query.c \
+    ../gc_hal_user_bitmask.c \
+
+
+!IF "$(VIVANTE_ENABLE_3D)" == "1"
+SOURCES = $(SOURCES) \
+    ../gc_hal_user_bufobj.c \
+    ../gc_hal_user_cl.c \
+    ../gc_hal_user_engine.c \
+    ../gc_hal_user_index.c \
+    ../gc_hal_user_shader.c \
+    ../gc_hal_user_mem.c \
+    ../gc_hal_user_format.c \
+    ../gc_hal_user_texture.c \
+    ../gc_hal_user_vertex.c \
+    ../gc_hal_user_vertex_array.c \
+    ../gc_hal_user_statistics.c
+
+!ELSE
+!    IF "$(VIVANTE_ENABLE_VG)" == "1"
+SOURCES = $(SOURCES) \
+    ../gc_hal_user_mem.c \
+
+!    ENDIF
+!ENDIF
+
+INCLUDES = \
+    $(INCLUDES); \
+    $(AQROOT)\hal\user; \
+    $(AQROOT)\hal\os\ce\user; \
+    $(AQROOT)\compiler\libVSC\include; \

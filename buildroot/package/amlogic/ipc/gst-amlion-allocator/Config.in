@@ -1,0 +1,5 @@
+config BR2_PACKAGE_GST_AMLION_ALLOCATOR
+	bool "Amlogic gstreamer ion allocator lib"
+	select BR2_PACKAGE_AML_LIBION
+	help
+	  gstreamer 1.0 lib

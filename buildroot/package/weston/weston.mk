@@ -4,21 +4,14 @@
 #
 ################################################################################
 
-ifeq ($(BR2_PACKAGE_IMX_GPU_VIV_OUTPUT_WL),y)
-WESTON_VERSION = rel_imx_4.9.51_8mq_ga
-WESTON_SITE = https://source.codeaurora.org/external/imx/weston-imx
-WESTON_SITE_METHOD = git
-WESTON_AUTORECONF = YES
-else
-WESTON_VERSION = 5.0.0
+WESTON_VERSION = 6.0.0
 WESTON_SITE = http://wayland.freedesktop.org/releases
 WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
-endif
 WESTON_LICENSE = MIT
 WESTON_LICENSE_FILES = COPYING
 
 WESTON_DEPENDENCIES = host-pkgconf wayland wayland-protocols \
-	libxkbcommon pixman libpng jpeg udev cairo libinput libdrm \
+	libxkbcommon pixman libpng jpeg mtdev udev cairo libinput libdrm \
 	$(if $(BR2_PACKAGE_WEBP),webp)
 
 WESTON_CONF_OPTS = \
@@ -26,7 +19,8 @@ WESTON_CONF_OPTS = \
 	--disable-headless-compositor \
 	--disable-colord \
 	--disable-devdocs \
-	--disable-setuid-install
+	--disable-setuid-install \
+	--enable-autotools
 
 WESTON_MAKE_OPTS = \
 	WAYLAND_PROTOCOLS_DATADIR=$(STAGING_DIR)/usr/share/wayland-protocols
@@ -57,18 +51,13 @@ else
 WESTON_CONF_OPTS += --disable-weston-launch
 endif
 
-ifeq ($(BR2_PACKAGE_IMX_GPU_VIV_OUTPUT_WL),y)
-ifeq ($(BR2_PACKAGE_IMX_GPU_G2D),y)
-WESTON_DEPENDENCIES += imx-gpu-g2d
-# --enable-imxg2d actually disables it, so no CONF_OPTS
-else
-WESTON_CONF_OPTS += --disable-imxg2d
-endif
-endif
-
-ifeq ($(BR2_PACKAGE_HAS_LIBEGL_WAYLAND)$(BR2_PACKAGE_HAS_LIBGLES),yy)
+# Needs wayland-egl, which normally only mesa provides or package opengl.
+ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_EGL)$(BR2_PACKAGE_MESA3D_OPENGL_ES),yy)
 WESTON_CONF_OPTS += --enable-egl
-WESTON_DEPENDENCIES += libegl libgles
+WESTON_DEPENDENCIES += libegl
+else ifeq ($(BR2_PACKAGE_MESON_MALI),y)
+WESTON_CONF_OPTS += --enable-egl --enable-simple-egl-clients --disable-simple-dmabuf-egl-client
+WESTON_DEPENDENCIES += libegl
 else
 WESTON_CONF_OPTS += \
 	--disable-egl \
@@ -95,8 +84,13 @@ ifeq ($(BR2_PACKAGE_WESTON_DRM),y)
 WESTON_CONF_OPTS += \
 	--enable-drm-compositor \
 	WESTON_NATIVE_BACKEND=drm-backend.so
+WESTON_DEPENDENCIES += libdrm
 else
 WESTON_CONF_OPTS += --disable-drm-compositor
+endif
+
+ifeq ($(BR2_PACKAGE_WESTON_DRM_FIX_UI_SIZE),y)
+WESTON_CONF_OPTS += --enable-drm-fix-ui-size
 endif
 
 ifeq ($(BR2_PACKAGE_WESTON_X11),y)
@@ -149,4 +143,13 @@ else
 WESTON_CONF_OPTS += --disable-demo-clients-install
 endif
 
+ifeq ($(BR2_PACKAGE_WESTON_DRM_HELPER),y)
+WESTON_CONF_OPTS += \
+	--enable-drm-helper
+WESTON_DEPENDENCIES += meson-display
+endif
+
 $(eval $(autotools-package))
+
+
+include $(sort $(wildcard package/weston/*/*.mk))

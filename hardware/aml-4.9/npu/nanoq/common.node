@@ -1,0 +1,32 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Common makefile for the node.
+#
+
+################################################################################
+# Specify the targets.
+
+.PHONY: all clean install $(MODULES)
+
+all: $(MAIN_MODULE)
+
+clean: all
+clean: V_TARGET := clean
+
+install: all
+install: V_TARGET := install
+
+$(MODULES):
+	@test ! -d $@ || $(MAKE) --makefile=makefile.linux --directory=$@ $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)

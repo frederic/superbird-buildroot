@@ -1,0 +1,100 @@
+--- swupdate-2018.11/handlers/raw_handler.c	2019-08-02 19:12:23.328113900 +0800
++++ swupdate-2018.11/handlers/raw_handler.c	2019-08-02 19:17:58.778823311 +0800
+@@ -20,6 +20,36 @@
+ #include "handler.h"
+ #include "util.h"
+ 
++#define ARRAY_SIZE(x)  sizeof(x)/sizeof(x[0])
++#define EMMC_USER_PARTITION        "bootloader"
++#define EMMC_BLK0BOOT0_PARTITION   "mmcblk0boot0"
++#define EMMC_BLK0BOOT1_PARTITION   "mmcblk0boot1"
++#define EMMC_BLK1BOOT0_PARTITION   "mmcblk1boot0"
++#define EMMC_BLK1BOOT1_PARTITION   "mmcblk1boot1"
++#define EMMC_BLK2BOOT0_PARTITION   "mmcblk2boot0"
++#define EMMC_BLK2BOOT1_PARTITION   "mmcblk2boot1"
++
++enum emmcPartition {
++    USER = 0,
++    BLK0BOOT0,
++    BLK0BOOT1,
++    BLK1BOOT0,
++    BLK1BOOT1,
++    BLK2BOOT0,
++    BLK2BOOT1,
++};
++
++static int sEmmcPartionIndex = -1;
++static const char *sEmmcPartionName[] = {
++    EMMC_USER_PARTITION,
++    EMMC_BLK0BOOT0_PARTITION,
++    EMMC_BLK0BOOT1_PARTITION,
++    EMMC_BLK1BOOT0_PARTITION,
++    EMMC_BLK1BOOT1_PARTITION,
++    EMMC_BLK2BOOT0_PARTITION,
++    EMMC_BLK2BOOT1_PARTITION,
++};
++
+ void raw_handler(void);
+ void raw_filecopy_handler(void);
+ 
+@@ -143,24 +173,44 @@
+ 
+ 	getBootloaderOffset(&offset);
+ 
+-	//write bootloader
+-	printf("write %s to /dev/bootloader.\n", img->fname);
+-	fdout = open("/dev/bootloader", O_RDWR);
+-	if (fdout < 0) {
+-		TRACE("open %s failed!\n", "/dev/bootloader");
+-		return -1;
++	unsigned int i = 0;
++	char emmcPartitionPath[128];
++	for (i = USER; i < ARRAY_SIZE(sEmmcPartionName); i ++) {
++		memset(emmcPartitionPath, 0, sizeof(emmcPartitionPath));
++		sprintf(emmcPartitionPath, "/dev/%s", sEmmcPartionName[i]);
++
++		if (!access(emmcPartitionPath, F_OK)) {
++			printf("write %s to %s.\n", img->fname, emmcPartitionPath);
++			//open
++			fdout = open(emmcPartitionPath, O_RDWR);
++			if (fdout < 0) {
++  				TRACE("open %s failed!\n", emmcPartitionPath);
++				return -1;
++			}
++
++			ret = lseek(fdout, offset, SEEK_SET);
++			if (ret < 0) {
++				TRACE("lseek %s failed!\n", emmcPartitionPath);
++				close(fdout);
++				return -1;
++			}
++
++			ret = copyimage(&fdout, img, NULL);
++			close(fdout);
++			if (ret != 0) {
++				TRACE("install %s failed!\n", "/dev/bootloader");
++				return -1;
++			}
++
++			ret = lseek64(img->fdin, (img->size)*(-1), SEEK_CUR);
++			if (ret < 0) {
++				TRACE("install %s failed!\n", "/dev/bootloader");
++				return -1;
++			}
++		}
+ 	}
+ 
+-	lseek(fdout, offset, SEEK_SET);
+-
+-	ret = copyimage(&fdout, img, NULL);
+-	close(fdout);
+-	if (ret != 0) {
+-		TRACE("install %s failed!\n", "/dev/bootloader");
+-		return -1;
+-	}
+-
+-	return ret;
++	return 0;
+ }
+ 
+ static int install_raw_image(struct img_type *img,

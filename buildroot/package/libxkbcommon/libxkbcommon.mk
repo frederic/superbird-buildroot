@@ -21,5 +21,10 @@ LIBXKBCOMMON_DEPENDENCIES += libxcb
 else
 LIBXKBCOMMON_CONF_OPTS += --disable-x11
 endif
+ifeq ($(BR2_PACKAGE_WAYLAND),y)
+LIBXKBCOMMON_DEPENDENCIES += wayland wayland-protocols
+LIBXKBCOMMON_CONF_OPTS += --enable-wayland
+endif
+
 
 $(eval $(autotools-package))

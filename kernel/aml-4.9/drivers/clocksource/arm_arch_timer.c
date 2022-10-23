@@ -449,7 +449,15 @@ static void arch_counter_set_user_access(void)
 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
 
 	/* Enable user access to the virtual counter */
-	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_VCT_ACCESS))
+		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+	else
+		cntkctl &= ~ARCH_TIMER_USR_VCT_ACCESS_EN;
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+	/* Enable user access to the phyical counter for __vdso_gettimeofday */
+	cntkctl |= ARCH_TIMER_USR_PCT_ACCESS_EN;
+#endif
 
 	arch_timer_set_cntkctl(cntkctl);
 }

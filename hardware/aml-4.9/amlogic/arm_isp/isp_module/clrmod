@@ -1,0 +1,25 @@
+if [ "${1}" = "" ]; then
+	echo "None KDIR. Set NULL as defalut"
+	KERNEL_DIR=$(cd $(dirname $0); pwd)
+else
+	echo "KDIR Target is $1"
+	KERNEL_DIR=$1
+fi
+
+echo $KERNEL_DIR
+
+rm -f *.ko
+
+cd ./v4l2_dev
+make KDIR=$KERNEL_DIR ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean
+
+cd .././subdev/iq
+make KDIR=$KERNEL_DIR ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean
+
+cd ../.././subdev/lens
+make KDIR=$KERNEL_DIR ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean
+
+cd ../.././subdev/sensor
+make KDIR=$KERNEL_DIR ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- clean
+
+unset KERNEL_DIR

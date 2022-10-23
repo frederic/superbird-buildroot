@@ -44,8 +44,18 @@ struct mem_cgroup;
  */
 struct page {
 	/* First double word block */
+#if defined(CONFIG_AMLOGIC_PAGE_TRACE) && defined(CONFIG_64BIT)
+	union {
+		unsigned long flags;
+		struct {
+			unsigned int s_flags;
+			unsigned int trace;
+		};
+	};
+#else
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
+#endif /* CONFIG_AMLOGIC_PAGE_TRACE */
 	union {
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
@@ -326,11 +336,18 @@ struct vm_area_struct {
 	/*
 	 * For areas with an address space and backing store,
 	 * linkage into the address_space->i_mmap interval tree.
+	 *
+	 * For private anonymous mappings, a pointer to a null terminated string
+	 * in the user process containing the name given to the vma, or NULL
+	 * if unnamed.
 	 */
-	struct {
-		struct rb_node rb;
-		unsigned long rb_subtree_last;
-	} shared;
+	union {
+		struct {
+			struct rb_node rb;
+			unsigned long rb_subtree_last;
+		} shared;
+		const char __user *anon_name;
+	};
 
 	/*
 	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
@@ -396,7 +413,7 @@ struct kioctx_table;
 struct mm_struct {
 	struct vm_area_struct *mmap;		/* list of VMAs */
 	struct rb_root mm_rb;
-	u32 vmacache_seqnum;                   /* per-thread vmacache */
+	u64 vmacache_seqnum;                   /* per-thread vmacache */
 #ifdef CONFIG_MMU
 	unsigned long (*get_unmapped_area) (struct file *filp,
 				unsigned long addr, unsigned long len,
@@ -619,5 +636,14 @@ enum tlb_flush_reason {
 typedef struct {
 	unsigned long val;
 } swp_entry_t;
+
+/* Return the name for an anonymous mapping or NULL for a file-backed mapping */
+static inline const char __user *vma_get_anon_name(struct vm_area_struct *vma)
+{
+	if (vma->vm_file)
+		return NULL;
+
+	return vma->anon_name;
+}
 
 #endif /* _LINUX_MM_TYPES_H */

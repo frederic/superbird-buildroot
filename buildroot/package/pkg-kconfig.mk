@@ -59,6 +59,7 @@ $(2)_KCONFIG_EDITORS ?= menuconfig
 $(2)_KCONFIG_OPTS ?=
 $(2)_KCONFIG_FIXUP_CMDS ?=
 $(2)_KCONFIG_FRAGMENT_FILES ?=
+$(2)_KCONFIG_CONFIG_TARGET ?= oldconfig
 $(2)_KCONFIG_DOTCONFIG ?= .config
 
 # The config file as well as the fragments could be in-tree, so before
@@ -109,7 +110,7 @@ define $(2)_REGEN_DOT_CONFIG
 		$$(Q)$$($(2)_KCONFIG_MAKE) olddefconfig,
 		$$(if $$(filter oldnoconfig,$$($(2)_KCONFIG_RULES)),
 			$$(Q)$$($(2)_KCONFIG_MAKE) oldnoconfig,
-			$$(Q)(yes "" | $$($(2)_KCONFIG_MAKE) oldconfig)))
+			$$(Q)(yes "" | $$($(2)_KCONFIG_MAKE) $$($(2)_KCONFIG_CONFIG_TARGET))))
 endef
 
 # The specified source configuration file and any additional configuration file

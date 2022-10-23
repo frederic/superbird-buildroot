@@ -1,0 +1,75 @@
+#!/bin/sh
+
+data_ubi_handle()
+{
+    mount | grep 'data' && echo "Already mounted" && exit 0
+    #get current platform
+    platform=`cat /proc/device-tree/compatible`
+    case ${platform} in
+        "amlogic, axg")
+            platform="axg"
+            ;;
+        "amlogic,a1" | "amlogic, a1")
+            platform="a1"
+            ;;
+        *)
+            platform=""
+            ;;
+    esac
+
+    if [ "${platform}" = "axg" ] || [ "${platform}" = "a1" ]
+    then
+        data_mtd_number=$(cat /proc/mtd | grep  -E "data" | awk -F : '{print $1}' | grep -o '[0-9]\+')
+    fi
+
+    #mount dir create
+    if [ ! -d "/data"  ]
+    then
+        mkdir /data
+    fi
+
+    # sure ubi vol exist or not
+    ubiattach /dev/ubi_ctrl -m ${data_mtd_number}
+    if [ -c "/dev/ubi1_0" ]
+    then
+        data_vol_name=`cat /sys/class/ubi/ubi1_0/name`
+        if [ "${data_vol_name}" = "data" ]
+        then
+            mount -t ubifs /dev/ubi1_0 /data
+            return 0
+        fi
+    fi
+
+    #get data size
+#    dataSize=`cat /proc/mtd |grep "data"|awk '{print $2}'`
+#    dataSize=`printf %d 0x$dataSize`
+#    dataSize=$(expr $(expr $dataSize \/ 1024) \/ 1024)
+#    let dataSize=dataSize-4 ###Reserved 5M###
+
+    #mount data
+    ubidetach -p /dev/mtd${data_mtd_number}
+    ubiformat -y /dev/mtd${data_mtd_number}
+    ubiattach /dev/ubi_ctrl -m ${data_mtd_number}
+#    ubimkvol /dev/ubi1 -s $dataSize"MiB" -N data
+    ubimkvol /dev/ubi1 -m -N data
+    mount -t ubifs /dev/ubi1_0 /data
+}
+
+data_ext4_handle()
+{
+    mount | grep '/data type ext4' && echo "Already mounted" && exit 0
+    #mount dir create
+    if [ ! -d "/data"  ]
+    then
+        mkdir /data
+    fi
+
+    mount -t ext4 /dev/data /data
+    if [ $? -ne 0 ]
+    then
+        mkfs.ext4 /dev/data
+        mount -t ext4 /dev/data /data
+    fi
+    return 0
+}
+

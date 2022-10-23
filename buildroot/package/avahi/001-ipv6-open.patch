@@ -1,0 +1,13 @@
+diff --git a/./avahi-daemon/avahi-daemon.conf  b/./avahi-daemon/avahi-daemon.conf
+index 95166f8..4da52c4 100644
+--- a/./avahi-daemon/avahi-daemon.conf
++++ b/./avahi-daemon/avahi-daemon.conf
+@@ -52,7 +52,7 @@ publish-workstation=no
+ #publish-dns-servers=192.168.50.1, 192.168.50.2
+ #publish-resolv-conf-dns-servers=yes
+ #publish-aaaa-on-ipv4=yes
+-#publish-a-on-ipv6=no
++publish-a-on-ipv6=yes
+ 
+ [reflector]
+ #enable-reflector=no

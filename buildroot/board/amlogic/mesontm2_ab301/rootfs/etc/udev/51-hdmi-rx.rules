@@ -1,0 +1,8 @@
+#51-hdmi-rx.rules
+DEVPATH!="/devices/platform/0.hdmirx/hdmirx/hdmirx0/rx22",GOTO="finish"
+ACTION=="change",GOTO="change"
+GOTO="finish"
+LABEL="change"
+ENV{STATE}=="HDMI=1",RUN+="/etc/init.d/S49hdcprx22 start"
+ENV{STATE}=="HDMI=0",RUN+="/etc/init.d/S49dhcprx22 stop"
+LABEL="finish"

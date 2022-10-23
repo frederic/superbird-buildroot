@@ -173,6 +173,9 @@ extern bool single_task_running(void);
 extern unsigned long nr_iowait(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern void get_iowait_load(unsigned long *nr_waiters, unsigned long *load);
+#ifdef CONFIG_CPU_QUIET
+extern u64 nr_running_integral(unsigned int cpu);
+#endif
 
 extern void calc_global_load(unsigned long ticks);
 
@@ -314,6 +317,15 @@ extern char ___assert_task_state[1 - 2*!!(
 
 /* Task command name length */
 #define TASK_COMM_LEN 16
+
+enum task_event {
+	PUT_PREV_TASK   = 0,
+	PICK_NEXT_TASK  = 1,
+	TASK_WAKE       = 2,
+	TASK_MIGRATE    = 3,
+	TASK_UPDATE     = 4,
+	IRQ_UPDATE	= 5,
+};
 
 #include <linux/spinlock.h>
 
@@ -982,6 +994,14 @@ enum cpu_idle_type {
 #define SCHED_CAPACITY_SHIFT	SCHED_FIXEDPOINT_SHIFT
 #define SCHED_CAPACITY_SCALE	(1L << SCHED_CAPACITY_SHIFT)
 
+struct sched_capacity_reqs {
+	unsigned long cfs;
+	unsigned long rt;
+	unsigned long dl;
+
+	unsigned long total;
+};
+
 /*
  * Wake-queues are lists of tasks with a pending wakeup, whose
  * callers have already marked the task as woken internally,
@@ -1045,6 +1065,7 @@ extern void wake_up_q(struct wake_q_head *head);
 #define SD_PREFER_SIBLING	0x1000	/* Prefer to place tasks in a sibling domain */
 #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
 #define SD_NUMA			0x4000	/* cross-node balancing */
+#define SD_SHARE_CAP_STATES	0x8000  /* Domain members share capacity state */
 
 #ifdef CONFIG_SCHED_SMT
 static inline int cpu_smt_flags(void)
@@ -1077,7 +1098,56 @@ struct sched_domain_attr {
 
 extern int sched_domain_level_max;
 
+struct capacity_state {
+	unsigned long cap;	/* compute capacity */
+	unsigned long power;	/* power consumption at this compute capacity */
+};
+
+struct idle_state {
+	unsigned long power;	 /* power consumption in this idle state */
+};
+
+struct sched_group_energy {
+	unsigned int nr_idle_states;	/* number of idle states */
+	struct idle_state *idle_states;	/* ptr to idle state array */
+	unsigned int nr_cap_states;	/* number of capacity states */
+	struct capacity_state *cap_states; /* ptr to capacity state array */
+};
+
+unsigned long capacity_curr_of(int cpu);
+
 struct sched_group;
+
+struct eas_stats {
+	/* select_idle_sibling() stats */
+	u64 sis_attempts;
+	u64 sis_idle;
+	u64 sis_cache_affine;
+	u64 sis_suff_cap;
+	u64 sis_idle_cpu;
+	u64 sis_count;
+
+	/* select_energy_cpu_brute() stats */
+	u64 secb_attempts;
+	u64 secb_sync;
+	u64 secb_idle_bt;
+	u64 secb_insuff_cap;
+	u64 secb_no_nrg_sav;
+	u64 secb_nrg_sav;
+	u64 secb_count;
+
+	/* find_best_target() stats */
+	u64 fbt_attempts;
+	u64 fbt_no_cpu;
+	u64 fbt_no_sd;
+	u64 fbt_pref_idle;
+	u64 fbt_count;
+
+	/* cas */
+	/* select_task_rq_fair() stats */
+	u64 cas_attempts;
+	u64 cas_count;
+};
 
 struct sched_domain_shared {
 	atomic_t	ref;
@@ -1147,6 +1217,8 @@ struct sched_domain {
 	unsigned int ttwu_wake_remote;
 	unsigned int ttwu_move_affine;
 	unsigned int ttwu_move_balance;
+
+	struct eas_stats eas_stats;
 #endif
 #ifdef CONFIG_SCHED_DEBUG
 	char *name;
@@ -1184,6 +1256,8 @@ bool cpus_share_cache(int this_cpu, int that_cpu);
 
 typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
 typedef int (*sched_domain_flags_f)(void);
+typedef
+const struct sched_group_energy * const(*sched_domain_energy_f)(int cpu);
 
 #define SDTL_OVERLAP	0x01
 
@@ -1197,6 +1271,7 @@ struct sd_data {
 struct sched_domain_topology_level {
 	sched_domain_mask_f mask;
 	sched_domain_flags_f sd_flags;
+	sched_domain_energy_f energy;
 	int		    flags;
 	int		    numa_level;
 	struct sd_data      data;
@@ -1342,6 +1417,70 @@ struct sched_statistics {
 	u64			nr_wakeups_affine_attempts;
 	u64			nr_wakeups_passive;
 	u64			nr_wakeups_idle;
+
+	/* select_idle_sibling() */
+	u64			nr_wakeups_sis_attempts;
+	u64			nr_wakeups_sis_idle;
+	u64			nr_wakeups_sis_cache_affine;
+	u64			nr_wakeups_sis_suff_cap;
+	u64			nr_wakeups_sis_idle_cpu;
+	u64			nr_wakeups_sis_count;
+
+	/* energy_aware_wake_cpu() */
+	u64			nr_wakeups_secb_attempts;
+	u64			nr_wakeups_secb_sync;
+	u64			nr_wakeups_secb_idle_bt;
+	u64			nr_wakeups_secb_insuff_cap;
+	u64			nr_wakeups_secb_no_nrg_sav;
+	u64			nr_wakeups_secb_nrg_sav;
+	u64			nr_wakeups_secb_count;
+
+	/* find_best_target() */
+	u64			nr_wakeups_fbt_attempts;
+	u64			nr_wakeups_fbt_no_cpu;
+	u64			nr_wakeups_fbt_no_sd;
+	u64			nr_wakeups_fbt_pref_idle;
+	u64			nr_wakeups_fbt_count;
+
+	/* cas */
+	/* select_task_rq_fair() */
+	u64			nr_wakeups_cas_attempts;
+	u64			nr_wakeups_cas_count;
+};
+#endif
+
+#ifdef CONFIG_SCHED_WALT
+#define RAVG_HIST_SIZE_MAX  5
+
+/* ravg represents frequency scaled cpu-demand of tasks */
+struct ravg {
+	/*
+	 * 'mark_start' marks the beginning of an event (task waking up, task
+	 * starting to execute, task being preempted) within a window
+	 *
+	 * 'sum' represents how runnable a task has been within current
+	 * window. It incorporates both running time and wait time and is
+	 * frequency scaled.
+	 *
+	 * 'sum_history' keeps track of history of 'sum' seen over previous
+	 * RAVG_HIST_SIZE windows. Windows where task was entirely sleeping are
+	 * ignored.
+	 *
+	 * 'demand' represents maximum sum seen over previous
+	 * sysctl_sched_ravg_hist_size windows. 'demand' could drive frequency
+	 * demand for tasks.
+	 *
+	 * 'curr_window' represents task's contribution to cpu busy time
+	 * statistics (rq->curr_runnable_sum) in current window
+	 *
+	 * 'prev_window' represents task's contribution to cpu busy time
+	 * statistics (rq->prev_runnable_sum) in previous window
+	 */
+	u64 mark_start;
+	u32 sum, demand;
+	u32 sum_history[RAVG_HIST_SIZE_MAX];
+	u32 curr_window, prev_window;
+	u16 active_windows;
 };
 #endif
 
@@ -1516,6 +1655,16 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+#ifdef CONFIG_SCHED_WALT
+	struct ravg ravg;
+	/*
+	 * 'init_load_pct' represents the initial task load assigned to children
+	 * of this task
+	 */
+	u32 init_load_pct;
+	u64 last_sleep_ts;
+#endif
+
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group *sched_task_group;
 #endif
@@ -1559,7 +1708,7 @@ struct task_struct {
 
 	struct mm_struct *mm, *active_mm;
 	/* per-thread vma caching */
-	u32 vmacache_seqnum;
+	u64 vmacache_seqnum;
 	struct vm_area_struct *vmacache[VMACACHE_SIZE];
 #if defined(SPLIT_RSS_COUNTING)
 	struct task_rss_stat	rss_stat;
@@ -1644,6 +1793,10 @@ struct task_struct {
 
 	cputime_t utime, stime, utimescaled, stimescaled;
 	cputime_t gtime;
+#ifdef CONFIG_CPU_FREQ_TIMES
+	u64 *time_in_state;
+	unsigned int max_state;
+#endif
 	struct prev_cputime prev_cputime;
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 	seqcount_t vtime_seqcount;
@@ -3178,7 +3331,13 @@ static inline unsigned long *end_of_stack(const struct task_struct *task)
 
 #elif !defined(__HAVE_THREAD_FUNCTIONS)
 
+#ifdef CONFIG_AMLOGIC_VMAP
+#define task_thread_info(task)		\
+	((struct thread_info *)(((unsigned long)(task)->stack) + \
+				  THREAD_INFO_OFFSET))
+#else
 #define task_thread_info(task)	((struct thread_info *)(task)->stack)
+#endif
 #define task_stack_page(task)	((void *)(task)->stack)
 
 static inline void setup_thread_stack(struct task_struct *p, struct task_struct *org)
@@ -3198,11 +3357,15 @@ static inline void setup_thread_stack(struct task_struct *p, struct task_struct 
  */
 static inline unsigned long *end_of_stack(struct task_struct *p)
 {
+#ifdef CONFIG_AMLOGIC_VMAP
+	return p->stack;
+#else /* CONFIG_AMLOGIC_VMAP */
 #ifdef CONFIG_STACK_GROWSUP
 	return (unsigned long *)((unsigned long)task_thread_info(p) + THREAD_SIZE) - 1;
 #else
 	return (unsigned long *)(task_thread_info(p) + 1);
 #endif
+#endif /* CONFIG_AMLOGIC_VMAP */
 }
 
 #endif
@@ -3224,8 +3387,12 @@ static inline void *try_get_task_stack(struct task_struct *tsk)
 static inline void put_task_stack(struct task_struct *tsk) {}
 #endif
 
+#ifdef CONFIG_AMLOGIC_VMAP
+#define task_stack_end_corrupted(task)	(false)
+#else
 #define task_stack_end_corrupted(task) \
 		(*(end_of_stack(task)) != STACK_END_MAGIC)
+#endif
 
 static inline int object_is_on_stack(void *obj)
 {
@@ -3567,6 +3734,11 @@ static inline void inc_syscw(struct task_struct *tsk)
 {
 	tsk->ioac.syscw++;
 }
+
+static inline void inc_syscfs(struct task_struct *tsk)
+{
+	tsk->ioac.syscfs++;
+}
 #else
 static inline void add_rchar(struct task_struct *tsk, ssize_t amt)
 {
@@ -3581,6 +3753,9 @@ static inline void inc_syscr(struct task_struct *tsk)
 }
 
 static inline void inc_syscw(struct task_struct *tsk)
+{
+}
+static inline void inc_syscfs(struct task_struct *tsk)
 {
 }
 #endif

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_NN_DETECT_YOLOFACE
+    bool "aml nn_detect yoloface library"
+    depends on BR2_PACKAGE_NPU
+    help
+        Support yoloface detection

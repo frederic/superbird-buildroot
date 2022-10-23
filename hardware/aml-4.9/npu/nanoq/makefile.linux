@@ -1,0 +1,373 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Main linux build file.
+#
+
+################################################################################
+# Macros.
+
+AQROOT              ?= $(PWD)
+AQARCH              ?= $(AQROOT)/arch/XAQ2
+AQVGARCH            ?= $(AQROOT)/arch/GC350
+
+export AQROOT AQARCH AQVGARCH
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+.PHONY: default_target all clean install drivers
+default_target: all
+
+################################################################################
+# Components of the project.
+
+# Register header
+REG_HEAD            := $(AQARCH)/reg
+
+
+# galcore
+ifneq ($(LINUX_VSIMULATOR),1)
+GAL_CORE            := ./
+
+$(GAL_CORE):        $(REG_HEAD)
+
+.PHONY: gal_core
+gal_core:           $(GAL_CORE)
+endif
+
+
+# libGAL
+LIB_GAL             := $(AQROOT)/hal
+LIB_LIST            := $(LIB_GAL)
+
+$(LIB_GAL):         $(REG_HEAD)
+
+.PHONY: gal hal_user hal_drv
+gal hal_user:       $(LIB_GAL)
+hal_drv:            $(LIB_GAL)
+
+
+
+ifeq ($(LINUX_VSIMULATOR),1)
+# libEmulator
+LIB_VSIMULATOR      := $(AQROOT)/vsimulator/common
+LIB_EMULATOR        := $(AQROOT)/vsimulator/os/linux/emulator
+LIB_LIST            += $(LIB_VSIMULATOR) $(LIB_EMULATOR)
+
+$(LIB_VSIMULATOR):  $(REG_HEAD)
+$(LIB_EMULATOR):    $(LIB_VSIMULATOR) $(REG_HEAD)
+
+.PHONY: emulator
+simulator:           $(LIB_EMULATOR)
+
+$(LIB_GAL):         $(LIB_EMULATOR)
+endif
+
+ifneq ($(VIVANTE_ENABLE_3D),0)
+# libEGL
+LIB_EGL             := $(AQROOT)/driver/khronos/libEGL
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_EGL)
+endif
+
+$(LIB_EGL):         $(LIB_GAL)
+
+.PHONY: egl
+egl:                $(LIB_EGL)
+drivers:            $(LIB_EGL)
+
+
+ifeq ($(USE_VDK),1)
+# libVDK
+LIB_VDK             := $(AQROOT)/sdk/vdk
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_VDK)
+endif
+
+$(LIB_VDK):         $(LIB_EGL)
+
+.PHONY: vdk
+vdk:                $(LIB_VDK)
+drivers:            $(LIB_VDK)
+endif # USE_VDK
+endif # VIVANTE_ENABLE_3D or VIVANTE_ENABLE_VG
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+# libGLESv1, libGLESv2, libGLSLC, libVSC, libVSC_Lite
+LIB_GLES11          := $(AQROOT)/driver/khronos/libGLESv11
+LIB_GLES2X          := $(AQROOT)/driver/khronos/libGLESv3
+LIB_GLSLC           := $(AQROOT)/compiler/libGLSLC
+LIB_VSC             := $(AQROOT)/compiler/libVSC
+LIB_VSC_Lite             := $(AQROOT)/compiler/libVSC_Lite
+LIB_LIST            += $(LIB_VSC)
+ifeq ($(USE_VSC_LITE),1)
+LIB_LIST            += $(LIB_VSC_Lite)
+endif
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_GLES11) $(LIB_GLES2X) $(LIB_GLSLC)
+endif
+
+$(LIB_GLES11):      $(LIB_GAL) $(LIB_VSC)
+$(LIB_GLES2X):      $(LIB_GAL) $(LIB_VSC) $(LIB_GLSLC)
+$(LIB_GLSLC):       $(LIB_GAL) $(LIB_VSC)
+$(LIB_VSC):         $(LIB_GAL)
+$(LIB_VSC_Lite):         $(LIB_GAL)
+
+.PHONY: oes11_drv gles11 oes2x_drv gles2x glslc vsc vsc_lite
+oes11_drv gles11:   $(LIB_GLES11)
+oes2x_drv gles2x:   $(LIB_GLES2X)
+glslc:              $(LIB_GLSLC)
+vsc:                $(LIB_VSC)
+vsc_lite:           $(LIB_VSC_Lite)
+
+drivers:            $(LIB_EGL) $(LIB_GLES11) $(LIB_GLES2X)
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifneq ($(USE_OPENCL)$(USE_OPENVX),00)
+# libCLC
+LIB_CLC             := $(AQROOT)/compiler/libCLC
+LIB_LIST            += $(LIB_CLC)
+
+$(LIB_CLC):         $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: clc
+clc:                $(LIB_CLC)
+endif # USE_OPENCL or USE_OPENVX
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_OPENCL),1)
+# libOpenCL
+LIB_CL11            := $(AQROOT)/driver/khronos/libCL
+LIB_LIST            += $(LIB_CL11)
+
+$(LIB_CL11):        $(LIB_GAL) $(LIB_GLES2X) $(LIB_CLC)
+
+.PHONY: cl11 ocl11_drv
+cl11:               $(LIB_CL11)
+ocl11_drv:          $(LIB_CLC) $(LIB_CL11)
+
+ifeq ($(BUILD_OPENCL_ICD),1)
+LIB_CL11_ICD        := $(AQROOT)/driver/khronos/libCL/icdloader12
+LIB_LIST            += $(LIB_CL11_ICD)
+
+cl11:               $(LIB_CL11_ICD)
+ocl11_drv:          $(LIB_CL11_ICD)
+endif # BUILD_OPENCL_ICD
+endif # USE_OPENCL
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_OPENVX),1)
+# libOpenVX
+LIB_VX              := $(AQROOT)/driver/khronos/libOpenVX
+LIB_LIST            += $(LIB_VX)
+
+$(LIB_VX):          $(LIB_GAL) $(LIB_CLC)
+
+.PHONY: ovx_drv
+ovx_drv:            $(LIB_VX)
+
+endif # USE_OPENVX
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_VULKAN),1)
+# libvulkan
+LIB_VULKAN          := $(AQROOT)/driver/khronos/libVulkan11
+LIB_SPIRV           := $(AQROOT)/compiler/libSPIRV
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_VULKAN) $(LIB_SPIRV)
+endif
+$(LIB_VULKAN):      $(LIB_GAL) $(LIB_SPIRV) $(LIB_VSC) $(LIB_GLSLC)
+$(LIB_SPIRV):       $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: vulkan_drv
+vulkan_drv:         $(LIB_VULKAN)
+
+drivers:            $(LIB_VULKAN)
+endif # USE_VULKAN
+endif # VIVANTE_ENABLE_3D
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(EGL_API_DRI),1)
+
+ifeq ($(GL4_LINUX_ENABLE),1)
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
+else
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
+endif
+
+
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_GL21)
+endif
+
+$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: gl21
+gl21:               $(LIB_GL21)
+endif # EGL_API_DRI
+ifeq ($(X11_DRI3),1)
+
+ifeq ($(GL4_LINUX_ENABLE),1)
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
+else
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
+endif
+
+
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_GL21)
+endif
+
+$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: gl21
+gl21:               $(LIB_GL21)
+endif # X11_DRI3
+
+ifeq ($(EGL_API_WL),1)
+
+ifeq ($(GL4_LINUX_ENABLE),1)
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
+else
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
+endif
+
+
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_GL21)
+endif
+
+$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: gl21
+gl21:               $(LIB_GL21)
+
+endif # EgL_API_WL
+
+
+endif # VIVANTE_ENABLE_3D
+
+
+ifneq ($(VIVANTE_NO_VG),1)
+ifeq ($(VIVANTE_ENABLE_3D),1)
+LIB_VG11            := $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
+ifeq ($(LINUX_VSIMULATOR),0)
+LIB_LIST            += $(LIB_VG11)
+endif
+
+$(LIB_VG11):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: ovg11_drv vg11 vg113d
+ovg11_drv vg11:     $(LIB_VG11)
+vg113d:             $(LIB_VG11)
+drivers:            $(LIB_VG11)
+endif # VIVANTE_ENABLE_3D
+endif # not VIVANTE_NO_VG
+
+
+
+ifeq ($(USE_EXA_G2D),1)
+LIB_EXA             := $(AQROOT)/driver/X/EXA_G2D/src
+
+ifeq ($(EGL_API_DRI),1)
+LIB_LIST            += $(LIB_EXA)
+
+$(LIB_EXA):         $(LIB_GAL)
+endif # EGL_API_DRI
+
+ifeq ($(X11_DRI3),1)
+LIB_DRM             := $(AQROOT)/driver/X/libdrm-2.4.91
+LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
+
+$(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
+$(LIB_EGL):         $(LIB_DRM)
+$(LIB_GL21):        $(LIB_DRM)
+endif # X11_DRI3
+
+else
+
+
+endif
+
+ifeq ($(EGL_API_GBM),1)
+ifeq ($(GBM_LIBS),)
+
+LIB_GBM_VIV         := $(AQROOT)/driver/gbm/backends/viv
+LIB_GBM             := $(AQROOT)/driver/gbm/main
+LIB_LIST            += $(LIB_GBM_VIV) $(LIB_GBM)
+
+$(LIB_GBM_VIV):     $(LIB_GAL)
+$(LIB_GBM):         $(LIB_GBM_VIV)
+
+.PHONY: gbm
+gbm:                $(LIB_GBM_VIV) $(LIB_GBM)
+
+$(LIB_EGL):         $(LIB_GBM)
+endif
+endif
+
+################################################################################
+# Define the macros used in the common makefile.
+
+SUBDIRS             := $(REG_HEAD) $(LIB_LIST)
+MAIN_MODULE         := $(LIB_LIST) $(GAL_CORE)
+
+################################################################################
+# Targets
+
+all:     $(MAIN_MODULE)
+
+clean:   V_TARGET := clean
+install: V_TARGET := install
+
+clean:   all
+	@rm -rf $(SDK_DIR)
+
+install: all
+	@mkdir -p $(SDK_DIR)
+	@-cp -f $(AQROOT)/release/SW/ReadMe_Linux_SDK.txt $(SDK_DIR)/ReadMe.txt
+
+.PHONY: $(SUBDIRS)
+$(SUBDIRS):
+	@test ! -d $@ || $(MAKE) -f makefile.linux -C $@ $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
+
+ifneq ($(LINUX_VSIMULATOR),1)
+.PHONY: $(GAL_CORE)
+
+ifeq ($(KERNEL_DIR),)
+$(warning "-------------------------------------------------")
+$(warning "Warning: KERNEL_DIR not set")
+$(warning "Warning: kernel driver will not be built")
+$(warning "-------------------------------------------------")
+
+else
+$(GAL_CORE):
+	@test ! -d $@ || $(MAKE) -f Kbuild -C $@ $(V_TARGET)
+
+drivers:            $(GAL_CORE)
+endif
+endif
+

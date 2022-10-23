@@ -22,6 +22,14 @@
 #include <linux/ctype.h>
 #include <linux/err.h>
 #include <u-boot/zlib.h>
+#include <asm/arch/bl31_apis.h>
+#include <libavb.h>
+#ifdef CONFIG_AML_ANTIROLLBACK
+#include <anti-rollback.h>
+#endif
+#include <asm/arch/secure_apb.h>
+
+#include <amlogic/aml_efuse.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -92,8 +100,40 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 /* bootm - boot application image from image in memory */
 /*******************************************************************/
 
+#ifdef CONFIG_AML_RSVD_ADDR
+static void defendkey_process(void)
+{
+	char *bootargs = getenv("bootargs");
+	if (!bootargs)
+		return;
+
+	if (!strstr(bootargs,"defendkey"))
+	{
+		char *reboot_mode_s = NULL;
+		char *upgrade_step_s = NULL;
+		char env_cmd[128] = {0};
+
+		reboot_mode_s = getenv("reboot_mode");
+		upgrade_step_s = getenv("upgrade_step");
+		if ((!reboot_mode_s) || (!upgrade_step_s))
+			return;
+
+		if ((!strcmp(reboot_mode_s, "recovery")) || (!strcmp(reboot_mode_s, "update"))
+			|| (!strcmp(reboot_mode_s, "factory_reset")) || (!strcmp(upgrade_step_s, "3")))
+		{
+			sprintf(env_cmd, "setenv bootargs ${bootargs} defendkey=%x,%x,", CONFIG_AML_RSVD_ADDR, CONFIG_AML_RSVD_SIZE);
+			run_command(env_cmd,0);
+		}
+	}
+}
+#endif
+
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+	int nRet;
+	char *avb_s;
+	char argv0_new[12] = {0};
+	char *argv_new = (char*)&argv0_new;
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
 
@@ -107,6 +147,9 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		relocated = 1;
 	}
 #endif
+
+	extern void ee_gate_off(void);
+	extern void ee_gate_on(void);
 
 	/* determine if we have a sub command */
 	argc--; argv++;
@@ -126,7 +169,134 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			return do_bootm_subcommand(cmdtp, flag, argc, argv);
 	}
 
-	return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
+#ifndef CONFIG_SKIP_KERNEL_DTB_VERIFY
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+	unsigned int nLoadAddr = GXB_IMG_LOAD_ADDR; //default load address
+
+	if (argc > 0)
+	{
+		char *endp;
+		nLoadAddr = simple_strtoul(argv[0], &endp, 16);
+		//printf("aml log : addr = 0x%x\n",nLoadAddr);
+	}
+
+	nRet = aml_sec_boot_check(AML_D_P_IMG_DECRYPT,nLoadAddr,GXB_IMG_SIZE,GXB_IMG_DEC_ALL);
+	if (nRet)
+	{
+		printf("\naml log : Sig Check %d\n",nRet);
+		return nRet;
+	}
+#endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
+#endif /* ! CONFIG_SKIP_KERNEL_DTB_VERIFY */
+
+	avb_s = getenv("avb2");
+	if (avb_s == NULL) {
+		run_command("get_avb_mode;", 0);
+		avb_s = getenv("avb2");
+	}
+	printf("avb2: %s\n", avb_s);
+	if (strcmp(avb_s, "1") == 0) {
+		AvbSlotVerifyData* out_data;
+		char *bootargs = NULL;
+		char *newbootargs = NULL;
+		const char *bootstate_o = "androidboot.verifiedbootstate=orange";
+		const char *bootstate_g = "androidboot.verifiedbootstate=green";
+		const char *bootstate = NULL;
+		nRet = avb_verify(&out_data);
+		printf("avb verification: locked = %d, result = %d\n", !is_device_unlocked(), nRet);
+		if (is_device_unlocked()) {
+			if(nRet != AVB_SLOT_VERIFY_RESULT_OK &&
+					nRet != AVB_SLOT_VERIFY_RESULT_ERROR_VERIFICATION &&
+					nRet != AVB_SLOT_VERIFY_RESULT_ERROR_ROLLBACK_INDEX &&
+					nRet != AVB_SLOT_VERIFY_RESULT_ERROR_PUBLIC_KEY_REJECTED) {
+				avb_slot_verify_data_free(out_data);
+				return nRet;
+			}
+		} else {
+			if (nRet == AVB_SLOT_VERIFY_RESULT_OK) {
+#ifdef CONFIG_AML_ANTIROLLBACK
+				uint32_t i = 0;
+				uint32_t version;
+				for (i = 0; i < AVB_MAX_NUMBER_OF_ROLLBACK_INDEX_LOCATIONS; i++) {
+					if (get_avb_antirollback(i, &version) &&
+							version != (uint32_t )out_data->rollback_indexes[i]) {
+						if (!set_avb_antirollback(i, (uint32_t )out_data->rollback_indexes[i]))
+							printf("rollback(%d) = %u failed\n", i, (uint32_t )out_data->rollback_indexes[i]);
+					}
+				}
+#endif
+			}
+			if (nRet != AVB_SLOT_VERIFY_RESULT_OK) {
+				avb_slot_verify_data_free(out_data);
+				return nRet;
+			}
+		}
+		bootargs = getenv("bootargs");
+		if (!bootargs) {
+			bootargs = "\0";
+		}
+
+		if (out_data) {
+			keymaster_boot_params boot_params;
+			const int is_dev_unlocked = is_device_unlocked();
+
+			boot_params.device_locked = is_dev_unlocked? 0: 1;
+			if (is_dev_unlocked) {
+				bootstate = bootstate_o;
+				boot_params.verified_boot_state = 2;
+			}
+			else {
+				bootstate = bootstate_g;
+				boot_params.verified_boot_state = 0;
+			}
+			memcpy(boot_params.verified_boot_key, out_data->boot_key_hash,
+					sizeof(boot_params.verified_boot_key));
+			memcpy(boot_params.verified_boot_hash, out_data->vbmeta_digest,
+					sizeof(boot_params.verified_boot_hash));
+
+			if (set_boot_params(&boot_params) < 0) {
+				printf("failed to set boot params.\n");
+			}
+
+			newbootargs = malloc(strlen(bootargs) + strlen(out_data->cmdline) + strlen(bootstate) + 1 + 1 + 1);
+			if (!newbootargs) {
+				printf("failed to allocate buffer for bootarg\n");
+				return -1;
+			}
+			sprintf(newbootargs, "%s %s %s", bootargs, out_data->cmdline, bootstate);
+			setenv("bootargs", newbootargs);
+			free(newbootargs);
+			newbootargs = NULL;
+			avb_slot_verify_data_free(out_data);
+		}
+	}
+
+#ifdef CONFIG_AML_RSVD_ADDR
+	defendkey_process();
+#endif
+
+	if (IS_FEAT_BOOT_VERIFY())
+	{
+		/* Override load address argument to skip secure boot header (512).
+		* Only skip if secure boot so normal boot can use plain boot.img+		 */
+		ulong img_addr,nCheckOffset;
+		img_addr = genimg_get_kernel_addr(argc < 1 ? NULL : argv[0]);
+		nCheckOffset = 0;
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+		nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
+#endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
+		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
+			nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
+		else
+			nCheckOffset = 0;
+		img_addr += nCheckOffset;
+		snprintf(argv0_new, sizeof(argv0_new), "%lx", img_addr);
+		argc = 1;
+		argv = (char**)&argv_new;
+	}
+
+	ee_gate_off();
+	nRet = do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
 		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
 		BOOTM_STATE_LOADOS |
 #if defined(CONFIG_PPC) || defined(CONFIG_MIPS)
@@ -134,6 +304,8 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif
 		BOOTM_STATE_OS_PREP | BOOTM_STATE_OS_FAKE_GO |
 		BOOTM_STATE_OS_GO, &images, 1);
+	ee_gate_on();
+	return nRet;//should be here.
 }
 
 int bootm_maybe_autostart(cmd_tbl_t *cmdtp, const char *cmd)

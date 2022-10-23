@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# directfb
+#
+
+start() {
+	printf "Starting launcher: "
+	/usr/bin/dfbshow /etc/launcher.jpg &        
+	echo "OK"
+}
+stop() {
+	printf "Stopping launcher: "
+	killall dfbshow
+	echo "OK"
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
+

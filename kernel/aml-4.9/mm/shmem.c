@@ -1373,7 +1373,11 @@ static struct page *shmem_swapin(swp_entry_t swap, gfp_t gfp,
 	struct page *page;
 
 	shmem_pseudo_vma_init(&pvma, info, index);
+#ifdef CONFIG_AMLOGIC_CMA
+	page = swapin_readahead(swap, gfp | __GFP_BDEV, &pvma, 0);
+#else
 	page = swapin_readahead(swap, gfp, &pvma, 0);
+#endif
 	shmem_pseudo_vma_destroy(&pvma);
 
 	return page;
@@ -1417,7 +1421,11 @@ static struct page *shmem_alloc_page(gfp_t gfp,
 	struct page *page;
 
 	shmem_pseudo_vma_init(&pvma, info, index);
+#ifdef CONFIG_AMLOGIC_CMA
+	page = alloc_page_vma(gfp | __GFP_BDEV, &pvma, 0);
+#else
 	page = alloc_page_vma(gfp, &pvma, 0);
+#endif
 	shmem_pseudo_vma_destroy(&pvma);
 
 	return page;
@@ -4076,6 +4084,14 @@ struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags
 }
 EXPORT_SYMBOL_GPL(shmem_file_setup);
 
+void shmem_set_file(struct vm_area_struct *vma, struct file *file)
+{
+	if (vma->vm_file)
+		fput(vma->vm_file);
+	vma->vm_file = file;
+	vma->vm_ops = &shmem_vm_ops;
+}
+
 /**
  * shmem_zero_setup - setup a shared anonymous mapping
  * @vma: the vma to be mmapped is prepared by do_mmap_pgoff
@@ -4095,10 +4111,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
-	if (vma->vm_file)
-		fput(vma->vm_file);
-	vma->vm_file = file;
-	vma->vm_ops = &shmem_vm_ops;
+	shmem_set_file(vma, file);
 
 	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGE_PAGECACHE) &&
 			((vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK) <

@@ -1,0 +1,21 @@
+pivot() { # <new_root> <old_root>
+        /bin/mount -o noatime,move /proc $1/proc && \
+        pivot_root $1 $1$2 && {
+                /bin/mount -o noatime,move $2/dev /dev
+                /bin/mount -o noatime,move $2/tmp /tmp
+                /bin/mount -o noatime,move $2/sys /sys 2>&-
+                /bin/mount -o noatime,move $2/run /run 2>&-
+                /bin/mount -o noatime,move $2/data /data 2>&-
+                return 0
+        }
+}
+
+fopivot() { # <rw_root> <work_dir> <ro_root> <dupe?>
+        /bin/mount -o noatime,lowerdir=/,upperdir=$1,workdir=$2 -t overlay "overlayfs:$1" /mnt
+        pivot /mnt $3
+}
+
+do_overlay_mount() { #<overlay dir>
+        mkdir -p $1/upper $1/work
+        fopivot $1/upper $1/work /rom 1
+}

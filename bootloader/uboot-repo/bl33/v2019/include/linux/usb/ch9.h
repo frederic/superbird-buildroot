@@ -50,6 +50,8 @@
 #define USB_DIR_OUT			0		/* to device */
 #define USB_DIR_IN			0x80		/* to host */
 
+#define USB_ENABLE	0xea
+
 /*
  * USB types, the second of three bRequestType fields
  */
@@ -653,6 +655,7 @@ static inline int usb_endpoint_interrupt_type(
 
 /*-------------------------------------------------------------------------*/
 
+#if 0
 /* USB_DT_SS_ENDPOINT_COMP: SuperSpeed Endpoint Companion descriptor */
 struct usb_ss_ep_comp_descriptor {
 	__u8  bLength;
@@ -683,6 +686,7 @@ usb_ss_max_streams(const struct usb_ss_ep_comp_descriptor *comp)
 
 	return max_streams;
 }
+#endif
 
 /* Bits 1:0 of bmAttributes if this is an isoc endpoint */
 #define USB_SS_MULT(p)			(1 + ((p) & 0x3))

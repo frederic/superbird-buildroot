@@ -48,6 +48,7 @@
 #include <linux/compiler.h>
 #include <linux/err.h>
 #include <efi_loader.h>
+#include <amlogic/storage.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -326,6 +327,12 @@ static int initr_manual_reloc_cmdtable(void)
 }
 #endif
 
+#ifdef CONFIG_AML_STORAGE
+static int initr_storage(void)
+{
+	return !store_init(0);
+}
+#else
 #if defined(CONFIG_MTD_NOR_FLASH)
 static int initr_flash(void)
 {
@@ -402,11 +409,12 @@ static int initr_onenand(void)
 #ifdef CONFIG_MMC
 static int initr_mmc(void)
 {
-	puts("MMC:   ");
+	puts("MMC:   \n");
 	mmc_initialize(gd->bd);
 	return 0;
 }
 #endif
+#endif //end of CONFIG_AML_STORAGE
 
 /*
  * Tell if it's OK to load the environment early in boot.
@@ -729,6 +737,12 @@ static init_fnc_t init_sequence_r[] = {
 	/* initialize higher level parts of CPU like time base and timers */
 	cpu_init_r,
 #endif
+#ifdef CONFIG_AML_STORAGE
+	initr_storage,
+#else
+#ifdef CONFIG_PPC
+	initr_spi,
+#endif
 #ifdef CONFIG_CMD_NAND
 	initr_nand,
 #endif
@@ -738,6 +752,7 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_MMC
 	initr_mmc,
 #endif
+#endif //end of CONFIG_AML_STORAGE
 	initr_env,
 #ifdef CONFIG_SYS_BOOTPARAMS_LEN
 	initr_malloc_bootparams,

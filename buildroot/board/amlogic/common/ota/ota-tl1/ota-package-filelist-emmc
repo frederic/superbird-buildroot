@@ -1,0 +1,3 @@
+# ota package file list for emmc
+HASH_FILES="u-boot.bin dtb.img boot.img rootfs.ext2.img2simg update.sh"
+FILES="sw-description sw-description.sig u-boot.bin dtb.img boot.img rootfs.ext2.img2simg update.sh"

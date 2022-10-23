@@ -41,9 +41,17 @@ obj-$(CONFIG_USB_EHCI_UNIPHIER) += ehci-uniphier.o
 obj-$(CONFIG_USB_EHCI_VCT) += ehci-vct.o
 obj-$(CONFIG_USB_EHCI_RMOBILE) += ehci-rmobile.o
 obj-$(CONFIG_USB_EHCI_ZYNQ) += ehci-zynq.o
+ifdef CONFIG_USB_DWC_OTG_294
+obj-$(CONFIG_USB_DWC_OTG_HCD) += dwc_otg_hcd_294.o
+else
+obj-$(CONFIG_USB_DWC_OTG_HCD) += dwc_otg_hcd.o
+endif
 
 # xhci
 obj-$(CONFIG_USB_XHCI) += xhci.o xhci-mem.o xhci-ring.o
+obj-$(CONFIG_USB_XHCI_AMLOGIC_GXL) += xhci-amlogic-gxl.o
+obj-$(CONFIG_USB_XHCI_AMLOGIC_V2) += xhci-amlogic-v2.o
+obj-$(CONFIG_USB_XHCI_AMLOGIC) += xhci-amlogic.o
 obj-$(CONFIG_USB_XHCI_KEYSTONE) += xhci-keystone.o
 obj-$(CONFIG_USB_XHCI_EXYNOS) += xhci-exynos5.o
 obj-$(CONFIG_USB_XHCI_OMAP) += xhci-omap.o

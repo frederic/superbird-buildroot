@@ -1,0 +1,6 @@
+config BR2_PACKAGE_AML_DSP_UTIL
+    bool "aml_dsp_util"
+    help
+        amlogic DSP utility
+
+

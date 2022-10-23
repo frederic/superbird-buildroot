@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dtvkit>
+    <tuner ts_input="2" dvbt2="yes" dvbs2="yes" dvbc="yes"/>
+    <demux/>
+    <demux/>
+    <demux/>
+    <recorder/>
+    <ci_slot/>
+    <vdec/>
+    <adec/>
+    <adec/>
+    <av demux="0"/>
+</dtvkit>

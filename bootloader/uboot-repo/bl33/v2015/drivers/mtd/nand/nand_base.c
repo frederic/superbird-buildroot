@@ -845,7 +845,9 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 				column >>= 1;
 			chip->cmd_ctrl(mtd, column, ctrl);
 			ctrl &= ~NAND_CTRL_CHANGE;
-			chip->cmd_ctrl(mtd, column >> 8, ctrl);
+			/* Only output a single addr cycle for 8bits opcodes. */
+			if (!nand_opcode_8bits(command))
+				chip->cmd_ctrl(mtd, column >> 8, ctrl);
 		}
 		if (page_addr != -1) {
 			chip->cmd_ctrl(mtd, page_addr, ctrl);
@@ -3818,6 +3820,8 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	*maf_id = chip->read_byte(mtd);
 	*dev_id = chip->read_byte(mtd);
 
+	printk("nand id: 0x%x 0x%x \n", *maf_id, *dev_id);
+
 	/*
 	 * Try again to make sure, as some systems the bus-hold or other
 	 * interface concerns can cause random data which looks like a
@@ -3960,7 +3964,7 @@ ident_done:
 		type->name);
 #endif
 
-	pr_info("%dMiB, %s, page size: %d, OOB size: %d\n",
+	printk("%dMiB, %s, page size: %d, OOB size: %d\n",
 		(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
 		mtd->writesize, mtd->oobsize);
 	return type;
@@ -4086,6 +4090,8 @@ int nand_scan_tail(struct mtd_info *mtd)
 			ecc->layout = &nand_oob_64;
 			break;
 		case 128:
+		/* for 256 bytes oob */
+		case 256:
 			ecc->layout = &nand_oob_128;
 			break;
 		default:

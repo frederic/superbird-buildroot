@@ -1,0 +1,72 @@
+From 728a387fd6cdeee9ac01061d1a94f4ea3724ee1c Mon Sep 17 00:00:00 2001
+From: Pengcheng Chen <pengcheng.chen@amlogic.com>
+Date: Tue, 19 Sep 2017 17:02:47 +0800
+Subject: [PATCH] add amlgfx DSBLIT_BLEND_COLORALPHA
+
+Signed-off-by: Pengcheng Chen <pengcheng.chen@amlogic.com>
+---
+ gfxdrivers/amlgfx/aml.h       |    3 ++-
+ gfxdrivers/amlgfx/aml_accel.c |    4 ++++
+ gfxdrivers/amlgfx/aml_accel.h |    1 +
+ gfxdrivers/amlgfx/aml_state.c |    4 ++++
+ 4 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gfxdrivers/amlgfx/aml.h b/gfxdrivers/amlgfx/aml.h
+index 8ddfba6..1cd5d70 100644
+--- a/gfxdrivers/amlgfx/aml.h
++++ b/gfxdrivers/amlgfx/aml.h
+@@ -205,7 +205,8 @@
+ 
+ #define AML_SUPPORTED_DRAWINGFUNCTIONS (DFXL_FILLRECTANGLE)
+ 
+-#define AML_SUPPORTED_BLITTINGFLAGS ( DSBLIT_BLEND_ALPHACHANNEL | DSBLIT_COLORIZE | \
++#define AML_SUPPORTED_BLITTINGFLAGS ( DSBLIT_BLEND_ALPHACHANNEL | DSBLIT_BLEND_COLORALPHA | \
++											DSBLIT_COLORIZE | \
+ 											DSBLIT_SRC_PREMULTIPLY |DSBLIT_SRC_COLORKEY | \
+ 											DSBLIT_ROTATE180 )
+ 
+diff --git a/gfxdrivers/amlgfx/aml_accel.c b/gfxdrivers/amlgfx/aml_accel.c
+index f529ce0..0e478b2 100644
+--- a/gfxdrivers/amlgfx/aml_accel.c
++++ b/gfxdrivers/amlgfx/aml_accel.c
+@@ -875,6 +875,10 @@ amlBlit( void *drv, void *dev, DFBRectangle *rect, int dx, int dy )
+ 			amlBlit_ConfigEx(drv, dev, rect, amldev->src_info, amldev->dst_info);
+ 			amlBlit_Start(drv, dev, rect, dx, dy, GE2D_BLIT, SRC_TO_DST);
+ 			break;
++			case GE2D_BLEND_COLORALPHA:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, rect, rect, dx, dy);
++			break;
+ 			default:
+ 			printf("------the blit blitfunction_type is not support\n");
+ 			break;
+diff --git a/gfxdrivers/amlgfx/aml_accel.h b/gfxdrivers/amlgfx/aml_accel.h
+index 6e5d309..0c4479c 100644
+--- a/gfxdrivers/amlgfx/aml_accel.h
++++ b/gfxdrivers/amlgfx/aml_accel.h
+@@ -70,6 +70,7 @@ typedef enum {
+ 	GE2D_BLEND_COLORIZE_ALPHA,
+ 	GE2D_BLEND_SRC_COLORKEY_COLORIZE,
+ 	GE2D_ROTATION,
++	GE2D_BLEND_COLORALPHA,
+ 	GE2D_NOT_SUPPORT
+ } AMLBlendSubFunction;
+ 
+diff --git a/gfxdrivers/amlgfx/aml_state.c b/gfxdrivers/amlgfx/aml_state.c
+index d0ee5e4..b38e252 100644
+--- a/gfxdrivers/amlgfx/aml_state.c
++++ b/gfxdrivers/amlgfx/aml_state.c
+@@ -452,6 +452,10 @@ aml_blend_optype(AMLGFX_DeviceData *adev, CardState *state)
+ 			amldev->dst_info.rotation = GE2D_ROTATION_270;
+ 			amldev->blitfunction_type = GE2D_ROTATION;
+ 			break;
++			case DSBLIT_BLEND_COLORALPHA:
++			amldev->blend_op.alpha_blending_src_factor = ALPHA_FACTOR_CONST_ALPHA;
++			amldev->blitfunction_type = GE2D_BLEND_COLORALPHA;
++			break;
+ 			default:
+ 			printf("!!!!!!aml_state.c %d > DSPD_SRC_OVER flags[0x%x]***NULL\n",__LINE__,flags);
+ 			amldev->blitfunction_type = GE2D_NOT_SUPPORT;
+-- 
+1.7.9.5
+

@@ -3,6 +3,7 @@
  * (C) Copyright 2017 - Beniamino Galvani <b.galvani@gmail.com>
  */
 #include <common.h>
+#include <asm/arch-meson/i2c.h>
 #include <asm/io.h>
 #include <clk.h>
 #include <dm.h>
@@ -41,6 +42,12 @@ struct i2c_regs {
 	u32 tok_rdata1;
 };
 
+struct meson_i2c_data {
+	u8 delay_ajust;
+	u8 div_factor;
+	u32 clkin_rate;
+};
+
 struct meson_i2c {
 	struct clk clk;
 	struct i2c_regs *regs;
@@ -50,6 +57,7 @@ struct meson_i2c {
 	uint pos;		/* Position of current transfer in message */
 	u32 tokens[2];		/* Sequence of tokens to be written */
 	uint num_tokens;	/* Number of tokens to be written */
+	struct meson_i2c_data *data;
 };
 
 static void meson_i2c_reset_tokens(struct meson_i2c *i2c)
@@ -160,7 +168,7 @@ static int meson_i2c_xfer_msg(struct meson_i2c *i2c, struct i2c_msg *msg,
 {
 	ulong start;
 
-	debug("meson i2c: %s addr %u len %u\n",
+	debug("meson i2c: %s addr 0x%x len %u\n",
 	      (msg->flags & I2C_M_RD) ? "read" : "write",
 	      msg->addr, msg->len);
 
@@ -222,14 +230,10 @@ static int meson_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 {
 	struct meson_i2c *i2c = dev_get_priv(bus);
-	ulong clk_rate;
+	unsigned int clk_rate = i2c->data->clkin_rate;
 	unsigned int div;
 
-	clk_rate = clk_get_rate(&i2c->clk);
-	if (IS_ERR_VALUE(clk_rate))
-		return -EINVAL;
-
-	div = DIV_ROUND_UP(clk_rate, speed * 4);
+	div = DIV_ROUND_UP(clk_rate, speed * i2c->data->div_factor);
 
 	/* clock divider has 12 bits */
 	if (div >= (1 << 12)) {
@@ -243,7 +247,7 @@ static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 	clrsetbits_le32(&i2c->regs->ctrl, REG_CTRL_CLKDIVEXT_MASK,
 			(div >> 10) << REG_CTRL_CLKDIVEXT_SHIFT);
 
-	debug("meson i2c: set clk %u, src %lu, div %u\n", speed, clk_rate, div);
+	debug("meson i2c: set clk %u, src %u, div %u\n", speed, clk_rate, div);
 
 	return 0;
 }
@@ -251,21 +255,46 @@ static int meson_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
 static int meson_i2c_probe(struct udevice *bus)
 {
 	struct meson_i2c *i2c = dev_get_priv(bus);
-	int ret;
 
-	ret = clk_get_by_index(bus, 0, &i2c->clk);
-	if (ret < 0)
-		return ret;
+	i2c->data = (struct meson_i2c_data *)dev_get_driver_data(bus);
 
-	ret = clk_enable(&i2c->clk);
-	if (ret)
-		return ret;
-
-	i2c->regs = dev_read_addr_ptr(bus);
 	clrbits_le32(&i2c->regs->ctrl, REG_CTRL_START);
 
 	return 0;
 }
+
+static int meson_i2c_ofdata_to_platdata(struct udevice *dev)
+{
+	struct meson_i2c *i2c = dev_get_priv(dev);
+
+	i2c->regs = dev_read_addr_ptr(dev);
+
+	return 0;
+}
+
+static const struct meson_i2c_data i2c_meson_meson6_data = {
+	.div_factor = 4,
+	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
+};
+
+static const struct meson_i2c_data i2c_meson_gx_data = {
+	.div_factor = 4,
+	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
+};
+
+static const struct meson_i2c_data i2c_meson_data = {
+	.div_factor = 3,
+	.delay_ajust = 15,
+	.clkin_rate = MESON_I2C_CLK_RATE,
+};
+
+static const struct meson_i2c_data i2c_meson_a1_data = {
+	.div_factor = 3,
+	.delay_ajust = 15,
+	.clkin_rate = 64000000,
+};
 
 static const struct dm_i2c_ops meson_i2c_ops = {
 	.xfer          = meson_i2c_xfer,
@@ -273,9 +302,11 @@ static const struct dm_i2c_ops meson_i2c_ops = {
 };
 
 static const struct udevice_id meson_i2c_ids[] = {
-	{ .compatible = "amlogic,meson6-i2c" },
-	{ .compatible = "amlogic,meson-gx-i2c" },
-	{ .compatible = "amlogic,meson-gxbb-i2c" },
+	{ .compatible = "amlogic,meson6-i2c", .data = (long)&i2c_meson_meson6_data },
+	{ .compatible = "amlogic,meson-gx-i2c", .data = (long)&i2c_meson_gx_data },
+	{ .compatible = "amlogic,meson-gxbb-i2c", .data = (long)&i2c_meson_gx_data },
+	{ .compatible = "amlogic,meson-i2c", .data = (long)&i2c_meson_data },
+	{ .compatible = "amlogic,meson-a1-i2c", .data = (long)&i2c_meson_a1_data },
 	{ }
 };
 
@@ -283,6 +314,7 @@ U_BOOT_DRIVER(i2c_meson) = {
 	.name = "i2c_meson",
 	.id   = UCLASS_I2C,
 	.of_match = meson_i2c_ids,
+	.ofdata_to_platdata = meson_i2c_ofdata_to_platdata,
 	.probe = meson_i2c_probe,
 	.priv_auto_alloc_size = sizeof(struct meson_i2c),
 	.ops = &meson_i2c_ops,

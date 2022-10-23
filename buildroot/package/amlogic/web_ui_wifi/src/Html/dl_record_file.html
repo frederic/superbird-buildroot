@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Amlogic record control</title>
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body background="./images/bg.PNG">
+
+<nav class="navbar">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="./record.html">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+      </a>
+    </div>
+    </div>
+</nav>
+
+<div class="panel panel-default">
+	<div id="gettext" class="panel-heading">RECORD DOWNLOAD LIST
+		<img src="./images/refresh.png" onclick="get_record_dl_list()"/>
+	</div>
+  	<ul class="list-group" id="record_dl_text"></ul>
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ajax.js"></script>
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+	window.onload = function(){
+		get_record_dl_list();
+	}
+  </script>
+
+</body>
+</html>

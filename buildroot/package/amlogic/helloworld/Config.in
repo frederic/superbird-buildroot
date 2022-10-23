@@ -1,0 +1,5 @@
+config BR2_PACKAGE_HELLOWORLD
+    bool "helloworld"
+    help
+      Hello World package says hello world to you
+      see http://helloworld.com for more on this software

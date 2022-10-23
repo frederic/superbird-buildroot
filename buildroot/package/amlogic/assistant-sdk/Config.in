@@ -1,0 +1,4 @@
+config BR2_PACKAGE_ASSISTANT_SDK
+	bool "assistant-sdk"
+	help
+	  This is a comment that explains what libfoo is.

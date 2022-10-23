@@ -10,6 +10,7 @@ case "$1" in
     stop)
 	$DAEMON -c && $DAEMON -k
 	;;
+    netready|netup|netdown|netchange) ;;
     reload)
 	$DAEMON -c && $DAEMON -r
 	;;

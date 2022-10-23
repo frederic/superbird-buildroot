@@ -1,0 +1,4 @@
+config BR2_PACKAGE_DUEROS
+	bool "duerOS"
+	help
+		This is duerOS SDK

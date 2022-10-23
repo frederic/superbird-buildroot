@@ -29,6 +29,10 @@
 #include <linux/sizes.h>
 
 #include "mtdcore.h"
+#ifdef CONFIG_AML_MTDPART
+#include <jffs2/load_kernel.h>
+#include <amlogic/aml_mtd.h>
+#endif
 
 #ifndef __UBOOT__
 static DEFINE_MUTEX(mtd_partitions_mutex);
@@ -696,7 +700,7 @@ static struct mtd_info *allocate_partition(struct mtd_info *master,
 	if (slave->size == MTDPART_SIZ_FULL)
 		slave->size = master->size - slave->offset;
 
-	debug("0x%012llx-0x%012llx : \"%s\"\n", (unsigned long long)slave->offset,
+	printk("0x%012llx-0x%012llx : \"%s\"\n", (unsigned long long)slave->offset,
 		(unsigned long long)(slave->offset + slave->size), slave->name);
 
 	/* let's do some sanity checks */
@@ -861,6 +865,45 @@ EXPORT_SYMBOL_GPL(mtd_del_partition);
  * We don't register the master, or expect the caller to have done so,
  * for reasons of data integrity.
  */
+#ifdef CONFIG_AML_MTDPART
+struct list_head aml_device;
+static int aml_nbparts = 0;
+int get_aml_mtdpart_count(void)
+{
+	return aml_nbparts;
+}
+
+int get_aml_mtdpart_name(struct mtd_info *master, int idx, char *name)
+{
+	int i;
+	struct part_info *temp;
+	struct mtd_device *dentry;
+	if (idx >= get_aml_mtdpart_count())
+		return -1;
+
+	list_for_each_entry(dentry, &aml_device, link) {
+		list_for_each_entry(temp, &dentry->parts, link) {
+			printf("0x%012llx-0x%012llx : \"%s\"\n",
+			(unsigned long long)temp->offset,
+			(unsigned long long)(temp->offset + temp->size),
+			temp->name);
+		}
+	}
+	return 0;
+}
+
+void list_aml_mtd_partitions(struct mtd_info *master)
+{
+	//struct mtd_info *slave, *next;
+	struct mtd_info *slave;
+	int i;
+
+	list_for_each_entry(slave, &master->partitions, node)
+		printf("%2d: %-20s0x%08x\t0x%08x\n",
+					i++, slave->name, slave->size, slave->offset);
+	return;
+}
+#endif
 
 int add_mtd_partitions(struct mtd_info *master,
 		       const struct mtd_partition *parts,
@@ -870,7 +913,14 @@ int add_mtd_partitions(struct mtd_info *master,
 	uint64_t cur_offset = 0;
 	int i;
 
-	debug("Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
+#ifdef CONFIG_AML_MTDPART
+	printf("%s, %d, master: %p, master->partitions: %p\n", __func__, __LINE__, master, &master->partitions);
+	if (master->partitions.next == NULL) {
+		printf("%s, %d INIT partition\n", __func__, __LINE__);
+		INIT_LIST_HEAD(&master->partitions);
+	}
+#endif
+	printk("Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
 
 	for (i = 0; i < nbparts; i++) {
 		slave = allocate_partition(master, parts + i, i, cur_offset);
@@ -995,3 +1045,73 @@ uint64_t mtd_get_device_size(const struct mtd_info *mtd)
 	return mtd->size;
 }
 EXPORT_SYMBOL_GPL(mtd_get_device_size);
+
+#ifdef CONFIG_AML_MTDPART
+extern struct mtd_info *mtd_store_get(int dev);
+
+int mtdparts_init(void)
+{
+	static int init_flag = 0;
+	struct mtd_info *part;
+	struct part_info *temp;
+	struct mtd_device *dev, *dentry;
+	struct mtd_info *mtd = NULL;
+	u8 i = 0;
+	u8 cnt = 0;
+
+#ifdef CONFIG_MESON_NFC
+	cnt = MAX_MTD_CNT;
+#endif
+#if defined(CONFIG_SPI_FLASH) || defined(CONFIG_SPI_NAND)
+	cnt = MAX_MTD_CNT - 1;
+#endif
+
+	if (init_flag) {
+		debug("%s %d part already init\n", __func__, __LINE__);
+		return 0;
+	}
+	INIT_LIST_HEAD(&aml_device);
+
+	for (i = 0; i < cnt; i++) {
+		mtd = mtd_store_get(i);
+		printf("%s, %d,mtd->partition: 0x%p, mtd: 0x%p\n", __func__, __LINE__, &mtd->partitions, mtd);
+		list_for_each_entry(part, &mtd->partitions, node) {
+			dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+			dev->num_parts = 1;
+			dev->id = kzalloc(sizeof(*dev->id), GFP_KERNEL);
+			if (part->type == MTD_NANDFLASH)
+				dev->id->type = MTD_DEV_TYPE_NAND;
+			else if (part->type == MTD_NORFLASH)
+				dev->id->type = MTD_DEV_TYPE_NOR;
+			else
+				dev->id->type = 0;
+			dev->id->size = part->size;
+			dev->id->num = 0;
+#ifdef CONFIG_MESON_NFC
+		if (strcmp(part->name, "bootloader"))
+			dev->id->num = 1;
+#endif
+		temp = kzalloc(sizeof(*temp), GFP_KERNEL);
+		temp->name = part->name;
+
+		temp->offset = part->offset;
+		temp->size = part->size;
+		temp->dev = dev;
+		INIT_LIST_HEAD(&dev->parts);
+		list_add_tail(&temp->link, &dev->parts);
+		list_add_tail(&dev->link, &aml_device);
+		}
+	}
+	list_for_each_entry(dentry, &aml_device, link) {
+		list_for_each_entry(temp, &dentry->parts, link) {
+			printf("0x%012llx-0x%012llx : \"%s\"\n",
+			(unsigned long long)temp->offset,
+			(unsigned long long)(temp->offset + temp->size),
+			temp->name);
+			aml_nbparts++;
+		}
+	}
+	init_flag = 1;
+	return 0;
+}
+#endif

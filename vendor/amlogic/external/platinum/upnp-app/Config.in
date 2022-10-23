@@ -1,0 +1,8 @@
+config BR2_PACKAGE_UPNP_APP
+        bool "upnp-player"
+        depends on BR2_PACKAGE_GSTREAMER1
+        help
+          amlogic dlna player.
+
+          http://openlinux.amlogic.com
+

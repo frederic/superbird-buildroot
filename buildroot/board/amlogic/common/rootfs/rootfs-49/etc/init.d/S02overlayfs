@@ -1,0 +1,28 @@
+#!/bin/sh
+
+. /etc/datamount
+. /etc/overlaymount
+
+mount | grep /dev/system | grep ext4
+if [ $? -eq 0 ]
+then
+  current_system=ext4
+else
+  current_system=ubi
+fi
+
+case ${current_system} in
+  "ext4")
+    data_ext4_handle
+    vendor_ext4_handle
+    ;;
+  "ubi")
+    data_ubi_handle
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+
+
+do_overlay_mount /data/overlay

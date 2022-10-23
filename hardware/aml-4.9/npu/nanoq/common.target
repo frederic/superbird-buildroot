@@ -1,0 +1,111 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+################################################################################
+# Define a shortcut for the main target.
+
+TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
+
+ifeq ($(TARGET_SONAME),)
+TARGET_SONAME := $(TARGET_NAME)
+endif
+
+ifeq ($(OBJ_DIR),)
+ifeq ($(DEBUG), 1)
+OBJ_DIR	?= bin_d
+else
+OBJ_DIR	?= bin_r
+endif
+endif
+
+################################################################################
+# Specify targets.
+
+all: $(TARGET_OUTPUT)
+
+clean:
+	@rm -rf $(OBJ_DIR)/* $(OBJ_DIR)
+	@rm -rf $(CLEAN_EXTRA)
+
+install: $(TARGET_OUTPUT)
+ifneq ($(INSTALL_DIR),)
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_OUTPUT) $(INSTALL_DIR)
+endif
+
+MAKEFILE_NAME	= makefile.linux
+
+ifeq ($(gcdSTATIC_LINK),1)
+ifneq ($(USE_ARMCC), 1)
+  PFLAGS += -static
+else
+  PFLAGS += -L--no_search_dynamic_libraries
+endif
+else
+ifneq ($(QNX), 1)
+LIBS += -lrt
+endif
+PFLAGS += -Wl,-rpath-link $(SDK_DIR)/drivers
+endif
+
+ifeq ($(PROGRAM), 1)
+$(TARGET_OUTPUT): $(OBJECTS)
+ifeq ($(SRC_CXX),)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(PFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+else
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CXX) $(PFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+endif
+
+ifneq ($(USE_ARMCC), 1)
+ifneq ($(DEBUG), 1)
+	@$(STRIP) $(TARGET_OUTPUT)
+endif
+endif
+endif
+
+ifeq ($(DYNAMIC), 1)
+ifeq ($(USE_ARMCC), 1)
+LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+else
+LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+endif
+$(TARGET_OUTPUT): $(OBJECTS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+endif
+
+ifeq ($(STATIC), 1)
+$(TARGET_OUTPUT): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $(TARGET_OUTPUT) $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	$(RANLIB) $(TARGET_OUTPUT)
+endif
+endif
+
+$(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -o $@ $<
+
+$(OBJ_DIR)/%.o: %.cpp
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CXX) -c $(CFLAGS) -o $@ $<
+
+$(OBJ_DIR)/%.o: %.cc
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CXX) -c $(CFLAGS) -o $@ $<

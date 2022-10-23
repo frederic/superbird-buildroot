@@ -1,0 +1,13 @@
+diff --git a/examples/widgets/animation/moveblocks/main.cpp b/examples/widgets/animation/moveblocks/main.cpp
+index 3b8faab..32d2687 100644
+--- a/examples/widgets/animation/moveblocks/main.cpp
++++ b/examples/widgets/animation/moveblocks/main.cpp
+@@ -310,7 +310,7 @@ int main(int argc, char **argv)
+     machine.start();
+ //![9]
+
+-    window.resize(300, 300);
++    window.resize(768, 1024);
+     window.show();
+
+     qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));

@@ -1,0 +1,10 @@
+config BR2_PACKAGE_ALSAPLAYER
+	bool "alsaplayer"
+	select BR2_PACKAGE_LIBVORBIS
+	select BR2_PACKAGE_FLAC
+	select BR2_PACKAGE_LIBSNDFILE
+    select BR2_PACKAGE_LIBID3TAG
+    select BR2_PACKAGE_LIBMAD
+    select BR2_PACKAGE_LIBOGG
+	help
+		alsaplayer is a player for audio that it supports .mp3 .ogg .flac .wav CD file.

@@ -1,0 +1,7 @@
+dwc3
+dwc_otg
+# media modules
+media_clock
+firmware
+decoder_common
+stream_input

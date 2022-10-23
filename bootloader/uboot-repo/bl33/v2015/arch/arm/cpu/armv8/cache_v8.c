@@ -18,14 +18,18 @@ void set_pgtable_section(u64 *page_table, u64 index, u64 section,
 	u64 value;
 
 	value = section | PMD_TYPE_SECT | PMD_SECT_AF;
+#ifdef CONFIG_CMD_AML_MTEST
+	if (memory_type == MT_NORMAL)
+		value |= PMD_SECT_S;
+#endif
 	value |= PMD_ATTRINDX(memory_type);
 	page_table[index] = value;
 }
 
 /* to activate the MMU we need to set up virtual memory */
-static void mmu_setup(void)
+void mmu_setup(void)
 {
-	int i, j, el;
+	u64 i, j, el;
 	bd_t *bd = gd->bd;
 	u64 *page_table = (u64 *)gd->arch.tlb_addr;
 
@@ -38,11 +42,28 @@ static void mmu_setup(void)
 	/* Setup an identity-mapping for all RAM space */
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
 		ulong start = bd->bi_dram[i].start;
+		/* plus CONFIG_SYS_MEM_TOP_HIDE, for all ddr need cached */
+#if defined(CONFIG_SYS_MEM_TOP_HIDE)
+		ulong end = bd->bi_dram[i].start + bd->bi_dram[i].size + CONFIG_SYS_MEM_TOP_HIDE;
+#else
 		ulong end = bd->bi_dram[i].start + bd->bi_dram[i].size;
-		for (j = start >> SECTION_SHIFT;
-		     j < end >> SECTION_SHIFT; j++) {
-			set_pgtable_section(page_table, j, j << SECTION_SHIFT,
-					    MT_NORMAL);
+#endif
+		end &= 0xF8000000;
+		if ((end >> (SECTION_SHIFT-2)) & 1) {
+			/* odd multiple of 128MB, align to 256M */
+			end += (SECTION_SIZE>>2);
+		}
+		if ((end >> (SECTION_SHIFT-1)) & 1) {
+			/* odd multiple of 256MB, align to 512M */
+			end += (SECTION_SIZE>>1);
+		}
+		printf("mmu cfg end: 0x%lx\n", end);
+		if (end == 0x100000000) {
+			end -= SECTION_SIZE;
+		}
+		printf("mmu cfg end: 0x%lx\n", end);
+		for (j = start >> SECTION_SHIFT; j < end >> SECTION_SHIFT; j++) {
+			set_pgtable_section(page_table, j, j << SECTION_SHIFT, MT_NORMAL);
 		}
 	}
 
@@ -126,7 +147,8 @@ void dcache_disable(void)
 
 	set_sctlr(sctlr & ~(CR_C|CR_M));
 
-	flush_dcache_all();
+	__asm_flush_dcache_all();
+	flush_l3_cache();
 	__asm_invalidate_tlb_all();
 }
 

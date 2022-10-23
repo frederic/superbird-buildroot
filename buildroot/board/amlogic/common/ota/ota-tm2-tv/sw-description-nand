@@ -1,0 +1,102 @@
+software =
+{
+	version = "1.0.1";
+	hardware-compatibility: [ "1.0" ];
+	images: (
+		{
+			filename = "rootfs.ubifs";
+			volume = "rootfs";
+		},
+		{
+			filename = "dtb.img";
+			device = "/dev/dtb";
+		},
+		{
+			filename = "boot.img";
+			device = "/dev/mtd5";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "1792K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "1536K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "1280K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "1024K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "768K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "512K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			offset = "256K";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.bl2";
+			device = "/dev/mtd0";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.tpl";
+			device = "/dev/mtd1";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.tpl";
+			device = "/dev/mtd1";
+			offset = "2M";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.tpl";
+			device = "/dev/mtd1";
+			offset = "4M";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.usb.tpl";
+			device = "/dev/mtd1";
+			offset = "6M";
+			type = "flash";
+		}
+	);
+	scripts: (
+		{
+			filename = "update.sh";
+			type = "shellscript";
+		}
+	);
+	uboot: (
+		{
+			name = "upgrade_step";
+			value = "1";
+		}
+	);
+}

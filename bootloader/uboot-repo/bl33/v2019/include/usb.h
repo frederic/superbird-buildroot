@@ -17,6 +17,41 @@
 #include <asm/cache.h>
 #include <part.h>
 
+#define HEHE_DEBUG(x...)   printf(x)
+//#define HEHE_DEBUG(x...)
+
+/* get from ch9.h fix compile error. start */
+struct usb_ss_ep_comp_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u8  bMaxBurst;
+	__u8  bmAttributes;
+	__le16 wBytesPerInterval;
+} __attribute__ ((packed));
+
+#define USB_DT_SS_EP_COMP_SIZE		6
+
+/* Bits 4:0 of bmAttributes if this is a bulk endpoint */
+static inline int
+usb_ss_max_streams(const struct usb_ss_ep_comp_descriptor *comp)
+{
+	int		max_streams;
+
+	if (!comp)
+		return 0;
+
+	max_streams = comp->bmAttributes & 0x1f;
+
+	if (!max_streams)
+		return 0;
+
+	max_streams = 1 << max_streams;
+
+	return max_streams;
+}
+/* get from ch9.h fix compile error. end */
+
 /*
  * The EHCI spec says that we must align to at least 32 bytes.  However,
  * some platforms require larger alignment.
@@ -214,7 +249,7 @@ extern void udc_disconnect(void);
  * @param index USB controller number
  * @param init initializes controller as USB host or device
  */
-int board_usb_init(int index, enum usb_init_type init);
+/*int board_usb_init(int index, enum usb_init_type init);*/
 
 /*
  * can be used to clean up after failed USB initialization attempt
@@ -785,6 +820,7 @@ struct dm_usb_ops {
 	 * in a USB transfer. USB class driver needs to be aware of this.
 	 */
 	int (*get_max_xfer_size)(struct udevice *bus, size_t *size);
+	int (*tuning)(struct usb_device *dev, int port);
 };
 
 #define usb_get_ops(dev)	((struct dm_usb_ops *)(dev)->driver->ops)
@@ -1072,5 +1108,10 @@ struct usb_generic_descriptor **usb_emul_find_descriptor(
  * each.
  */
 void usb_show_tree(void);
+
+int usb_hub_port_reset(struct usb_device *dev, int port,
+			      unsigned short *portstat);
+
+int usb_tuning_port(struct usb_device *udev, int port);
 
 #endif /*_USB_H_ */

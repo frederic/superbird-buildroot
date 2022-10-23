@@ -26,6 +26,28 @@ define KCONFIG_DISABLE_OPT # (option, file)
 	echo '# $(1) is not set' >> $(2)
 endef
 
+define KCONFIG_DISABLE_OPT_LIST # (options, file)
+	for kernel_item in $$(echo $(1)); 	do \
+		$(SED) "/\\<$$kernel_item\\>/d" $(2); \
+		echo "# $$kernel_item is not set" >> $(2); \
+	done
+endef
+
+define KCONFIG_ENABLE_OPT_LIST # (options, file)
+	for kernel_item in $$(echo $(1)); 	do \
+		$(SED) "/\\<$$kernel_item\\>/d" $(2); \
+		echo "$$kernel_item=y" >> $(2); \
+	done
+endef
+
+define KCONFIG_SET_OPT_LIST # (options, file)
+	for kernel_set in $$(echo $(1)); 	do \
+		kernel_item=$$(echo $$kernel_set| cut -d'=' -f1); \
+		$(SED) "/\\<$$kernel_item\\>/d" $(2); \
+		echo "$$kernel_set" >> $(2); \
+	done
+endef
+
 # Helper functions to determine the name of a package and its
 # directory from its makefile directory, using the $(MAKEFILE_LIST)
 # variable provided by make. This is used by the *-package macros to

@@ -12,8 +12,15 @@
 #include <fdtdec.h>
 #include <menu.h>
 #include <post.h>
+#include <asm/arch/timer.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#if defined(BL33_BOOT_TIME_PROBE)
+	#define TE TE_time
+#else
+	#define TE(...)
+#endif
 
 #define MAX_DELAY_STOP_STR 32
 
@@ -114,7 +121,7 @@ static int abortboot_keyed(int bootdelay)
 					delaykey[i].len, delaykey[i].str,
 					delaykey[i].len) == 0) {
 					debug_bootkeys("got %skey\n",
-						delaykey[i].retry ? "delay" :
+						       delaykey[i].retry ? "delay" :
 						"stop");
 
 				/* don't retry auto boot */
@@ -144,14 +151,17 @@ static int menukey;
 
 static int abortboot_normal(int bootdelay)
 {
+	TE(__func__);
+
 	int abort = 0;
 	unsigned long ts;
+	int key = 0;
 
 #ifdef CONFIG_MENUPROMPT
 	printf(CONFIG_MENUPROMPT);
 #else
 	if (bootdelay >= 0)
-		printf("Hit any key to stop autoboot: %2d ", bootdelay);
+		printf("Hit Enter or space or Ctrl+C key to stop autoboot -- : %2d ", bootdelay);
 #endif
 
 #if defined CONFIG_ZERO_BOOTDELAY_CHECK
@@ -161,12 +171,22 @@ static int abortboot_normal(int bootdelay)
 	 */
 	if (bootdelay >= 0) {
 		if (tstc()) {	/* we got a key press	*/
-			(void) getc();  /* consume input	*/
+			key = getc(); /* consume input */
 			puts("\b\b\b 0");
-			abort = 1;	/* don't auto boot	*/
+			switch (key) {
+				case 0x03:      /* ^C - Ctrl+C */
+				case 0x0d:      /* Enter */
+				case 0x20:      /* Space */ //only "enter" key can triger abort
+				abort = 1;	/* don't auto boot	*/
+			}
 		}
 	}
 #endif
+
+	char *s_ms = getenv("ms_delay_step");
+	int delay_count = s_ms ? (int)simple_strtol(s_ms, NULL, 10) : 0;
+	if ((!delay_count) ||(delay_count > 100))
+		delay_count = 100;
 
 	while ((bootdelay > 0) && (!abort)) {
 		--bootdelay;
@@ -174,17 +194,18 @@ static int abortboot_normal(int bootdelay)
 		ts = get_timer(0);
 		do {
 			if (tstc()) {	/* we got a key press	*/
-				abort  = 1;	/* don't auto boot	*/
-				bootdelay = 0;	/* no more delay	*/
-# ifdef CONFIG_MENUKEY
-				menukey = getc();
-# else
-				(void) getc();  /* consume input	*/
-# endif
-				break;
+				key = getc();
+				switch (key) {
+					case 0x03:      /* ^C - Ctrl+C */
+					case 0x0d:      /* Enter */
+					case 0x20:      /* Space */ //only "enter" key can triger abort
+					abort  = 1;	/* don't auto boot	*/
+					bootdelay = 0;	/* no more delay	*/
+					break;
+				}
 			}
-			udelay(10000);
-		} while (!abort && get_timer(ts) < 1000);
+			udelay(1000);
+		} while (!abort && get_timer(ts) < delay_count);
 
 		printf("\b\b\b%2d ", bootdelay);
 	}
@@ -195,6 +216,8 @@ static int abortboot_normal(int bootdelay)
 	if (abort)
 		gd->flags &= ~GD_FLG_SILENT;
 #endif
+
+		TE(__func__);
 
 	return abort;
 }
@@ -273,6 +296,11 @@ const char *bootdelay_process(void)
 		s = getenv("bootcmd");
 
 	process_fdt_options(gd->fdt_blob);
+
+	if (0 == strcmp(getenv("reboot_mode"), "bootloader")) {
+		bootdelay = -1;
+	}
+
 	stored_bootdelay = bootdelay;
 
 	return s;

@@ -1,0 +1,25 @@
+Index: wpe-33da4322c54b1da5881d06b340670dc590f4fe4a/Source/ThirdParty/WPE-platform/src/wayland-egl/renderer-backend.cpp
+===================================================================
+--- wpe-33da4322c54b1da5881d06b340670dc590f4fe4a.orig/Source/ThirdParty/WPE-platform/src/wayland-egl/renderer-backend.cpp	2017-02-28 00:51:35.000000000 +0800
++++ wpe-33da4322c54b1da5881d06b340670dc590f4fe4a/Source/ThirdParty/WPE-platform/src/wayland-egl/renderer-backend.cpp	2017-08-01 18:57:05.963993280 +0800
+@@ -116,16 +116,18 @@
+             wl_shell_surface_add_listener(m_shellSurface,
+                                           &shell_surface_listener, NULL);
+             // wl_shell_surface_set_toplevel(m_shellSurface);
+-            wl_shell_surface_set_fullscreen(m_shellSurface, WL_SHELL_SURFACE_FULLSCREEN_METHOD_DEFAULT, 0, NULL);
++            // wl_shell_surface_set_fullscreen(m_shellSurface, WL_SHELL_SURFACE_FULLSCREEN_METHOD_DEFAULT, 0, NULL);
++            wl_shell_surface_set_maximized(m_shellSurface, NULL);
+         }
+     }
++#if 0
+     struct wl_region *region;
+     region = wl_compositor_create_region(m_backend->display.interfaces().compositor);
+     wl_region_add(region, 0, 0,
+                    width,
+                    height);
+     wl_surface_set_opaque_region(m_surface, region);
+-
++#endif
+     m_window = wl_egl_window_create(m_surface, width, height);
+ }
+ 

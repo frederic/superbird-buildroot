@@ -27,17 +27,25 @@
 #define _DVBFRONTEND_H_
 
 #include <linux/types.h>
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#include <linux/videodev2.h>
+#endif
 
 enum fe_type {
 	FE_QPSK,
 	FE_QAM,
 	FE_OFDM,
-	FE_ATSC
+	FE_ATSC,
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	FE_ANALOG,
+	FE_DTMB,
+	FE_ISDBT
+#endif
 };
 
 enum fe_caps {
 	FE_IS_STUPID			= 0,
-	FE_CAN_INVERSION_AUTO		= 0x1,
+	FE_CAN_INVERSION_AUTO	= 0x1,
 	FE_CAN_FEC_1_2			= 0x2,
 	FE_CAN_FEC_2_3			= 0x4,
 	FE_CAN_FEC_3_4			= 0x8,
@@ -60,15 +68,19 @@ enum fe_caps {
 	FE_CAN_HIERARCHY_AUTO		= 0x100000,
 	FE_CAN_8VSB			= 0x200000,
 	FE_CAN_16VSB			= 0x400000,
-	FE_HAS_EXTENDED_CAPS		= 0x800000,   /* We need more bitspace for newer APIs, indicate this. */
+/* We need more bitspace for newer APIs, indicate this. */
+	FE_HAS_EXTENDED_CAPS	        = 0x800000,
 	FE_CAN_MULTISTREAM		= 0x4000000,  /* frontend supports multistream filtering */
 	FE_CAN_TURBO_FEC		= 0x8000000,  /* frontend supports "turbo fec modulation" */
-	FE_CAN_2G_MODULATION		= 0x10000000, /* frontend supports "2nd generation modulation" (DVB-S2) */
+/* frontend supports "2nd generation modulation" (DVB-S2) */
+	FE_CAN_2G_MODULATION	        = 0x10000000,
 	FE_NEEDS_BENDING		= 0x20000000, /* not supported anymore, don't use (frontend requires frequency bending) */
 	FE_CAN_RECOVER			= 0x40000000, /* frontend can recover from a cable unplug automatically */
 	FE_CAN_MUTE_TS			= 0x80000000  /* frontend can stop spurious TS data output */
 };
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define FE_CAN_3_LAYER FE_CAN_MULTISTREAM
+#endif
 struct dvb_frontend_info {
 	char       name[128];
 	enum fe_type type;	/* DEPRECATED. Use DTV_ENUM_DELSYS instead */
@@ -102,7 +114,10 @@ struct dvb_diseqc_slave_reply {
 enum fe_sec_voltage {
 	SEC_VOLTAGE_13,
 	SEC_VOLTAGE_18,
-	SEC_VOLTAGE_OFF
+	SEC_VOLTAGE_OFF,
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	SEC_VOLTAGE_ON     /*for ISDBT antenna control*/
+#endif
 };
 
 enum fe_sec_tone_mode {
@@ -127,14 +142,21 @@ enum fe_sec_mini_cmd {
  *			to reset DiSEqC, tone and parameters
  */
 enum fe_status {
-	FE_HAS_SIGNAL		= 0x01,
-	FE_HAS_CARRIER		= 0x02,
-	FE_HAS_VITERBI		= 0x04,
-	FE_HAS_SYNC		= 0x08,
-	FE_HAS_LOCK		= 0x10,
-	FE_TIMEDOUT		= 0x20,
-	FE_REINIT		= 0x40,
-};
+	FE_HAS_SIGNAL	= 0x01,   /* found something above the noise level */
+	FE_HAS_CARRIER	= 0x02,   /* found a DVB signal  */
+	FE_HAS_VITERBI	= 0x04,   /* FEC is stable  */
+	FE_HAS_SYNC	= 0x08,   /* found sync bytes  */
+	FE_HAS_LOCK	= 0x10,   /* everything's working... */
+	FE_TIMEDOUT	= 0x20,   /* no lock within the last ~2 seconds */
+	FE_REINIT	= 0x40,    /* frontend was reinitialized,  */
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	BLINDSCAN_NONEDO = 0x80, /* not blind scan  */
+	BLINDSCAN_UPDATESTARTFREQ = 0x100, /* blind scan update start freq  */
+	BLINDSCAN_UPDATEPROCESS   = 0x200, /* blind scan update process  */
+	BLINDSCAN_UPDATERESULTFREQ = 0x400/* blind scan update result  */
+#endif
+}; /* application is recommended to reset */
+/* DiSEqC, tone and parameters */
 
 enum fe_spectral_inversion {
 	INVERSION_OFF,
@@ -216,6 +238,25 @@ enum fe_interleaving {
 	INTERLEAVING_720,
 };
 
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+struct fe_blind_scan_parameters {
+	/* minimum tuner frequency in kHz */
+	__u32 min_frequency;
+	/* maximum tuner frequency in kHz */
+	__u32 max_frequency;
+	/* minimum symbol rate in sym/sec */
+	__u32 min_symbol_rate;
+	/* maximum symbol rate in sym/sec */
+	__u32 max_symbol_rate;
+	/* search range in kHz. freq -/+freqRange will be searched */
+	__u32 frequency_range;
+	/* tuner step frequency in kHz */
+	__u32 frequency_step;
+	/* blindscan event timeout */
+	__s32 timeout;
+};
+#endif
+
 /* S2API Commands */
 #define DTV_UNDEFINED		0
 #define DTV_TUNE		1
@@ -276,7 +317,9 @@ enum fe_interleaving {
 #define DTV_DVBT2_PLP_ID_LEGACY	43
 
 #define DTV_ENUM_DELSYS		44
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define DTV_DVBT2_PLP_ID    DTV_DVBT2_PLP_ID_LEGACY
+#endif
 /* ATSC-MH */
 #define DTV_ATSCMH_FIC_VER		45
 #define DTV_ATSCMH_PARADE_ID		46
@@ -307,7 +350,30 @@ enum fe_interleaving {
 #define DTV_STAT_ERROR_BLOCK_COUNT	68
 #define DTV_STAT_TOTAL_BLOCK_COUNT	69
 
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+
+/* Get tne TS input of the frontend */
+#define DTV_TS_INPUT                    70
+/* Blind scan */
+#define DTV_START_BLIND_SCAN            71
+#define DTV_CANCEL_BLIND_SCAN           72
+#define DTV_BLIND_SCAN_MIN_FRE          73
+#define DTV_BLIND_SCAN_MAX_FRE          74
+#define DTV_BLIND_SCAN_MIN_SRATE        75
+#define DTV_BLIND_SCAN_MAX_SRATE        76
+#define DTV_BLIND_SCAN_FRE_RANGE        77
+#define DTV_BLIND_SCAN_FRE_STEP         78
+#define DTV_BLIND_SCAN_TIMEOUT          79
+/* Blind scan end*/
+#define DTV_DELIVERY_SUB_SYSTEM			80
+#define DTV_MAX_COMMAND		DTV_DELIVERY_SUB_SYSTEM
+
+#else  /*!defined(CONFIG_AMLOGIC_DVB_COMPAT)*/
+
 #define DTV_MAX_COMMAND		DTV_STAT_TOTAL_BLOCK_COUNT
+
+#endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
+
 
 enum fe_pilot {
 	PILOT_ON,
@@ -342,6 +408,9 @@ enum fe_delivery_system {
 	SYS_DVBT2,
 	SYS_TURBO,
 	SYS_DVBC_ANNEX_C,
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	SYS_ANALOG
+#endif
 };
 
 /* backward compatibility */
@@ -476,12 +545,54 @@ struct dtv_property {
 	int result;
 } __attribute__ ((packed));
 
+struct dtv_property_32 {
+	__u32 cmd;
+	__u32 reserved[3];
+	union {
+		__u32 data;
+		struct dtv_fe_stats st;
+		struct {
+			__u8 data[32];
+			__u32 len;
+			__u32 reserved1[3];
+			__u32 reserved2;
+		} buffer;
+	} u;
+	int result;
+} __attribute__ ((packed));
+
+struct dtv_property_64 {
+	__u32 cmd;
+	__u32 reserved[3];
+	union {
+		__u32 data;
+		struct dtv_fe_stats st;
+		struct {
+			__u8 data[32];
+			__u32 len;
+			__u32 reserved1[3];
+			__u64 reserved2;
+		} buffer;
+	} u;
+	int result;
+} __attribute__ ((packed));
+
 /* num of properties cannot exceed DTV_IOCTL_MAX_MSGS per ioctl */
 #define DTV_IOCTL_MAX_MSGS 64
 
 struct dtv_properties {
 	__u32 num;
 	struct dtv_property *props;
+};
+
+struct dtv_properties_32 {
+	__u32 num;
+	__u32 props;
+};
+
+struct dtv_properties_64 {
+	__u32 num;
+	__u64 props;
 };
 
 #if defined(__DVB_CORE__) || !defined (__KERNEL__)
@@ -520,6 +631,13 @@ typedef enum fe_pilot fe_pilot_t;
 typedef enum fe_rolloff fe_rolloff_t;
 typedef enum fe_delivery_system fe_delivery_system_t;
 
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+enum fe_ofdm_mode {
+	OFDM_DVBT,
+	OFDM_DVBT2,
+};
+#endif
+
 struct dvb_qpsk_parameters {
 	__u32		symbol_rate;  /* symbol rate in Symbols per second */
 	fe_code_rate_t	fec_inner;    /* forward error correction (see above) */
@@ -545,27 +663,185 @@ struct dvb_ofdm_parameters {
 	fe_hierarchy_t      hierarchy_information;
 };
 
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#define ANALOG_FLAG_ENABLE_AFC                 0X00000001
+#define  ANALOG_FLAG_MANUL_SCAN                0x00000011
+struct dvb_analog_parameters {
+	/*V4L2_TUNER_MODE_MONO,V4L2_TUNER_MODE_STEREO,*/
+	/*V4L2_TUNER_MODE_LANG2,V4L2_TUNER_MODE_SAP,*/
+	/*V4L2_TUNER_MODE_LANG1,V4L2_TUNER_MODE_LANG1_LANG2 */
+	unsigned int audmode;
+	unsigned int soundsys;	/*A2,BTSC,EIAJ,NICAM */
+	v4l2_std_id std;
+	unsigned int flag;
+	unsigned int afc_range;
+};
+#endif
+
 struct dvb_frontend_parameters {
-	__u32 frequency;     /* (absolute) frequency in Hz for DVB-C/DVB-T/ATSC */
-			     /* intermediate frequency in kHz for DVB-S */
+	/* (absolute) frequency in Hz for DVB-C/DVB-T/ATSC */
+	__u32 frequency;
+	/* intermediate frequency in kHz for DVB-S */
 	fe_spectral_inversion_t inversion;
 	union {
 		struct dvb_qpsk_parameters qpsk;	/* DVB-S */
 		struct dvb_qam_parameters  qam;		/* DVB-C */
 		struct dvb_ofdm_parameters ofdm;	/* DVB-T */
 		struct dvb_vsb_parameters vsb;		/* ATSC */
+#if 0 && defined(CONFIG_AMLOGIC_DVB_COMPAT)
+		struct dvb_analog_parameters analog;
+#endif
 	} u;
 };
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+
+struct dvb_frontend_parameters_ex {
+	__u32 frequency;  /* (absolute) frequency in Hz for DVB-C/DVB-T/ATSC */
+			  /* intermediate frequency in kHz for DVB-S */
+	fe_spectral_inversion_t inversion;
+	union {
+		struct dvb_qpsk_parameters qpsk;	/* DVB-S */
+		struct dvb_qam_parameters  qam;		/* DVB-C */
+		struct dvb_ofdm_parameters ofdm;	/* DVB-T */
+		struct dvb_vsb_parameters vsb;		/* ATSC */
+		struct dvb_analog_parameters analog;
+		/* Add extenstion data here */
+	} u;
+};
+
+/*
+static char dvb_check_frontend_parameters_size[
+	(sizeof(struct dvb_frontend_parameters_ex)
+	== sizeof(struct dvb_frontend_parameters)) ? 1 : -1]
+	__attribute__((__unused__));
+*/
+
+#endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
 
 struct dvb_frontend_event {
 	fe_status_t status;
 	struct dvb_frontend_parameters parameters;
 };
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+/* Satellite blind scan event */
+struct dvbsx_blindscanevent {
+	enum fe_status status;
+	union {
+		/* The percentage completion of the*/
+		/*blind scan procedure. A value of*/
+		/*100 indicates that the blind scan*/
+		/*is finished. */
+		__u16 m_uiprogress;
+		/*The start scan frequency in units of kHz.*/
+		/*The minimum value depends on the tuner*/
+		/*specification.*/
+		__u32 m_uistartfreq_khz;
+		/* Blind scan channel info. */
+		struct dvb_frontend_parameters parameters;
+	} u;
+};
+#endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
 #endif
 
 #define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
 #define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
 
+#define FE_SET_PROPERTY_32     _IOW('o', 82, struct dtv_properties_32)
+#define FE_GET_PROPERTY_32     _IOR('o', 83, struct dtv_properties_32)
+
+#define FE_SET_PROPERTY_64     _IOW('o', 82, struct dtv_properties_64)
+#define FE_GET_PROPERTY_64     _IOR('o', 83, struct dtv_properties_64)
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+/*for atv*/
+struct tuner_status_s {
+	unsigned int frequency;
+	unsigned int rssi;
+	unsigned char mode;/*dtv:0 or atv:1*/
+	unsigned char tuner_locked;/*notlocked:0,locked:1*/
+	union {
+		void *ressrved;
+		__u64 reserved1;
+	};
+};
+
+
+struct atv_status_s {
+	unsigned char atv_lock;/*notlocked:0,locked 1*/
+	v4l2_std_id	  std;
+	unsigned int  audmode;
+	int  snr;
+	int  afc;
+	union {
+		void *resrvred;
+		__u64 reserved1;
+	};
+};
+
+struct sound_status_s {
+	unsigned short sound_sys;/*A2DK/A2BG/NICAM BG/NICAM DK/BTSC/EIAJ*/
+	unsigned short sound_mode;/*SETERO/DUAL/MONO/SAP*/
+	union {
+		void *resrvred;
+		__u64 reserved1;
+	};
+};
+
+
+enum tuner_param_cmd_e {
+	TUNER_CMD_AUDIO_MUTE = 0x0000,
+	TUNER_CMD_AUDIO_ON,
+	TUNER_CMD_TUNER_POWER_ON,
+	TUNER_CMD_TUNER_POWER_DOWN,
+	TUNER_CMD_SET_VOLUME,
+	TUNER_CMD_SET_LEAP_SETP_SIZE,
+	TUNER_CMD_GET_MONO_MODE,
+	TUNER_CMD_SET_BEST_LOCK_RANGE,
+	TUNER_CMD_GET_BEST_LOCK_RANGE,
+	TUNER_CMD_SET_CVBS_AMP_OUT,
+	TUNER_CMD_GET_CVBS_AMP_OUT,
+	TUNER_CMD_NULL,
+};
+
+
+/*parameter for set param box*/
+struct tuner_param_s {
+	enum tuner_param_cmd_e cmd;
+	unsigned int      parm;
+	unsigned int	resvred;
+};
+
+
+enum fe_layer {
+	Layer_A_B_C,
+	Layer_A,
+	Layer_B,
+	Layer_C,
+};
+
+// typedef struct dvb_analog_parameters dvb_analog_parameters_t;
+// typedef struct tuner_status_s tuner_status_t;
+// typedef struct atv_status_s atv_status_t;
+// typedef struct sound_status_s sound_status_t;
+// typedef enum tuner_param_cmd_e tuner_param_cmd_t;
+// typedef struct tuner_param_s tuner_param_t;
+// typedef enum fe_layer fe_layer_t;
+// typedef enum fe_ofdm_mode fe_ofdm_mode_t;
+
+
+/* Satellite blind scan settings */
+struct dvbsx_blindscanpara {
+	__u32 minfrequency;/* minimum tuner frequency in kHz */
+	__u32 maxfrequency;/* maximum tuner frequency in kHz */
+	__u32 minSymbolRate;/* minimum symbol rate in sym/sec */
+	__u32 maxSymbolRate;/* maximum symbol rate in sym/sec */
+	/*search range in kHz. freq -/+freqRange will be searched */
+	__u32 frequencyRange;
+	__u32 frequencyStep;/* tuner step frequency in kHz */
+	__s32 timeout;/* blindscan event timeout*/
+};
+#endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning
  * behaviour. Additionally, there will be no automatic monitoring of the lock
@@ -598,5 +874,18 @@ struct dvb_frontend_event {
 #define FE_GET_EVENT		   _IOR('o', 78, struct dvb_frontend_event)
 
 #define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+/*need del this ioctl, used set PROPERTY instead*/
+#define FE_SET_DELAY               _IO('o', 100)
+#define FE_READ_AFC                _IOR('o', 91, __u32)
+#define FE_FINE_TUNE               _IOW('o', 92, __u32)
+#define FE_READ_TUNER_STATUS       _IOR('o', 93, struct tuner_status_s)
+#define FE_READ_ANALOG_STATUS      _IOR('o', 94, struct atv_status_s)
+#define FE_READ_SD_STATUS          _IOR('o', 95, struct sound_status_s)
+/*set & get the tuner parameters only atv*/
+#define FE_SET_PARAM_BOX           _IOWR('o', 97, struct tuner_param_s)
+#define FE_SET_AFC                 _IOW('o', 98, __u32)
+#endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
 
 #endif /*_DVBFRONTEND_H_*/

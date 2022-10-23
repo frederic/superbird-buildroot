@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Spotify setting</title>
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="panel panel-default">
+<nav class="navbar">
+  <div class="container-fluid">
+    <div class="navbar-header">
+	<a class="navbar-brand" href="./index.html">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+	</a>
+    </div>
+	<ul class="nav navbar-nav navbar-right">
+		<li><a class="list-group-item" role="button" onclick="TurnOffSpotify()">Log Out</a></li>
+	</ul>
+    </div>
+</nav>
+</div>
+
+<div style="position:absolute; width:100%; height:100%; z-index:-1; left:0; top:0;">
+	<img src="./images/spotify1.jpg" height="100%" width="100%" style="left:0; top:0;">
+</div>
+<div>
+      <div id="userinfo" class="modal-header">
+      </div>
+      <div class="modal-body">
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon2">DeviceName</span>
+                <input type="text" class="form-control" placeholder="you can rename device" aria-describedby="basic-addon1" id="modal_spotify_dname">
+            </div>
+	    <div class="input-group"><HR size=5></div>
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon0">UserName</span>
+                <input type="text" class="form-control" placeholder="please enter username here" aria-describedby="basic-addon1" id="modal_spotify_username">
+            </div>
+	    <div class="input-group"><HR size=5></div>
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon1">PassWord</span>
+                <input type="text" class="form-control" placeholder="please enter password here" aria-describedby="basic-addon1" id="modal_spotify_pwd">
+            </div>
+      </div>
+      <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="set_spotify()">connect</button>
+      </div>
+</div>
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ajax.js"></script>
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+	$().ready(function(){
+		check_spotify();
+	});
+  </script>
+
+</body>
+</html>

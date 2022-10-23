@@ -1,0 +1,88 @@
+#!/bin/sh
+
+data_ubi_handle()
+{
+    #get current platform
+    platform=`cat /proc/device-tree/compatible`
+    case ${platform} in
+        "amlogic, axg")
+            platform="axg"
+            ;;
+        *)
+            platform=""
+            ;;
+    esac
+
+    if [ "${platform}" = "axg" ]
+    then
+        data_mtd_number=$(cat /proc/mtd | grep  -E "data" | awk -F : '{print $1}' | grep -o '[0-9]\+')
+    fi
+
+    #mount dir create
+    if [ ! -d "/data"  ]
+    then
+        mkdir /data
+    fi
+
+    # sure ubi vol exist or not
+    ubiattach /dev/ubi_ctrl -m ${data_mtd_number}
+    if [ -c "/dev/ubi1_0" ]
+    then
+        data_vol_name=`cat /sys/class/ubi/ubi1_0/name`
+        if [ "${data_vol_name}" = "data" ]
+        then
+            mount -t ubifs /dev/ubi1_0 /data
+            return 0
+        fi
+    fi
+
+    ubiformat /dev/mtd${data_mtd_number}
+    ubiattach /dev/ubi_ctrl -m ${data_mtd_number}
+    ubimkvol /dev/ubi1 -m -N data
+    mount -t ubifs /dev/ubi1_0 /data
+}
+
+data_ext4_handle()
+{
+    #mount dir create
+    if [ ! -d "/data"  ]
+    then
+        mkdir /data
+    fi
+
+    mount -t ext4 /dev/data /data
+    if [ $? -ne 0 ]
+    then
+        mkfs.ext4 /dev/data
+        mount -t ext4 /dev/data /data
+    fi
+    return 0
+}
+
+case "$1" in
+    start)
+        mount | grep /dev/system | grep ext4
+        if [ $? -eq 0 ]
+        then
+            current_system=ext4
+        else
+            current_system=ubi
+        fi
+
+        case ${current_system} in
+            "ext4")
+                data_ext4_handle
+                ;;
+            "ubi")
+                data_ubi_handle
+                ;;
+            *)
+                exit 1
+                ;;
+        esac 
+        ;;
+    *)
+        exit 1
+esac
+
+exit $?

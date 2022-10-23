@@ -29,13 +29,30 @@
 #include <nand.h>
 
 #if defined(CONFIG_CMD_MTDPARTS)
-
+extern unsigned int get_mtd_size(char *name);
 /* partition handling routines */
 int mtdparts_init(void);
 int id_parse(const char *id, const char **ret_id, u8 *dev_type, u8 *dev_num);
 int find_dev_and_part(const char *id, struct mtd_device **dev,
 		      u8 *part_num, struct part_info **part);
 #endif
+
+#define debugP(fmt...) //printf("[Dbg nand]L%d:", __LINE__),printf(fmt)
+
+static inline int isstring(char *p)
+{
+	char *endptr = p;
+	while (*endptr != '\0') {
+		if (!(((*endptr >= '0') && (*endptr <= '9'))
+			|| ((*endptr >= 'a') && (*endptr <= 'f'))
+			|| ((*endptr >= 'A') && (*endptr <= 'F'))
+			|| (*endptr == 'x') || (*endptr == 'X')))
+			return 1;
+		endptr++;
+	}
+
+	return 0;
+}
 
 static int nand_dump(nand_info_t *nand, ulong off, int only_oob, int repeat)
 {
@@ -109,6 +126,96 @@ free_dat:
 	return ret;
 }
 
+/* There are 8 bl2 scopy in first 4M, 512K per scopy */
+#ifndef CONFIG_BL2_OFF
+#define CONFIG_BL2_OFF 0
+#endif
+
+#ifndef CONFIG_BL2_SIZE
+#define CONFIG_BL2_SIZE (48 * 1024)
+#endif
+
+#ifndef CONFIG_BL2_SCOPY_SIZE
+#define CONFIG_BL2_SCOPY_SIZE (512 * 1024)
+#endif
+
+#ifndef CONFIG_BL2_SCOPY_NUM
+#define CONFIG_BL2_SCOPY_NUM 8
+#endif
+
+#ifndef CONFIG_SPINAND_RB_PAGE_SIZE
+#define CONFIG_SPINAND_RB_PAGE_SIZE (2 * 1024)
+#endif
+
+#define BL3_OFF (CONFIG_BL2_OFF + CONFIG_BL2_SCOPY_SIZE * CONFIG_BL2_SCOPY_NUM) //0x400000
+
+static int spinand_update(
+		nand_info_t *nand,
+		u_char *buf, /* mem address */
+		loff_t off,  /* storage offset */
+		size_t len,
+		size_t max)
+{
+	u_char *_buf;
+	loff_t _off;
+	size_t _len;
+	size_t ps = nand->writesize;
+	int i, ret = -1;
+
+	if (ps < CONFIG_SPINAND_RB_PAGE_SIZE) {
+		printf("error page size\n");
+		return -1;
+	}
+
+	/* update bl3 */
+	_buf = buf + CONFIG_BL2_SIZE;
+	_len = len - CONFIG_BL2_SIZE;
+	_off = off + BL3_OFF;
+	printf("bl3: buf=%p, off=0x%x, len=0x%x\n",
+			_buf, (u32)_off, (u32)_len);
+	ret = nand_write_skip_bad(nand, _off, &_len,
+				NULL, max, (u_char *)_buf, 0);
+	if (ret)
+		return ret;
+
+	/* update bl2 */
+	if (ps == CONFIG_SPINAND_RB_PAGE_SIZE)
+		len = CONFIG_BL2_SIZE;
+	else {
+		/* example for ps=4K & CONFIG_SPINAND_RB_PAGE_SIZE=2K,
+		 * romboot only reads first 2K though in a 4K page.
+		 */
+		int pages = CONFIG_BL2_SIZE / CONFIG_SPINAND_RB_PAGE_SIZE;
+		u_char *new_buf;
+		len = ps / CONFIG_SPINAND_RB_PAGE_SIZE;
+		if (ps % CONFIG_SPINAND_RB_PAGE_SIZE)
+			len++;
+		len *= CONFIG_BL2_SIZE;
+		_buf = buf;
+		new_buf = buf = (u_char *)malloc(len);
+		printf("new_buf=%p, size=0x%x, pages=%d\n", buf, (u32)len, pages);
+		for (i=0; i<pages; i++) {
+			memcpy((void *)new_buf, (void *)_buf, CONFIG_SPINAND_RB_PAGE_SIZE);
+			new_buf += ps;
+			_buf += CONFIG_SPINAND_RB_PAGE_SIZE;
+		}
+	}
+
+	_off = off + CONFIG_BL2_OFF;
+	for (i = 0; i < CONFIG_BL2_SCOPY_NUM; i++) {
+		_buf = buf;
+		_len = len;
+		printf("bl2 scopy %d: buf=%p, off=0x%x, len=0x%x\n",
+				i, _buf, (u32)_off, (u32)_len);
+		ret = nand_write_skip_bad(nand, _off, &_len,
+				NULL, max, (u_char *)_buf, 0);
+		if (ret)
+			break;
+		_off += CONFIG_BL2_SCOPY_SIZE;
+	}
+
+	return ret;
+}
 /* ------------------------------------------------------------------------- */
 
 static int set_dev(int dev)
@@ -133,6 +240,17 @@ static int set_dev(int dev)
 	return 0;
 }
 
+/* interface for cmd_amlmtd */
+int set_mtd_dev(int dev)
+{
+	return set_dev(dev);
+}
+
+int get_mtd_dev(void)
+{
+	return nand_curr_device;
+}
+
 static inline int str2off(const char *p, loff_t *num)
 {
 	char *endptr;
@@ -148,7 +266,7 @@ static inline int str2long(const char *p, ulong *num)
 	*num = simple_strtoul(p, &endptr, 16);
 	return *p != '\0' && *endptr == '\0';
 }
-
+#ifndef CONFIFG_AML_MTDPART
 static int get_part(const char *partname, int *idx, loff_t *off, loff_t *size,
 		loff_t *maxsize)
 {
@@ -186,7 +304,42 @@ static int get_part(const char *partname, int *idx, loff_t *off, loff_t *size,
 	return -1;
 #endif
 }
+#else
+static int get_part(const char *partname, int *idx, loff_t *off, loff_t *size,
+		loff_t *maxsize)
+{
+#ifdef CONFIG_CMD_MTDPARTS
+	struct mtd_device *dev;
+	struct part_info *part;
+	u8 pnum;
+	int ret;
 
+	ret = mtdparts_init();
+	if (ret) {
+		printf("mtd part init failed, ret: %d\n", ret);
+		return ret;
+	}
+
+	ret = find_dev_and_part(partname, &dev, &pnum, &part);
+	if (ret)
+		return ret;
+
+	*off = part->offset;
+	*size = part->size;
+	*maxsize = part->size;
+	*idx = 1;
+
+	ret = set_dev(*idx);
+	if (ret)
+		return ret;
+
+	return 0;
+#else
+	puts("offset is not a number\n");
+	return -1;
+#endif
+}
+#endif
 static int arg_off(const char *arg, int *idx, loff_t *off, loff_t *size,
 		loff_t *maxsize)
 {
@@ -233,11 +386,11 @@ static int arg_off_size(int argc, char *const argv[], int *idx,
 	}
 
 print:
-	printf("device %d ", *idx);
+	debugP("device %d ", *idx);
 	if (*size == nand_info[*idx].size)
 		puts("whole chip\n");
 	else
-		printf("offset 0x%llx, size 0x%llx\n",
+		debugP("offset 0x%llx, size 0x%llx\n",
 		       (unsigned long long)*off, (unsigned long long)*size);
 	return 0;
 }
@@ -397,7 +550,7 @@ static void nand_print_and_set_info(int idx)
 	printf("  Page size  %8d b\n", nand->writesize);
 	printf("  OOB size   %8d b\n", nand->oobsize);
 	printf("  Erase size %8d b\n", nand->erasesize);
-
+	printf("  size       %8lld b\n", nand->size);
 	/* Set geometry info */
 	setenv_hex("nand_writesize", nand->writesize);
 	setenv_hex("nand_oobsize", nand->oobsize);
@@ -466,7 +619,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int i, ret = 0;
 	ulong addr;
-	loff_t off, size, maxsize;
+	loff_t off, size, maxsize = 0;
 	char *cmd, *s;
 	nand_info_t *nand;
 #ifdef CONFIG_SYS_NAND_QUIET
@@ -490,7 +643,11 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	/* Only "dump" is repeatable. */
 	if (repeat && strcmp(cmd, "dump"))
 		return 0;
-
+	if (strcmp(cmd, "init") == 0) {
+		putc('\n');
+		nand_init();
+		return 0;
+	}
 	if (strcmp(cmd, "info") == 0) {
 
 		putc('\n');
@@ -538,8 +695,9 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if (strcmp(cmd, "bad") == 0) {
 		printf("\nDevice %d bad blocks:\n", dev);
+		printf("\nDevice %d %s\n", dev, nand->name);
 		for (off = 0; off < nand->size; off += nand->erasesize)
-			if (nand_block_isbad(nand, off))
+			if (nand_block_isbad((struct mtd_info *)nand, off))
 				printf("  %08llx\n", (unsigned long long)off);
 		return 0;
 	}
@@ -589,7 +747,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (argc != o + args)
 			goto usage;
 
-		printf("\nNAND %s: ", cmd);
+		debugP("\nNAND %s: ", cmd);
 		/* skip first two or three arguments, look for offset and size */
 		if (arg_off_size(argc - o, argv + o, &dev, &off, &size,
 				 &maxsize) != 0)
@@ -617,6 +775,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				}
 			}
 		}
+		printf("%s(): off %lld, size %lld\n", __func__, off, size);
 		ret = nand_erase_opts(nand, &opts);
 		printf("%s\n", ret ? "ERROR" : "OK");
 
@@ -633,7 +792,9 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return ret == 0 ? 1 : 0;
 	}
 
-	if (strncmp(cmd, "read", 4) == 0 || strncmp(cmd, "write", 5) == 0) {
+	if ((strncmp(cmd, "read", 4) == 0) ||
+			(strncmp(cmd, "write", 5) == 0) ||
+			(strncmp(cmd, "spinand_update", 14) == 0)) {
 		size_t rwsize;
 		ulong pagecount = 1;
 		int read;
@@ -642,48 +803,71 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (argc < 4)
 			goto usage;
 
-		addr = (ulong)simple_strtoul(argv[2], NULL, 16);
+		#define SPINAND_UPDATE_FLAG (1<<2)
+		read = strncmp(cmd, "read", 4) == 0;
+		if (strncmp(cmd, "spinand_update", 14) == 0)
+			read |= SPINAND_UPDATE_FLAG;
+		debugP("\nNAND %s ...\n", cmd);
 
-		read = strncmp(cmd, "read", 4) == 0; /* 1 = read, 0 = write */
-		printf("\nNAND %s: ", read ? "read" : "write");
+		if (isstring(argv[2])) {
+			nand = get_mtd_device_nm(argv[2]);
+			if (IS_ERR(nand))
+				goto usage;
+			addr = (ulong)simple_strtoul(argv[3], NULL, 16);
+			/* 1 = read, 0 = write */
+			if (argc == 4) {
+				off = 0;
+				size = get_mtd_size(argv[2]);
+			} else {
+				if (arg_off_size(argc - 4, argv + 4,
+					&dev, &off, &size, &maxsize) != 0)
+					return 1;
+			}
+			rwsize = size;
+		} else {
+			addr = (ulong)simple_strtoul(argv[2], NULL, 16);
+			s = strchr(cmd, '.');
 
-		s = strchr(cmd, '.');
+			if (s && !strcmp(s, ".raw")) {
+				raw = 1;
 
-		if (s && !strcmp(s, ".raw")) {
-			raw = 1;
+				if (arg_off(argv[3], &dev, &off, &size, &maxsize))
+					return 1;
 
-			if (arg_off(argv[3], &dev, &off, &size, &maxsize))
-				return 1;
+				nand = &nand_info[dev];
+
+				if (argc > 4 && !str2long(argv[4], &pagecount)) {
+					printf("'%s' is not a number\n", argv[4]);
+					return 1;
+				}
+
+				if (pagecount * nand->writesize > size) {
+					puts("Size exceeds partition or device limit\n");
+					return -1;
+				}
+
+				rwsize = pagecount * (nand->writesize + nand->oobsize);
+			} else {
+				if (arg_off_size(argc - 3, argv + 3, &dev,
+							&off, &size, &maxsize) != 0)
+					return 1;
+
+				/* size is unspecified */
+				if (argc < 5)
+					adjust_size_for_badblocks(&size, off, dev);
+				rwsize = size;
+			}
 
 			nand = &nand_info[dev];
-
-			if (argc > 4 && !str2long(argv[4], &pagecount)) {
-				printf("'%s' is not a number\n", argv[4]);
-				return 1;
-			}
-
-			if (pagecount * nand->writesize > size) {
-				puts("Size exceeds partition or device limit\n");
-				return -1;
-			}
-
-			rwsize = pagecount * (nand->writesize + nand->oobsize);
-		} else {
-			if (arg_off_size(argc - 3, argv + 3, &dev,
-						&off, &size, &maxsize) != 0)
-				return 1;
-
-			/* size is unspecified */
-			if (argc < 5)
-				adjust_size_for_badblocks(&size, off, dev);
-			rwsize = size;
 		}
 
-		nand = &nand_info[dev];
-
+		s = strchr(cmd, '.');
 		if (!s || !strcmp(s, ".jffs2") ||
 		    !strcmp(s, ".e") || !strcmp(s, ".i")) {
-			if (read)
+			if (read & SPINAND_UPDATE_FLAG)
+				ret = spinand_update(nand, (u_char *)addr,
+						0, rwsize, maxsize);
+			else if (read)
 				ret = nand_read_skip_bad(nand, off, &rwsize,
 							 NULL, maxsize,
 							 (u_char *)addr);
@@ -730,7 +914,7 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 
-		printf(" %zu bytes %s: %s\n", rwsize,
+		debugP(" %zu bytes %s: %s\n", rwsize,
 		       read ? "read" : "written", ret ? "ERROR" : "OK");
 
 		return ret == 0 ? 0 : 1;

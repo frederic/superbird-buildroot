@@ -34,6 +34,8 @@
 
 /* Private own data */
 static struct ubi_device *ubi;
+static int curr_dev = -1;
+static int all_dev = 0;
 static char buffer[80];
 static int ubi_initialized;
 
@@ -117,6 +119,22 @@ static int ubi_check(char *name)
 	return -EEXIST;
 }
 
+static int ubi_get_volname(const struct ubi_volume *vol, char *name)
+{
+	if (!strcmp(ubi->mtd->name,name)) {
+		setenv("volName",vol->name);
+		return 0;
+	}
+	return -EEXIST;
+}
+
+static int ubi_getVolName(char *name, int num)
+{
+	if (!ubi->volumes[num])
+		return -EEXIST;
+
+	return ubi_get_volname(ubi->volumes[num], name);
+}
 
 static int verify_mkvol_req(const struct ubi_device *ubi,
 			    const struct ubi_mkvol_req *req)
@@ -420,13 +438,18 @@ static int ubi_dev_scan(struct mtd_info *info, char *ubidev,
 	mtd_part.name = buffer;
 	mtd_part.size = part->size;
 	mtd_part.offset = part->offset;
+#ifndef CONFIFG_AML_MTDPART
 	add_mtd_partitions(info, &mtd_part, 1);
-
+#endif
 	strcpy(ubi_mtd_param_buffer, buffer);
 	if (vid_header_offset)
 		sprintf(ubi_mtd_param_buffer, "mtd=%d,%s", pnum,
 				vid_header_offset);
+#ifdef CONFIFG_AML_MTDPART
+	err = ubi_mtd_param_parse(ubidev, NULL);
+#else
 	err = ubi_mtd_param_parse(ubi_mtd_param_buffer, NULL);
+#endif
 	if (err) {
 		del_mtd_partitions(info);
 		return -err;
@@ -446,7 +469,7 @@ static int ubi_dev_scan(struct mtd_info *info, char *ubidev,
 int ubi_part(char *part_name, const char *vid_header_offset)
 {
 	int err = 0;
-	char mtd_dev[16];
+	// char mtd_dev[16];
 	struct mtd_device *dev;
 	struct part_info *part;
 	u8 pnum;
@@ -475,6 +498,7 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 	if (ubi_initialized) {
 		ubi_exit();
 		del_mtd_partitions(ubi_dev.mtd_info);
+		ubi_initialized = 0;
 	}
 
 	/*
@@ -485,6 +509,8 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 		printf("Partition %s not found!\n", part_name);
 		return 1;
 	}
+
+#ifndef CONFIFG_AML_MTDPART
 	sprintf(mtd_dev, "%s%d", MTD_DEV_TYPE(dev->id->type), dev->id->num);
 	ubi_dev.mtd_info = get_mtd_device_nm(mtd_dev);
 	if (IS_ERR(ubi_dev.mtd_info)) {
@@ -492,6 +518,14 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 		       mtd_dev);
 		return 1;
 	}
+#else
+	ubi_dev.mtd_info = get_mtd_device_nm(part_name);
+	if (IS_ERR(ubi_dev.mtd_info)) {
+		printf("Partition %s not found!\n", part_name);
+		return 1;
+	}
+#endif
+
 
 	ubi_dev.selected = 1;
 
@@ -503,9 +537,11 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 		ubi_dev.selected = 0;
 		return err;
 	}
-
-	ubi = ubi_devices[0];
-
+	//ubi = ubi_devices[0];
+	all_dev++;
+	curr_dev = all_dev - 1;
+	ubi = ubi_devices[curr_dev];
+	ubi_msg("current ubi device %d\n", curr_dev);
 	return 0;
 }
 
@@ -516,6 +552,46 @@ static int do_ubi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
+
+	if (strcmp(argv[1], "device") == 0) {
+		/* list all attached ubi device*/
+		if (argc == 2) {
+			int i = 0;
+			if (0 == all_dev) {
+				ubi_msg("no ubi device attached!\n");
+				return 0;
+			}
+			for (i = 0; i < all_dev; i++) {
+					ubi_msg("device %d:\n", i);
+					display_ubi_info(ubi_devices[i]);
+			}
+			ubi_msg("\n\n %d device attached, current device %d, %s\n",
+				all_dev, curr_dev, ubi->mtd->name);
+			return 0;
+		}
+		/* select device if it exist */
+		if (argc == 3) {
+			int dev = (int)simple_strtoul(argv[2], NULL, 10);
+			if (dev >= all_dev) {
+				ubi_msg("check cmd plz, current device %d, %s\n",
+						curr_dev, ubi->mtd->name);
+				return 1;
+			}
+			if (dev != curr_dev) {
+				if (ubi_devices[dev]) {
+					curr_dev = dev;
+					ubi = ubi_devices[dev];
+					ubi_msg("set to device %d, %s\n", dev, ubi->mtd->name);
+				}
+			} else {
+				ubi_msg("current device %d, %s\n",
+					curr_dev, ubi->mtd->name);
+			}
+
+			return 0;
+		}
+		return CMD_RET_USAGE;
+	}
 
 	if (strcmp(argv[1], "part") == 0) {
 		const char *vid_header_offset = NULL;
@@ -559,6 +635,13 @@ static int do_ubi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 		printf("Error, no volume name passed\n");
 		return 1;
+	}
+
+	if (strcmp(argv[1], "getVolName") == 0) {
+		if (argc > 2)
+			return ubi_getVolName(argv[2],simple_strtol(argv[3], NULL, 10));
+
+		printf("Error, no volume name got\n");
 	}
 
 	if (strncmp(argv[1], "create", 6) == 0) {
@@ -666,6 +749,8 @@ U_BOOT_CMD(
 		" header offset)\n"
 	"ubi info [l[ayout]]"
 		" - Display volume and ubi layout information\n"
+	"ubi getVolName partitionName volumeid"
+		" - Get volume name\n"
 	"ubi check volumename"
 		" - check if volumename exists\n"
 	"ubi create[vol] volume [size] [type]"

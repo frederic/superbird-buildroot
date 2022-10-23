@@ -1,0 +1,53 @@
+config BR2_PACKAGE_CYPRESS_WIFI
+	bool "cypress_wifi"
+	default n
+	depends on BR2_LINUX_KERNEL
+	help
+	  cypress wifi driver
+
+config BR2_PACKAGE_CYPRESS_WIFI_GIT_VERSION
+	string "cypress_wifi branch"
+	depends on BR2_PACKAGE_CYPRESS_WIFI
+	help
+		Branch for cypress_wifi
+
+config BR2_PACKAGE_CYPRESS_WIFI_GIT_REPO_URL
+	string "cypress_wifi git"
+	depends on BR2_PACKAGE_CYPRESS_WIFI
+	help
+		cypress_wifi git
+
+config BR2_PACKAGE_CYPRESS_WIFI_LOCAL
+	bool "cypress_wifi local"
+	help
+		cypress_wifi local
+
+config BR2_PACKAGE_CYPRESS_WIFI_LOCAL_PATH
+	string "cypress_wifi local path"
+	depends on BR2_PACKAGE_CYPRESS_WIFI_LOCAL
+	help
+		cypress_wifi local path
+
+config BR2_PACKAGE_CYPRESS_WIFI_SDIO_VERSION
+	string "cypress_wifi sdio build version"
+	depends on BR2_PACKAGE_CYPRESS_WIFI_LOCAL
+	help
+		cypress_wifi sdio build version
+
+config BR2_PACKAGE_CYPRESS_WIFI_PCI_VERSION
+	string "cypress_wifi pci build version"
+	depends on BR2_PACKAGE_CYPRESS_WIFI_LOCAL
+	help
+		cypress_wifi pci build version
+
+config BR2_PACKAGE_CYPRESS_WIFI_USB_VERSION
+	string "cypress_wifi usb build version"
+	depends on BR2_PACKAGE_CYPRESS_WIFI_LOCAL
+	help
+		cypress_wifi usb build version
+
+config BR2_PACKAGE_CYPRESS_WIFI_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_CYPRESS_WIFI
+	help
+	  compile ko directly

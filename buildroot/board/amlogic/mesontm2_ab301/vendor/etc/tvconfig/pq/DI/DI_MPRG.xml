@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="DI_MPEG" platform="txlx" commands="">
+<Group num="0" val="">
+<Page tab_title="EI_NR CTRL" layout="35x4">
+<Control ui_type="slider" name="ei0_filter" range="0~255" addr="0x1704" mask="23:16" dst="U" desc="ei0_filter[2:+] abs_diff_left>filter and ...right>filter and ...top>filter and ...bot>filter -> filter" default="0" value="255" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_threshold" range="0~255" addr="0x1704" mask="15:8" dst="U" desc="ei0_threshold[2:+]" default="0" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="ei0_vertical" range="0~1" addr="0x1704" mask="3:3" dst="U" desc="ei0_vertical" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="ei0_bpscf2" range="0~1" addr="0x1704" mask="2:2" dst="U" desc="ei0_bpscf2" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="ei0_bpsfar1" range="0~1" addr="0x1704" mask="1:1" dst="U" desc="ei0_bpsfar1" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_diff" range="0~255" addr="0x1705" mask="31:24" dst="U" desc="ei0_diff" default="0" value="90" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_angle45" range="0~255" addr="0x1705" mask="23:16" dst="U" desc="ei0_angle45" default="0" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_peak" range="0~255" addr="0x1705" mask="15:8" dst="U" desc="ei0_peak" default="0" value="15" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_cross" range="0~255" addr="0x1705" mask="7:0" dst="U" desc="ei0_cross" default="0" value="45" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_close2" range="0~255" addr="0x1706" mask="31:24" dst="U" desc="ei0_close2" default="0" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_close1" range="0~255" addr="0x1706" mask="23:16" dst="U" desc="ei0_close1" default="0" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_far2" range="0~255" addr="0x1706" mask="15:8" dst="U" desc="ei0_far2" default="0" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="ei0_far1" range="0~255" addr="0x1706" mask="7:0" dst="U" desc="ei0_far1" default="0" value="90" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="nr_cue_en" range="0~1" addr="0x1707" mask="26:26" dst="U" desc="nr_cue_en" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="nr2_en" range="0~1" addr="0x1707" mask="25:25" dst="U" desc="nr2_en" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_p1txtcore_mode" range="0~3" addr="0x1708" mask="31:30" dst="U" desc="mot_p1txtcore_mode" default="0" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_p1txtcore_clmt" range="0~63" addr="0x1708" mask="29:24" dst="U" desc="mot_p1txtcore_clmt" default="0" value="63" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_p1txtcore_ylmt" range="0~63" addr="0x1708" mask="21:16" dst="U" desc="mot_p1txtcore_ylmt" default="0" value="63" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_p1txtcore_crate" range="0~255" addr="0x1708" mask="15:8" dst="U" desc="mot_p1txtcore_crate" default="0" value="16" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_p1txtcore_yrate" range="0~255" addr="0x1708" mask="7:0" dst="U" desc="mot_p1txtcore_yrate" default="0" value="16" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_curtxtcore_clmt" range="0~63" addr="0x1709" mask="29:24" dst="U" desc="mot_curtxtcore_clmt" default="0" value="63" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_curtxtcore_ylmt" range="0~63" addr="0x1709" mask="21:16" dst="U" desc="mot_curtxtcore_ylmt" default="0" value="63" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_curtxtcore_crate" range="0~255" addr="0x1709" mask="15:8" dst="U" desc="mot_curtxtcore_crate" default="0" value="16" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="mot_curtxtcore_yrate" range="0~255" addr="0x1709" mask="7:0" dst="U" desc="mot_curtxtcore_yrate" default="0" value="16" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_amblike2_biasvertical" range="0~1" addr="0x171a" mask="29:29" dst="U" desc="reg_ei_caldrt_amblike2_biasvertical" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_addxla2list_drtmax" range="0~31" addr="0x171a" mask="28:24" dst="U" desc="reg_ei_caldrt_addxla2list_drtmax" default="21" value="21" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_addxla2list_signm0th" range="0~7" addr="0x171a" mask="22:20" dst="U" desc="reg_ei_caldrt_addxla2list_signm0th" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_addxla2list_mode" range="0~1" addr="0x171a" mask="19:19" dst="U" desc="reg_ei_caldrt_addxla2list_mode" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_signm_sad_cor_rate" range="0~7" addr="0x171a" mask="18:16" dst="U" desc="reg_ei_signm_sad_cor_rate" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_signm_sadi_cor_rate" range="0~15" addr="0x171a" mask="15:12" dst="U" desc="reg_ei_signm_sadi_cor_rate" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_signm_sadi_cor_ofst" range="0~63" addr="0x171a" mask="11:6" dst="U" desc="reg_ei_signm_sadi_cor_ofst" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_signm_sad_ofst" range="0~63" addr="0x171a" mask="5:0" dst="U" desc="reg_ei_signm_sad_ofst" default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_cnflcctchk_frcverthrd" range="0~7" addr="0x171b" mask="30:28" dst="U" desc="reg_ei_caldrt_cnflcctchk_frcverthrd" default="5" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_cnflctchk_mg" range="0~7" addr="0x171b" mask="26:24" dst="U" desc="reg_ei_caldrt_cnflctchk_mg" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_cnflctchk_ws" range="0~3" addr="0x171b" mask="23:22" dst="U" desc="reg_ei_caldrt_cnflctchk_ws" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_cnflctchk_en" range="0~1" addr="0x171b" mask="21:21" dst="U" desc="reg_ei_caldrt_cnflctchk_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_verfrc_final_en" range="0~1" addr="0x171b" mask="20:20" dst="U" desc="reg_ei_caldrt_verfrc_final_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_verfrc_retimflt_en" range="0~1" addr="0x171b" mask="19:19" dst="U" desc="reg_ei_caldrt_verfrc_retimflt_en" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_verftc_eithratemth" range="0~7" addr="0x171b" mask="18:16" dst="U" desc="reg_ei_caldrt_verftc_eithratemth" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_verfrc_retiming_en" range="0~1" addr="0x171b" mask="15:15" dst="U" desc="reg_ei_caldrt_verfrc_retiming_en" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_verfrc_bothratemth" range="0~7" addr="0x171b" mask="14:12" dst="U" desc="reg_ei_caldrt_verfrc_bothratemth" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_ver_thrd" range="0~7" addr="0x171b" mask="11:9" dst="U" desc="reg_ei_caldrt_ver_thrd" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_addxla2list_drtmin" range="0~31" addr="0x171b" mask="8:4" dst="U" desc="reg_ei_caldrt_addxla2list_drtmin" default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_addxla2list_drtlimit" range="0~15" addr="0x171b" mask="3:0" dst="U" desc="reg_ei_caldrt_addxla2list_drtlimit" default="15" value="15" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad12thhig" range="0~255" addr="0x171c" mask="31:24" dst="U" desc="reg_ei_caldrt_abext_sad12thhig" default="80" value="80" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad00thlow" range="0~255" addr="0x171c" mask="23:16" dst="U" desc="reg_ei_caldrt_abext_sad00thlow" default="35" value="35" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad12thlow" range="0~255" addr="0x171c" mask="15:8" dst="U" desc="reg_ei_caldrt_abext_sad12thlow" default="28" value="28" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_ratemth" range="0~7" addr="0x171c" mask="6:4" dst="U" desc="reg_ei_caldrt_abext_ratemth" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_drtthrd" range="0~7" addr="0x171c" mask="2:0" dst="U" desc="reg_ei_caldrt_abext_drtthrd" default="5" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_xlanopeak_codien" range="0~1" addr="0x171d" mask="29:29" dst="U" desc="reg_ei_caldrt_xlanopeak_codien" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_xlanopeak_drtmax" range="0~31" addr="0x171d" mask="28:24" dst="U" desc="reg_ei_caldrt_xlanopeak_drtmax" default="15" value="15" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_xlanopeak_en" range="0~1" addr="0x171d" mask="23:23" dst="U" desc="reg_ei_caldrt_xlanopeak_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_monotrnd_alpha" range="0~7" addr="0x171d" mask="22:20" dst="U" desc="reg_ei_caldrt_abext_monotrnd_alpha" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_mononum12_thrd" range="0~3" addr="0x171d" mask="19:18" dst="U" desc="reg_ei_caldrt_abext_mononum12_thrd" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_mononum00_thrd" range="0~3" addr="0x171d" mask="17:16" dst="U" desc="reg_ei_caldrt_abext_mononum00_thrd" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad00rate" range="0~15" addr="0x171d" mask="15:12" dst="U" desc="reg_ei_caldrt_abext_sad00rate" default="6" value="6" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad12rate" range="0~15" addr="0x171d" mask="11:8" dst="U" desc="reg_ei_caldrt_abext_sad12rate" default="6" value="6" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abext_sad00thhig" range="0~255" addr="0x171d" mask="7:0" dst="U" desc="reg_ei_caldrt_abext_sad00thhig" default="80" value="80" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_assign_headtail_magin" range="0~7" addr="0x171e" mask="30:28" dst="U" desc="reg_ei_assign_headtail_magin" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastcurpncnfltchk_mode" range="0~7" addr="0x171e" mask="26:24" dst="U" desc="reg_ei_retime_lastcurpncnfltchk_mode" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastcurpncnfltchk_drtth" range="0~3" addr="0x171e" mask="22:21" dst="U" desc="reg_ei_retime_lastcurpncnfltchk_drtth" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_histchk_cnfid" range="0~1" addr="0x171e" mask="20:20" dst="U" desc="reg_ei_caldrt_histchk_cnfid" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_histchk_thrd" range="0~15" addr="0x171e" mask="19:16" dst="U" desc="reg_ei_caldrt_histchk_thrd" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_histchk_abext" range="0~1" addr="0x171e" mask="15:15" dst="U" desc="reg_ei_caldrt_histchk_abext" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_histchk_npen" range="0~1" addr="0x171e" mask="14:14" dst="U" desc="reg_ei_caldrt_histchk_npen" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_amblike2_drtmg" range="0~7" addr="0x171e" mask="13:11" dst="U" desc="reg_ei_caldrt_amblike2_drtmg" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_amblike2_valmg" range="0~7" addr="0x171e" mask="10:8" dst="U" desc="reg_ei_caldrt_amblike2_valmg" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_amblike2_alpha" range="0~15" addr="0x171e" mask="7:4" dst="U" desc="reg_ei_caldrt_amblike2_alpha" default="10" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_amblike2_drtth" range="0~15" addr="0x171e" mask="3:0" dst="U" desc="reg_ei_caldrt_amblike2_drtth" default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hcnfcheck_frcvert_xla_th3" range="0~15" addr="0x171f" mask="31:28" dst="U" desc="reg_ei_caldrt_hcnfcheck_frcvert_xla_th3" default="7" value="7" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hcnfcheck_frcvert_xla_en" range="0~1" addr="0x171f" mask="27:27" dst="U" desc="reg_ei_caldrt_hcnfcheck_frcvert_xla_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_conf_drtth" range="0~7" addr="0x171f" mask="26:24" dst="U" desc="reg_ei_caldrt_conf_drtth" default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_conf_absdrtth" range="0~15" addr="0x171f" mask="23:20" dst="U" desc="reg_ei_caldrt_conf_absdrtth" default="11" value="11" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abcheck_mode1" range="0~3" addr="0x171f" mask="19:18" dst="U" desc="reg_ei_caldrt_abcheck_mode1" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abcheck_mode0" range="0~3" addr="0x171f" mask="17:16" dst="U" desc="reg_ei_caldrt_abcheck_mode0" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abcheck_drtth1" range="0~15" addr="0x171f" mask="15:12" dst="U" desc="reg_ei_caldrt_abcheck_drtth1" default="11" value="11" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abcheck_drtth0" range="0~15" addr="0x171f" mask="11:8" dst="U" desc="reg_ei_caldrt_abcheck_drtth0" default="11" value="11" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_abpnchk1_th" range="0~7" addr="0x171f" mask="6:4" dst="U" desc="reg_ei_caldrt_abpnchk1_th" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_abpnchk1_en" range="0~1" addr="0x171f" mask="1:1" dst="U" desc="reg_ei_caldrt_abpnchk1_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_abpnchk0_en" range="0~1" addr="0x171f" mask="0:0" dst="U" desc="reg_ei_caldrt_abpnchk0_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hstrrgchk_drtth" range="0~15" addr="0x1793" mask="31:28" dst="U" desc="reg_ei_caldrt_hstrrgchk_drtth" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hstrrgchk_frcverthrd" range="0~15" addr="0x1793" mask="27:24" dst="U" desc="reg_ei_caldrt_hstrrgchk_frcverthrd" default="8" value="8" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hstrrgchk_mg" range="0~15" addr="0x1793" mask="23:20" dst="U" desc="reg_ei_caldrt_hstrrgchk_mg" default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hstrrgchk_1sidnul" range="0~1" addr="0x1793" mask="19:19" dst="U" desc="reg_ei_caldrt_hstrrgchk_1sidnul" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hstrrgchk_excpcnf" range="0~1" addr="0x1793" mask="18:18" dst="U" desc="reg_ei_caldrt_hstrrgchk_excpcnf" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hstrrgchk_ws" range="0~3" addr="0x1793" mask="17:16" dst="U" desc="reg_ei_caldrt_hstrrgchk_ws" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hstrrgchk_en" range="0~1" addr="0x1793" mask="15:15" dst="U" desc="reg_ei_caldrt_hstrrgchk_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hpncheck_mode" range="0~3" addr="0x1793" mask="14:13" dst="U" desc="reg_ei_caldrt_hpncheck_mode" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hpncheck_mute" range="0~1" addr="0x1793" mask="12:12" dst="U" desc="reg_ei_caldrt_hpncheck_mute" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hcnfcheck_mg2" range="0~7" addr="0x1793" mask="11:9" dst="U" desc="reg_ei_caldrt_hcnfcheck_mg2" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hcnfcheck_mg1" range="0~7" addr="0x1793" mask="8:6" dst="U" desc="reg_ei_caldrt_hcnfcheck_mg1" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hcnfcheck_mode" range="0~3" addr="0x1793" mask="5:4" dst="U" desc="reg_ei_caldrt_hcnfcheck_mode" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_caldrt_hcnfcheck_frcvert_xla_th5" range="0~15" addr="0x1793" mask="3:0" dst="U" desc="reg_ei_caldrt_hcnfcheck_frcvert_xla_th5" default="9" value="9" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_amb_detect_mode" range="0~3" addr="0x179e" mask="30:29" dst="U" desc="reg_ei_amb_detect_mode" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_amb_detect_winth" range="0~31" addr="0x179e" mask="28:24" dst="U" desc="reg_ei_amb_detect_winth" default="8" value="8" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_amb_decide_rppth" range="0~7" addr="0x179e" mask="23:21" dst="U" desc="reg_ei_amb_decide_rppth" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastmappncnfltchk_drtth" range="0~3" addr="0x179e" mask="20:19" dst="U" desc="reg_ei_retime_lastmappncnfltchk_drtth" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastmappncnfltchk_mode" range="0~7" addr="0x179e" mask="18:16" dst="U" desc="reg_ei_retime_lastmappncnfltchk_mode" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastmapvertfrcchk_mode" range="0~3" addr="0x179e" mask="15:14" dst="U" desc="reg_ei_retime_lastmapvertfrcchk_mode" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastvertfrcchk_mode" range="0~3" addr="0x179e" mask="13:12" dst="U" desc="reg_ei_retime_lastvertfrcchk_mode" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_lastpnchk_drtth" range="0~15" addr="0x179e" mask="11:8" dst="U" desc="reg_ei_retime_lastpnchk_drtth" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_retime_lastpnchk_en" range="0~1" addr="0x179e" mask="6:6" dst="U" desc="reg_ei_retime_lastpnchk_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_retime_mode" range="0~3" addr="0x179e" mask="5:4" dst="U" desc="reg_ei_retime_mode" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_retime_last_en" range="0~1" addr="0x179e" mask="3:3" dst="U" desc="reg_ei_retime_last_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_retime_ab_en" range="0~1" addr="0x179e" mask="2:2" dst="U" desc="reg_ei_retime_ab_en" default="" value="" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hstrvertfrcchk_en" range="0~1" addr="0x179e" mask="1:1" dst="U" desc="reg_ei_caldrt_hstrvertfrcchk_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_caldrt_hstrrgchk_mode" range="0~1" addr="0x179e" mask="0:0" dst="U" desc="reg_ei_caldrt_hstrrgchk_mode" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_drtdelay2_lmt" range="0~15" addr="0x179f" mask="31:28" dst="U" desc="reg_ei_drtdelay2_lmt" default="13" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_drtdelay2_notver_lrwin" range="0~3" addr="0x179f" mask="27:26" dst="U" desc="reg_ei_drtdelay2_notver_lrwin" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_drtdelay_mode" range="0~3" addr="0x179f" mask="25:24" dst="U" desc="reg_ei_drtdelay_mode" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_drtdelay2_mode" range="0~1" addr="0x179f" mask="23:23" dst="U" desc="reg_ei_drtdelay2_mode" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_assign_xla_signm0th" range="0~7" addr="0x179f" mask="22:20" dst="U" desc="reg_ei_assign_xla_signm0th" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_assign_pkbiasvert_en" range="0~1" addr="0x179f" mask="19:19" dst="U" desc="reg_ei_assign_pkbiasvert_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_ei_assign_xla_en" range="0~1" addr="0x179f" mask="18:18" dst="U" desc="reg_ei_assign_xla_en" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_assign_xla_mode" range="0~3" addr="0x179f" mask="17:16" dst="U" desc="reg_ei_assign_xla_mode" default="0" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_assign_nlfilter_magin" range="0~15" addr="0x179f" mask="15:12" dst="U" desc="reg_ei_assign_nlfilter_magin" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_localsearch_maxrange" range="0~15" addr="0x179f" mask="11:8" dst="U" desc="reg_ei_localsearch_maxrange" default="5" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_xla_drtth" range="0~15" addr="0x179f" mask="7:4" dst="U" desc="reg_ei_xla_drtth" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_flatmsad_thrd" range="0~15" addr="0x179f" mask="3:0" dst="U" desc="reg_ei_flatmsad_thrd" default="3" value="12" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_int_drt2x_chrdrt_limit" range="0~15" addr="0x17a8" mask="27:24" dst="U" desc="reg_ei_int_drt2x_chrdrt_limit" default="15" value="15" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_int_drt16x_core" range="0~15" addr="0x17a8" mask="23:20" dst="U" desc="reg_ei_int_drt16x_core" default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_int_drtdelay2_notver_cancv" range="0~15" addr="0x17a8" mask="19:16" dst="U" desc="reg_ei_int_drtdelay2_notver_cancv" default="2" value="2" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_int_drtdelay2_notver_sadth" range="0~255" addr="0x17a8" mask="15:8" dst="U" desc="reg_ei_int_drtdelay2_notver_sadth" default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_ei_int_drtdelay2_vlddrt_sadth" range="0~255" addr="0x17a8" mask="7:0" dst="U" desc="reg_ei_int_drtdelay2_vlddrt_sadth" default="20" value="20" cmd="common:2,0xff900000" />
+</Page>
+<Page tab_title="EI_DRT" layout="8x4">
+<Control ui_type="slider" name="reg_min_pix" range="0~255" addr="0x1779" mask="31:24" dst="U" desc="reg_min_pix: the threshold of min pix of photos,  less than threshold the pix do not participate in the monotonic trend calculation." default="22" value="22" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_max_pix" range="0~255" addr="0x1779" mask="23:16" dst="U" desc="reg_max_pix:the threshold of max pix of photos, >threshold the pix do not participate in the monotonic trend calculation." default="203" value="203" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_dmaxmin_thrdma" range="0~255" addr="0x1779" mask="15:8" dst="U" desc="reg_dmaxmin_thrdma: the max pixel and min pixel difference is larger than the value the trend existent." default="50" value="50" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_dmaxmin_thrdmi" range="0~255" addr="0x1779" mask="7:0" dst="U" desc="reg_dmaxmin_thrdmi: the max pixel and min pixel difference is smaller than the value the trend non-existent." default="30" value="30" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_newcorrpix_maxthrd" range="0~255" addr="0x177a" mask="31:24" dst="U" desc="reg_newcorrpix_maxthrd:the new low angle drt sad threshold." default="40" value="35" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_corrpix_diffthrd" range="0~255" addr="0x177a" mask="23:16" dst="U" desc="reg_corrpix_diffthrd: the top and bottom pixel difference is larger than the value, the case may be ultra-low angle." default="60" value="150" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_corrpix_minthrd" range="0~255" addr="0x177a" mask="15:8" dst="U" desc="reg_corrpix_minthrd: the difference of top and bottom pixel is smaller than the value, the drt may be raw drt." default="10" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_corrpix_maxthrd" range="0~255" addr="0x177a" mask="7:0" dst="U" desc="reg_corrpix_maxthrd: the difference of top and bottom pixel is larger than the value, the drt may be raw drt." default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_max_pixwave" range="0~31" addr="0x177b" mask="28:24" dst="U" desc="reg_max_pixwave: the wave of the max pix threshold, prevent min pix close to reg_max_pix caused the number between max and min pix zeros." default="0" value="0" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_pix_wave" range="0~31" addr="0x177b" mask="20:16" dst="U" desc="reg_pix_wave: the wave of the max and min pix, the max pixel smaller than the value or the min pixel larger than the value, may be the ultra-low angle case." default="15" value="15" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_maxdrt_thrd" range="0~63" addr="0x177b" mask="13:8" dst="U" desc="reg_maxdrt_thrd: the threshold of the low angle max drt." default="40" value="40" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_wave_thrd" range="0~255" addr="0x177b" mask="7:0" dst="U" desc="reg_wave_thrd:in bilateral cases tow pixel difference is smaller than the value, the trend between the tow pixel not change." default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_newraw_thrd" range="0~255" addr="0x177c" mask="31:24" dst="U" desc="reg_newraw_thrd: the old drt and new drt transition threshold." default="32" value="32" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_tb_max_thrd" range="0~255" addr="0x177c" mask="23:16" dst="U" desc="reg_tb_max_thrd: the threshold of top and bottom max or min pixel." default="10" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_diffpix_thrd" range="0~255" addr="0x177c" mask="15:8" dst="U" desc="reg_diffpix_thrd: Max-Min less than the value,the trend is non-existent." default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_bilt_trendnumt" range="0~63" addr="0x177c" mask="5:0" dst="U" desc="reg_bilt_trendnumt: in bilateral cases the difference between the top and bottom pixel number of the monotonic trend smaller than the value is low angle." default="5" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_trend_numb" range="0~31" addr="0x177d" mask="28:24" dst="U" desc="reg_trend_numb:in bilateral cases the pixel number of the monotonic trend larger than the value is low angle." default="10" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_bilt_trendnum" range="0~31" addr="0x177d" mask="20:16" dst="U" desc="reg_bilt_trendnum:in bilateral cases the pixel number of the trend larger than the value is low angle." default="4" value="4" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_unil_trendnumt" range="0~31" addr="0x177d" mask="12:8" dst="U" desc="reg_unil_trendnumt: in unilateral cases the difference between the top and bottom pixel number of the monotonic trend smaller than the value is low angle." default="7" value="7" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_trend_num" range="0~31" addr="0x177d" mask="4:0" dst="U" desc="reg_trend_num: in unilateral cases the pixel number of the trend larger than the value is ultra-low angle." default="10" value="10" cmd="common:2,0xff900000" />
+</Page>
+<Page tab_title="XLR" layout="6x4">
+<Control ui_type="checkbox" name="reg_xlr_en" range="0~1" addr="0x3730" mask="22:22" dst="U" desc="enable bits for xlr function, 1: enable, 0: disable" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_xlr_side_en" range="0~1" addr="0x3730" mask="21:21" dst="U" desc="enable to filter the above and below lines with xlr filter." default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_xlr_3lines" range="0~1" addr="0x3730" mask="20:20" dst="U" desc="unsigned, default = 1, 3 lines version enable." default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_simlp_gain" range="0~15" addr="0x3730" mask="19:16" dst="U" desc="unsigned , default = 12, gain to simlp to decide if need the XLR" default="12" value="12" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_ooplp_gain" range="0~63" addr="0x3730" mask="13:8" dst="U" desc="unsigned,default = 6,gain to out-of-phase lp error to decide if need the XLR, birn to 16 as 1, default= 3" default="6" value="6" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_dislp_thr" range="0~255" addr="0x3730" mask="7:0" dst="U" desc="unsigned,default = 64,threshold to lp error to discard XLR. default= 80" default="64" value="64" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_txt_core" range="0~15" addr="0x3731" mask="27:24" dst="U" desc="unsigned,default = 3,coring to texture,default = 3." default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_err_thrd2" range="0~255" addr="0x3731" mask="23:16" dst="U" desc="unsigned, default = 5, threshold to error to decide blending coef" default="5" value="5" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_err_thrd1" range="0~255" addr="0x3731" mask="15:8" dst="U" desc="unsigned, default = 10, threshold to error to decide blending coef" default="10" value="10" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_err_thrd0" range="0~255" addr="0x3731" mask="7:0" dst="U" desc="unsigned, default = 20, threshold to error to decide blending coef" default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_hct_step" range="0~3" addr="0x3732" mask="27:26" dst="U" desc="unsigned, default = 3, horizontal chroma diff steps" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_hct_lpf" range="0~3" addr="0x3732" mask="25:24" dst="U" desc="unsigned, default = 1, horizontal chroma diff steps" default="1" value="1" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_hct_thr" range="0~255" addr="0x3732" mask="23:16" dst="U" desc="unsigned, default = 20, horizontal chroma diff threshold for xlr enable, to save the horozontal no color tran mode" default="20" value="20" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_sat_thr" range="0~255" addr="0x3732" mask="15:8" dst="U" desc="unsigned, default = 8, saturation threshold for xlr enable, the smaller of the threshold, the more will do xlr" default="8" value="8" cmd="common:2,0xff900000" />
+<Control ui_type="slider" name="reg_xlr_hmargin" range="0~63" addr="0x3732" mask="7:2" dst="U" desc="unsigned, default = 3, left/right number of pixels without xlr" default="3" value="3" cmd="common:2,0xff900000" />
+<Control ui_type="checkbox" name="reg_xlr_hpf_only" range="0~1" addr="0x3732" mask="0:0" dst="U" desc="unsigned,default = 0,enable for only do xlr filter on high pass portion of the data, instead full data" default="0" value="0" cmd="common:2,0xff900000" />
+</Page>
+</Group>
+</Form>
+

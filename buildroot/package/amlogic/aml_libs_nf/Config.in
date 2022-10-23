@@ -1,0 +1,7 @@
+config BR2_PACKAGE_AML_LIBS_NF
+        bool "aml_libs_nf"
+        help
+          amlogic media player library for netflix.
+
+          http://openlinux.amlogic.com
+

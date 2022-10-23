@@ -1,0 +1,57 @@
+
+QT IDE based BSA sample application
+
+Functionality:
+Device inquiry, pairing, A2DP sink, AVRCP Controller, HF, PBAP Client, MAP Client, A2DP source, HF-AG
+
+==============================================================
+Setup:
+
+Note: The sample has been tested on Fedora 16, Kernel 3.1.0.7 distribution.
+
+> su
+> yum install gcc 
+> yum install gcc-c++
+> yum install kernel-devel-$(uname -r) 
+> yum install alsa-lib-devel 
+> yum install alsa-utils alsa-lib
+> yum groupinstall "Development Tools" "Development Libraries" 
+> yum install libGLU-devel 
+
+Install QT: Download QT http://qt-project.org/downloads, for example qt-linux-opensource-
+5.1.1-x86-offline.run.(Either online or offline installer can be used). 
+ 
+> su 
+> chmod +x qt-linux-opensource-5.1.1-x86-offline.run 
+> ./qt-linux-opensource-5.1.1-x86-offline.run 
+==============================================================
+Compilation:
+
+Start the QT IDE - 
+> su 
+Note that QT creator is started as root. 
+> cd <path_to_qtcreator> 
+For example - 
+> cd /home/user/Qt/Tools/QtCreator/bin 
+> ./qtcreator 
+ 
+Open project file /home/user/bsa/3rdparty/embedded/bsa_examples/linux/qt_app/ 
+qt_app.pro, compile the app. 
+==============================================================
+Debugging: 
+ 
+Copy the bsa_server and firmware (hcd) file to same folder as qt application output folder, for 
+example – 
+ 
+> cp /home/user/bsa/3rdparty/embedded/bsa_examples/linux/server/build/x86/bsa_server 
+/home/user/bsa/3rdparty/embedded/bsa_examples/linux/build-Debug 
+ 
+Start the bsa_server first. The bsa_server should run from the same folder as qt sample app 
+and as root (su) so that it can communicate with btusb driver.
+ 
+> su 
+> cd /home/user/bsa/3rdparty/embedded/bsa_examples/linux/build-Debug 
+> ./bsa_server -p <hcdfile> 
+ 
+Start debugging via QT IDE. 
+==============================================================

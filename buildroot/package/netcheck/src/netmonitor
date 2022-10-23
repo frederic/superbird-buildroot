@@ -1,0 +1,94 @@
+#!/bin/sh
+
+ALL_CALL_ACTION="/etc/init.d/S??*"
+
+netReadyAction()
+{
+    for i in $ALL_CALL_ACTION ;do
+    [ ! -f "$i" ] && continue
+    $i netready
+    done
+}
+netUpAction()
+{
+    for i in $ALL_CALL_ACTION ;do
+    [ ! -f "$i" ] && continue
+    $i netup
+    done
+}
+netDownAction()
+{
+    for i in $ALL_CALL_ACTION ;do
+    [ ! -f "$i" ] && continue
+    $i netdown
+    done
+}
+netRereadyAction()
+{
+    for i in $ALL_CALL_ACTION ;do
+    [ ! -f "$i" ] && continue
+    $i netchange
+    done
+}
+
+netCheckState()
+{
+    local flag=0
+    local tempgeteway=0
+    while true
+    do
+        geteway=`route -n |awk '{print $2}' |awk 'NR==3'`
+        if [ "${geteway}"x != ""x ] && [ "${geteway}"x != "0.0.0.0"x ];then
+            if [ $geteway != $tempgeteway ];then
+                if [ $tempgeteway == "0" ];then
+                    netcheck $geteway
+                    netcheck_res=$?
+                    if [ $netcheck_res -eq 1 ]; then
+                        #echo "dlna start[$geteway]:dlna first start..."
+                        tempgeteway=$geteway
+                        flag=1
+                        netReadyAction
+                    #else
+                        #echo "dlna start[$geteway]:dlna first start err!"
+                    fi
+                else
+                    netcheck $geteway
+                    netcheck_res=$?
+                    if [ $netcheck_res -eq 1 ]; then
+                        #echo "dlna restart[$geteway]:network ip change..."
+                        tempgeteway=$geteway
+                        flag=1
+                        netRereadyAction
+                    #else
+                        #echo "dlna restart[$geteway]:err!"
+                    fi
+                fi
+            else
+                netcheck $geteway
+                netcheck_res=$?
+                if [ $netcheck_res -ne $flag ]; then
+                    flag=$netcheck_res
+                    if [ $flag -eq 1 ]; then
+                        #echo "dlna start[$geteway]:network connected..."
+                        netUpAction
+                    else
+                        #echo "dlna stop[$geteway]:network disconnected..."
+                        netDownAction
+                    fi
+                fi
+            fi
+        else
+          if [ $flag -eq 1 ];then
+            #echo "dlna stop:network disconnected..."
+            flag=0
+            netDownAction
+          else
+            sleep 3
+          fi
+        fi
+    done
+}
+
+netCheckState
+
+exit

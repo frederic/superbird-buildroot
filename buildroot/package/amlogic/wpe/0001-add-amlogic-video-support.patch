@@ -1,0 +1,111 @@
+--- a/Source/cmake/OptionsWPE.cmake
++++ b/Source/cmake/OptionsWPE.cmake
+@@ -51,13 +51,14 @@ WEBKIT_OPTION_DEFINE(USE_HOLE_PUNCH_EXTE
+ WEBKIT_OPTION_DEFINE(USE_HOLE_PUNCH_GSTREAMER "Transparent hole for the video player, rendering done by GStreamer and platform dependant sink" PRIVATE OFF)
+ WEBKIT_OPTION_DEFINE(USE_WESTEROS_SINK "Westeros-Sink to be used as video-sink for GStreamer video player" PUBLIC OFF)
+ WEBKIT_OPTION_DEFINE(USE_FUSION_SINK "Fusion-Sink to be used as video-sink for GStreamer video player" PUBLIC OFF)
+-
++WEBKIT_OPTION_DEFINE(USE_AMLOGIC_SINK "Amlogic-Sink to be used as video-sink for GStreamer video player" PUBLIC OFF)
+ WEBKIT_OPTION_DEPEND(ENABLE_WEB_AUDIO USE_GSTREAMER)
+ WEBKIT_OPTION_DEPEND(USE_GSTREAMER_GL USE_GSTREAMER)
+ WEBKIT_OPTION_DEPEND(USE_GSTREAMER_WEBKIT_HTTP_SRC USE_GSTREAMER)
+ WEBKIT_OPTION_DEPEND(USE_HOLE_PUNCH_GSTREAMER USE_GSTREAMER)
+ WEBKIT_OPTION_DEPEND(USE_WESTEROS_SINK USE_GSTREAMER)
+ WEBKIT_OPTION_DEPEND(USE_FUSION_SINK USE_GSTREAMER)
++WEBKIT_OPTION_DEPEND(USE_AMLOGIC_SINK USE_GSTREAMER)
+ 
+ WEBKIT_OPTION_END()
+ 
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.cpp
+@@ -334,7 +334,7 @@ MediaPlayerPrivateGStreamerBase::~MediaP
+ void MediaPlayerPrivateGStreamerBase::setPipeline(GstElement* pipeline)
+ {
+     m_pipeline = pipeline;
+-#if USE(HOLE_PUNCH_GSTREAMER) && (USE(WESTEROS_SINK) || USE(FUSION_SINK))
++#if USE(HOLE_PUNCH_GSTREAMER) && (USE(WESTEROS_SINK) || USE(FUSION_SINK) || USE(AMLOGIC_SINK))
+     updateVideoRectangle();
+ #endif
+ }
+@@ -975,7 +975,7 @@ void MediaPlayerPrivateGStreamerBase::se
+     GST_INFO("Setting size to %dx%d", size.width(), size.height());
+     m_size = size;
+ 
+-#if USE(WESTEROS_SINK) || USE(FUSION_SINK)
++#if USE(WESTEROS_SINK) || USE(FUSION_SINK) || USE(AMLOGIC_SINK)
+     updateVideoRectangle();
+ #endif
+ }
+@@ -987,12 +987,12 @@ void MediaPlayerPrivateGStreamerBase::se
+ 
+     m_position = position;
+ 
+-#if USE(WESTEROS_SINK) || USE(FUSION_SINK)
++#if USE(WESTEROS_SINK) || USE(FUSION_SINK) || USE(AMLOGIC_SINK)
+     updateVideoRectangle();
+ #endif
+ }
+ 
+-#if USE(WESTEROS_SINK) || USE(FUSION_SINK)
++#if USE(WESTEROS_SINK) || USE(FUSION_SINK) || USE(AMLOGIC_SINK)
+ void MediaPlayerPrivateGStreamerBase::updateVideoRectangle()
+ {
+     if (!m_pipeline)
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.h
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.h
+@@ -270,7 +270,7 @@ protected:
+ 
+ private:
+ 
+-#if USE(WESTEROS_SINK) || USE(FUSION_SINK)
++#if USE(WESTEROS_SINK) || USE(FUSION_SINK) || USE(AMLOGIC_SINK)
+     void updateVideoRectangle();
+ #endif
+ 
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -2018,7 +2018,7 @@ MediaPlayer::SupportsType MediaPlayerPri
+ 
+ bool isMediaDiskCacheDisabled()
+ {
+-    static bool result = false;
++    static bool result = true;
+     static bool computed = false;
+ 
+     if (computed)
+@@ -2227,7 +2227,19 @@ void MediaPlayerPrivateGStreamer::create
+     g_object_set(G_OBJECT(m_videoSink.get()), "zorder",0.0f, nullptr);
+ #endif
+ 
+-#if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)
++#if USE(AMLOGIC_SINK)
++    GRefPtr<GstElement> m_audioSink;
++    m_audioSink = gst_element_factory_make("amlasink", nullptr);
++    g_object_set(m_pipeline.get(), "audio-sink", m_audioSink.get(), nullptr);
++
++#if USE(HOLE_PUNCH_GSTREAMER)
++    m_videoSink = gst_element_factory_make("amlvsink", nullptr);
++    g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
++
++#endif
++#endif
++
++#if !USE(WESTEROS_SINK) && !USE(FUSION_SINK) && !USE(AMLOGIC_SINK)
+     g_object_set(m_pipeline.get(), "audio-sink", createAudioSink(), nullptr);
+ #endif
+     configurePlaySink();
+--- a/Source/WebCore/rendering/RenderVideo.cpp
++++ b/Source/WebCore/rendering/RenderVideo.cpp
+@@ -285,6 +285,12 @@ void RenderVideo::acceleratedRenderingSt
+ bool RenderVideo::requiresImmediateCompositing() const
+ {
+     MediaPlayer* player = videoElement().player();
++#if USE(HOLE_PUNCH_GSTREAMER) || USE(HOLE_PUNCH_EXTERNAL)
++    if (!player)
++        return false;
++    IntRect windowRect = document().view()->contentsToScreen(absoluteBoundingBoxRect(true));
++    player->setPosition(IntPoint(windowRect.x(), windowRect.y()));
++#endif
+     return player && player->requiresImmediateCompositing();
+ }
+ 

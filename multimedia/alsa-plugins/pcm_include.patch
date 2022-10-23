@@ -1,0 +1,12 @@
+diff --git a/usb_stream/pcm_usb_stream.c b/usb_stream/pcm_usb_stream.c
+index b1fd68f..92ab206 100644
+--- a/usb_stream/pcm_usb_stream.c
++++ b/usb_stream/pcm_usb_stream.c
+@@ -21,6 +21,7 @@
+ #include <byteswap.h>
+ #define _GNU_SOURCE
+ #include <sys/mman.h>
++#include <linux/mman.h>
+ #include <sys/shm.h>
+ #include <sys/ioctl.h>
+ #include <sys/types.h>

@@ -26,6 +26,9 @@ UBOOT_SITE_METHOD = hg
 else ifeq ($(BR2_TARGET_UBOOT_CUSTOM_SVN),y)
 UBOOT_SITE = $(call qstrip,$(BR2_TARGET_UBOOT_CUSTOM_REPO_URL))
 UBOOT_SITE_METHOD = svn
+else ifeq ($(BR2_TARGET_UBOOT_CUSTOM_LOCAL),y)
+UBOOT_SITE        = $(call qstrip,$(BR2_TARGET_UBOOT_CUSTOM_LOCAL_LOCATION))
+UBOOT_SITE_METHOD = local
 else
 # Handle stable official U-Boot versions
 UBOOT_SITE = ftp://ftp.denx.de/pub/u-boot
@@ -37,7 +40,7 @@ BR_NO_CHECK_HASH_FOR += $(UBOOT_SOURCE)
 endif
 
 ifeq ($(BR2_TARGET_UBOOT_FORMAT_BIN),y)
-UBOOT_BINS += u-boot.bin
+UBOOT_BINS += build/u-boot.bin
 endif
 
 ifeq ($(BR2_TARGET_UBOOT_FORMAT_ELF),y)
@@ -112,11 +115,17 @@ endif
 
 ifeq ($(BR2_TARGET_UBOOT_FORMAT_CUSTOM),y)
 UBOOT_BINS += $(call qstrip,$(BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME))
+else ifeq ($(BR2_TARGET_UBOOT_WITH_SECURE_OS),y)
+UBOOT_BINS         += uboot-secureos.bin
 endif
 
 ifeq ($(BR2_TARGET_UBOOT_OMAP_IFT),y)
 UBOOT_BINS += u-boot.bin
 UBOOT_BIN_IFT = u-boot.bin.ift
+endif
+
+ifeq ($(BR2_TARGET_UBOOT_AMLOGIC_REPO),y)
+	UBOOT_BINS := build/u-boot.bin build/u-boot.bin.usb.bl2 build/u-boot.bin.usb.tpl  build/u-boot.bin.sd.bin build/u-boot.bin.encrypt build/u-boot.bin.encrypt.efuse build/u-boot.bin.encrypt.sd.bin build/u-boot.bin.encrypt.usb.bl2 build/u-boot.bin.encrypt.usb.tpl
 endif
 
 # The kernel calls AArch64 'arm64', but U-Boot calls it just 'arm', so
@@ -156,6 +165,45 @@ ifeq ($(BR2_TARGET_UBOOT_NEEDS_OPENSSL),y)
 UBOOT_DEPENDENCIES += host-openssl
 endif
 
+ifeq ($(BR2_PACKAGE_TDK),y)
+UBOOT_DEPENDENCIES += tdk
+SECUROS_IMAGE_DIR = "gx"
+
+ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "axg")
+SECUROS_IMAGE_DIR = "axg"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "txlx")
+SECUROS_IMAGE_DIR = "txlx"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "g12a")
+SECUROS_IMAGE_DIR = "g12a"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "g12b")
+SECUROS_IMAGE_DIR = "g12a"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "sm1")
+SECUROS_IMAGE_DIR = "g12a"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "tl1")
+SECUROS_IMAGE_DIR = "tl1"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "tm2")
+SECUROS_IMAGE_DIR = "tm2"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "a1")
+SECUROS_IMAGE_DIR = "a1"
+else ifeq ($(BR2_TARGET_UBOOT_PLATFORM), "c1")
+SECUROS_IMAGE_DIR = "c1"
+else
+SECUROS_IMAGE_DIR = "gx"
+endif
+
+ifeq ($(BR2_TARGET_UBOOT_AMLOGIC_REPO),y)
+	BL32_DEST_DIR=$(@D)/bl32/bin/$(call qstrip,$(BR2_TARGET_UBOOT_PLATFORM))
+else
+	BL32_DEST_DIR=$(@D)/fip/$(call qstrip,$(BR2_TARGET_UBOOT_PLATFORM))
+endif
+
+define UBOOT_TDK_BINARY
+	mkdir -p $(BL32_DEST_DIR) && cp -f $(TDK_DIR)/secureos/$(call qstrip,$(SECUROS_IMAGE_DIR))/bl32.img $(BL32_DEST_DIR)
+endef
+
+UBOOT_PRE_CONFIGURE_HOOKS += UBOOT_TDK_BINARY
+endif
+
 ifeq ($(BR2_TARGET_UBOOT_NEEDS_LZOP),y)
 UBOOT_DEPENDENCIES += host-lzop
 endif
@@ -170,6 +218,13 @@ endef
 
 UBOOT_POST_EXTRACT_HOOKS += UBOOT_COPY_OLD_LICENSE_FILE
 UBOOT_POST_RSYNC_HOOKS += UBOOT_COPY_OLD_LICENSE_FILE
+
+ifeq ($(BR2_TARGET_UBOOT_CUSTOM_LOCAL),y)
+define UBOOT_COPY_GIT_DIR
+        cp -rf $(UBOOT_SITE)/* $(@D)/
+endef
+UBOOT_PRE_PATCH_HOOKS += UBOOT_COPY_GIT_DIR
+endif
 
 ifneq ($(ARCH_XTENSA_OVERLAY_FILE),)
 define UBOOT_XTENSA_OVERLAY_EXTRACT
@@ -197,6 +252,22 @@ define UBOOT_APPLY_LOCAL_PATCHES
 endef
 UBOOT_POST_PATCH_HOOKS += UBOOT_APPLY_LOCAL_PATCHES
 
+ifeq ($(BR2_TARGET_UBOOT_WITH_SECURE_OS)$(BR2_PACKAGE_AML_BDK),yy)
+define UBOOT_SECUREOS_BINARY
+	mkdir -p $(@D)/secure_os
+	cp -f package/aml_bdk/src/secureos/$(word 1, $(subst _, ,$(UBOOT_BOARD_NAME)))/otzone-ucl.bin $(@D)/secure_os
+endef
+UBOOT_PRE_CONFIGURE_HOOKS += UBOOT_SECUREOS_BINARY
+endif
+
+ifneq ($(BR2_PACKAGE_AML_UBOOT_CUSTOMER_GIT_REPO_URL),"")
+UBOOT_DEPENDENCIES += aml_uboot_customer
+define UBOOT_CUSTOMER_TREE
+	cp -rf $(AML_UBOOT_CUSTOMER_DIR) $(@D)/customer
+endef
+UBOOT_PRE_CONFIGURE_HOOKS += UBOOT_CUSTOMER_TREE
+endif
+
 # This is equivalent to upstream commit
 # http://git.denx.de/?p=u-boot.git;a=commitdiff;h=e0d20dc1521e74b82dbd69be53a048847798a90a. It
 # fixes a build failure when libfdt-devel is installed system-wide.
@@ -210,11 +281,13 @@ endef
 UBOOT_POST_PATCH_HOOKS += UBOOT_FIXUP_LIBFDT_INCLUDE
 
 ifeq ($(BR2_TARGET_UBOOT_BUILD_SYSTEM_LEGACY),y)
+ifneq ($(BR2_TARGET_UBOOT_AMLOGIC_REPO),y)
 define UBOOT_CONFIGURE_CMDS
 	$(TARGET_CONFIGURE_OPTS) \
 		$(MAKE) -C $(@D) $(UBOOT_MAKE_OPTS) \
 		$(UBOOT_BOARD_NAME)_config
 endef
+endif
 else ifeq ($(BR2_TARGET_UBOOT_BUILD_SYSTEM_KCONFIG),y)
 ifeq ($(BR2_TARGET_UBOOT_USE_DEFCONFIG),y)
 UBOOT_KCONFIG_DEFCONFIG = $(call qstrip,$(BR2_TARGET_UBOOT_BOARD_DEFCONFIG))_defconfig
@@ -242,6 +315,25 @@ define UBOOT_HELP_CMDS
 endef
 endif # BR2_TARGET_UBOOT_BUILD_SYSTEM_LEGACY
 
+ifeq ($(BR2_TARGET_UBOOT_AMLOGIC_REPO),y)
+define UBOOT_BUILD_CMDS
+	$(TARGET_CONFIGURE_OPTS) $(UBOOT_CONFIGURE_OPTS) \
+	cd $(@D);./mk $(UBOOT_BOARD_NAME)
+endef
+define UBOOT_INSTALL_AMLOGIC_USB_TOOL
+	cp -dpf $(@D)/build/u-boot.bin $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.sd.bin $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.encrypt $(BINARIES_DIR)/
+	test -f $(@D)/build/u-boot.bin.encrypt.efuse && cp -dpf $(@D)/build/u-boot.bin.encrypt.efuse $(BINARIES_DIR)/ || echo "Potential error: Missing file: $(@D)/build/u-boot.bin.encrypt.efuse"
+	cp -dpf $(@D)/build/u-boot.bin.usb.bl2 $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.usb.tpl $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.encrypt.usb.bl2 $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.encrypt.usb.tpl $(BINARIES_DIR)/
+	cp -dpf $(@D)/build/u-boot.bin.encrypt.sd.bin $(BINARIES_DIR)/
+	$(INSTALL) -m 0755 $(@D)/fip/$(call qstrip,$(BR2_TARGET_UBOOT_PLATFORM))/aml_encrypt_$(BR2_TARGET_UBOOT_PLATFORM) $(HOST_DIR)/usr/bin
+endef
+UBOOT_POST_INSTALL_IMAGES_HOOKS += UBOOT_INSTALL_AMLOGIC_USB_TOOL
+else
 UBOOT_CUSTOM_DTS_PATH = $(call qstrip,$(BR2_TARGET_UBOOT_CUSTOM_DTS_PATH))
 
 define UBOOT_BUILD_CMDS
@@ -260,6 +352,7 @@ define UBOOT_BUILD_CMDS
 			-e $(BR2_TARGET_UBOOT_FORMAT_NAND_ERASE_SIZE) \
 			nand $(@D)/u-boot.sb $(@D)/u-boot.nand)
 endef
+endif
 
 define UBOOT_BUILD_OMAP_IFT
 	$(HOST_DIR)/bin/gpsign -f $(@D)/u-boot.bin \
@@ -280,7 +373,7 @@ endif
 
 define UBOOT_INSTALL_IMAGES_CMDS
 	$(foreach f,$(UBOOT_BINS), \
-			cp -dpf $(@D)/$(f) $(BINARIES_DIR)/
+		test -f $(@D)/$(f) && cp -dpf $(@D)/$(f) $(BINARIES_DIR)/ || echo "Potential error: Missing $(@D)/$(f)"
 	)
 	$(if $(BR2_TARGET_UBOOT_FORMAT_NAND),
 		cp -dpf $(@D)/u-boot.sb $(BINARIES_DIR))

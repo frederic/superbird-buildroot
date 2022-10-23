@@ -1,0 +1,49 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+             $(appdir)/../app_common/include \
+             $(appdir)/../app_av/include \
+             $(appdir)/../app_ag/include \
+             $(appdir)/../app_avk/include \
+			 $(appdir)/../app_hs/include
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source \
+            $(appdir)/../app_common/source \
+			$(appdir)/../app_av/source \
+			$(appdir)/../app_ag/source \
+			$(appdir)/../app_avk/source \
+			$(appdir)/../app_hs/source
+
+# list of sources for the current application
+appsrcs := \
+    app_switch.c \
+	app_switch_main.c \
+    app_av.c \
+    app_av_bcst.c \
+    app_disc.c \
+    app_utils.c \
+    app_mgt.c \
+    app_xml_utils.c \
+    app_xml_param.c \
+    app_wav.c \
+    app_playlist.c \
+    app_mutex.c \
+    app_thread.c \
+    app_services.c \
+    app_dm.c \
+    nanoxml.c \
+    app_avk.c \
+	app_hs.c \
+	app_ag.c
+
+ifeq ($(strip $(ENABLE_ALSA)),TRUE)
+appsrcs := $(appsrcs) app_alsa.c
+endif
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)
+

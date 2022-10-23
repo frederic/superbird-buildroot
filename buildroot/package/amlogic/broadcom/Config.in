@@ -1,0 +1,3 @@
+source "package/amlogic/broadcom/brcmap6xxx/Config.in"
+source "package/amlogic/broadcom/brcm_smartconfig/Config.in"
+source "package/amlogic/broadcom/brcmusi/Config.in"

@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+
+function init_asound(){
+	sleep 2
+	cat /proc/device-tree/amlogic-dt-id | grep v03
+	if [ $? -eq 0 ]
+	then
+		#sed -i "s/device 1/device 2/g" /etc/asound.conf
+		sed -i "s/hw:0,1/hw:0,2/g" /etc/asound.conf
+		sync
+	else
+		sed -i "s/hw:0,2/hw:0,1/g" /etc/asound.conf
+		sync
+	fi
+
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+}
+
+case "$1" in
+  start)
+	  init_asound &
+	;;
+  *)
+	echo "Usage: $0 {start}"
+	exit 1
+esac
+
+exit $?
+

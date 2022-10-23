@@ -1,0 +1,20 @@
+# This is map table for buildroot, use this define the key map for buildroot system
+
+# type                  key
+#up                      106    #this key used avs mute
+#down                    105    #this key used avs tap
+#WifiConfig              139
+#VolumeUp                115    #this key used avs VolumeUp
+#VolumeDown              114    #this key used avs VolumeDown
+Power                   200     # power key
+Source                  201			# eject key
+Mute                    209     # mute key
+VolumeUp                210     # vol+ key
+VolumeDown              211     # vol- key
+LINEIN                  204     # AUX key
+HDMI1                   207     # INTRO key (4,1)
+HDMI2                   208     # REPEAT key (4,2)
+HDMIARC                 205     # PAIR key (3,3)
+SSPDIF                  206     # DIMMER key (3,4)
+BlueTooth               203     # BT key (2,3)
+

@@ -1,0 +1,46 @@
+diff -Nur swupdate-2018.11-Orig/core/swupdate.c swupdate-2018.11/core/swupdate.c
+--- swupdate-2018.11-Orig/core/swupdate.c	2019-06-19 12:46:54.988367279 +0800
++++ swupdate-2018.11/core/swupdate.c	2019-06-19 13:04:32.677959185 +0800
+@@ -606,6 +606,7 @@
+ #endif
+ #ifdef CONFIG_DOWNLOAD
+ 	strcat(main_options, "d:");
++	strcat(main_options, "D");
+ #endif
+ #ifdef CONFIG_SURICATTA
+ 	strcat(main_options, "u:");
+@@ -767,6 +768,15 @@
+ 			dwlav = splitargs(dwloptions, &dwlac);
+ 			opt_d = 1;
+ 			break;
++        case 'D':
++            if (get_recovery_otapath(image_url) != 0) {
++                exit(EXIT_FAILURE);
++                break;
++            }
++            (void)snprintf(dwloptions, sizeof(dwloptions), "%s -u %s", argv[0], image_url);
++            dwlav = splitargs(dwloptions, &dwlac);
++            opt_d = 1;
++            break;
+ #endif
+ 		case 'H':
+ 			if (opt_to_hwrev(optarg, &swcfg.hw) < 0)
+diff -Nur swupdate-2018.11-Orig/corelib/stream_interface.c swupdate-2018.11/corelib/stream_interface.c
+--- swupdate-2018.11-Orig/corelib/stream_interface.c	2019-06-19 12:46:54.988367279 +0800
++++ swupdate-2018.11/corelib/stream_interface.c	2019-06-19 13:01:54.513721134 +0800
+@@ -444,6 +444,7 @@
+ 			bootloader_env_set("recovery_status", "in_progress");
+ 
+ 			notify(RUN, RECOVERY_NO_ERROR, INFOLEVEL, "Installation in progress");
++            set_recovery();
+ 			ret = install_images(software, 0, 0);
+ 			if (ret != 0) {
+ 				bootloader_env_set("recovery_status", "failed");
+@@ -456,6 +457,7 @@
+ 				 * that it is not required to start recovery again
+ 				 */
+ 				bootloader_env_unset("recovery_status");
++                clean_recovery_otapath();
+ 				notify(SUCCESS, RECOVERY_NO_ERROR, INFOLEVEL, "SWUPDATE successful !");
+ 				inst.last_install = SUCCESS;
+ 			}

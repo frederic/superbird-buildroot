@@ -2218,7 +2218,11 @@ static void xhci_add_in_port(struct xhci_hcd *xhci, unsigned int num_ports,
 	if ((xhci->hci_version >= 0x100) && (major_revision != 0x03)) {
 		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 				"xHCI 1.0: support USB2 software lpm");
+#ifdef CONFIG_AMLOGIC_USB
+		xhci->sw_lpm_support = 0;
+#else
 		xhci->sw_lpm_support = 1;
+#endif
 		if (temp & XHCI_HLC) {
 			xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 					"xHCI 1.0: support USB2 hardware lpm");
@@ -2251,7 +2255,14 @@ static void xhci_add_in_port(struct xhci_hcd *xhci, unsigned int num_ports,
 		}
 		xhci->port_array[i] = major_revision;
 		if (major_revision == 0x03)
+#ifdef CONFIG_AMLOGIC_USB
+			if (xhci->quirks & XHCI_AML_SUPER_SPEED_SUPPORT)
+				xhci->num_usb3_ports++;
+			else
+				xhci->num_usb3_ports = 0;
+#else
 			xhci->num_usb3_ports++;
+#endif
 		else
 			xhci->num_usb2_ports++;
 	}

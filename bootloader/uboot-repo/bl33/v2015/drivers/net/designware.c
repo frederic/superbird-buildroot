@@ -15,11 +15,20 @@
 #include <linux/compiler.h>
 #include <linux/err.h>
 #include <asm/io.h>
+#include <asm/arch/io.h>
 #include "designware.h"
+#include <asm/arch/secure_apb.h>
+#include <amlogic/keyunify.h>
+#include <version.h>
 
 #if !defined(CONFIG_PHYLIB)
 # error "DesignWare Ether MAC requires PHYLIB - missing CONFIG_PHYLIB"
 #endif
+
+struct eth_device *dev = NULL;
+struct dw_eth_dev *priv = NULL;
+int do_cali_process = 0;
+int do_cali_timeout = 0;
 
 static int dw_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 {
@@ -98,8 +107,8 @@ static void tx_descs_init(struct eth_device *dev)
 
 	for (idx = 0; idx < CONFIG_TX_DESCR_NUM; idx++) {
 		desc_p = &desc_table_p[idx];
-		desc_p->dmamac_addr = &txbuffs[idx * CONFIG_ETH_BUFSIZE];
-		desc_p->dmamac_next = &desc_table_p[idx + 1];
+		desc_p->dmamac_addr = (u32)(phys_addr_t)&txbuffs[idx * CONFIG_ETH_BUFSIZE];
+		desc_p->dmamac_next = (u32)(phys_addr_t)&desc_table_p[idx + 1];
 
 #if defined(CONFIG_DW_ALTDESCRIPTOR)
 		desc_p->txrx_status &= ~(DESC_TXSTS_TXINT | DESC_TXSTS_TXLAST |
@@ -117,11 +126,11 @@ static void tx_descs_init(struct eth_device *dev)
 	}
 
 	/* Correcting the last pointer of the chain */
-	desc_p->dmamac_next = &desc_table_p[0];
+	desc_p->dmamac_next = (u32)(phys_addr_t)&desc_table_p[0];
 
 	/* Flush all Tx buffer descriptors at once */
-	flush_dcache_range((unsigned int)priv->tx_mac_descrtable,
-			   (unsigned int)priv->tx_mac_descrtable +
+	flush_dcache_range((phys_addr_t)priv->tx_mac_descrtable,
+			   (phys_addr_t)priv->tx_mac_descrtable +
 			   sizeof(priv->tx_mac_descrtable));
 
 	writel((ulong)&desc_table_p[0], &dma_p->txdesclistaddr);
@@ -143,13 +152,13 @@ static void rx_descs_init(struct eth_device *dev)
 	 * Otherwise there's a chance to get some of them flushed in RAM when
 	 * GMAC is already pushing data to RAM via DMA. This way incoming from
 	 * GMAC data will be corrupted. */
-	flush_dcache_range((unsigned int)rxbuffs, (unsigned int)rxbuffs +
+	flush_dcache_range((phys_addr_t)rxbuffs, (phys_addr_t)rxbuffs +
 			   RX_TOTAL_BUFSIZE);
 
 	for (idx = 0; idx < CONFIG_RX_DESCR_NUM; idx++) {
 		desc_p = &desc_table_p[idx];
-		desc_p->dmamac_addr = &rxbuffs[idx * CONFIG_ETH_BUFSIZE];
-		desc_p->dmamac_next = &desc_table_p[idx + 1];
+		desc_p->dmamac_addr = (u32)(phys_addr_t)&rxbuffs[idx * CONFIG_ETH_BUFSIZE];
+		desc_p->dmamac_next = (u32)(phys_addr_t)&desc_table_p[idx + 1];
 
 		desc_p->dmamac_cntl =
 			(MAC_MAX_FRAME_SZ & DESC_RXCTRL_SIZE1MASK) | \
@@ -159,11 +168,11 @@ static void rx_descs_init(struct eth_device *dev)
 	}
 
 	/* Correcting the last pointer of the chain */
-	desc_p->dmamac_next = &desc_table_p[0];
+	desc_p->dmamac_next = (u32)(phys_addr_t)&desc_table_p[0];
 
 	/* Flush all Rx buffer descriptors at once */
-	flush_dcache_range((unsigned int)priv->rx_mac_descrtable,
-			   (unsigned int)priv->rx_mac_descrtable +
+	flush_dcache_range((phys_addr_t)priv->rx_mac_descrtable,
+			   (phys_addr_t)priv->rx_mac_descrtable +
 			   sizeof(priv->rx_mac_descrtable));
 
 	writel((ulong)&desc_table_p[0], &dma_p->rxdesclistaddr);
@@ -208,9 +217,11 @@ static void dw_adjust_link(struct eth_mac_regs *mac_p,
 
 	writel(conf, &mac_p->conf);
 
-	printf("Speed: %d, %s duplex%s\n", phydev->speed,
-	       (phydev->duplex) ? "full" : "half",
-	       (phydev->port == PORT_FIBRE) ? ", fiber mode" : "");
+	if (!do_cali_process) {
+		printf("Speed: %d, %s duplex%s\n", phydev->speed,
+			(phydev->duplex) ? "full" : "half",
+			(phydev->port == PORT_FIBRE) ? ", fiber mode" : "");
+	}
 }
 
 static void dw_eth_halt(struct eth_device *dev)
@@ -238,8 +249,12 @@ static int dw_eth_init(struct eth_device *dev, bd_t *bis)
 	while (readl(&dma_p->busmode) & DMAMAC_SRST) {
 		if (get_timer(start) >= CONFIG_MACRESET_TIMEOUT)
 			return -1;
-
+#ifdef CONFIG_PXP_EMULATOR
+		udelay(100);
+#else
 		mdelay(100);
+#endif
+
 	};
 
 	/* Soft reset above clears HW address registers.
@@ -262,7 +277,11 @@ static int dw_eth_init(struct eth_device *dev, bd_t *bis)
 		       priv->phydev->dev->name);
 		return -1;
 	}
-
+#ifdef CONFIG_PXP_EMULATOR
+	priv->phydev->link = 1;
+	priv->phydev->speed = 100;
+	priv->phydev->duplex = 1;
+#endif
 	dw_adjust_link(mac_p, priv->phydev);
 
 	if (!priv->phydev->link)
@@ -279,12 +298,9 @@ static int dw_eth_send(struct eth_device *dev, void *packet, int length)
 	struct eth_dma_regs *dma_p = priv->dma_regs_p;
 	u32 desc_num = priv->tx_currdescnum;
 	struct dmamacdescr *desc_p = &priv->tx_mac_descrtable[desc_num];
-	uint32_t desc_start = (uint32_t)desc_p;
-	uint32_t desc_end = desc_start +
+	phys_addr_t desc_start = (phys_addr_t)desc_p;
+	phys_addr_t desc_end = desc_start +
 		roundup(sizeof(*desc_p), ARCH_DMA_MINALIGN);
-	uint32_t data_start = (uint32_t)desc_p->dmamac_addr;
-	uint32_t data_end = data_start +
-		roundup(length, ARCH_DMA_MINALIGN);
 	/*
 	 * Strictly we only need to invalidate the "txrx_status" field
 	 * for the following check, but on some platforms we cannot
@@ -301,19 +317,20 @@ static int dw_eth_send(struct eth_device *dev, void *packet, int length)
 		return -1;
 	}
 
-	memcpy(desc_p->dmamac_addr, packet, length);
-
+	memcpy((void *)(phys_addr_t)desc_p->dmamac_addr, packet, length);
 	/* Flush data to be sent */
-	flush_dcache_range(data_start, data_end);
+	flush_dcache_range((phys_addr_t)priv->txbuffs, (phys_addr_t)priv->txbuffs + TX_TOTAL_BUFSIZE);
 
 #if defined(CONFIG_DW_ALTDESCRIPTOR)
 	desc_p->txrx_status |= DESC_TXSTS_TXFIRST | DESC_TXSTS_TXLAST;
+	desc_p->dmamac_cntl &= (~DESC_TXCTRL_SIZE1MASK);
 	desc_p->dmamac_cntl |= (length << DESC_TXCTRL_SIZE1SHFT) & \
 			       DESC_TXCTRL_SIZE1MASK;
 
 	desc_p->txrx_status &= ~(DESC_TXSTS_MSK);
 	desc_p->txrx_status |= DESC_TXSTS_OWNBYDMA;
 #else
+	desc_p->dmamac_cntl &= (~DESC_TXCTRL_SIZE1MASK);
 	desc_p->dmamac_cntl |= ((length << DESC_TXCTRL_SIZE1SHFT) & \
 			       DESC_TXCTRL_SIZE1MASK) | DESC_TXCTRL_TXLAST | \
 			       DESC_TXCTRL_TXFIRST;
@@ -342,12 +359,9 @@ static int dw_eth_recv(struct eth_device *dev)
 	u32 status, desc_num = priv->rx_currdescnum;
 	struct dmamacdescr *desc_p = &priv->rx_mac_descrtable[desc_num];
 	int length = 0;
-	uint32_t desc_start = (uint32_t)desc_p;
-	uint32_t desc_end = desc_start +
-		roundup(sizeof(*desc_p), ARCH_DMA_MINALIGN);
-	uint32_t data_start = (uint32_t)desc_p->dmamac_addr;
-	uint32_t data_end;
-
+	phys_addr_t desc_start = (phys_addr_t)desc_p;
+	phys_addr_t desc_end = desc_start +
+	roundup(sizeof(*desc_p), ARCH_DMA_MINALIGN);
 	/* Invalidate entire buffer descriptor */
 	invalidate_dcache_range(desc_start, desc_end);
 
@@ -355,16 +369,13 @@ static int dw_eth_recv(struct eth_device *dev)
 
 	/* Check  if the owner is the CPU */
 	if (!(status & DESC_RXSTS_OWNBYDMA)) {
-
 		length = (status & DESC_RXSTS_FRMLENMSK) >> \
 			 DESC_RXSTS_FRMLENSHFT;
 
 		/* Invalidate received data */
-		data_end = data_start + roundup(length, ARCH_DMA_MINALIGN);
-		invalidate_dcache_range(data_start, data_end);
+		invalidate_dcache_range((phys_addr_t)priv->rxbuffs, (phys_addr_t)priv->rxbuffs + RX_TOTAL_BUFSIZE);
 
-		NetReceive(desc_p->dmamac_addr, length);
-
+		NetReceive((uchar *)(phys_addr_t)desc_p->dmamac_addr, length);
 		/*
 		 * Make the current descriptor valid again and go to
 		 * the next one
@@ -409,11 +420,14 @@ static int dw_phy_init(struct eth_device *dev)
 	return 1;
 }
 
+#ifdef ETHERNET_EXTERNAL_PHY
+int check_eth_para(void);
+char bestwindow = -1;
+char cmd[64];
+#endif
 int designware_initialize(ulong base_addr, u32 interface)
 {
-	struct eth_device *dev;
-	struct dw_eth_dev *priv;
-
+	int ret;
 	dev = (struct eth_device *) malloc(sizeof(struct eth_device));
 	if (!dev)
 		return -ENOMEM;
@@ -453,6 +467,434 @@ int designware_initialize(ulong base_addr, u32 interface)
 
 	dw_mdio_init(dev->name, priv->mac_regs_p);
 	priv->bus = miiphy_get_dev_by_name(dev->name);
+	ret = dw_phy_init(dev);
 
-	return dw_phy_init(dev);
+#ifdef ETHERNET_EXTERNAL_PHY
+	if (check_eth_para()) {
+		run_command("autocali 5 1 1 0", 0);
+	}
+	if (bestwindow >= 0) {
+		sprintf(cmd, "fdt set /ethernet@%08x auto_cali_idx <%d>", (unsigned int)base_addr, bestwindow);
+		run_command("fdt addr $dtb_mem_addr", 0);
+		run_command(cmd, 0);
+	}
+#endif
+	return ret;
 }
+
+/* amlogic debug cmd start */
+static int do_phyreg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	unsigned int reg, value;
+	unsigned char *cmd = NULL;
+	unsigned int i;
+
+	if (argc < 2) {
+		return cmd_usage(cmdtp);
+	}
+
+	if (priv == NULL || priv->phydev == NULL) {
+		return -1;
+	}
+
+	cmd = (unsigned char *)argv[1];
+	switch (*cmd) {
+		case 'd':
+			printf("=== ethernet phy register dump:\n");
+			for (i = 0; i < 32; i++)
+				printf("[reg_%d] 0x%x\n", i, phy_read(priv->phydev, MDIO_DEVAD_NONE, i));
+			break;
+		case 'r':
+			if (argc != 3) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet phy register read:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			printf("[reg_%d] 0x%x\n", reg, phy_read(priv->phydev, MDIO_DEVAD_NONE, reg));
+
+			break;
+		case 'w':
+			if (argc != 4) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet phy register write:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			value = simple_strtoul(argv[3], NULL, 16);
+			phy_write(priv->phydev, MDIO_DEVAD_NONE, reg, value);
+			printf("[reg_%d] 0x%x\n", reg, phy_read(priv->phydev, MDIO_DEVAD_NONE, reg));
+			break;
+
+		default:
+			return cmd_usage(cmdtp);
+	}
+
+	return 0;
+}
+
+static int do_macreg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	unsigned int reg, value;
+	unsigned char *cmd = NULL;
+	unsigned int i = 0;
+
+	if (argc  < 2) {
+		return cmd_usage(cmdtp);
+	}
+
+	cmd = (unsigned char *)argv[1];
+	switch (*cmd) {
+		case 'd':
+			printf("=== ETH_MAC register dump:\n");
+			for (i = 0x0000; i <= 0x004C; i += 0x4)
+				printf("[0x%04x] 0x%lx\n", i, (unsigned long)readl((unsigned long)priv->mac_regs_p + i));
+
+			printf("=== ETH_DMA register dump:\n");
+			for (i = 0x0000; i <= 0x0054; i += 0x4)
+				printf("[0x%04x] 0x%x\n", i, (unsigned int)readl((unsigned long)priv->dma_regs_p + i));
+
+			break;
+		case 'r':
+			if (argc != 3) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet mac register read:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			printf("[0x%04x] 0x%x\n", i, (unsigned int)readl((unsigned long)priv->mac_regs_p + reg));
+
+			break;
+		case 'w':
+			if (argc != 4) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== ethernet mac register write:\n");
+			reg = simple_strtoul(argv[2], NULL, 10);
+			value = simple_strtoul(argv[3], NULL, 16);
+			writel(value, (unsigned long)priv->mac_regs_p + reg);
+			printf("[0x%04x] 0x%x\n", reg, value);
+			break;
+
+		default:
+			return cmd_usage(cmdtp);
+	}
+
+	return 0;
+}
+
+static int do_cbusreg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	unsigned int reg, value;
+	char *cmd = NULL;
+
+
+	if (argc < 3) {
+		return cmd_usage(cmdtp);
+	}
+
+	cmd = argv[1];
+	switch (*cmd) {
+		case 'r':
+			if (argc != 3) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== cbus register read:\n");
+			reg = simple_strtoul(argv[2], NULL, 16);
+			printf("[0x%04x] 0x%x\n", reg, READ_CBUS_REG(reg));
+
+			break;
+		case 'w':
+			if (argc != 4) {
+				return cmd_usage(cmdtp);
+			}
+			printf("=== cbus register write:\n");
+			reg = simple_strtoul(argv[2], NULL, 16);
+			value = simple_strtoul(argv[3], NULL, 16);
+			WRITE_CBUS_REG(reg, value);
+			printf("[0x%04x] 0x%x\n", reg, READ_CBUS_REG(reg));
+			break;
+
+		default:
+			return cmd_usage(cmdtp);
+	}
+
+	return 0;
+}
+#ifdef ETHERNET_EXTERNAL_PHY
+int print_flag = 0;
+
+#define ETH_MAGIC "exphy:"
+struct unify_eth_info {
+	char magic[6];
+	char index;
+	char chk;
+	char ver[24];
+};
+
+int check_eth_para(void)
+{
+	struct unify_eth_info unify_eth;
+	int ret;
+
+	ret = key_unify_read("eth_exphy_para", &unify_eth, sizeof(struct unify_eth_info));
+	if (ret)
+		return ret;
+
+	if (strncmp(unify_eth.magic, ETH_MAGIC, 6) != 0)
+		return -1;
+
+	if (unify_eth.index + unify_eth.chk !=0xff)
+		return -1;
+
+	if (strcmp(unify_eth.ver, PLAIN_VERSION) != 0)
+		return -1;
+
+	bestwindow = unify_eth.index;
+	return 0;
+}
+
+int calc_result(u16* calilist)
+{
+	int best_window = -1;
+	int start_window = -1;
+	int end_window = -1;
+	int cur_test_start_window = -1;
+	int cur_window;
+	int i,j;
+	u16 cali;
+
+	for (i=0; i<4; i++) {
+		cali = calilist[i];
+		cur_test_start_window = -1;
+		for (j=0; j<16; j++) {
+			cur_window = (i * 16) +j;
+			if (cali & (1<<j)) {
+				if (cur_test_start_window == -1)
+					cur_test_start_window = cur_window;
+
+				if (j == 15) {
+					if (cur_window - cur_test_start_window >= end_window - start_window) {
+						start_window = cur_test_start_window;
+						end_window = cur_window;
+						if (print_flag)
+							printf("cur: %d, start:%d, end:%d\n", cur_window,start_window,end_window);
+					}
+				}
+			} else {
+				if (cur_test_start_window != -1) {
+					if (cur_window-1 - cur_test_start_window >= end_window - start_window) {
+						start_window = cur_test_start_window;
+						end_window = cur_window-1;
+						if (print_flag)
+							printf("cur: %d, start:%d, end:%d\n", cur_window,start_window,end_window);
+					}
+					cur_test_start_window = -1;
+				}
+			}
+		}
+	}
+
+	if (print_flag)
+		printf("final start:%d, end:%d\n", start_window,end_window);
+	if ((start_window == -1) || (end_window == -1))
+		best_window = -1;
+	else {
+		best_window = (start_window + end_window)/2;
+		if (((end_window & 0xf) == 0xf) && ((best_window & 0xf) != 0xf))
+			best_window += 1;
+	}
+	return best_window;
+}
+
+static int do_autocali(cmd_tbl_t *cmdtp, int flag, int argc,
+			char * const argv[])
+{
+	unsigned int i,j /*, valid = 0*/;
+	unsigned int loop_num;
+	unsigned int loop_type;
+	u16 reg = 0;
+	u16 calilist[4];
+	int cali_window;
+	struct unify_eth_info unify_eth;
+
+	if (argc < 5) {
+		return cmd_usage(cmdtp);
+	}
+	loop_num = simple_strtoul(argv[1], NULL, 10);
+	loop_type = simple_strtoul(argv[2], NULL, 10);
+	print_flag = simple_strtoul(argv[4], NULL, 10);
+	do_cali_timeout = simple_strtoul(argv[3], NULL, 10);
+	do_cali_process = 1;
+	for (i=0; i<4; i++) {
+		calilist[i] = 0;
+	}
+	if (loop_type) {
+		phy_write(priv->phydev, MDIO_DEVAD_NONE, 0, 0x5040);
+		mdelay(2);
+	} else {
+		//MDI 1000M loopback
+		phy_write(priv->phydev, MDIO_DEVAD_NONE, 31, 0x0a43);
+		phy_write(priv->phydev, MDIO_DEVAD_NONE, 0, 0x8000);
+		mdelay(40);
+		phy_write(priv->phydev, MDIO_DEVAD_NONE, 0, 0x1140);
+		phy_write(priv->phydev, MDIO_DEVAD_NONE, 24, 0x2d18);
+		mdelay(400);
+	}
+	if (print_flag)
+		printf("----------normal----------\n");
+
+	phy_write(priv->phydev, MDIO_DEVAD_NONE,31, 0xd08);
+	reg = phy_read(priv->phydev, MDIO_DEVAD_NONE,0x11);
+	reg = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x11, reg & (~0x100));
+	reg = phy_read(priv->phydev, MDIO_DEVAD_NONE,0x15);
+	reg = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x15, reg & (~0x8));
+	phy_write(priv->phydev, MDIO_DEVAD_NONE, 31, 0x0);
+	writel(0x1621, 0xff634540);
+	for (i = 0; i < 16; i++) {
+		writel(i << 16, 0xff634544);
+		if (print_flag)
+			printf("0x%05x\n", i << 16);
+		//mdelay(20);
+		for (j=0; j<loop_num; j++) {
+			if (NetLoop(ETHLOOP) < 0) {
+				if (print_flag)
+					printf("-------------failed\n\n");
+				calilist[0] &=(~(1<<i));
+				break;
+			} else {
+				if (print_flag)
+					printf("-------------success\n\n");
+				calilist[0] |=(1<<i);
+			}
+			mdelay(1);
+		}
+	}
+	if (print_flag)
+		printf("----------invert----------\n");
+	writel(0x1629, 0xff634540);
+	for (i = 0; i < 16; i++) {
+		writel(i << 16, 0xff634544);
+		if (print_flag)
+			printf("0x%05x\n", i << 16);
+		//mdelay(20);
+		for (j=0; j<loop_num; j++) {
+			if (NetLoop(ETHLOOP) < 0) {
+				if (print_flag)
+					printf("-------------failed\n\n");
+				calilist[1] &=(~(1<<i));
+				break;
+			} else {
+				if (print_flag)
+					printf("-------------success\n\n");
+				calilist[1] |=(1<<i);
+			}
+			mdelay(1);
+		}
+	}
+
+	/*add 2ns delay and invert clk*/
+	/*reset exphy to add 2ns delay*/
+	phy_write(priv->phydev, MDIO_DEVAD_NONE,31, 0xd08);
+	reg = phy_read(priv->phydev, MDIO_DEVAD_NONE,0x15);
+	reg = phy_write(priv->phydev, MDIO_DEVAD_NONE, 0x15, reg | 0x8);
+	phy_write(priv->phydev, MDIO_DEVAD_NONE, 31, 0x0);
+
+	/*inverte clk*/
+	writel(0x1629, 0xff634540);
+
+	if (print_flag)
+		printf("----invert && add 2ns-----\n");
+	for (i = 0; i < 16; i++) {
+		writel(i << 16, 0xff634544);
+		if (print_flag)
+			printf("0x%05x\n", i << 16);
+		//mdelay(20);
+		for (j=0;j<loop_num;j++) {
+			if (NetLoop(ETHLOOP) < 0) {
+				if (print_flag)
+					printf("-------------failed\n\n");
+				calilist[2] &=(~(1<<i));
+				break;
+			} else {
+				if (print_flag)
+					printf("-------------success\n\n");
+				calilist[2] |=(1<<i);
+			}
+			mdelay(1);
+		}
+	}
+
+	if (print_flag)
+		printf("----normal && add 2ns-----\n");
+	writel(0x1621, 0xff634540);
+	for (i = 0; i < 16; i++) {
+		writel(i << 16, 0xff634544);
+		if (print_flag)
+			printf("0x%05x\n", i << 16);
+		//mdelay(20);
+		for (j=0; j<loop_num; j++) {
+			if (NetLoop(ETHLOOP) < 0) {
+				if (print_flag)
+					printf("-------------failed\n\n");
+				calilist[3] &=(~(1<<i));
+				break;
+			} else {
+				if (print_flag)
+					printf("-------------success\n\n");
+				calilist[3] |=(1<<i);
+			}
+			mdelay(1);
+		}
+	}
+
+	if (print_flag)
+		printf("result:	%04x\t%04x\t%04x\t%04x\n", calilist[0], calilist[1], calilist[2], calilist[3]);
+
+	cali_window = calc_result(calilist);
+	printf("The Best Window is index %d\n", cali_window);
+
+	strncpy(unify_eth.magic, ETH_MAGIC, 6);
+	unify_eth.index = cali_window;
+	unify_eth.chk = 0xff - unify_eth.index;
+	strcpy(unify_eth.ver, PLAIN_VERSION);
+
+	key_unify_write("eth_exphy_para", &unify_eth, sizeof(struct unify_eth_info));
+	bestwindow = unify_eth.index;
+	do_cali_process = 0;
+	return 0;
+}
+
+#endif
+
+U_BOOT_CMD(
+		phyreg, 4, 1, do_phyreg,
+		"ethernet phy register read/write/dump",
+		"d            - dump phy registers\n"
+		"       r reg        - read phy register\n"
+		"       w reg val    - write phy register"
+		);
+
+U_BOOT_CMD(
+		macreg, 4, 1, do_macreg,
+		"ethernet mac register read/write/dump",
+		"d            - dump mac registers\n"
+		"       r reg        - read mac register\n"
+		"       w reg val    - write mac register"
+		);
+
+U_BOOT_CMD(
+		cbusreg, 4, 1, do_cbusreg,
+		"cbus register read/write",
+		"r reg        - read cbus register\n"
+		"        w reg val    - write cbus register"
+		);
+#ifdef ETHERNET_EXTERNAL_PHY
+U_BOOT_CMD(
+	autocali,	5,	1,	do_autocali,
+	"auto cali\t- auto set cali value for exphy\n",
+	"loopcnt type timeout flag\n"
+	"		loopcnt	- loop package count\n"
+	"		type	- 0: pcs loop 1: phy loop\n"
+	"		timeout	- timeout (ms)\n"
+	"		flag	- print flag\n"
+);
+#endif
+/* amlogic debug cmd end */

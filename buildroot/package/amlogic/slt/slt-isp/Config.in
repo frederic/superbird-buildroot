@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SLT_ISP
+    bool "SLT for ISP"
+    help
+        SLT program for ISP
+    depends on BR2_PACKAGE_ARM_ISP

@@ -1,0 +1,46 @@
+diff -Nur onvif_wsdd-Orig/Makefile onvif_wsdd/Makefile
+--- onvif_wsdd-Orig/Makefile	2018-12-17 16:18:51.000000000 +0800
++++ onvif_wsdd/Makefile	2019-04-03 13:52:41.927061928 +0800
+@@ -23,7 +23,7 @@
+ GENERATED_DIR     = ./generated
+ 
+ 
+-CFLAGS            = -DDAEMON_NAME='"$(DAEMON_NAME)"'
++CFLAGS           := $(CFLAGS) -DDAEMON_NAME='"$(DAEMON_NAME)"'
+ CFLAGS           += -DDAEMON_MAJOR_VERSION=$(DAEMON_MAJOR_VERSION)
+ CFLAGS           += -DDAEMON_MINOR_VERSION=$(DAEMON_MINOR_VERSION)
+ CFLAGS           += -DDAEMON_PATCH_VERSION=$(DAEMON_PATCH_VERSION)
+@@ -228,7 +228,8 @@
+     # build
+     if [ ! -f $(SOAPCPP2) ] || [ ! -f $(WSDL2H) ]; then \
+          cd gsoap-2.8; \
+-         ./configure && \
++         LDFLAGS=-Wl,-rpath,$(HOST_DIR)/usr/lib \
++         CFLAGS= ./configure --with-openssl=$(OPENSSL) && \
+          make -j1; \
+          cd ..;\
+     fi
+diff -Nur onvif_wsdd-Orig/start_scripts/S90wsdd onvif_wsdd/start_scripts/S90wsdd
+--- onvif_wsdd-Orig/start_scripts/S90wsdd	2018-12-17 16:18:51.000000000 +0800
++++ onvif_wsdd/start_scripts/S90wsdd	2019-04-03 08:37:31.470504394 +0800
+@@ -1,8 +1,8 @@
+ #! /bin/sh
+ 
+-DAEMON=wsdd_debug
+-DAEMON_PATH=.
+-PID_FILE=$DAEMON.pid
++DAEMON=onvif_wsdd
++DAEMON_PATH=/usr/bin
++PID_FILE=/tmp/$DAEMON.pid
+ 
+ 
+ DAEMON_ARGS="--pid_file $PID_FILE"
+@@ -11,7 +11,7 @@
+ # WS-Discovery param (more details see help)
+ DAEMON_ARGS="$DAEMON_ARGS --if_name eth0"
+ DAEMON_ARGS="$DAEMON_ARGS --type tdn:NetworkVideoTransmitter"
+-DAEMON_ARGS="$DAEMON_ARGS --xaddr http://%s:1000/onvif/device_service"
++DAEMON_ARGS="$DAEMON_ARGS --xaddr http://%s:1000"
+ 
+ 
+ # Scope more details see in ONVIF Doc

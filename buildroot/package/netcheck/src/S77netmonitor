@@ -1,0 +1,31 @@
+#! /bin/sh
+
+# Additional options that are passed to dlna Sync
+
+case "$1" in
+    start)
+    printf "Starting netmonitor..."
+    /sbin/netmonitor &
+    ;;
+    stop)
+    printf "Stoping netmonitor..."
+    killall netmonitor
+    ;;
+    restart)
+    printf "Restart netmonitor..."
+    killall netmonitor
+    /sbin/netmonitor &
+    ;;
+    netready)
+    ;;
+    netup)
+    ;;
+    netdown)
+    ;;
+    netchange)
+    ;;
+    *)
+    echo "Usage: $0 {start|stop|restart|netready|netup|netdown|netchange}"
+    exit 1
+    ;;
+esac

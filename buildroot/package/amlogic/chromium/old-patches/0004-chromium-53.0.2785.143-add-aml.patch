@@ -1,0 +1,1312 @@
+--- a/src/media/filters/ffmpeg_video_decoder.cc
++++ b/src/media/filters/ffmpeg_video_decoder.cc
+@@ -359,7 +359,26 @@ bool FFmpegVideoDecoder::ConfigureDecode
+   // Initialize AVCodecContext structure.
+   codec_context_.reset(avcodec_alloc_context3(NULL));
+   VideoDecoderConfigToAVCodecContext(config_, codec_context_.get());
+-
++  switch(codec_context_->codec_id) {
++    case AV_CODEC_ID_H264:
++      codec_context_->codec_id = AV_CODEC_ID_H264_AML;
++      break;
++    case AV_CODEC_ID_HEVC:
++      codec_context_->codec_id = AV_CODEC_ID_HEVC_AML;
++      break;
++    case AV_CODEC_ID_VP9:
++      codec_context_->codec_id = AV_CODEC_ID_VP9_AML;
++      break;
++    case AV_CODEC_ID_MPEG4:
++      codec_context_->codec_id = AV_CODEC_ID_MPEG4;
++      break;
++    case AV_CODEC_ID_MPEG1VIDEO:
++    case AV_CODEC_ID_MPEG2VIDEO:
++      codec_context_->codec_id = AV_CODEC_ID_MPEGVIDEO_AML;
++      break;
++    default:
++      break;
++  }
+   codec_context_->thread_count = GetThreadCount(codec_context_->codec_id);
+   codec_context_->thread_type = low_delay ? FF_THREAD_SLICE : FF_THREAD_FRAME;
+   codec_context_->opaque = this;
+--- a/src/third_party/ffmpeg/ffmpeg.gyp
++++ b/src/third_party/ffmpeg/ffmpeg.gyp
+@@ -337,6 +337,9 @@
+                       '-lm',
+                       '-lz',
+                       '-lrt',
++                      '-lamcodec',
++                      '-lamadec',
++                      '-lamavutils',
+                     ],
+                   },
+                 }],
+--- a/src/third_party/ffmpeg/ffmpeg_generated.gni
++++ b/src/third_party/ffmpeg/ffmpeg_generated.gni
+@@ -57,6 +57,10 @@ if ((is_android && current_cpu == "arm"
+     "libavcodec/vorbisdec.c",
+     "libavcodec/vorbisdsp.c",
+     "libavcodec/xiph.c",
++    "libavcodec/aml_codec.c",
++    "libavcodec/hevc_ps.c",
++    "libavcodec/hevc_data.c",
++    "libavcodec/hevc_parse.c",
+     "libavformat/allformats.c",
+     "libavformat/autorename_libavformat_options.c",
+     "libavformat/autorename_libavformat_pcm.c",
+--- a/src/third_party/ffmpeg/ffmpeg_generated.gypi
++++ b/src/third_party/ffmpeg/ffmpeg_generated.gypi
+@@ -548,6 +548,10 @@
+           'libavcodec/vorbisdec.c',
+           'libavcodec/vorbisdsp.c',
+           'libavcodec/xiph.c',
++          'libavcodec/aml_codec.c',
++          'libavcodec/hevc_ps.c',
++          'libavcodec/hevc_data.c',
++          'libavcodec/hevc_parse.c',
+           'libavformat/allformats.c',
+           'libavformat/autorename_libavformat_options.c',
+           'libavformat/autorename_libavformat_pcm.c',
+--- a/src/third_party/ffmpeg/chromium/config/Chrome/linux/arm-neon/config.h
++++ b/src/third_party/ffmpeg/chromium/config/Chrome/linux/arm-neon/config.h
+@@ -710,6 +710,7 @@
+ #define CONFIG_H263I_DECODER 0
+ #define CONFIG_H263P_DECODER 0
+ #define CONFIG_H264_DECODER 1
++#define CONFIG_H264_AML_DECODER 1
+ #define CONFIG_H264_CRYSTALHD_DECODER 0
+ #define CONFIG_H264_MMAL_DECODER 0
+ #define CONFIG_H264_QSV_DECODER 0
+@@ -717,6 +718,7 @@
+ #define CONFIG_H264_VDPAU_DECODER 0
+ #define CONFIG_HAP_DECODER 0
+ #define CONFIG_HEVC_DECODER 0
++#define CONFIG_HEVC_AML_DECODER 1
+ #define CONFIG_HEVC_QSV_DECODER 0
+ #define CONFIG_HNM4_VIDEO_DECODER 0
+ #define CONFIG_HQ_HQA_DECODER 0
+@@ -745,7 +747,9 @@
+ #define CONFIG_MPEG_XVMC_DECODER 0
+ #define CONFIG_MPEG1VIDEO_DECODER 0
+ #define CONFIG_MPEG2VIDEO_DECODER 0
++#define CONFIG_MPEGVIDEO_AML_DECODER 1
+ #define CONFIG_MPEG4_DECODER 0
++#define CONFIG_MPEG4_AML_DECODER 1
+ #define CONFIG_MPEG4_CRYSTALHD_DECODER 0
+ #define CONFIG_MPEG4_MMAL_DECODER 0
+ #define CONFIG_MPEG4_VDPAU_DECODER 0
+@@ -849,6 +853,7 @@
+ #define CONFIG_VP7_DECODER 0
+ #define CONFIG_VP8_DECODER 1
+ #define CONFIG_VP9_DECODER 0
++#define CONFIG_VP9_AML_DECODER 1
+ #define CONFIG_VQA_DECODER 0
+ #define CONFIG_WEBP_DECODER 0
+ #define CONFIG_WMV1_DECODER 0
+--- a/src/third_party/ffmpeg/libavcodec/allcodecs.c
++++ b/src/third_party/ffmpeg/libavcodec/allcodecs.c
+@@ -195,6 +195,7 @@ void avcodec_register_all(void)
+     REGISTER_DECODER(H263I,             h263i);
+     REGISTER_ENCDEC (H263P,             h263p);
+     REGISTER_DECODER(H264,              h264);
++    REGISTER_DECODER(H264_AML,          h264_aml);
+     REGISTER_DECODER(H264_CRYSTALHD,    h264_crystalhd);
+     REGISTER_DECODER(H264_MMAL,         h264_mmal);
+     REGISTER_DECODER(H264_QSV,          h264_qsv);
+@@ -204,6 +205,7 @@ void avcodec_register_all(void)
+ #endif
+     REGISTER_ENCDEC (HAP,               hap);
+     REGISTER_DECODER(HEVC,              hevc);
++    REGISTER_DECODER(HEVC_AML,          hevc_aml);
+     REGISTER_DECODER(HEVC_QSV,          hevc_qsv);
+     REGISTER_DECODER(HNM4_VIDEO,        hnm4_video);
+     REGISTER_DECODER(HQ_HQA,            hq_hqa);
+@@ -236,12 +238,14 @@ void avcodec_register_all(void)
+     REGISTER_ENCDEC (MPEG1VIDEO,        mpeg1video);
+     REGISTER_ENCDEC (MPEG2VIDEO,        mpeg2video);
+     REGISTER_ENCDEC (MPEG4,             mpeg4);
++    REGISTER_DECODER(MPEG4_AML,         mpeg4_aml);
+     REGISTER_DECODER(MPEG4_CRYSTALHD,   mpeg4_crystalhd);
+     REGISTER_DECODER(MPEG4_MMAL,        mpeg4_mmal);
+ #if FF_API_VDPAU
+     REGISTER_DECODER(MPEG4_VDPAU,       mpeg4_vdpau);
+ #endif
+     REGISTER_DECODER(MPEGVIDEO,         mpegvideo);
++    REGISTER_DECODER(MPEGVIDEO_AML,     mpegvideo_aml);
+ #if FF_API_VDPAU
+     REGISTER_DECODER(MPEG_VDPAU,        mpeg_vdpau);
+     REGISTER_DECODER(MPEG1_VDPAU,       mpeg1_vdpau);
+@@ -348,6 +352,7 @@ void avcodec_register_all(void)
+     REGISTER_DECODER(VP7,               vp7);
+     REGISTER_DECODER(VP8,               vp8);
+     REGISTER_DECODER(VP9,               vp9);
++    REGISTER_DECODER(VP9_AML,           vp9_aml);
+     REGISTER_DECODER(VQA,               vqa);
+     REGISTER_DECODER(WEBP,              webp);
+     REGISTER_ENCODER(WRAPPED_AVFRAME,   wrapped_avframe);
+--- a/src/third_party/ffmpeg/libavcodec/avcodec.h
++++ b/src/third_party/ffmpeg/libavcodec/avcodec.h
+@@ -107,6 +107,7 @@ enum AVCodecID {
+ #if FF_API_XVMC
+     AV_CODEC_ID_MPEG2VIDEO_XVMC,
+ #endif /* FF_API_XVMC */
++    AV_CODEC_ID_MPEGVIDEO_AML,
+     AV_CODEC_ID_H261,
+     AV_CODEC_ID_H263,
+     AV_CODEC_ID_RV10,
+@@ -117,6 +118,7 @@ enum AVCodecID {
+     AV_CODEC_ID_SP5X,
+     AV_CODEC_ID_JPEGLS,
+     AV_CODEC_ID_MPEG4,
++    AV_CODEC_ID_MPEG4_AML,
+     AV_CODEC_ID_RAWVIDEO,
+     AV_CODEC_ID_MSMPEG4V1,
+     AV_CODEC_ID_MSMPEG4V2,
+@@ -132,6 +134,7 @@ enum AVCodecID {
+     AV_CODEC_ID_HUFFYUV,
+     AV_CODEC_ID_CYUV,
+     AV_CODEC_ID_H264,
++    AV_CODEC_ID_H264_AML,
+     AV_CODEC_ID_INDEO3,
+     AV_CODEC_ID_VP3,
+     AV_CODEC_ID_THEORA,
+@@ -273,12 +276,14 @@ enum AVCodecID {
+     AV_CODEC_ID_CLLC,
+     AV_CODEC_ID_MSS2,
+     AV_CODEC_ID_VP9,
++    AV_CODEC_ID_VP9_AML,
+     AV_CODEC_ID_AIC,
+     AV_CODEC_ID_ESCAPE130,
+     AV_CODEC_ID_G2M,
+     AV_CODEC_ID_WEBP,
+     AV_CODEC_ID_HNM4_VIDEO,
+     AV_CODEC_ID_HEVC,
++    AV_CODEC_ID_HEVC_AML,
+ #define AV_CODEC_ID_H265 AV_CODEC_ID_HEVC
+     AV_CODEC_ID_FIC,
+     AV_CODEC_ID_ALIAS_PIX,
+--- a/src/third_party/ffmpeg/libavcodec/codec_desc.c
++++ b/src/third_party/ffmpeg/libavcodec/codec_desc.c
+@@ -56,6 +56,14 @@ static const AVCodecDescriptor codec_des
+     },
+ #endif /* FF_API_XVMC */
+     {
++        .id        = AV_CODEC_ID_MPEGVIDEO_AML,
++        .type      = AVMEDIA_TYPE_VIDEO,
++        .name      = "mpegvideo_aml",
++        .long_name = NULL_IF_CONFIG_SMALL("MPEG-1/MPEG-2 video(Amlogic Decoder)"),
++        .props     = AV_CODEC_PROP_LOSSY | AV_CODEC_PROP_REORDER,
++        .profiles  = NULL_IF_CONFIG_SMALL(ff_mpeg2_video_profiles),
++    },
++    {
+         .id        = AV_CODEC_ID_H261,
+         .type      = AVMEDIA_TYPE_VIDEO,
+         .name      = "h261",
+@@ -107,6 +115,14 @@ static const AVCodecDescriptor codec_des
+         .profiles  = NULL_IF_CONFIG_SMALL(ff_mpeg4_video_profiles),
+     },
+     {
++        .id        = AV_CODEC_ID_MPEG4_AML,
++        .type      = AVMEDIA_TYPE_VIDEO,
++        .name      = "mpeg4_aml",
++        .long_name = NULL_IF_CONFIG_SMALL("MPEG-4 part 2(Amlogic Decoder)"),
++        .props     = AV_CODEC_PROP_LOSSY | AV_CODEC_PROP_REORDER,
++        .profiles  = NULL_IF_CONFIG_SMALL(ff_mpeg4_video_profiles),
++    },
++    {
+         .id        = AV_CODEC_ID_RAWVIDEO,
+         .type      = AVMEDIA_TYPE_VIDEO,
+         .name      = "rawvideo",
+@@ -213,6 +229,14 @@ static const AVCodecDescriptor codec_des
+         .profiles  = NULL_IF_CONFIG_SMALL(ff_h264_profiles),
+     },
+     {
++        .id        = AV_CODEC_ID_H264_AML,
++        .type      = AVMEDIA_TYPE_VIDEO,
++        .name      = "h264_aml",
++        .long_name = NULL_IF_CONFIG_SMALL("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10(Amlogic Decoder)"),
++        .props     = AV_CODEC_PROP_LOSSY | AV_CODEC_PROP_LOSSLESS | AV_CODEC_PROP_REORDER,
++        .profiles  = NULL_IF_CONFIG_SMALL(ff_h264_profiles),
++    },
++    {
+         .id        = AV_CODEC_ID_INDEO3,
+         .type      = AVMEDIA_TYPE_VIDEO,
+         .name      = "indeo3",
+@@ -920,6 +944,14 @@ static const AVCodecDescriptor codec_des
+         .profiles  = NULL_IF_CONFIG_SMALL(ff_vp9_profiles),
+     },
+     {
++        .id        = AV_CODEC_ID_VP9_AML,
++        .type      = AVMEDIA_TYPE_VIDEO,
++        .name      = "vp9_aml",
++        .long_name = NULL_IF_CONFIG_SMALL("Google VP9(Amlogic Decoder)"),
++        .props     = AV_CODEC_PROP_LOSSY,
++        .profiles  = NULL_IF_CONFIG_SMALL(ff_vp9_profiles),
++    },
++    {
+         .id        = AV_CODEC_ID_PICTOR,
+         .type      = AVMEDIA_TYPE_VIDEO,
+         .name      = "pictor",
+@@ -1212,6 +1244,14 @@ static const AVCodecDescriptor codec_des
+         .props     = AV_CODEC_PROP_LOSSY | AV_CODEC_PROP_REORDER,
+         .profiles  = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
+     },
++    {
++        .id        = AV_CODEC_ID_HEVC_AML,
++        .type      = AVMEDIA_TYPE_VIDEO,
++        .name      = "hevc_aml",
++        .long_name = NULL_IF_CONFIG_SMALL("H.265 / HEVC (High Efficiency Video Coding)(Amlogic Decoder)"),
++        .props     = AV_CODEC_PROP_LOSSY | AV_CODEC_PROP_REORDER,
++        .profiles  = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++    },
+     {
+         .id        = AV_CODEC_ID_FIC,
+         .type      = AVMEDIA_TYPE_VIDEO,
+--- /dev/null
++++ b/src/third_party/ffmpeg/libavcodec/aml_codec.c
+@@ -0,0 +1,857 @@
++/*
++ * aml_codec.c
++ *
++ *  Created on: 2017年6月12日
++ *      Author: tao
++ */
++
++#include "libavutil/opt.h"
++#include "libavutil/time.h"
++#include "libavutil/buffer.h"
++#include "bytestream.h"
++#include "hevc.h"
++#include "profiles.h"
++#include "aml_codec.h"
++#include "Amavutils.h"
++
++#if DEBUG_DUMP
++#include <unistd.h>
++#include <fcntl.h>
++#endif
++
++void ff_hevc_packet_uninit(HEVCPacket *pkt)
++{
++    int i;
++    for (i = 0; i < pkt->nals_allocated; i++) {
++        av_freep(&pkt->nals[i].rbsp_buffer);
++        av_freep(&pkt->nals[i].skipped_bytes_pos);
++    }
++    av_freep(&pkt->nals);
++    pkt->nals_allocated = 0;
++}
++
++
++static int hevc_decode_nal_units(const uint8_t *buf, int buf_size, HEVCParamSets *ps,
++                                 int is_nalff, int nal_length_size, void *logctx)
++{
++    int i;
++    int ret = 0;
++    HEVCPacket pkt = { 0 };
++
++    ret = ff_hevc_split_packet(NULL, &pkt, buf, buf_size, logctx, is_nalff, nal_length_size);
++    if (ret < 0) {
++        goto done;
++    }
++
++    for (i = 0; i < pkt.nb_nals; i++) {
++        HEVCNAL *nal = &pkt.nals[i];
++
++        /* ignore everything except parameter sets and VCL NALUs */
++        switch (nal->type) {
++        case NAL_VPS: ff_hevc_decode_nal_vps(&nal->gb, logctx, ps);    break;
++        case NAL_SPS: ff_hevc_decode_nal_sps(&nal->gb, logctx, ps, 1); break;
++        case NAL_PPS: ff_hevc_decode_nal_pps(&nal->gb, logctx, ps);    break;
++        case NAL_TRAIL_R:
++        case NAL_TRAIL_N:
++        case NAL_TSA_N:
++        case NAL_TSA_R:
++        case NAL_STSA_N:
++        case NAL_STSA_R:
++        case NAL_BLA_W_LP:
++        case NAL_BLA_W_RADL:
++        case NAL_BLA_N_LP:
++        case NAL_IDR_W_RADL:
++        case NAL_IDR_N_LP:
++        case NAL_CRA_NUT:
++        case NAL_RADL_N:
++        case NAL_RADL_R:
++        case NAL_RASL_N:
++        case NAL_RASL_R:
++            av_log(logctx, AV_LOG_ERROR, "Invalid NAL unit: %d\n", nal->type);
++            ret = AVERROR_INVALIDDATA;
++            goto done;
++            break;
++        }
++    }
++
++done:
++    ff_hevc_packet_uninit(&pkt);
++    return ret;
++}
++
++int ff_hevc_decode_extradata(const uint8_t *data, int size, HEVCParamSets *ps,
++                             int *is_nalff, int *nal_length_size,
++                             int err_recognition, void *logctx)
++{
++    int ret = 0;
++    GetByteContext gb;
++
++    bytestream2_init(&gb, data, size);
++
++    if (size > 3 && (data[0] || data[1] || data[2] > 1)) {
++        /* It seems the extradata is encoded as hvcC format.
++         * Temporarily, we support configurationVersion==0 until 14496-15 3rd
++         * is finalized. When finalized, configurationVersion will be 1 and we
++         * can recognize hvcC by checking if avctx->extradata[0]==1 or not. */
++        int i, j, num_arrays, nal_len_size;
++
++        *is_nalff = 1;
++
++        bytestream2_skip(&gb, 21);
++        nal_len_size = (bytestream2_get_byte(&gb) & 3) + 1;
++        num_arrays   = bytestream2_get_byte(&gb);
++
++        /* nal units in the hvcC always have length coded with 2 bytes,
++         * so put a fake nal_length_size = 2 while parsing them */
++        *nal_length_size = 2;
++
++        /* Decode nal units from hvcC. */
++        for (i = 0; i < num_arrays; i++) {
++            int type = bytestream2_get_byte(&gb) & 0x3f;
++            int cnt  = bytestream2_get_be16(&gb);
++
++            for (j = 0; j < cnt; j++) {
++                // +2 for the nal size field
++                int nalsize = bytestream2_peek_be16(&gb) + 2;
++                if (bytestream2_get_bytes_left(&gb) < nalsize) {
++                    av_log(logctx, AV_LOG_ERROR,
++                           "Invalid NAL unit size in extradata.\n");
++                    return AVERROR_INVALIDDATA;
++                }
++
++                ret = hevc_decode_nal_units(gb.buffer, nalsize, ps, *is_nalff, *nal_length_size, logctx);
++                if (ret < 0) {
++                    av_log(logctx, AV_LOG_ERROR,
++                           "Decoding nal unit %d %d from hvcC failed\n",
++                           type, i);
++                    return ret;
++                }
++                bytestream2_skip(&gb, nalsize);
++            }
++        }
++
++        /* Now store right nal length size, that will be used to parse
++         * all other nals */
++        *nal_length_size = nal_len_size;
++    } else {
++        *is_nalff = 0;
++        ret = hevc_decode_nal_units(data, size, ps, *is_nalff, *nal_length_size, logctx);
++        if (ret < 0)
++            return ret;
++    }
++
++    return ret;
++}
++
++static int aml_codec_write(AVCodecContext *avctx, uint8_t *p, int len)
++{
++    int ret;
++    uint32_t offset;
++    AMLContext *h = avctx->priv_data;
++
++    for (offset = 0; len > 0;) {
++        ret = codec_write(h->pcodec, p + offset, len);
++        if (ret >= 0) {
++#if DEBUG_DUMP
++            if (h->dfd >= 0) {
++                write(h->dfd, p + offset, ret);
++            }
++#endif
++            offset += ret;
++            len -= ret;
++        } else if (errno == EAGAIN || errno == EINTR) {
++            av_usleep(10 * 1000);
++        } else {
++            break;
++        }
++    }
++    return 0;
++}
++
++static int check_size_in_buffer(uint8_t *p, uint32_t len)
++{
++    uint32_t size;
++    uint8_t *q = p;
++    while ((q + 4) < (p + len)) {
++        size = (*q << 24) | (*(q + 1) << 16) | (*(q + 2) << 8) | (*(q + 3));
++        if (size & 0xff000000) {
++            return 0;
++        }
++
++        if (q + size + 4 == p + len) {
++            return 1;
++        }
++
++        q += size + 4;
++    }
++    return 0;
++}
++
++static int check_size_in_buffer3(uint8_t *p, uint32_t len)
++{
++    uint32_t size;
++    uint8_t *q = p;
++    while ((q + 3) < (p + len)) {
++        size = (*q << 16) | (*(q + 1) << 8) | (*(q + 2));
++
++        if (q + size + 3 == p + len) {
++            return 1;
++        }
++
++        q += size + 3;
++    }
++    return 0;
++}
++
++static int check_size_in_buffer2(uint8_t *p, uint32_t len)
++{
++    uint32_t size;
++    uint8_t *q = p;
++    while ((q + 2) < (p + len)) {
++        size = (*q << 8) | (*(q + 1));
++
++        if (q + size + 2 == p + len) {
++            return 1;
++        }
++
++        q += size + 2;
++    }
++    return 0;
++}
++
++
++static int h264_update_frame_header(AVCodecContext *avctx, AVPacket *pkt)
++{
++    uint32_t nalsize, size = pkt->size;
++    uint8_t *data = pkt->data;
++    uint8_t *p = data;
++    if (p != NULL) {
++        if (check_size_in_buffer(p, size)) {
++            while ((p + 4) < (data + size)) {
++                nalsize = (*p << 24) | (*(p + 1) << 16) | (*(p + 2) << 8) | (*(p + 3));
++                *p = 0;
++                *(p + 1) = 0;
++                *(p + 2) = 0;
++                *(p + 3) = 1;
++                p += (nalsize + 4);
++            }
++            return 0;
++        } else if (check_size_in_buffer3(p, size)) {
++            while ((p + 3) < (data + size)) {
++                nalsize = (*p << 16) | (*(p + 1) << 8) | (*(p + 2));
++                *p = 0;
++                *(p + 1) = 0;
++                *(p + 2) = 1;
++                p += (nalsize + 3);
++            }
++            return 0;
++        } else if (check_size_in_buffer2(p, size)) {
++//            uint8_t *new_data;
++//            int new_len = 0;
++//
++//            new_data = (uint8_t *)av_malloc(size + 2 * 1024);
++//            if (!new_data) {
++//                return -2;
++//            }
++//
++//            while ((p + 2) < (data + size)) {
++//                nalsize = (*p << 8) | (*(p + 1));
++//                *(new_data + new_len) = 0;
++//                *(new_data + new_len + 1) = 0;
++//                *(new_data + new_len + 2) = 0;
++//                *(new_data + new_len + 3) = 1;
++//                memcpy(new_data + new_len + 4, p + 2, nalsize);
++//                p += (nalsize + 2);
++//                new_len += nalsize + 4;
++//            }
++//
++//            av_free(pkt->buf);
++//
++//            pkt->buf = new_data;
++//            pkt->data = pkt->buf;
++//            pkt->size = new_len;
++            av_log(avctx, AV_LOG_ERROR, "FIXME\n");
++        }
++    } else {
++        return -1;
++    }
++    return 0;
++}
++
++static AVBufferRef *gen_h264_header(AVCodecContext *avctx)
++{
++    AVBufferRef *header = NULL;
++    uint8_t *p =avctx->extradata;
++    uint8_t nal_header[4] = {0, 0, 0, 1};
++    if (avctx->extradata_size >= 10) {
++        header =av_buffer_allocz(avctx->extradata_size * 2);
++        if (!header) {
++            av_log(avctx, AV_LOG_ERROR, "av_buffer_allocz for header failed\n");
++            goto exit;
++        }
++        header->size = 0;
++        if (((p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 1)
++                || (p[0] == 0 && p[1] == 0 && p[2] == 1))
++                && avctx->extradata_size < 1024) {
++            memcpy(header->data, avctx->extradata, avctx->extradata_size);
++            header->size = avctx->extradata_size;
++        } else if (p[0] != 1) {
++            av_log(avctx, AV_LOG_ERROR, "Unkonwn avcC version %d\n", p[0]);
++        } else {
++            int cnt = *(p + 5) & 0x1f;
++            int i, nalsize, offset = 0;
++            av_log(avctx, AV_LOG_INFO, "sps: %d\n", cnt);
++            p += 6;
++            for (i = 0; i < cnt; i++) {
++                nalsize = (*p << 8) | (*(p + 1));
++                memcpy(header->data + offset, nal_header, sizeof(nal_header));
++                offset += 4;
++                memcpy(header->data + offset, p + 2, nalsize);
++                offset += nalsize;
++                p += (nalsize + 2);
++            }
++            cnt = *(p++);
++            av_log(avctx, AV_LOG_INFO, "pps: %d\n", cnt);
++            for (i = 0; i < cnt; i++) {
++                nalsize = (*p << 8) | (*(p + 1));
++                memcpy(header->data + offset, nal_header, sizeof(nal_header));
++                offset += 4;
++                memcpy(header->data + offset, p + 2, nalsize);
++                offset += nalsize;
++                p += (nalsize + 2);
++            }
++            header->size = offset; //IMPORTANT
++        }
++    }
++
++exit:
++    return header;
++}
++static AVBufferRef *gen_hevc_header(AVCodecContext *avctx)
++{
++    AVBufferRef *header = NULL;
++    uint8_t *p =avctx->extradata;
++    uint8_t nal_header[4] = {0, 0, 0, 1};
++    if (avctx->extradata_size >= 10) {
++        header =av_buffer_allocz(avctx->extradata_size * 2);
++        if (!header) {
++            av_log(avctx, AV_LOG_ERROR, "av_buffer_allocz for header failed\n");
++            goto exit;
++        }
++        header->size = 0;
++        if (((p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 1)
++                || (p[0] == 0 && p[1] == 0 && p[2] == 1))
++                && avctx->extradata_size < 1024) {
++            memcpy(header->data, avctx->extradata, avctx->extradata_size);
++            header->size = avctx->extradata_size;
++        } else if (p[0] != 1) {
++            av_log(avctx, AV_LOG_ERROR, "Unkonwn avcC version %d\n", p[0]);
++        } else {
++            int nal_len_size, nal_size;
++            int num_arrays = 0;
++            int offset = 0;
++            int i, j;
++            p += 21;
++            nal_len_size = (*p) & 3 + 1;
++            p++;
++            num_arrays = *p;
++            p++;
++
++            for (i = 0; i < num_arrays; i++) {
++                int type, cnt;
++                type = (*p) & 0x3F;
++                p++;
++                cnt = (*p << 8) | (*(p + 1));
++                p += 2;
++                for (j = 0; j < cnt; j++) {
++                    nal_size = (*p << 8) | (*(p + 1));
++                    memcpy(header->data + offset, nal_header,
++                            sizeof(nal_header));
++                    offset += 4;
++                    memcpy(header->data + offset, p + 2, nal_size);
++                    offset += nal_size;
++                    p += (nal_size + 2);
++                }
++            }
++            header->size = offset; //IMPORTANT
++        }
++    }
++
++exit:
++    return header;
++}
++
++
++static int vp9_write_pkt(AVCodecContext *avctx, AVPacket *pkt)
++{
++    uint8_t marker;
++    uint8_t *p = pkt->data;
++    int32_t cur_frame, cur_mag, mag, index_sz, offset[9], size[8],
++            tframesize[9], dsize, mag_ptr, frame_number = 0, total_datasize = 0;
++    dsize = pkt->size;
++    pkt->size = 0; //IMPORTANT
++    marker = p[dsize - 1];
++    if ((marker & 0xE0) == 0xC0) {
++        frame_number = (marker & 0x07) + 1;
++        mag = ((marker >> 3) & 0x03) + 1;
++        index_sz = 2 + mag * frame_number;
++        av_log(avctx, AV_LOG_INFO,
++                " frame_number : %d, mag : %d; index_sz : %d\n", frame_number,
++                mag, index_sz);
++        offset[0] = 0;
++        mag_ptr = dsize - mag * frame_number - 2;
++        if (p[mag_ptr] != marker) {
++            av_log(avctx, AV_LOG_ERROR, " Wrong marker2 : 0x%X --> 0x%X\n",
++                    marker, p[mag_ptr]);
++            return -2;
++        }
++        mag_ptr++;
++        for (cur_frame = 0; cur_frame < frame_number; cur_frame++) {
++            size[cur_frame] = 0; // or size[0] = bytes_in_buffer - 1; both OK
++            for (cur_mag = 0; cur_mag < mag; cur_mag++) {
++                size[cur_frame] = size[cur_frame]
++                        | (p[mag_ptr] << (cur_mag * 8));
++                mag_ptr++;
++            }
++            offset[cur_frame + 1] = offset[cur_frame] + size[cur_frame];
++            if (cur_frame == 0)
++                tframesize[cur_frame] = size[cur_frame];
++            else
++                tframesize[cur_frame] = tframesize[cur_frame - 1]
++                        + size[cur_frame];
++            total_datasize += size[cur_frame];
++        }
++    } else {
++        frame_number = 1;
++        offset[0] = 0;
++        size[0] = dsize; // or size[0] = bytes_in_buffer - 1; both OK
++        total_datasize += dsize;
++        tframesize[0] = dsize;
++    }
++    if (total_datasize > dsize) {
++        av_log(avctx, AV_LOG_ERROR, "DATA overflow : 0x%X --> 0x%X\n",
++                total_datasize, dsize);
++        return -3;
++    }
++    if (frame_number >= 1) {
++        for (cur_frame = 0; cur_frame < frame_number; cur_frame++) {
++            int framesize = size[cur_frame];
++            int32_t oldframeoff = tframesize[cur_frame] - framesize;
++            uint8_t fdata[16];
++            uint8_t *old_framedata = p + oldframeoff;
++
++            framesize += 4;
++            /*add amlogic frame headers.*/
++            fdata[0] = (framesize >> 24) & 0xff;
++            fdata[1] = (framesize >> 16) & 0xff;
++            fdata[2] = (framesize >> 8) & 0xff;
++            fdata[3] = (framesize >> 0) & 0xff;
++            fdata[4] = ((framesize >> 24) & 0xff) ^ 0xff;
++            fdata[5] = ((framesize >> 16) & 0xff) ^ 0xff;
++            fdata[6] = ((framesize >> 8) & 0xff) ^ 0xff;
++            fdata[7] = ((framesize >> 0) & 0xff) ^ 0xff;
++            fdata[8] = 0;
++            fdata[9] = 0;
++            fdata[10] = 0;
++            fdata[11] = 1;
++            fdata[12] = 'A';
++            fdata[13] = 'M';
++            fdata[14] = 'L';
++            fdata[15] = 'V';
++
++            aml_codec_write(avctx, fdata, 16);
++            framesize -= 4;
++
++            aml_codec_write(avctx, old_framedata, framesize);
++        }
++    }
++    return 0;
++}
++static int aml_codec_write_extra_data(AVCodecContext *avctx)
++{
++    AVBufferRef *header = NULL;
++
++    switch(avctx->codec->id) {
++    case AV_CODEC_ID_H264_AML:
++        header = gen_h264_header(avctx);
++        break;
++    case AV_CODEC_ID_HEVC_AML:
++        header = gen_hevc_header(avctx);
++        break;
++    }
++
++    if (header) {
++        if (header->size) {
++            aml_codec_write(avctx, header->data, header->size);
++        }
++        av_buffer_unref(&header);
++    }
++
++    return 0;
++}
++
++static int aml_codec_init(AVCodecContext *avctx)
++{
++    AMLContext *h = avctx->priv_data;
++    h->pcodec = av_mallocz(sizeof(codec_para_t));
++    if (!h->pcodec) {
++        av_log(avctx, AV_LOG_ERROR, "av_mallocz for h->pcodec failed\n");
++        goto error1;
++    }
++    h->pcodec->has_video = 1;
++    h->pcodec->has_audio = 0;
++    h->pcodec->noblock = 0;
++    switch(avctx->codec->id) {
++    case AV_CODEC_ID_H264_AML:
++        h->pcodec->video_type = VFORMAT_H264;
++        h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
++        h->pcodec->am_sysinfo.param = (void *)(EXTERNAL_PTS | SYNC_OUTSIDE);
++        break;
++    case AV_CODEC_ID_HEVC_AML:
++        h->pcodec->video_type = VFORMAT_HEVC;
++        h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_HEVC;
++        //h->pcodec->am_sysinfo.param = (void *)(EXTERNAL_PTS | SYNC_OUTSIDE);
++        break;
++    case AV_CODEC_ID_MPEGVIDEO_AML:
++        h->pcodec->video_type = VFORMAT_MPEG12;
++        h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_UNKNOW;
++        break;
++    case AV_CODEC_ID_VP9_AML:
++        h->pcodec->video_type = VFORMAT_VP9;
++        h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_VP9;
++        break;
++    case AV_CODEC_ID_MPEG4_AML:
++        h->pcodec->video_type = VFORMAT_MPEG4;
++        //FIXME:
++        switch (avctx->codec_tag) {
++//         case CODEC_TAG_COL1:
++//         case CODEC_TAG_DIV3:
++//         case CODEC_TAG_MP43:
++//             h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_MPEG4_3;
++//             break;
++//         case CODEC_TAG_DIV4:
++//         case CODEC_TAG_DIVX:
++//         case CODEC_TAG_divx:
++//             h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_MPEG4_4;
++//             break;
++        default:
++            h->pcodec->am_sysinfo.format = VIDEO_DEC_FORMAT_MPEG4_5;
++        }
++        break;
++    default:
++        av_log(avctx, AV_LOG_ERROR, "Not support codec_id %d\n", avctx->codec->id);
++        goto error2;
++    }
++
++    h->pcodec->stream_type = STREAM_TYPE_ES_VIDEO;
++
++    h->pcodec->am_sysinfo.rate = av_rescale(90000, avctx->framerate.den,
++            avctx->framerate.num);
++    h->pcodec->am_sysinfo.width = avctx->width;
++    h->pcodec->am_sysinfo.height = avctx->height;
++    av_log(avctx, AV_LOG_INFO,
++            "codec_init with fmt:%d sz:%dx%d rate:%d/%d extra:%d\n",
++            h->pcodec->video_type, avctx->width, avctx->height,
++            avctx->framerate.num, avctx->framerate.den, avctx->extradata_size);
++
++    if (codec_init(h->pcodec)) {
++        av_log(avctx, AV_LOG_ERROR, "codec_init failed\n");
++        goto error2;
++    }
++#if DEBUG_DUMP
++    h->dfd = open("/mmc/ffdump.data", O_CREAT | O_RDWR | O_TRUNC, 0644);
++#endif
++    if (aml_codec_write_extra_data(avctx)) {
++        av_log(avctx, AV_LOG_ERROR, "aml_codec_write_extra_data failed\n");
++        goto error3;
++    }
++    amsysfs_set_sysfs_int("/sys/class/tsync/enable", 1);
++    amsysfs_set_sysfs_int("/sys/class/tsync/mode", 1);
++    amsysfs_set_sysfs_int("/sys/class/tsync/slowsync_enable", 1);
++    return 0;
++error3:
++    codec_close(h->pcodec);
++error2:
++    av_freep(&h->pcodec);
++error1:
++    return -1;
++}
++
++static void aml_codec_close(AVCodecContext *avctx)
++{
++    AMLContext *h = avctx->priv_data;
++    if (h->pcodec) {
++        av_log(avctx, AV_LOG_ERROR, "aml_codec_close\n");
++        codec_close(h->pcodec);
++        av_freep(&h->pcodec);
++    }
++}
++
++static int aml_decode_extradata(AVCodecContext *avctx)
++{
++    int ret = 1;
++
++    switch (avctx->codec->id) {
++    case AV_CODEC_ID_HEVC_AML:
++        if (avctx->extradata_size > 0) {
++            int i;
++            HEVCParamSets ps;
++            int is_nalff = 0;
++            int nal_length_size = 0;
++
++            const HEVCPPS *pps = NULL;
++            const HEVCSPS *sps = NULL;
++
++            memset(&ps, 0, sizeof(ps));
++            ret = ff_hevc_decode_extradata(avctx->extradata,
++                    avctx->extradata_size, &ps, &is_nalff, &nal_length_size, 0,
++                    avctx);
++            if (ret < 0) {
++                av_log(avctx, AV_LOG_ERROR,
++                        "ff_hevc_decode_extradata failed\n");
++                goto error;
++            }
++
++            for (i = 0; i < MAX_PPS_COUNT; i++) {
++                if (ps.pps_list[i]) {
++                    pps = (const HEVCPPS*) ps.pps_list[i]->data;
++                    break;
++                }
++            }
++
++            if (pps) {
++                if (ps.sps_list[pps->sps_id]) {
++                    sps = (const HEVCSPS*) ps.sps_list[pps->sps_id]->data;
++                }
++            }
++
++            if (sps) {
++                avctx->width = sps->width;
++                avctx->height = sps->height;
++            } else {
++                ret = 1;
++            }
++
++        }
++        break;
++    default:
++        break;
++    }
++
++error:
++    return ret;
++}
++
++av_cold int ff_aml_decode_init(AVCodecContext *avctx)
++{
++    AMLContext *h = avctx->priv_data;
++
++    if (!avctx->width || !avctx->height) {
++        av_log(avctx, AV_LOG_ERROR, "aml_codec_init not support size:0x0\n");
++        aml_decode_extradata(avctx);
++        goto error1;
++    }
++
++    if (aml_codec_init(avctx)) {
++        av_log(avctx, AV_LOG_ERROR, "aml_codec_init failed\n");
++        goto error1;
++    }
++
++    /*FIXME: hack size to reduce swscale time */
++    //avctx->width = 320;
++    //avctx->height = 240;
++    avctx->pix_fmt = AV_PIX_FMT_YUV420P;
++
++
++
++    return 0;
++
++error1:
++    return -1;
++}
++
++static av_cold int aml_decode_end(AVCodecContext *avctx)
++{
++    AMLContext *h = avctx->priv_data;
++    aml_codec_close(avctx);
++
++#if DEBUG_DUMP
++    if (h->dfd >= 0) {
++        close(h->dfd);
++    }
++#endif
++    return 0;
++}
++
++static int aml_decode_frame(AVCodecContext *avctx, void *data,
++                             int *got_frame, AVPacket *avpkt)
++{
++    int ret = 0;
++    AMLContext *h = avctx->priv_data;
++    AVFrame *picture;
++    if (avpkt->pts != AV_NOPTS_VALUE) {
++        codec_checkin_pts(h->pcodec, (unsigned long) (avpkt->pts * 90LL / 1000LL + 1LL));
++    } else if (avctx->reordered_opaque != AV_NOPTS_VALUE) {
++        codec_checkin_pts(h->pcodec, (unsigned long) (avctx->reordered_opaque * 90LL / 1000LL + 1LL));
++    }
++
++    switch (avctx->codec->id) {
++
++    case AV_CODEC_ID_H264_AML:
++        h264_update_frame_header(avctx, avpkt);
++        break;
++    case AV_CODEC_ID_VP9_AML:
++        vp9_write_pkt(avctx, avpkt);
++        break;
++    default:
++        break;
++    }
++    picture = av_frame_alloc();
++    if (!picture) {
++        av_log(avctx, AV_LOG_ERROR, "ff_reget_buffer failed\n");
++        goto error1;
++    }
++    ret = ff_reget_buffer(avctx, picture);
++    if (ret) {
++        av_log(avctx, AV_LOG_ERROR, "ff_reget_buffer failed\n");
++        goto error2;
++    }
++
++    ret = av_frame_ref(data, picture);
++    if (ret) {
++        av_log(avctx, AV_LOG_ERROR, "av_frame_ref failed\n");
++        goto error2;
++    }
++
++    aml_codec_write(avctx, avpkt->data, avpkt->size);
++
++    *got_frame = 1;
++    av_frame_unref(picture);
++    return avpkt->size > 0 ? avpkt->size : 1;
++
++error2:
++    av_frame_free(&picture);
++error1:
++    return -1;
++}
++
++
++
++static void aml_flush(AVCodecContext *avctx)
++{
++    AMLContext *h = avctx->priv_data;
++    codec_reset(h->pcodec);
++}
++
++static const AVOption aml_options[] = {
++    { NULL },
++};
++
++static const AVClass aml_class = {
++    .class_name = "Amlogic H264/HEVC/MPEG2/VP9 Decoder",
++    .item_name  = av_default_item_name,
++    .option     = aml_options,
++    .version    = LIBAVUTIL_VERSION_INT,
++};
++
++AVCodec ff_h264_aml_decoder = {
++    .name                  = "h264_aml",
++    .long_name             = NULL_IF_CONFIG_SMALL("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10"),
++    .type                  = AVMEDIA_TYPE_VIDEO,
++    .id                    = AV_CODEC_ID_H264_AML,
++    .priv_data_size        = sizeof(AMLContext),
++    .init                  = ff_aml_decode_init,
++    .close                 = aml_decode_end,
++    .decode                = aml_decode_frame,
++    .capabilities          = 0,
++    .capabilities          = AV_CODEC_CAP_DR1,
++//FIXME:
++//    .capabilities          = /*AV_CODEC_CAP_DRAW_HORIZ_BAND |*/ AV_CODEC_CAP_DR1 |
++//                             AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS |
++//                             AV_CODEC_CAP_FRAME_THREADS ,
++    .caps_internal         = FF_CODEC_CAP_INIT_THREADSAFE,
++    .flush                 = aml_flush,
++    .init_thread_copy      = NULL, //FIXME
++    .update_thread_context = NULL, //FIXME
++    .profiles              = NULL_IF_CONFIG_SMALL(ff_h264_profiles),
++    .priv_class            = &aml_class,
++};
++
++AVCodec ff_hevc_aml_decoder = {
++    .name                  = "hevc_aml",
++    .long_name             = NULL_IF_CONFIG_SMALL("HEVC (High Efficiency Video Coding)"),
++    .type                  = AVMEDIA_TYPE_VIDEO,
++    .id                    = AV_CODEC_ID_HEVC_AML,
++    .priv_data_size        = sizeof(AMLContext),
++    .init                  = ff_aml_decode_init,
++    .close                 = aml_decode_end,
++    .decode                = aml_decode_frame,
++    .capabilities          = AV_CODEC_CAP_DR1,
++//FIXME:
++//    .capabilities          = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY |
++//                             AV_CODEC_CAP_SLICE_THREADS | AV_CODEC_CAP_FRAME_THREADS,
++    .caps_internal         = FF_CODEC_CAP_INIT_THREADSAFE,
++    .flush                 = aml_flush,
++    .init_thread_copy      = NULL, //FIXME
++    .update_thread_context = NULL, //FIXME
++    .profiles              = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++    .priv_class            = &aml_class,
++};
++
++AVCodec ff_mpegvideo_aml_decoder = {
++    .name                  = "mpegvideo_aml",
++    .long_name             = NULL_IF_CONFIG_SMALL("MPEG-1/ MPEG-2 video"),
++    .type                  = AVMEDIA_TYPE_VIDEO,
++    .id                    = AV_CODEC_ID_MPEGVIDEO_AML,
++    .priv_data_size        = sizeof(AMLContext),
++    .init                  = ff_aml_decode_init,
++    .close                 = aml_decode_end,
++    .decode                = aml_decode_frame,
++    .capabilities          = AV_CODEC_CAP_DR1,
++//FIXME:
++//    .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
++//                      AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
++//                      AV_CODEC_CAP_SLICE_THREADS,
++    .flush                 = aml_flush,
++    .profiles              = NULL_IF_CONFIG_SMALL(ff_mpeg2_video_profiles),
++    .priv_class            = &aml_class,
++};
++
++AVCodec ff_vp9_aml_decoder = {
++    .name                  = "vp9_aml",
++    .long_name             = NULL_IF_CONFIG_SMALL("Google VP9"),
++    .type                  = AVMEDIA_TYPE_VIDEO,
++    .id                    = AV_CODEC_ID_VP9_AML,
++    .priv_data_size        = sizeof(AMLContext),
++    .init                  = ff_aml_decode_init,
++    .close                 = aml_decode_end,
++    .decode                = aml_decode_frame,
++    .capabilities          = AV_CODEC_CAP_DR1,
++//FIXME:
++//    .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
++//                      AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
++//                      AV_CODEC_CAP_SLICE_THREADS,
++    .flush                 = aml_flush,
++    .profiles              = NULL_IF_CONFIG_SMALL(ff_vp9_profiles),
++    .priv_class            = &aml_class,
++};
++
++AVCodec ff_mpeg4_aml_decoder = {
++    .name                  = "mpeg4_aml",
++    .long_name             = NULL_IF_CONFIG_SMALL("MPEG-4 part 2"),
++    .type                  = AVMEDIA_TYPE_VIDEO,
++    .id                    = AV_CODEC_ID_MPEG4_AML,
++    .priv_data_size        = sizeof(AMLContext),
++    .init                  = ff_aml_decode_init,
++    .close                 = aml_decode_end,
++    .decode                = aml_decode_frame,
++    .capabilities          = AV_CODEC_CAP_DR1,
++//FIXME:
++//    .capabilities          = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
++//                             AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
++//                             AV_CODEC_CAP_FRAME_THREADS,
++    .flush                 = aml_flush,
++    .profiles              = NULL_IF_CONFIG_SMALL(ff_mpeg4_video_profiles),
++    .priv_class            = &aml_class,
++};
++
+--- /dev/null
++++ b/src/third_party/ffmpeg/libavcodec/aml_codec.h
+@@ -0,0 +1,123 @@
++/*
++ * aml_codec.h
++ *
++ *  Created on: 2017年6月12日
++ *      Author: tao
++ */
++
++#ifndef AVCODEC_AML_CODEC_H_
++#define AVCODEC_AML_CODEC_H_
++
++#include "libavutil/opt.h"
++#include "internal.h"
++#include "avcodec.h"
++
++#define FAKE_CODEC 0
++#define DEBUG_DUMP 0
++
++#if FAKE_CODEC
++
++typedef enum {
++    VIDEO_DEC_FORMAT_UNKNOW,
++    VIDEO_DEC_FORMAT_MPEG4_3,
++    VIDEO_DEC_FORMAT_MPEG4_4,
++    VIDEO_DEC_FORMAT_MPEG4_5,
++    VIDEO_DEC_FORMAT_H264,
++    VIDEO_DEC_FORMAT_MJPEG,
++    VIDEO_DEC_FORMAT_MP4,
++    VIDEO_DEC_FORMAT_H263,
++    VIDEO_DEC_FORMAT_REAL_8,
++    VIDEO_DEC_FORMAT_REAL_9,
++    VIDEO_DEC_FORMAT_WMV3,
++    VIDEO_DEC_FORMAT_WVC1,
++    VIDEO_DEC_FORMAT_SW,
++    VIDEO_DEC_FORMAT_AVS,
++    VIDEO_DEC_FORMAT_H264_4K2K,
++    VIDEO_DEC_FORMAT_HEVC,
++    VIDEO_DEC_FORMAT_VP9 ,
++    VIDEO_DEC_FORMAT_MAX
++} vdec_type_t;
++
++typedef enum {
++    VFORMAT_UNKNOWN = -1,
++    VFORMAT_MPEG12 = 0,
++    VFORMAT_MPEG4,
++    VFORMAT_H264,
++    VFORMAT_MJPEG,
++    VFORMAT_REAL,
++    VFORMAT_JPEG,
++    VFORMAT_VC1,
++    VFORMAT_AVS,
++    VFORMAT_SW,
++    VFORMAT_H264MVC,
++    VFORMAT_H264_4K2K,
++    VFORMAT_HEVC,
++    VFORMAT_H264_ENC,
++    VFORMAT_JPEG_ENC,
++    VFORMAT_VP9,
++
++/*add new here before.*/
++    VFORMAT_MAX,
++    VFORMAT_UNSUPPORT = VFORMAT_MAX
++} vformat_t;
++
++typedef enum {
++    STREAM_TYPE_UNKNOW,
++    STREAM_TYPE_ES_VIDEO,
++    STREAM_TYPE_ES_AUDIO,
++    STREAM_TYPE_ES_SUB,
++    STREAM_TYPE_PS,
++    STREAM_TYPE_TS,
++    STREAM_TYPE_RM,
++} stream_type_t;
++
++typedef struct {
++    stream_type_t stream_type;
++    unsigned int has_video :1;
++    unsigned int has_audio :1;
++    unsigned int noblock :1;
++    struct {
++        unsigned int format;
++        unsigned int width;
++        unsigned int height;
++        unsigned int rate;
++        void * param;
++    } am_sysinfo;
++    int video_type;
++} codec_para_t;
++#if 1
++#define codec_init(...) 0
++#define codec_write(a,b,c) c
++#define codec_close(...)
++#define codec_checkin_pts(...)
++#else
++int codec_init(codec_para_t *pcodec);
++int codec_close(codec_para_t *pcodec);
++int codec_checkin_pts(codec_para_t *pcodec, unsigned long pts);
++int codec_write(codec_para_t *pcodec, void *buffer, int len);
++#endif
++
++#else
++#include <codec.h>
++#endif
++
++#define EXTERNAL_PTS        (1)
++#define SYNC_OUTSIDE        (2)
++#define USE_IDR_FRAMERATE   (4)
++#define IPONLY_MODE         (8)
++#define NO_DEC_REF_BUF      (0x10)
++#define NO_ERROR_RECOVERY   (0x20)
++#define UNSTABLE_PTS         (0x40)
++
++typedef struct AMLContext {
++    const AVClass *class;
++    AVCodecContext *avctx;
++    codec_para_t *pcodec;
++#if DEBUG_DUMP
++    int dfd;
++#endif
++
++} AMLContext;
++
++int ff_aml_decode_init(AVCodecContext *avctx);
++#endif /* AVCODEC_AML_CODEC_H_ */
+--- a/src/media/renderers/audio_renderer_impl.cc
++++ b/src/media/renderers/audio_renderer_impl.cc
+@@ -8,6 +8,8 @@
+ #include <stddef.h>
+ #include <algorithm>
+ #include <utility>
++#include <stdlib.h>
++#include <fcntl.h>
+ 
+ #include "base/bind.h"
+ #include "base/callback.h"
+@@ -882,6 +884,15 @@ int AudioRendererImpl::Render(AudioBus*
+                                         weak_factory_.GetWeakPtr()));
+     }
+ 
++    char buf[64] = {0};
++    snprintf(buf, sizeof(buf), "0x%llx", audio_clock_->front_timestamp().InMilliseconds() * 90LL + 1LL);
++    int fd = open("/sys/class/tsync/pts_audio", O_CREAT | O_RDWR | O_TRUNC, 0644);
++    if (fd >= 0) {
++        write(fd, buf, strlen(buf));
++        close(fd);
++    } else {
++        LOG(ERROR) << buf << " unable to open /sys/class/tsync/pts_audio";
++    }
+     if (audio_clock_->front_timestamp() >= ended_timestamp_ &&
+         !rendered_end_of_stream_) {
+       rendered_end_of_stream_ = true;
+--- a/src/third_party/ffmpeg/chromium/config/Chrome/linux/arm64/config.h
++++ b/src/third_party/ffmpeg/chromium/config/Chrome/linux/arm64/config.h
+@@ -710,6 +710,7 @@
+ #define CONFIG_H263I_DECODER 0
+ #define CONFIG_H263P_DECODER 0
+ #define CONFIG_H264_DECODER 1
++#define CONFIG_H264_AML_DECODER 1
+ #define CONFIG_H264_CRYSTALHD_DECODER 0
+ #define CONFIG_H264_MMAL_DECODER 0
+ #define CONFIG_H264_QSV_DECODER 0
+@@ -717,6 +718,7 @@
+ #define CONFIG_H264_VDPAU_DECODER 0
+ #define CONFIG_HAP_DECODER 0
+ #define CONFIG_HEVC_DECODER 0
++#define CONFIG_HEVC_AML_DECODER 1
+ #define CONFIG_HEVC_QSV_DECODER 0
+ #define CONFIG_HNM4_VIDEO_DECODER 0
+ #define CONFIG_HQ_HQA_DECODER 0
+@@ -745,7 +747,9 @@
+ #define CONFIG_MPEG_XVMC_DECODER 0
+ #define CONFIG_MPEG1VIDEO_DECODER 0
+ #define CONFIG_MPEG2VIDEO_DECODER 0
++#define CONFIG_MPEGVIDEO_AML_DECODER 1
+ #define CONFIG_MPEG4_DECODER 0
++#define CONFIG_MPEG4_AML_DECODER 1
+ #define CONFIG_MPEG4_CRYSTALHD_DECODER 0
+ #define CONFIG_MPEG4_MMAL_DECODER 0
+ #define CONFIG_MPEG4_VDPAU_DECODER 0
+@@ -849,6 +853,7 @@
+ #define CONFIG_VP7_DECODER 0
+ #define CONFIG_VP8_DECODER 1
+ #define CONFIG_VP9_DECODER 0
++#define CONFIG_VP9_AML_DECODER 1
+ #define CONFIG_VQA_DECODER 0
+ #define CONFIG_WEBP_DECODER 0
+ #define CONFIG_WMV1_DECODER 0

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_HOST_AML_IMG_PACKER_NEW
+	bool "host new aml image packer"
+	help
+        host new aml image packer
+

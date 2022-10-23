@@ -1,0 +1,12 @@
+diff --git a/src/starboard/shared/starboard/player/input_buffer_internal.cc b/src/starboard/shared/starboard/player/input_buffer_internal.cc
+index c757c6d..efbfcd3 100644
+--- a/src/starboard/shared/starboard/player/input_buffer_internal.cc
++++ b/src/starboard/shared/starboard/player/input_buffer_internal.cc
+@@ -107,6 +107,7 @@ void InputBuffer::SetDecryptedContent(const void* buffer, int size) {
+   } else {
+     data_ = NULL;
+   }
++  size_ = size;
+   has_drm_info_ = false;
+ }
+ 

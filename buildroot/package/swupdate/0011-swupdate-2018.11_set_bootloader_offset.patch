@@ -1,0 +1,99 @@
+--- swupdate-2018.11/handlers/raw_handler.c	2019-07-22 20:31:26.718573100 +0800
++++ swupdate-2018.11/handlers/raw_handler.c	2019-07-22 20:28:03.782378800 +0800
+@@ -85,6 +85,84 @@
+ 	return ret;
+ }
+ 
++static int read_sysfs_val(const char* path, char* rBuf, const unsigned bufSz, int * readCnt)
++{
++    int fd  = -1;
++    int count = 0;
++
++    if (access(path, F_OK)) {
++            printf("path[%s] not existed\n", path);
++            return -1;
++    }
++    if (access(path, R_OK)) {
++            printf("path[%s] cannot read\n", path);
++            return -1;
++    }
++
++    fd = open(path, O_RDONLY);
++    if (fd < 0) {
++            printf("fail in open[%s] in O_RDONLY\n", path);
++            return -1;
++    }
++
++    count = read(fd, rBuf, bufSz);
++    close(fd);
++    if (count <= 0) {
++            printf("read %s failed (count:%d)\n", path, count);
++            return -1;
++    }
++    *readCnt = count;
++
++    return 0;
++}
++
++
++static int getBootloaderOffset(int* bootloaderOffset)
++{
++    const char* PathBlOff = "/sys/class/aml_store/bl_off_bytes" ;
++    int             iret  = 0;
++    char  buf[16]         = { 0 };
++    int           readCnt = 0;
++
++    iret = read_sysfs_val(PathBlOff, buf, 15, &readCnt);
++    if (iret < 0) {
++            printf("fail when read path[%s]\n", PathBlOff);
++            return -1;
++    }
++    buf[readCnt] = 0;
++    *bootloaderOffset = atoi(buf);
++    printf("bootloaderOffset is %s\n", buf);
++
++    return 0;
++}
++
++static int install_bootloader(struct img_type *img) {
++	int ret = 0;
++	int fdout = 0;
++	int offset = 0;
++
++	getBootloaderOffset(&offset);
++
++	//write bootloader
++	printf("write %s to /dev/bootloader.\n", img->fname);
++	fdout = open("/dev/bootloader", O_RDWR);
++	if (fdout < 0) {
++		TRACE("open %s failed!\n", "/dev/bootloader");
++		return -1;
++	}
++
++	lseek(fdout, offset, SEEK_SET);
++
++	ret = copyimage(&fdout, img, NULL);
++	close(fdout);
++	if (ret != 0) {
++		TRACE("install %s failed!\n", "/dev/bootloader");
++		return -1;
++	}
++
++	return ret;
++}
++
+ static int install_raw_image(struct img_type *img,
+ 	void __attribute__ ((__unused__)) *data)
+ {
+@@ -93,6 +171,11 @@
+ 	int slot = 0;
+ 	char device_name[128];
+ 
++	// bootloader maybe need to seek 512 byte
++	if ((strcmp(img->fname, "u-boot.bin")==0) ||(strcmp(img->fname, "u-boot.bin.encrypt")==0)) {
++		return install_bootloader(img);
++	}
++
+ 	//if a/b system and write boot partition
+ 	if ((strcmp(img->fname, "boot.img")==0) && (get_system_type()==0)) {
+ 		return install_boot_ab(img);

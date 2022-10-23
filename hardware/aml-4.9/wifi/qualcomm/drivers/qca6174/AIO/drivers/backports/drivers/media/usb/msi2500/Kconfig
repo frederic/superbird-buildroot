@@ -1,0 +1,7 @@
+config USB_MSI2500
+	depends on !BACKPORT_KERNEL_3_4
+	tristate "Mirics MSi2500"
+	depends on m
+	depends on VIDEO_V4L2 && SPI
+	select VIDEOBUF2_VMALLOC
+	select MEDIA_TUNER_MSI001

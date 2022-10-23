@@ -1,0 +1,61 @@
+From 137b8c8afd481aea30d1f167bb0476b56af68816 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Thu, 7 Mar 2019 20:21:27 +0800
+Subject: [PATCH kmscube 2/3] fix fd leak for meson_mali's gbm_device_get_fd
+
+Comment:
+The mesa's gbm implement return the fd directly,
+but arm ddk's gbm implement return with a dup fd.
+---
+ drm-common.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drm-common.c b/drm-common.c
+index 136fe69..b868cad 100644
+--- a/drm-common.c
++++ b/drm-common.c
+@@ -53,6 +53,9 @@ drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
+ 		drmModeRmFB(drm_fd, fb->fb_id);
+ 
+ 	free(fb);
++        if (drm_fd) {
++                close(drm_fd);
++        }
+ }
+ 
+ struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
+@@ -64,8 +67,12 @@ struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
+ 		 offsets[4] = {0}, flags = 0;
+ 	int ret = -1;
+ 
+-	if (fb)
++	if (fb) {
++                if (drm_fd) {
++                        close(drm_fd);
++                }
+ 		return fb;
++        }
+ 
+ 	fb = calloc(1, sizeof *fb);
+ 	fb->bo = bo;
+@@ -111,11 +118,17 @@ struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
+ 	if (ret) {
+ 		printf("failed to create fb: %s\n", strerror(errno));
+ 		free(fb);
++                if (drm_fd) {
++                        close(drm_fd);
++                }
+ 		return NULL;
+ 	}
+ 
+ 	gbm_bo_set_user_data(bo, fb, drm_fb_destroy_callback);
+ 
++        if (drm_fd) {
++                close(drm_fd);
++        }
+ 	return fb;
+ }
+ 
+-- 
+2.7.4
+

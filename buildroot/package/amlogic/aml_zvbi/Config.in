@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_ZVBI
+    bool "aml zvbi libs"
+    help
+        aml zvbi libs

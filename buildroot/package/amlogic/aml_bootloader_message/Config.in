@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_BOOTLOADER_MESSAGE
+	bool "aml bootloader message"
+	help
+	  bootloader message
+

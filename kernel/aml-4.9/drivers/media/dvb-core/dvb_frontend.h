@@ -264,6 +264,10 @@ struct dvb_tuner_ops {
 	 */
 	int (*set_frequency)(struct dvb_frontend *fe, u32 frequency);
 	int (*set_bandwidth)(struct dvb_frontend *fe, u32 bandwidth);
+
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	int (*get_strength)(struct dvb_frontend *fe, s16 *strength);
+#endif
 };
 
 /**
@@ -791,5 +795,10 @@ void dvb_frontend_reinitialise(struct dvb_frontend *fe);
  * calling this function directly.
  */
 void dvb_frontend_sleep_until(ktime_t *waketime, u32 add_usec);
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+/**
+ * dvb_frontend_add_event() - add event for the dvb frontend
+ */
+void dvb_frontend_add_event(struct dvb_frontend *fe, enum fe_status status);
+#endif
 #endif

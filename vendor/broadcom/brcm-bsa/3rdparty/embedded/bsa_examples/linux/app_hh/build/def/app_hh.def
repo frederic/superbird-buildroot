@@ -1,0 +1,69 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+             $(appdir)/../app_common/include \
+             $(appdir)/../app_ble/include
+
+ifeq ($(strip $(ENABLE_BTHID)),TRUE)
+appincdir := $(appincdir) ../../../../brcm/linux/bthid
+endif
+
+ifeq ($(strip $(ENABLE_BLE_AUDIO)),TRUE)
+appincdir := $(appincdir) $(embdrvdir)/sbc/decoder/include
+endif
+
+ifeq ($(strip $(ENABLE_AUDIO_STREAMING)),TRUE)
+appincdir := $(appincdir) $(embdrvdir)/sbc/encoder/include
+endif
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source \
+             $(appdir)/../app_common/source \
+             $(appdir)/../app_ble/source
+
+# list of sources for the current application
+appsrcs := \
+    app_hh_xml.c \
+    app_hh_db.c \
+    app_ble_client_db.c \
+    app_ble_client_xml.c \
+    app_hh.c \
+    app_wav.c \
+    app_hh_main.c \
+    app_disc.c \
+    app_mgt.c \
+    app_utils.c \
+    app_xml_param.c \
+    app_xml_utils.c \
+    app_services.c \
+    app_link.c \
+    app_dm.c \
+    app_thread.c \
+    nanoxml.c
+
+ifeq ($(strip $(ENABLE_BTHID)),TRUE)
+appsrcs := $(appsrcs) app_bthid.c
+endif
+
+ifeq ($(strip $(ENABLE_ALSA)),TRUE)
+appsrcs := $(appsrcs) app_alsa.c
+endif
+
+ifeq ($(strip $(ENABLE_OTAFWDL)),TRUE)
+appsrcs := $(appsrcs) app_hh_otafwdl.c
+endif
+
+ifeq ($(strip $(ENABLE_AUDIO_STREAMING)),TRUE)
+appsrcs := $(appsrcs) app_hh_as.c
+endif
+
+ifeq ($(strip $(ENABLE_BLE_AUDIO)),TRUE)
+appsrcs := $(appsrcs) app_hh_ble_audio_sink.c
+endif
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)
+

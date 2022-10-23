@@ -1,0 +1,16 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/libavcodec/Makefile
+===================================================================
+--- ffmpeg-3.4.5-ori/libavcodec/Makefile	2018-11-02 02:34:22.000000000 +0800
++++ ffmpeg-3.4.5/libavcodec/Makefile	2019-08-05 16:13:21.630988663 +0800
+@@ -420,7 +420,7 @@
+ OBJS-$(CONFIG_MP2FIXED_ENCODER)        += mpegaudioenc_fixed.o mpegaudio.o \
+                                           mpegaudiodata.o mpegaudiodsp_data.o
+ OBJS-$(CONFIG_MP2FLOAT_DECODER)        += mpegaudiodec_float.o
+-OBJS-$(CONFIG_MP3_DECODER)             += mpegaudiodec_fixed.o
++OBJS-$(CONFIG_MP3_DECODER)             += mpegaudiodec_fixed.o amldec.o
+ OBJS-$(CONFIG_MP3ADU_DECODER)          += mpegaudiodec_fixed.o
+ OBJS-$(CONFIG_MP3ADUFLOAT_DECODER)     += mpegaudiodec_float.o
+ OBJS-$(CONFIG_MP3FLOAT_DECODER)        += mpegaudiodec_float.o

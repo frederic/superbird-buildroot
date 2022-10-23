@@ -150,7 +150,7 @@ config BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV
 	depends on BR2_USE_MMU # eudev
 	select BR2_PACKAGE_EUDEV
 
-comment "eudev needs a toolchain w/ wchar, dynamic library"
+comment "eudev needs a toolchain w/ largefile, wchar, dynamic library"
 	depends on BR2_USE_MMU
 	depends on !BR2_USE_WCHAR || BR2_STATIC_LIBS
 
@@ -491,6 +491,36 @@ config BR2_ROOTFS_USERS_TABLES
 	  users on the system, with home directory, password, etc.
 
 	  See manual for details on the usage and syntax of these files.
+
+config BR2_ROOTFS_COMMON_OVERLAY
+	string "Root filesystem common overlay directories"
+	default ""
+	help
+	  common directories that are copied over the target root filesystem
+
+config BR2_ROOTFS_UPGRADE_DIR
+	string "amlogic upgrade configure directories"
+	default ""
+	help
+	  amlogic upgrade configure directories"
+
+config BR2_RECOVERY_OTA_DIR
+	string "amlogic recovery configure directories"
+	default ""
+	help
+	  amlogic recovery configure directories"
+
+config BR2_RECOVERY_OTA_RAMDISK_DIR
+	string "amlogic recovery RAMDISK configure directories"
+	default ""
+	help
+	  amlogic recovery RAMDISK configure directories"
+
+config BR2_ROOTFS_UPGRADE_DIR_OVERLAY
+         string "amlogic p231 upgrade configure directories"
+         default ""
+         help
+           amlogic p231 upgrade configure directories"
 
 config BR2_ROOTFS_OVERLAY
 	string "Root filesystem overlay directories"

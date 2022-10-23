@@ -1,0 +1,48 @@
+{
+    global:
+        gcoOS_*;
+        gcoMATH_*;
+        gcoHAL_*;
+        gcsHASH_*;
+
+        gcoSURF_*;
+        depr_gcoSURF_*;
+        gcsSURF_NODE_*;
+        gcsRECT_*;
+
+        gcoBUFFER_*;
+
+        gco2D_*;
+        gcoBRUSH_*;
+
+        gco3D_*;
+        gcoBUFOBJ_*;
+        gcoINDEX_*;
+        gcoSHADER_*;
+        gcoSTREAM_*;
+        gcoTEXTURE_*;
+        gcoVERTEX_*;
+        gcoVERTEXARRAY_*;
+
+        gcQueryShaderCompilerHwCfg*;
+        gcLoadShaders*;
+        gcLoadKernel*;
+        gcInvokeThreadWalker*;
+
+        gcoCL_*;
+
+        gcoVG_*;
+
+        gcoVX_*;
+
+        gcoPROFILER_*;
+        gcfSTATISTICS_*;
+
+        gcfAddMemoryInfo*;
+        gcfDelMemoryInfo*;
+
+        gcfMEM_*;
+
+    local:
+        *;
+};

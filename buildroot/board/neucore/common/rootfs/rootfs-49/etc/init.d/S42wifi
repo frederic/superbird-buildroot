@@ -1,0 +1,220 @@
+#!/bin/sh
+#killall hostapd
+#killall wpa_supplicant
+#killall dnsmasq
+#killall dhcpcd
+
+NAME1=wpa_supplicant
+DAEMON1=/usr/sbin/$NAME1
+PIDFILE1=/var/run/$NAME1.pid
+
+NAME2=hostapd
+DAEMON2=/usr/sbin/$NAME2
+PIDFILE2=/var/run/$NAME2.pid
+
+NAME3=dnsmasq
+DAEMON3=/usr/sbin/$NAME3
+PIDFILE3=/var/run/$NAME3.pid
+
+NAME4=dhcpcd
+DAEMON4=/usr/sbin/$NAME4
+PIDFILE4=/var/run/${NAME4}-wlan0.pid
+
+RTK_FLAG_FILE=/etc/wifi/rtk_station_mode
+RTK_WIFI_FLAG="NONE"
+ap_name_file=/etc/wifi/ap_name
+function hostapd_conf(){
+	while true
+	do
+		cat /sys/class/net/$1/address | sed 's/\://g' > /etc/wifi/ap_name
+		if [ -f $ap_name_file ];then
+			break
+		fi
+	done
+	ap_name=`cat /etc/wifi/ap_name`
+	ssid=amlogic-audio-$ap_name
+	password=12345678
+
+	echo 0 > /etc/hostapd_temp.conf
+	echo "interface=$1" > /etc/hostapd_temp.conf
+	echo "driver=nl80211" >> /etc/hostapd_temp.conf
+	echo "ctrl_interface=/var/run/hostapd" >> /etc/hostapd_temp.conf
+	echo "ssid=${ssid}" >> /etc/hostapd_temp.conf
+	echo "channel=6" >> /etc/hostapd_temp.conf
+	echo "ieee80211n=1" >> /etc/hostapd_temp.conf
+	echo "hw_mode=g" >> /etc/hostapd_temp.conf
+	echo "ignore_broadcast_ssid=0"  >> /etc/hostapd_temp.conf
+	echo "wpa=2" >> /etc/hostapd_temp.conf
+	echo "wpa_passphrase=${password}" >> /etc/hostapd_temp.conf
+	echo "wpa_key_mgmt=WPA-PSK" >> /etc/hostapd_temp.conf
+	echo "rsn_pairwise=CCMP" >> /etc/hostapd_temp.conf
+}
+
+MULTI_WIFI=/usr/bin/multi_wifi_load_driver
+
+function start_sta(){
+if [ $? -eq 0 ]; then
+	cnt=1
+	while [ $cnt -lt 20 ]; do
+		status=`wpa_cli status`
+		status=${status##*wpa_state=}
+		status=$(echo $status |awk '{print $1}')
+		if [ "$status" = "COMPLETED" ];then
+			dhcpcd wlan0 &
+			break
+		else
+			cnt=$((cnt + 1))
+			sleep 1
+		fi
+	done
+
+	if [[ "${RTK_WIFI_FLAG}" == "TRUE" ]]
+	then
+		if [ ${cnt} -eq 20 ]
+		then
+			rm ${RTK_FLAG_FILE}
+			sync
+		fi
+	fi
+fi
+}
+
+function move_skt()
+{
+skt_board=`cat /proc/device-tree/amlogic-dt-id`
+case ${skt_board} in
+	"axg_a113d_skt_v1")
+		exit 0
+		;;
+	"axg_a113x_skt_v1")
+		exit 0
+		;;
+esac
+}
+
+function init_wifi_env()
+{
+killall hostapd
+killall wpa_supplicant
+killall dnsmasq
+killall dhcpcd
+}
+
+
+function hostapd_conf_pre()
+{
+	hostapd_conf $1
+	hostapd /etc/hostapd_temp.conf -e /etc/entropy.bin &
+	ifconfig $1 192.168.2.1
+	DONE=`start-stop-daemon -S -m -p $PIDFILE3  -x $DAEMON3  -- -i$1  --dhcp-option=3,192.168.2.1 --dhcp-range=192.168.2.50,192.168.2.200,12h -p100`
+}
+
+function wifi_setup(){
+DONE=`ifconfig wlan0 up > /dev/null`
+ifconfig wlan0 &> /dev/null
+
+if [ $? -eq 0 ]; then
+	if [[ "$1" == "both" ]]
+	then
+		DONE=`start-stop-daemon -S -m -p $PIDFILE1 -b -x $DAEMON1 -- -Dnl80211 -iwlan0 -c/etc/wpa_supplicant.conf`
+		iw wlan0 interface add wlan1 type managed
+		hostapd_conf_pre wlan1
+	elif [[ "$1" == "station" ]]
+	then
+		DONE=`start-stop-daemon -S -m -p $PIDFILE1 -b -x $DAEMON1 -- -Dnl80211 -iwlan0 -c/etc/wpa_supplicant.conf`
+	elif [[ "$1" == "ap" ]]
+	then
+		hostapd_conf_pre wlan0
+	fi
+fi
+ifconfig wlan0 &> /dev/null
+
+if [[ "$1" == "both" || "$1" == "station" ]]
+then
+	start_sta
+fi
+}
+function rtk_wifi_ap()
+{
+	wifi_setup ap
+}
+
+
+function rtk_wifi_station()
+{
+	wifi_setup station
+		if [ ! -f ${RTK_FLAG_FILE} ]
+		then
+			init_wifi_env
+			rtk_wifi_ap
+		fi
+
+}
+
+function wifi_rtk()
+{
+	if [ -f ${RTK_FLAG_FILE} ]
+	then
+		 rtk_wifi_station
+	else
+		rtk_wifi_ap
+	fi
+}
+
+function wifi_start()
+{
+move_skt
+
+init_wifi_env
+
+echo "start wifi station mode load driver and setup......"
+
+#if [[ "$1" == "both" || "$1" == "station" ]]
+#then
+$MULTI_WIFI station 1
+#else
+#$MULTI_WIFI ap 1
+#fi
+
+wifi_chip_id_vendor="/sys/bus/mmc/devices/sdio:0001/sdio:0001:1/vendor"
+wifi_chip_id=`cat ${wifi_chip_id_vendor}`
+case "${wifi_chip_id}" in
+	0x02d0)
+		wifi_setup both
+		;;
+	#we use qca9377 same with rtk temperary
+	0x024c|0x0271)
+		RTK_WIFI_FLAG="TRUE"
+		wifi_rtk
+		;;
+esac
+}
+
+case "$1" in
+	start)
+		wifi_start &
+		;;
+	stop)
+		killall hostapd
+		killall wpa_supplicant
+		killall dnsmasq
+		killall dhcpcd
+		echo -n "Stopping supplicant..."
+		DONE=`start-stop-daemon -K -o -p $PIDFILE1`
+		DONE=`start-stop-daemon -K -o -p $PIDFILE3`
+		rm -f $PIDFILE1
+		rm -f $PIDFILE3
+		$MULTI_WIFI station 0
+		$POWERCTL 0
+		;;
+	restart)
+		$0 stop
+		$0 start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+esac
+
+exit $?
+

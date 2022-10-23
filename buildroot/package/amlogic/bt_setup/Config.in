@@ -1,0 +1,4 @@
+config BR2_PACKAGE_BT_SETUP
+    bool "bt_setup"
+    help
+        bt setup.

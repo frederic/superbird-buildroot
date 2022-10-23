@@ -1,0 +1,5 @@
+service vendor.wifi_hal_legacy /vendor/bin/hw/android.hardware.wifi@1.0-service
+    class hal
+    capabilities NET_ADMIN NET_RAW SYS_MODULE
+    user wifi
+    group wifi gps

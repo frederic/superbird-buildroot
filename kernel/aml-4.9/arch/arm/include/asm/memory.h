@@ -33,11 +33,26 @@
 
 #ifdef CONFIG_MMU
 
+#ifdef CONFIG_AMLOGIC_KASAN32
+/*
+ * if open AMLOGIC_KASAN32, PAGE_OFFSET is set to 0xD0000000
+ * we config 0xB8000000 as shadow memory start. so vmalloc
+ * can be 0xC0000000 and total 256mb space for vmalloc
+ */
+#define VMALLOC_START		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_256M))
+#define KMEM_END		(0xffa00000UL)
+#define TASK_SIZE		(VMALLOC_START - UL(SZ_128M))
+#else /* CONFIG_AMLOGIC_KASAN32 */
 /*
  * TASK_SIZE - the maximum size of a user space task.
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
  */
+#ifdef CONFIG_AMLOGIC_VMAP
+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_64M))
+#else
 #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+#endif /* CONFIG_AMLOGIC_VMAP */
+#endif
 #define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
 
 /*
@@ -45,15 +60,28 @@
  */
 #define TASK_SIZE_26		(UL(1) << 26)
 
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M + SZ_4M + SZ_2M)
+#elif defined(CONFIG_AMLOGIC_VMAP)
+#define MODULES_VADDR		(PAGE_OFFSET - SZ_64M)
+#else
 /*
  * The module space lives between the addresses given by TASK_SIZE
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
  */
 #ifndef CONFIG_THUMB2_KERNEL
+/*
+ * to fix module link problem
+ */
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
 #else
 /* smaller range for Thumb-2 symbols relocation (2^24)*/
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
+#endif
+#endif	/* CONFIG_AMLOGIC_VMAP */
+
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define VMALLOC_END		(MODULES_VADDR - SZ_2M)
 #endif
 
 #if TASK_SIZE > MODULES_VADDR
@@ -63,10 +91,14 @@
 /*
  * The highmem pkmap virtual space shares the end of the module area.
  */
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define MODULES_END		(PAGE_OFFSET)
+#else
 #ifdef CONFIG_HIGHMEM
 #define MODULES_END		(PAGE_OFFSET - PMD_SIZE)
 #else
 #define MODULES_END		(PAGE_OFFSET)
+#endif
 #endif
 
 /*
@@ -238,21 +270,41 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
 #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+extern unsigned long phys_check(phys_addr_t x);
+extern unsigned long virt_check(unsigned long x);
+extern int scheduler_running;
+#endif
 static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	return virt_check(x);
+#else
 	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+#endif
 }
 
 static inline unsigned long __phys_to_virt(phys_addr_t x)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	return phys_check(x);
+#else
 	return x - PHYS_OFFSET + PAGE_OFFSET;
+#endif
 }
 
 #endif
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#define virt_to_pfn(kaddr) \
+	({virt_check((unsigned long)kaddr); \
+	 ((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+	 PHYS_PFN_OFFSET); })
+#else
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
+#endif
 
 /*
  * These are *only* valid on the kernel direct mapped RAM memory.

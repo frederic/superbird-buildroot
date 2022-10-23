@@ -7,6 +7,8 @@
 FFMPEG_VERSION = 3.4.5
 FFMPEG_SOURCE = ffmpeg-$(FFMPEG_VERSION).tar.xz
 FFMPEG_SITE = http://ffmpeg.org/releases
+#FFMPEG_SITE = $(TOPDIR)/../vendor/amlogic/ffmpeg
+#FFMPEG_SITE_METHOD = local
 FFMPEG_INSTALL_STAGING = YES
 
 FFMPEG_LICENSE = LGPL-2.1+, libjpeg license
@@ -54,9 +56,47 @@ FFMPEG_CONF_OPTS = \
 	--disable-libilbc \
 	--disable-libvo-amrwbenc \
 	--disable-symver \
+	--disable-encoder=ac3 \
+	--disable-decoder=ac3 \
+	--disable-demuxer=ac3 \
+	--disable-parser=ac3 \
+	--disable-encoder=eac3 \
+	--disable-decoder=eac3 \
+	--disable-demuxer=eac3 \
+	--disable-parser=eac3 \
+	--disable-encoder=mlp \
+	--disable-decoder=mlp \
+	--disable-demuxer=mlp \
+	--disable-parser=mlp \
+	--disable-encoder=truehd \
+	--disable-decoder=truehd \
+	--disable-demuxer=truehd \
+	--disable-parser=truehd \
+	--disable-encoder=dts \
+	--disable-decoder=dts \
+	--disable-demuxer=dts \
+	--disable-parser=dts \
+	--disable-encoder=dtshd \
+	--disable-decoder=dtshd \
+	--disable-demuxer=dtshd \
+	--disable-parser=dtshd \
 	--disable-doc
 
+#libplayer should compile first, so libplayer will link to its own inside ffmpeg
+FFMPEG_DEPENDENCIES += $(if $(BR2_PACKAGE_LIBPLAYER),libplayer)
 FFMPEG_DEPENDENCIES += host-pkgconf
+
+# Apply the related patch for our hifi dsp in ffmpeg
+ifeq ($(BR2_PACKAGE_AML_DSP_UTIL),y)
+FFMPEG_DEPENDENCIES += aml_dsp_util
+define FFMPEG_APPLY_HIFI4DSP_PATCHES
+	if [ -d $(FFMPEG_PKGDIR)/hifi4dsp  ]; then \
+		$(APPLY_PATCHES) $(@D) $(FFMPEG_PKGDIR)/hifi4dsp *.patch; \
+	fi
+endef
+
+FFMPEG_POST_PATCH_HOOKS += FFMPEG_APPLY_HIFI4DSP_PATCHES
+endif
 
 ifeq ($(BR2_PACKAGE_FFMPEG_GPL),y)
 FFMPEG_CONF_OPTS += --enable-gpl
@@ -161,6 +201,10 @@ FFMPEG_CONF_OPTS += --enable-alsa
 FFMPEG_DEPENDENCIES += alsa-lib
 else
 FFMPEG_CONF_OPTS += --disable-alsa
+endif
+ifeq ($(BR2_PACKAGE_PULSEAUDIO),y)
+FFMPEG_CONF_OPTS += --enable-libpulse
+FFMPEG_DEPENDENCIES += pulseaudio
 endif
 else
 FFMPEG_CONF_OPTS += --disable-indevs

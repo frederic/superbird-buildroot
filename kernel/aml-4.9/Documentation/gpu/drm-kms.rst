@@ -63,6 +63,9 @@ Frame Buffer Functions Reference
 DRM Format Handling
 ===================
 
+.. kernel-doc:: include/drm/drm_fourcc.h
+   :internal:
+
 .. kernel-doc:: drivers/gpu/drm/drm_fourcc.c
    :export:
 
@@ -307,6 +310,12 @@ Color Management Properties
 
 .. kernel-doc:: drivers/gpu/drm/drm_color_mgmt.c
    :export:
+
+Explicit Fencing Properties
+---------------------------
+
+.. kernel-doc:: drivers/gpu/drm/drm_atomic.c
+   :doc: explicit fencing properties
 
 Existing KMS Properties
 -----------------------

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="LC_HDMI" platform="txlx" commands="">
+<Group num="strong" val=" ">
+<Page tab_title="Over_all_setting" layout="10x4">
+<Control ui_type="checkbox" name="lc_enable" range="0~1" addr="0x3fc0" mask="4:4" dst="U" desc="enable signal for local contrast enhancement, 1-enable; 0 disable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="dnlp_enable" range="0~1" addr="0" mask="31:0" dst="U" desc="" default="0" value="1" cmd="dnlp2e:dnlp_en"/>
+<Control ui_type="checkbox" name="lc_blkblend_mode" range="0~1" addr="0x3fc0" mask="0:0" dst="U" desc="use bilinear interpolation between blocks, 0: no interpolation 1: blender enabled" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_hblank" range="0~255" addr="0x3fc0" mask="15:8" dst="U" desc="blank between two line." default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_hnum" range="0~31" addr="0x3fc1" mask="12:8" dst="U" desc="lc processing region number of H, maximum to(STA_LEN_H-1)(0~12)" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_vnum" range="0~31" addr="0x3fc1" mask="4:0" dst="U" desc="lc processing region number of V, maximum to (STA_LEN_V-1)(0~8)" default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_hlpf" range="0~3" addr="0x4000" mask="9:8" dst="U" desc="horizontal lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_vlpf" range="0~3" addr="0x4000" mask="5:4" dst="U" desc="Vertical lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="Curve_parameters" layout="10x4">
+<Control ui_type="slider" name="lc_slope_min" range="0~255" addr="0x4009" mask="15:8" dst="U" desc="reg_lc_ypkbv_slope_lmt_0: min slop for the curves to avoid artifacts,norm 32 to 1" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max" range="0~255" addr="0x4009" mask="7:0" dst="U" desc="reg_lc_ypkbv_slope_lmt_1: max slop for the curves to avoid artifacts, norm 32 to 1" default="96" value="91" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max_face" range="0~255" addr="0x4007" mask="7:0" dst="U" desc="reg_lc_slope_max_face: maximum slope for the pkBin-maxBV range curve to do face protection, norm 32 to 1" default="56" value="28" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_num_m_coring" range="0~15" addr="0x4007" mask="19:16" dst="U" desc="coring to num_m, soft coring" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_low" range="0~1023" addr="0x4003" mask="25:16" dst="U" desc=" reg_lc_contrast_low: contrast gain to the lc for dark side" default="16" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_hig" range="0~1023" addr="0x4003" mask="9:0" dst="U" desc=" reg_lc_contrast_hig: contrast gain to the lc for bright side" default="24" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_low" range="0~255" addr="0x4005" mask="15:8" dst="U" desc="reg_lc_cntstscl_low: scale for the contrast low, norm 8 as 1" default="64" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_hig" range="0~255" addr="0x4005" mask="7:0" dst="U" desc="reg_lc_cntstscl_hig: scale for the contrast high,norm 8 as 1" default="32" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_l" range="0~255" addr="0x4004" mask="31:24" dst="U" desc="reg_lc_cntstlmt_low_0: limit for the contrast low" default="10" value="10" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_h" range="0~255" addr="0x4004" mask="15:8" dst="U" desc="reg_lc_cntstlmt_low_1: limit for the contrast low" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_l" range="0~255" addr="0x4004" mask="23:16" dst="U" desc="reg_lc_cntstlmt_high_0: limit for the contrast high" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_h" range="0~255" addr="0x4004" mask="7:0" dst="U" desc="reg_lc_cntstlmt_high_1: limit for the contrast high" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_minmax" range="0~255" addr="0x4002" mask="15:8" dst="U" desc="x/1024 of amount" default="6" value="6" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_valid" range="0~255" addr="0x4002" mask="7:0" dst="U" desc="x/1024 of amount" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_low" range="0~255" addr="0x4006" mask="15:8" dst="U" desc="scale to num_m as limit of min_val to minBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_hig" range="0~255" addr="0x4006" mask="7:0" dst="U" desc="scale to num_m as limit of max_val to maxBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="curve_limit" layout="10x4">
+<Control ui_type="slider" name="ypk_ymax_limit_64" range="0~1023" addr="0x4010" mask="25:16" dst="U" desc="dark region boost minimum limit" default="120" value="80" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_128" range="0~1023" addr="0x4010" mask="9:0" dst="U" desc="dark region boost minimum limit" default="150" value="150" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_192" range="0~1023" addr="0x4011" mask="25:16" dst="U" desc="dark region boost minimum limit" default="230" value="230" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_256" range="0~1023" addr="0x4011" mask="9:0" dst="U" desc="dark region boost minimum limit" default="274" value="274" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_320" range="0~1023" addr="0x4012" mask="25:16" dst="U" desc="dark region boost minimum limit" default="330" value="330" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_384" range="0~1023" addr="0x4012" mask="9:0" dst="U" desc="dark region boost minimum limit" default="384" value="384" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="ypkbv_ratio_0" range="0~255" addr="0x4008" mask="31:24" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="140" value="77" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_256" range="0~255" addr="0x4008" mask="23:16" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="160" value="160" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_512" range="0~255" addr="0x4008" mask="15:8" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="120" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_768" range="0~255" addr="0x4008" mask="7:0" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="96" value="96" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_64" range="0~1023" addr="0x400a" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="48" value="48" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_128" range="0~1023" addr="0x400a" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="80" value="80" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_192" range="0~1023" addr="0x400b" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="120" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_256" range="0~1023" addr="0x400b" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="128" value="128" cmd="common:2,0xff900000"/>
+</Page>
+</Group>
+<Group num="medium" val="">
+<Page tab_title="Over_all_setting" layout="10x4">
+<Control ui_type="checkbox" name="lc_enable" range="0~1" addr="0x3fc0" mask="4:4" dst="U" desc="enable signal for local contrast enhancement, 1-enable; 0 disable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="dnlp_enable" range="0~1" addr="0" mask="31:0" dst="U" desc="" default="0" value="1" cmd="dnlp2e:dnlp_en"/>
+<Control ui_type="checkbox" name="lc_blkblend_mode" range="0~1" addr="0x3fc0" mask="0:0" dst="U" desc="use bilinear interpolation between blocks, 0: no interpolation 1: blender enabled" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_hblank" range="0~255" addr="0x3fc0" mask="15:8" dst="U" desc="blank between two line." default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_hnum" range="0~31" addr="0x3fc1" mask="12:8" dst="U" desc="lc processing region number of H, maximum to(STA_LEN_H-1)(0~12)" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_vnum" range="0~31" addr="0x3fc1" mask="4:0" dst="U" desc="lc processing region number of V, maximum to (STA_LEN_V-1)(0~8)" default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_hlpf" range="0~3" addr="0x4000" mask="9:8" dst="U" desc="horizontal lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_vlpf" range="0~3" addr="0x4000" mask="5:4" dst="U" desc="Vertical lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="Curve_parameters" layout="10x4">
+<Control ui_type="slider" name="lc_slope_min" range="0~255" addr="0x4009" mask="15:8" dst="U" desc="reg_lc_ypkbv_slope_lmt_0: min slop for the curves to avoid artifacts,norm 32 to 1" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max" range="0~255" addr="0x4009" mask="7:0" dst="U" desc="reg_lc_ypkbv_slope_lmt_1: max slop for the curves to avoid artifacts, norm 32 to 1" default="96" value="60" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max_face" range="0~255" addr="0x4007" mask="7:0" dst="U" desc="reg_lc_slope_max_face: maximum slope for the pkBin-maxBV range curve to do face protection, norm 32 to 1" default="56" value="50" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_num_m_coring" range="0~15" addr="0x4007" mask="19:16" dst="U" desc="coring to num_m, soft coring" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_low" range="0~1023" addr="0x4003" mask="25:16" dst="U" desc=" reg_lc_contrast_low: contrast gain to the lc for dark side" default="16" value="16" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_hig" range="0~1023" addr="0x4003" mask="9:0" dst="U" desc=" reg_lc_contrast_hig: contrast gain to the lc for bright side" default="24" value="24" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_low" range="0~255" addr="0x4005" mask="15:8" dst="U" desc="reg_lc_cntstscl_low: scale for the contrast low, norm 8 as 1" default="64" value="64" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_hig" range="0~255" addr="0x4005" mask="7:0" dst="U" desc="reg_lc_cntstscl_hig: scale for the contrast high,norm 8 as 1" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_l" range="0~255" addr="0x4004" mask="31:24" dst="U" desc="reg_lc_cntstlmt_low_0: limit for the contrast low" default="10" value="10" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_h" range="0~255" addr="0x4004" mask="15:8" dst="U" desc="reg_lc_cntstlmt_low_1: limit for the contrast low" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_l" range="0~255" addr="0x4004" mask="23:16" dst="U" desc="reg_lc_cntstlmt_high_0: limit for the contrast high" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_h" range="0~255" addr="0x4004" mask="7:0" dst="U" desc="reg_lc_cntstlmt_high_1: limit for the contrast high" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_minmax" range="0~255" addr="0x4002" mask="15:8" dst="U" desc="x/1024 of amount" default="6" value="6" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_valid" range="0~255" addr="0x4002" mask="7:0" dst="U" desc="x/1024 of amount" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_low" range="0~255" addr="0x4006" mask="15:8" dst="U" desc="scale to num_m as limit of min_val to minBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_hig" range="0~255" addr="0x4006" mask="7:0" dst="U" desc="scale to num_m as limit of max_val to maxBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="curve_limit" layout="10x4">
+<Control ui_type="slider" name="ypk_ymax_limit_64" range="0~1023" addr="0x4010" mask="25:16" dst="U" desc="dark region boost minimum limit" default="120" value="64" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_128" range="0~1023" addr="0x4010" mask="9:0" dst="U" desc="dark region boost minimum limit" default="150" value="150" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_192" range="0~1023" addr="0x4011" mask="25:16" dst="U" desc="dark region boost minimum limit" default="230" value="230" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_256" range="0~1023" addr="0x4011" mask="9:0" dst="U" desc="dark region boost minimum limit" default="274" value="274" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_320" range="0~1023" addr="0x4012" mask="25:16" dst="U" desc="dark region boost minimum limit" default="330" value="330" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_384" range="0~1023" addr="0x4012" mask="9:0" dst="U" desc="dark region boost minimum limit" default="384" value="384" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_704" range="0~1023" addr="0x4015" mask="25:16" dst="U" desc="dark region boost minimum limit" default="640" value="640" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_768" range="0~1023" addr="0x4015" mask="9:0" dst="U" desc="dark region boost minimum limit" default="640" value="640" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_0" range="0~255" addr="0x4008" mask="31:24" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="140" value="140" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_256" range="0~255" addr="0x4008" mask="23:16" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="160" value="160" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_512" range="0~255" addr="0x4008" mask="15:8" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="120" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_768" range="0~255" addr="0x4008" mask="7:0" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="96" value="96" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_64" range="0~1023" addr="0x400a" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="48" value="48" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_128" range="0~1023" addr="0x400a" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="80" value="80" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_192" range="0~1023" addr="0x400b" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="120" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_256" range="0~1023" addr="0x400b" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="128" value="128" cmd="common:2,0xff900000"/>
+<Group num="low" val=" ">
+<Page tab_title="Over_all_setting" layout="10x4">
+<Control ui_type="checkbox" name="lc_enable" range="0~1" addr="0x3fc0" mask="4:4" dst="U" desc="enable signal for local contrast enhancement, 1-enable; 0 disable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="dnlp_enable" range="0~1" addr="0" mask="31:0" dst="U" desc="" default="0" value="1" cmd="dnlp2e:dnlp_en"/>
+<Control ui_type="checkbox" name="lc_blkblend_mode" range="0~1" addr="0x3fc0" mask="0:0" dst="U" desc="use bilinear interpolation between blocks, 0: no interpolation 1: blender enabled" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_hblank" range="0~255" addr="0x3fc0" mask="15:8" dst="U" desc="blank between two line." default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_hnum" range="0~31" addr="0x3fc1" mask="12:8" dst="U" desc="lc processing region number of H, maximum to(STA_LEN_H-1)(0~12)" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_vnum" range="0~31" addr="0x3fc1" mask="4:0" dst="U" desc="lc processing region number of V, maximum to (STA_LEN_V-1)(0~8)" default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_hlpf" range="0~3" addr="0x4000" mask="9:8" dst="U" desc="horizontal lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_vlpf" range="0~3" addr="0x4000" mask="5:4" dst="U" desc="Vertical lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="Curve_parameters" layout="10x4">
+<Control ui_type="slider" name="lc_slope_min" range="0~255" addr="0x4009" mask="15:8" dst="U" desc="reg_lc_ypkbv_slope_lmt_0: min slop for the curves to avoid artifacts,norm 32 to 1" default="12" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max" range="0~255" addr="0x4009" mask="7:0" dst="U" desc="reg_lc_ypkbv_slope_lmt_1: max slop for the curves to avoid artifacts, norm 32 to 1" default="96" value="50" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max_face" range="0~255" addr="0x4007" mask="7:0" dst="U" desc="reg_lc_slope_max_face: maximum slope for the pkBin-maxBV range curve to do face protection, norm 32 to 1" default="56" value="34" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_num_m_coring" range="0~15" addr="0x4007" mask="19:16" dst="U" desc="coring to num_m, soft coring" default="1" value="3" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_low" range="0~1023" addr="0x4003" mask="25:16" dst="U" desc=" reg_lc_contrast_low: contrast gain to the lc for dark side" default="16" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_gain_hig" range="0~1023" addr="0x4003" mask="9:0" dst="U" desc=" reg_lc_contrast_hig: contrast gain to the lc for bright side" default="24" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_low" range="0~255" addr="0x4005" mask="15:8" dst="U" desc="reg_lc_cntstscl_low: scale for the contrast low, norm 8 as 1" default="64" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_hig" range="0~255" addr="0x4005" mask="7:0" dst="U" desc="reg_lc_cntstscl_hig: scale for the contrast high,norm 8 as 1" default="32" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_l" range="0~255" addr="0x4004" mask="31:24" dst="U" desc="reg_lc_cntstlmt_low_0: limit for the contrast low" default="10" value="10" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_h" range="0~255" addr="0x4004" mask="15:8" dst="U" desc="reg_lc_cntstlmt_low_1: limit for the contrast low" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_l" range="0~255" addr="0x4004" mask="23:16" dst="U" desc="reg_lc_cntstlmt_high_0: limit for the contrast high" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_h" range="0~255" addr="0x4004" mask="7:0" dst="U" desc="reg_lc_cntstlmt_high_1: limit for the contrast high" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_minmax" range="0~255" addr="0x4002" mask="15:8" dst="U" desc="x/1024 of amount" default="6" value="6" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_valid" range="0~255" addr="0x4002" mask="7:0" dst="U" desc="x/1024 of amount" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_low" range="0~255" addr="0x4006" mask="15:8" dst="U" desc="scale to num_m as limit of min_val to minBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_hig" range="0~255" addr="0x4006" mask="7:0" dst="U" desc="scale to num_m as limit of max_val to maxBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="curve_limit" layout="10x4">
+<Control ui_type="slider" name="ypk_ymax_limit_64" range="0~1023" addr="0x4010" mask="25:16" dst="U" desc="dark region boost minimum limit" default="120" value="100" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_128" range="0~1023" addr="0x4010" mask="9:0" dst="U" desc="dark region boost minimum limit" default="150" value="140" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_192" range="0~1023" addr="0x4011" mask="25:16" dst="U" desc="dark region boost minimum limit" default="230" value="239" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_256" range="0~1023" addr="0x4011" mask="9:0" dst="U" desc="dark region boost minimum limit" default="274" value="274" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_320" range="0~1023" addr="0x4012" mask="25:16" dst="U" desc="dark region boost minimum limit" default="330" value="330" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypk_ymax_limit_384" range="0~1023" addr="0x4012" mask="9:0" dst="U" desc="dark region boost minimum limit" default="384" value="384" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="ypkbv_ratio_0" range="0~255" addr="0x4008" mask="31:24" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="140" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_256" range="0~255" addr="0x4008" mask="23:16" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="160" value="180" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_512" range="0~255" addr="0x4008" mask="15:8" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="120" value="90" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ypkbv_ratio_768" range="0~255" addr="0x4008" mask="7:0" dst="U" desc="low_bound = ratio*(maxBv-minBv)+min_val as low bound of the ypkBV; normalized to 256 as 1" default="96" value="60" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_64" range="0~1023" addr="0x400a" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="48" value="48" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_128" range="0~1023" addr="0x400a" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="80" value="80" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_192" range="0~1023" addr="0x400b" mask="25:16" dst="U" desc="very dark region boost minimum limit" default="120" value="120" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="ymin_limit_256" range="0~1023" addr="0x400b" mask="9:0" dst="U" desc="very dark region boost minimum limit" default="128" value="128" cmd="common:2,0xff900000"/>
+</Page>
+</Group>
+</Page>
+</Group>
+</Form>
+

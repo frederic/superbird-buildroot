@@ -1,0 +1,148 @@
+diff --git a/src/cc/output/gl_renderer.cc b/src/cc/output/gl_renderer.cc
+old mode 100644
+new mode 100755
+index 0472812..74fb2bb
+--- a/src/cc/output/gl_renderer.cc
++++ b/src/cc/output/gl_renderer.cc
+@@ -334,7 +334,11 @@ GLRenderer::GLRenderer(RendererClient* client,
+       highp_threshold_cache_(0),
+       use_sync_query_(false),
+       on_demand_tile_raster_resource_id_(0),
+-      bound_geometry_(NO_BINDING) {
++      bound_geometry_(NO_BINDING),
++      video_axis_left(0),
++      video_axis_top(0),
++      video_axis_right(0),
++      video_axis_bottom(0) {
+   DCHECK(gl_);
+   DCHECK(context_support_);
+ 
+@@ -2086,27 +2090,37 @@ void GLRenderer::DrawYUVVideoQuad(const DrawingFrame* frame,
+                                   const gfx::QuadF* clip_region) {
+   SetBlendEnabled(quad->ShouldDrawWithBlending());
+ 
+-  LOG(INFO) << "quad rect:" << quad->rect.ToString() << ", visible_rect: " << quad->visible_rect.ToString()
+-      << ", shared_quad_state->visible_rect:" << quad->shared_quad_state->visible_quad_layer_rect.ToString()
+-      << ", quad_to_target_transform: " << quad->shared_quad_state->quad_to_target_transform.ToString();
++  // LOG(INFO) << "quad rect:" << quad->rect.ToString() << ", visible_rect: " << quad->visible_rect.ToString()
++  //     << ", shared_quad_state->visible_rect:" << quad->shared_quad_state->visible_quad_layer_rect.ToString()
++  //     << ", quad_to_target_transform: " << quad->shared_quad_state->quad_to_target_transform.ToString();
+   gfx::Vector2dF translationValue = quad->shared_quad_state->quad_to_target_transform.To2dTranslation();
+   gfx::Vector2dF scaleValue = quad->shared_quad_state->quad_to_target_transform.Scale2d();
+-  LOG(INFO) << "x_offset:" << translationValue.x() << ", y_offset:" << translationValue.y()
+-      << ", x_scale:" << scaleValue.x() << ", x_scale:" << scaleValue.y();
+-
+-  char buf[64];
+-  memset(buf, 0, 64);
+-  sprintf(buf, "%d %d %d %d", (int)translationValue.x(), (int)translationValue.y()
+-    , (int)(translationValue.x() + quad->visible_rect.width()*scaleValue.x())
+-    , (int)(translationValue.y() + quad->visible_rect.height()*scaleValue.y()));
+-
+-  int fd = open("/sys/class/video/axis", O_CREAT | O_RDWR | O_TRUNC, 0644);
+-  if (fd >= 0) {
++  // LOG(INFO) << "x_offset:" << translationValue.x() << ", y_offset:" << translationValue.y()
++  //     << ", x_scale:" << scaleValue.x() << ", x_scale:" << scaleValue.y();
++
++  int left = (int)translationValue.x();
++  int top = (int)translationValue.y();
++  int right = (int)(translationValue.x() + quad->visible_rect.width()*scaleValue.x());
++  int bottom = (int)(translationValue.y() + quad->visible_rect.height()*scaleValue.y());
++  if (left != video_axis_left || top != video_axis_top
++      || right != video_axis_right || bottom != video_axis_bottom) {
++    char buf[64];
++    memset(buf, 0, 64);
++    sprintf(buf, "%d %d %d %d", left, top, right, bottom);
++
++    int fd = open("/sys/class/video/axis", O_CREAT | O_RDWR | O_TRUNC, 0644);
++    if (fd >= 0) {
+       LOG(INFO) << "set video axis:" << buf;
+       write(fd, buf, strlen(buf));
+       close(fd);
+-  } else {
++    } else {
+       LOG(ERROR) << "unable to open /sys/class/video/axis";
++    }
++
++    video_axis_left = left;
++    video_axis_top = top;
++    video_axis_right = right;
++    video_axis_bottom = bottom;
+   }
+ 
+   TexCoordPrecision tex_coord_precision = TexCoordPrecisionRequired(
+diff --git a/src/cc/output/gl_renderer.h b/src/cc/output/gl_renderer.h
+old mode 100644
+new mode 100755
+index 65e4f49..7b35a49
+--- a/src/cc/output/gl_renderer.h
++++ b/src/cc/output/gl_renderer.h
+@@ -525,6 +525,10 @@ class CC_EXPORT GLRenderer : public DirectRenderer {
+   ResourceId on_demand_tile_raster_resource_id_;
+   BoundGeometry bound_geometry_;
+   DISALLOW_COPY_AND_ASSIGN(GLRenderer);
++  int video_axis_left;
++  int video_axis_top;
++  int video_axis_right;
++  int video_axis_bottom;
+ };
+ 
+ }  // namespace cc
+diff --git a/src/content/app/content_main.cc b/src/content/app/content_main.cc
+old mode 100644
+new mode 100755
+index b983bf8..f405605
+--- a/src/content/app/content_main.cc
++++ b/src/content/app/content_main.cc
+@@ -5,9 +5,13 @@
+ #include "content/public/app/content_main.h"
+ 
+ #include <memory>
++#include <fcntl.h>
++#include "base/logging.h"
+ 
+ #include "content/public/app/content_main_runner.h"
+ 
++#define VIDEO_AXIS_PATH     "/sys/class/video/axis"
++
+ namespace content {
+ 
+ int ContentMain(const ContentMainParams& params) {
+@@ -17,10 +21,38 @@ int ContentMain(const ContentMainParams& params) {
+   if (exit_code >= 0)
+     return exit_code;
+ 
++  char buf[64];
++  memset(buf, 0, 64);
++
++  buf[0] = '\0';
++  int fd = open(VIDEO_AXIS_PATH, O_CREAT | O_RDWR | O_TRUNC, 0644);
++  if (fd >= 0) {
++    read(fd, buf, sizeof(buf));
++    close(fd);
++    int left, top, right, bottom;
++    if (sscanf(buf, "%d %d %d %d", &left, &top, &right, &bottom) == 4) {
++      if (right == -1 && bottom == -1) {
++        memset(buf, 0, sizeof(buf));
++        sprintf(buf, "%d %d %d %d", 0, 0, 0, 0);
++      }
++    }
++  } else {
++    LOG(ERROR) << "unable to open /sys/class/video/axis";
++  }
++
+   exit_code = main_runner->Run();
+ 
+   main_runner->Shutdown();
+ 
++  fd = open(VIDEO_AXIS_PATH, O_CREAT | O_RDWR | O_TRUNC, 0644);
++  if (fd >= 0) {
++    LOG(INFO) << "set video axis:" << buf;
++    write(fd, buf, strlen(buf));
++    close(fd);
++  } else {
++    LOG(ERROR) << "unable to open /sys/class/video/axis";
++  }
++
+   return exit_code;
+ }
+ 

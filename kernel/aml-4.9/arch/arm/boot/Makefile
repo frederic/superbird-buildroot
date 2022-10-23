@@ -17,6 +17,16 @@ ifneq ($(MACHINE),)
 include $(MACHINE)/Makefile.boot
 endif
 
+ifeq ($(CONFIG_MACH_MESON8B),y)
+include $(srctree)/arch/arm/mach-meson/Makefile.boot
+endif
+
+ifeq ($(CONFIG_ARM64_A32),y)
+include $(srctree)/arch/arm/mach-meson/Makefile.boot
+endif
+
+include $(srctree)/arch/arm/boot/dts/Makefile
+
 # Note: the following conditions must always be true:
 #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
 #   PARAMS_PHYS must be within 4MB of ZRELADDR
@@ -28,6 +38,14 @@ INITRD_PHYS := $(initrd_phys-y)
 export ZRELADDR INITRD_PHYS PARAMS_PHYS
 
 targets := Image zImage xipImage bootpImage uImage
+
+DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
+ifneq ($(DTB_NAMES),)
+DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
+else
+DTB_LIST := $(dtb-y)
+endif
+DTB_OBJS := $(addprefix $(obj)/dts/,$(DTB_LIST))
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
 
@@ -54,6 +72,10 @@ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
 
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
+
+$(obj)/zImage-dtb:	$(obj)/zImage $(DTB_OBJS) FORCE
+	$(call if_changed,cat)
+	@echo '  Kernel: $@ is ready'
 
 endif
 

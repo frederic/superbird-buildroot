@@ -1,0 +1,35 @@
+config BR2_PACKAGE_MRVL_WIFIBT
+	bool "marvell wifi/bt"
+	depends on BR2_LINUX_KERNEL
+	help
+	marvell wifi/bt
+
+config BR2_PACKAGE_SD8977
+	bool "sd8977"
+	depends on BR2_PACKAGE_MRVL_WIFIBT
+	help
+	marvell sd8977 support
+
+config BR2_PACKAGE_SD8987
+	bool "sd8987"
+	depends on BR2_PACKAGE_MRVL_WIFIBT
+	help
+	marvell sd8987 support
+
+config BR2_PACKAGE_MRVL_WIFI_LOCAL_PATH
+	string "marvell wifi driver local path"
+	depends on BR2_PACKAGE_MRVL_WIFIBT
+	help
+	marvell wifi local path
+
+config BR2_PACKAGE_MRVL_BT_LOCAL_PATH
+	string "marvell bt driver local path"
+	depends on BR2_PACKAGE_MRVL_WIFIBT
+	help
+	marvell bt local path
+
+config BR2_PACKAGE_MRVL_FW_LOCAL_PATH
+	string "marvell wifi/bt fw local path"
+	depends on BR2_PACKAGE_MRVL_WIFIBT
+	help
+	marvell wifi/bt fw local path

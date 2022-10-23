@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Amlogic Home App</title>
+    <script type="text/javascript" src="key.js"></script>
+    <script type="text/javascript" src="focusManager.js"></script>
+    <style>
+        body {
+            background-color: white
+        }
+
+        div.row {
+            width: 150em;
+            height: 20em;
+            margin: 2em;
+        }
+
+        div.focusable {
+            display: inline-block;
+            width: 35em;
+            height: 20em;
+            margin: 2em;
+        }
+
+        div.app_logo {
+            width: 100%;
+            height: 100%;
+            background-repeat: no-repeat;
+            background-size: 50%;
+            background-position: center center;
+            transition: all 500ms;
+            border-radius: 60px;
+            border: 0px;
+            box-shadow: 0 0 0px rgba(0, 0, 0, 0);
+        }
+
+        div:focus>div.app_logo {
+            background-size: 100%;
+            background-color: rgb(240, 240, 240);
+            box-shadow: 0 0 50px rgba(35, 173, 278, 1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="row">
+        <div tabindex="-1" class="focusable" data-href="https://www.youtube.com/tv">
+            <div class="app_logo" style="background-image:url('youtube-tv.png');"></div>
+        </div>
+        <div tabindex="-1" class="focusable" data-href="https://www.youtube.com/tv/upg">
+            <div class="app_logo" style="background-image:url('youtube-live.png');"></div>
+        </div>
+        <div tabindex="-1" class="focusable" data-href="https://www.youtube.com/tv_kids">
+            <div class="app_logo" style="background-image:url('youtube-kids.png');"></div>
+        </div>
+    </div>
+    <div class="row">
+        <div tabindex="-1" class="focusable" data-href="https://ytlr-cert.appspot.com">
+            <div class="app_logo" style="background-image:url('youtube-qual-e.png');"></div>
+        </div>
+    </div>
+</body>
+
+</html>

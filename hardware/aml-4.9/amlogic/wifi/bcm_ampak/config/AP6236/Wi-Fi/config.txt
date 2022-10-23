@@ -1,0 +1,5 @@
+bcn_timeout=20
+kso_enable=0
+ccode=CN
+regrev=0
+pm2_sleep_ret=2000

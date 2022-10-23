@@ -13,6 +13,9 @@
 #include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dm/root.h>
+#ifdef CONFIG_SYS_I2C_MESON
+#include <amlogic/i2c.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -438,14 +441,27 @@ static int i2c_post_probe(struct udevice *dev)
 	i2c->speed_hz = fdtdec_get_int(gd->fdt_blob, dev->of_offset,
 				     "clock-frequency", 100000);
 
+#ifdef CONFIG_SYS_I2C_MESON
+	i2c->speed_hz = ((struct meson_i2c_platdata *)dev->platdata)->clock_frequency;
+#endif
+
 	return i2c_set_bus_speed(dev, i2c->speed_hz);
 }
 
+static unsigned int i2c_req_seq = 0;
+
 int i2c_post_bind(struct udevice *dev)
 {
+#ifdef CONFIG_OF_CONTROL
 	/* Scan the bus for devices */
 	return dm_scan_fdt_node(dev, gd->fdt_blob, dev->of_offset, false);
+#else
+	dev->req_seq = i2c_req_seq++;
+	return 0;
+#endif
+
 }
+
 
 UCLASS_DRIVER(i2c) = {
 	.id		= UCLASS_I2C,

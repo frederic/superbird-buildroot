@@ -1,8 +1,5 @@
 config BR2_PACKAGE_GST1_LIBAV
 	bool "gst1-libav"
-	depends on BR2_PACKAGE_FFMPEG_ARCH_SUPPORTS
-	select BR2_PACKAGE_FFMPEG
-	select BR2_PACKAGE_FFMPEG_SWSCALE
 	select BR2_PACKAGE_GST1_PLUGINS_BASE
 	help
 	  GStreamer plugin (formerly gst-ffmpeg).
@@ -14,3 +11,19 @@ config BR2_PACKAGE_GST1_LIBAV
 	  selected in the ffmpeg package.
 
 	  http://gstreamer.freedesktop.org/
+
+config BR2_PACKAGE_GST1_LIBAV_WITHOUT_FFMMPEG
+       bool "gst1-libav-without-ffmpeg"
+       default n
+       help
+           config-ffmpeg
+
+config BR2_PACKAGE_GST1_LIBAV_WITH_FFMMPEG
+       bool "gst1-libav-ffmpeg"
+       default y if !BR2_PACKAGE_GST1_LIBAV_WITHOUT_FFMMPEG
+       depends on BR2_PACKAGE_FFMPEG_ARCH_SUPPORTS
+       select BR2_PACKAGE_FFMPEG
+       select BR2_PACKAGE_FFMPEG_SWSCALE
+       help
+           This package contains GStreamer plugins based on
+	   the libav project.

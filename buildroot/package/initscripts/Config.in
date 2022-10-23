@@ -2,3 +2,9 @@ config BR2_PACKAGE_INITSCRIPTS
 	bool
 	help
 	  The basics startup scripts for both SysV and Busybox
+
+config BR2_PACKAGE_INITSCRIPTS_720P
+	bool "fb size 720p"
+	default n
+	help
+	  set directfb mode by framebuffer size

@@ -11,6 +11,21 @@ QT5BASE_SOURCE = qtbase-$(QT5_SOURCE_TARBALL_PREFIX)-$(QT5BASE_VERSION).tar.xz
 QT5BASE_DEPENDENCIES = host-pkgconf zlib
 QT5BASE_INSTALL_STAGING = YES
 
+define X11_PATCH
+	support/scripts/apply-patches.sh $(@D) package/qt5/qt5base/x11/  qt5base-\*.patch
+endef
+
+define 5_6_X11_PATCH
+	support/scripts/apply-patches.sh $(@D) package/qt5/qt5base/5_6_x11/  qt5base-\*.patch
+endef
+
+ifeq ($(BR2_PACKAGE_XSERVER_XORG_SERVER),y)
+ifeq ($(BR2_PACKAGE_QT5_VERSION_5_6),y)
+QT5BASE_POST_PATCH_HOOKS += 5_6_X11_PATCH
+else
+QT5BASE_POST_PATCH_HOOKS += X11_PATCH
+endif
+endif
 # A few comments:
 #  * -no-pch to workaround the issue described at
 #     http://comments.gmane.org/gmane.comp.lib.qt.devel/5933.
@@ -23,7 +38,7 @@ QT5BASE_CONFIGURE_OPTS += \
 	-no-cups \
 	-no-iconv \
 	-system-zlib \
-	-system-pcre \
+	-qt-pcre \
 	-no-pch \
 	-shared
 
@@ -322,6 +337,8 @@ define QT5BASE_CONFIGURE_CMDS
 		./configure \
 		-v \
 		-prefix /usr \
+		-I$(@D)/include \
+		-L$(@D)/lib \
 		-hostprefix $(HOST_DIR) \
 		-headerdir /usr/include/qt5 \
 		-sysroot $(STAGING_DIR) \
@@ -376,11 +393,12 @@ define QT5BASE_INSTALL_TARGET_FONTS
 endef
 endif
 
+# modified qt examples build and no install
 define QT5BASE_INSTALL_TARGET_EXAMPLES
-	if [ -d $(STAGING_DIR)/usr/lib/qt/examples/ ] ; then \
-		mkdir -p $(TARGET_DIR)/usr/lib/qt/examples ; \
-		cp -dpfr $(STAGING_DIR)/usr/lib/qt/examples/* $(TARGET_DIR)/usr/lib/qt/examples ; \
-	fi
+#	if [ -d $(STAGING_DIR)/usr/lib/qt/examples/ ] ; then \
+#		mkdir -p $(TARGET_DIR)/usr/lib/qt/examples ; \
+#		cp -dpfr $(STAGING_DIR)/usr/lib/qt/examples/* $(TARGET_DIR)/usr/lib/qt/examples ; \
+#	fi
 endef
 
 ifeq ($(BR2_STATIC_LIBS),y)

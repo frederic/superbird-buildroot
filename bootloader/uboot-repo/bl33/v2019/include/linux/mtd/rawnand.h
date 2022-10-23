@@ -936,7 +936,7 @@ struct nand_chip {
 	int jedec_version;
 	struct nand_onfi_params	onfi_params;
 	struct nand_jedec_params jedec_params;
- 
+
 	struct nand_data_interface *data_interface;
 
 	int read_retries;
@@ -980,7 +980,6 @@ static inline void nand_set_controller_data(struct nand_chip *chip, void *priv)
 {
 	chip->priv = priv;
 }
-
 /*
  * NAND Flash Manufacturer ID Codes
  */
@@ -998,6 +997,14 @@ static inline void nand_set_controller_data(struct nand_chip *chip, void *priv)
 #define NAND_MFR_SANDISK	0x45
 #define NAND_MFR_INTEL		0x89
 #define NAND_MFR_ATO		0x9b
+#define NAND_MFR_GIGA		0xc8
+#define NAND_MFR_ZETTA		0xba
+
+#ifdef  CONFIG_MESON_NFC
+#define NAND_ID_ESMT		0xc8
+#define NAND_ID_WINBOND		0xef
+#define NAND_MFR_DOSILICON	0xf8
+#endif
 
 /* The maximum expected count of bytes in the NAND ID sequence */
 #define NAND_MAX_ID_LEN 8

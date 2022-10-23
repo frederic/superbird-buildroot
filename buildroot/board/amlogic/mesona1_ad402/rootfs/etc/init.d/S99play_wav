@@ -1,0 +1,6 @@
+#!/bin/sh
+aplay -D hw:0,1  /etc/init.d/1KHz_r16000_c1_5s.wav &
+
+arecord -D hw:0,1 -c 2 -r 48000 -f S32_LE -d 5 /data/Analog_MIC_REC.wav
+
+aplay -D hw:0,1 /data/Analog_MIC_REC.wav

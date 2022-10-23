@@ -1,0 +1,28 @@
+config BR2_PACKAGE_AML_PMU
+	bool "aml pmu"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  pmu driver
+
+config BR2_PACKAGE_AML_PMU_GIT_VERSION
+	string "pmu branch"
+	depends on BR2_PACKAGE_AML_PMU
+	help
+		Branch for pmu
+
+config BR2_PACKAGE_AML_PMU_GIT_REPO_URL
+	string "pmu git"
+	depends on BR2_PACKAGE_AML_PMU
+	help
+		pmu git
+
+config BR2_PACKAGE_AML_PMU_LOCAL
+	bool "pmu local"
+	help
+		pmu local
+
+config BR2_PACKAGE_AML_PMU_LOCAL_PATH
+	string "pmu local path"
+	depends on BR2_PACKAGE_AML_PMU_LOCAL
+	help
+		pmu local path

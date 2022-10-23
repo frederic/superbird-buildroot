@@ -1,0 +1,38 @@
+#!/bin/sh
+
+HPD_STATE=/sys/class/amhdmitx/amhdmitx0/hpd_state
+DISP_CAP=/sys/class/amhdmitx/amhdmitx0/disp_cap
+DISP_MODE=/sys/class/display/mode
+
+MESON_EGL=fbdev
+if [ -f /etc/meson_egl.conf ];then
+    MESON_EGL=`cat /etc/meson_egl.conf`
+fi
+
+if [ $MESON_EGL == "wayland_fbdev" ];then
+    echo "meson egl: wayland_fbdev"
+elif [ $MESON_EGL == "wayland_drm" ];then
+    echo "meson egl: wayland_drm"
+    echo "drm will configure display modesetting, S50display exit now!!"
+    exit 0
+elif [ $MESON_EGL == "dummy" ];then
+    echo "meson egl: dummy"
+    echo "drm will configure display modesetting, S50display exit now!!"
+    exit 0
+else
+    echo "meson egl: fbdev"
+fi
+
+case "$1" in
+    start)
+        hdmi=`cat $HPD_STATE`
+        if [ $hdmi -eq 1 ]; then
+            mode=`awk -f /etc/display/get_hdmi_mode.awk $DISP_CAP`
+            echo $mode > $DISP_MODE
+        fi
+        fbset -fb /dev/fb0 -g 1920 1080 1920 2160 32
+        echo 0 0 1919 1079 > /sys/class/graphics/fb0/free_scale_axis
+esac
+
+exit $?
+

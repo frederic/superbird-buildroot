@@ -1,0 +1,1 @@
+country_list=US:US/988, CN:CN/38, JP:JP/967

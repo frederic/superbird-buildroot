@@ -168,6 +168,43 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
 }
 #endif
 
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+static long get_user_pfn(struct mm_struct *mm, unsigned long addr)
+{
+	long pfn = -1;
+	pgd_t *pgd;
+
+	if (!mm || addr >= VMALLOC_START)
+		mm = &init_mm;
+
+	pgd = pgd_offset(mm, addr);
+
+	do {
+		pud_t *pud;
+		pmd_t *pmd;
+		pte_t *pte;
+
+		if (pgd_none(*pgd) || pgd_bad(*pgd))
+			break;
+
+		pud = pud_offset(pgd, addr);
+		if (pud_none(*pud) || pud_bad(*pud))
+			break;
+
+		pmd = pmd_offset(pud, addr);
+		if (pmd_none(*pmd) || pmd_bad(*pmd))
+			break;
+
+		pte = pte_offset_map(pmd, addr);
+		pfn = pte_pfn(*pte);
+		pte_unmap(pte);
+	} while (0);
+
+	return pfn;
+}
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
+
+
 static bool is_el1_instruction_abort(unsigned int esr)
 {
 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
@@ -200,6 +237,54 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 	do_exit(SIGKILL);
 }
 
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+void show_all_pfn(struct task_struct *task, struct pt_regs *regs)
+{
+	int i;
+	long pfn1;
+	char s1[10];
+	int top;
+
+	if (compat_user_mode(regs))
+		top = 15;
+	else
+		top = 31;
+	pr_info("reg              value       pfn  ");
+	pr_cont("reg              value       pfn\n");
+	for (i = 0; i < top; i++) {
+		pfn1 = get_user_pfn(task->mm, regs->regs[i]);
+		if (pfn1 >= 0)
+			sprintf(s1, "%8lx", pfn1);
+		else
+			sprintf(s1, "--------");
+		if (i % 2 == 1)
+			pr_cont("r%-2d:  %016llx  %s\n", i, regs->regs[i], s1);
+		else
+			pr_info("r%-2d:  %016llx  %s  ", i, regs->regs[i], s1);
+	}
+	pr_cont("\n");
+	pfn1 = get_user_pfn(task->mm, regs->pc);
+	if (pfn1 >= 0)
+		sprintf(s1, "%8lx", pfn1);
+	else
+		sprintf(s1, "--------");
+	pr_info("pc :  %016llx  %s\n", regs->pc, s1);
+	pfn1 = get_user_pfn(task->mm, regs->sp);
+	if (pfn1 >= 0)
+		sprintf(s1, "%8lx", pfn1);
+	else
+		sprintf(s1, "--------");
+	pr_info("sp :  %016llx  %s\n", regs->sp, s1);
+
+	pfn1 = get_user_pfn(task->mm, regs->unused);
+	if (pfn1 >= 0)
+		sprintf(s1, "%8lx", pfn1);
+	else
+		sprintf(s1, "--------");
+	pr_info("unused :  %016llx  %s\n", regs->unused, s1);
+}
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
+
 /*
  * Something tried to access memory that isn't in our memory map. User mode
  * accesses just cause a SIGSEGV
@@ -217,6 +302,9 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 			tsk->comm, task_pid_nr(tsk), inf->name, sig,
 			addr, esr);
 		show_pte(tsk->mm, addr);
+	#ifdef CONFIG_AMLOGIC_USER_FAULT
+		show_all_pfn(tsk, regs);
+	#endif /* CONFIG_AMLOGIC_USER_FAULT */
 		show_regs(regs);
 	}
 
@@ -286,13 +374,19 @@ out:
 	return fault;
 }
 
-static inline bool is_permission_fault(unsigned int esr)
+static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
 {
 	unsigned int ec       = ESR_ELx_EC(esr);
 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
 
-	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
-	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+		return false;
+
+	if (system_uses_ttbr0_pan())
+		return fsc_type == ESR_ELx_FSC_FAULT &&
+			(regs->pstate & PSR_PAN_BIT);
+	else
+		return fsc_type == ESR_ELx_FSC_PERM;
 }
 
 static bool is_el0_instruction_abort(unsigned int esr)
@@ -332,7 +426,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 		mm_flags |= FAULT_FLAG_WRITE;
 	}
 
-	if (is_permission_fault(esr) && (addr < TASK_SIZE)) {
+	if (addr < TASK_SIZE && is_permission_fault(esr, regs)) {
 		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
 		if (regs->orig_addr_limit == KERNEL_DS)
 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
@@ -568,6 +662,20 @@ static const struct fault_info fault_info[] = {
 	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
 };
 
+#ifdef CONFIG_AMLOGIC_VMAP
+asmlinkage static void die_wrap(const struct fault_info *inf,
+				struct pt_regs *regs, unsigned int esr,
+				unsigned long addr)
+{
+	struct siginfo info;
+
+	info.si_signo = inf->sig;
+	info.si_errno = 0;
+	info.si_code  = inf->code;
+	info.si_addr  = (void __user *)addr;
+	arm64_notify_die("", regs, &info, esr);
+}
+#endif
 /*
  * Dispatch a data abort to the relevant handler.
  */
@@ -575,7 +683,9 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 					 struct pt_regs *regs)
 {
 	const struct fault_info *inf = esr_to_fault_info(esr);
+#ifndef CONFIG_AMLOGIC_VMAP
 	struct siginfo info;
+#endif
 
 	if (!inf->fn(addr, esr, regs))
 		return;
@@ -583,11 +693,15 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
 		 inf->name, esr, addr);
 
+#ifndef CONFIG_AMLOGIC_VMAP
 	info.si_signo = inf->sig;
 	info.si_errno = 0;
 	info.si_code  = inf->code;
 	info.si_addr  = (void __user *)addr;
 	arm64_notify_die("", regs, &info, esr);
+#else
+	die_wrap(inf, regs, esr, addr);
+#endif
 }
 
 asmlinkage void __exception do_el0_irq_bp_hardening(void)

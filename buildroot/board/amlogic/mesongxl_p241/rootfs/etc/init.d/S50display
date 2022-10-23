@@ -1,0 +1,12 @@
+#!/bin/sh
+
+DISP_MODE=/sys/class/display/mode
+
+case "$1" in
+    *)
+        echo 720p60hz > $DISP_MODE
+        fbset -fb /dev/fb0 -g 1280 720 1280 1440 32
+esac
+
+exit $?
+

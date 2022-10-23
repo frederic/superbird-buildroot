@@ -1,0 +1,13 @@
+config BR2_PACKAGE_KRB5
+	bool "krb5"
+	depends on BR2_USE_MMU # fork()
+	help
+	  KRB5 is the MIT Kerberos Version 5 implementation
+
+	  Kerberos is a network authentication protocol. It is designed
+	  to provide strong authentication for client/server
+	  applications by using secret-key cryptography. A free
+	  implementation of this protocol is available from the
+	  Massachusetts Institute of Technology.
+
+	  http://web.mit.edu/Kerberos

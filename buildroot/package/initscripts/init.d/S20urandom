@@ -44,6 +44,10 @@ case "$1" in
 			>/dev/null 2>&1 || echo "urandom stop: failed."
 		[ "$VERBOSE" != no ] && echo "done."
 		;;
+        netready) ;;
+        netup) ;;
+        netdown) ;;
+        netchange) ;;
 	*)
 		echo "Usage: urandom {start|stop}" >&2
 		exit 1

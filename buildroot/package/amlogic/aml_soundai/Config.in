@@ -1,0 +1,10 @@
+config BR2_PACKAGE_AML_SOUNDAI
+	bool "aml_soundai demo"
+
+	select BR2_PACKAGE_VLC
+	select BR2_PACKAGE_LIBIDN
+	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_ALSA_UTILS
+
+	help
+	  aml_soundai_demo

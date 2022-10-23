@@ -2513,6 +2513,26 @@ static void _gpiod_set_raw_value(struct gpio_desc *desc, bool value)
 		chip->set(chip, gpio_chip_hwgpio(desc), value);
 }
 
+#ifdef CONFIG_AMLOGIC_PINCTRL
+static int _gpiod_set_pull(struct gpio_desc *desc, int value)
+{
+	struct gpio_chip *chip;
+	int status = -EINVAL;
+
+	chip = desc->gdev->chip;
+	if (!chip || !chip->set_pull) {
+		gpiod_warn(desc,
+			"%s: missing set_pull() operations\n",
+			__func__);
+		return -EIO;
+	}
+	if (test_bit(FLAG_REQUESTED, &desc->flags))
+		status = chip->set_pull(chip, gpio_chip_hwgpio(desc), value);
+
+	return status;
+}
+#endif
+
 /*
  * set multiple outputs on the same chip;
  * use the chip's set_multiple function if available;
@@ -2634,6 +2654,25 @@ void gpiod_set_value(struct gpio_desc *desc, int value)
 	_gpiod_set_raw_value(desc, value);
 }
 EXPORT_SYMBOL_GPL(gpiod_set_value);
+
+/**
+ * gpiod_set_pull() - enable pull-down/up for the gpio, or disable.
+ * @desc: gpio whose value will be set
+ * @value: value to set
+ *
+ * This function should be called from contexts where we cannot sleep, and will
+ * complain if the GPIO chip functions potentially sleep.
+ */
+#ifdef CONFIG_AMLOGIC_PINCTRL
+int gpiod_set_pull(struct gpio_desc *desc, int value)
+{
+	VALIDATE_DESC(desc);
+	/* Should be using gpiod_set_pull_cansleep() */
+	WARN_ON(desc->gdev->chip->can_sleep);
+	return _gpiod_set_pull(desc, value);
+}
+EXPORT_SYMBOL_GPL(gpiod_set_pull);
+#endif
 
 /**
  * gpiod_set_raw_array_value() - assign values to an array of GPIOs
@@ -2891,6 +2930,23 @@ void gpiod_set_value_cansleep(struct gpio_desc *desc, int value)
 	_gpiod_set_raw_value(desc, value);
 }
 EXPORT_SYMBOL_GPL(gpiod_set_value_cansleep);
+
+/**
+ * gpiod_set_pull_cansleep() - enable pull-down/up for the gpio, or disable.
+ * @desc: gpio whose value will be set
+ * @value: value to set
+ *
+ * This function is to be called from contexts that can sleep.
+ */
+#ifdef CONFIG_AMLOGIC_PINCTRL
+int gpiod_set_pull_cansleep(struct gpio_desc *desc, int value)
+{
+	might_sleep_if(extra_checks);
+	VALIDATE_DESC(desc);
+	return _gpiod_set_pull(desc, value);
+}
+EXPORT_SYMBOL_GPL(gpiod_set_pull_cansleep);
+#endif
 
 /**
  * gpiod_set_raw_array_value_cansleep() - assign values to an array of GPIOs
@@ -3273,6 +3329,9 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
 	struct gpio_desc *desc = ERR_PTR(-ENODEV);
 	bool active_low = false;
 	bool single_ended = false;
+#ifdef CONFIG_AMLOGIC_MODIFY
+	bool open_drain = false;
+#endif
 	int ret;
 
 	if (!fwnode)
@@ -3286,6 +3345,9 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
 		if (!IS_ERR(desc)) {
 			active_low = flags & OF_GPIO_ACTIVE_LOW;
 			single_ended = flags & OF_GPIO_SINGLE_ENDED;
+#ifdef CONFIG_AMLOGIC_MODIFY
+			open_drain = flags & OF_GPIO_OPEN_DRAIN;
+#endif
 		}
 	} else if (is_acpi_node(fwnode)) {
 		struct acpi_gpio_info info;
@@ -3306,7 +3368,11 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
 		set_bit(FLAG_ACTIVE_LOW, &desc->flags);
 
 	if (single_ended) {
+#ifdef CONFIG_AMLOGIC_MODIFY
+		if (open_drain)
+#else
 		if (active_low)
+#endif
 			set_bit(FLAG_OPEN_DRAIN, &desc->flags);
 		else
 			set_bit(FLAG_OPEN_SOURCE, &desc->flags);

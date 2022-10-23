@@ -24,6 +24,11 @@ PULSEAUDIO_DEPENDENCIES = \
 	$(if $(BR2_PACKAGE_FFTW_SINGLE),fftw-single) \
 	$(if $(BR2_PACKAGE_SYSTEMD),systemd)
 
+ifeq ($(BR2_PACKAGE_BT_SETUP), y)
+PULSEAUDIO_DEPENDENCIES += bt_setup
+PULSEAUDIO_CONF_OPTS += --enable-amlbt
+endif
+
 ifeq ($(BR2_PACKAGE_LIBSAMPLERATE),y)
 PULSEAUDIO_CONF_OPTS += --enable-samplerate
 PULSEAUDIO_DEPENDENCIES += libsamplerate
@@ -147,6 +152,7 @@ endif
 else
 PULSEAUDIO_CONF_OPTS += --disable-x11
 endif
+#PULSEAUDIO_CONF_OPTS += --disable-dbus
 
 # ConsoleKit module init failure breaks user daemon startup
 define PULSEAUDIO_REMOVE_CONSOLE_KIT

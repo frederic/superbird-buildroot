@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -e
+
+# This script is POSIX compliant and thus runs in any shell.
+
+THIS_FILE=$(basename "${0}")
+SUPPORT_DIR=$(cd $(dirname "${0}") && cd .. && pwd)
+KCONFIG_SUPPORT_DIR="${SUPPORT_DIR}/kconfig"
+
+merge_config() {
+    TMP_DIR=$(mktemp -d --suffix -br-config-merge)
+    trap "rm -rf ${TMP_DIR:-XxXbe-safeXxX}" EXIT INT TERM
+
+    FRAGMENTS=$(printf "%s" "$*" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if [ -z "${FRAGMENTS}" ]; then
+        printf "${THIS_FILE}: nothing to merge\n"
+        exit 0
+    fi
+
+    MERGE_FILES="${FRAGMENTS}"
+    if [ -f "${FILE}" ]; then
+        MERGE_FILES="${FILE} ${MERGE_FILES}"
+    fi
+
+    ${KCONFIG_SUPPORT_DIR}/merge_config.sh -m -O "${TMP_DIR}" ${MERGE_FILES}
+
+    # update .config file only if required
+    diff "${TMP_DIR}/.config" "${FILE}" >/dev/null 2>&1 || cp "${TMP_DIR}"/.config "${FILE}"
+}
+
+ORIG_CFG_FILE="${1}"
+ORIG_CFG_PATH=$(dirname $ORIG_CFG_FILE)
+NEW_CFG_FILE="${1}.tmp"
+FRAGMENT_FILES=$(grep ^BR2_CONFIG_FRAGMENT_FILES ${ORIG_CFG_FILE} | cut -d= -f2 | tr -d '"')
+if [ -n "$FRAGMENT_FILES" ]; then
+    for fragfile in $FRAGMENT_FILES
+    do
+        FULL_FRAG="$FULL_FRAG $ORIG_CFG_PATH/$fragfile"
+    done
+    rm -fr $NEW_CFG_FILE
+    cp -a $ORIG_CFG_FILE $NEW_CFG_FILE
+    FILE=$NEW_CFG_FILE
+    merge_config $FULL_FRAG
+    exit 0
+else
+    exit 1
+fi

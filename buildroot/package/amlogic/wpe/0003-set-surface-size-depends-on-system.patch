@@ -1,0 +1,255 @@
+Index: wpe-33da4322c54b1da5881d06b340670dc590f4fe4a/Source/ThirdParty/WPE-platform/src/wayland-egl/view-backend.cpp
+===================================================================
+--- wpe-33da4322c54b1da5881d06b340670dc590f4fe4a.orig/Source/ThirdParty/WPE-platform/src/wayland-egl/view-backend.cpp	2017-02-28 00:51:35.000000000 +0800
++++ wpe-33da4322c54b1da5881d06b340670dc590f4fe4a/Source/ThirdParty/WPE-platform/src/wayland-egl/view-backend.cpp	2017-08-15 16:11:14.192511790 +0800
+@@ -31,10 +31,22 @@
+ #include "display.h"
+ #include "ipc.h"
+ #include "ipc-waylandegl.h"
++#include "wayland-client-protocol.h"
++#include <wayland-client.h>
++#include <cstring>
++#include <fcntl.h>
++#include <linux/fb.h>
++#include <sys/ioctl.h>
+ 
+ #define WIDTH 1280
+ #define HEIGHT 720
+ 
++#ifndef MIN
++#define MIN(x,y) (((x) < (y)) ? (x) : (y))
++#endif
++
++struct wl_output;
++
+ namespace WaylandEGL {
+ 
+ struct ViewBackend;
+@@ -48,20 +60,176 @@
+     void handleMessage(char*, size_t) override;
+ 
+     void ackBufferCommit();
++    int getSystemFbInfo(uint32_t* width, uint32_t* height);
+     void initialize();
+ 
++    struct output_info {
++        struct wl_output* output;
++        struct wpe_view_backend* backend;
++
++        uint32_t flags;
++        int32_t width, height;
++        int32_t refresh;
++    };
++
++    struct display_info {
++        struct wl_display* display;
++        struct wl_registry* registry;
++
++        struct output_info outputInfo;
++
++        bool roundtrip_needed;
++    };
++
+     struct wpe_view_backend* backend;
+     IPC::Host ipcHost;
++    GSource* m_eventSource;
++};
++
++
++class EventSource {
++public:
++    static GSourceFuncs sourceFuncs;
++
++    GSource source;
++    GPollFD pfd;
++    struct wl_display* display;
++};
++
++GSourceFuncs EventSource::sourceFuncs = {
++    // prepare
++    [](GSource* base, gint* timeout) -> gboolean
++    {
++        auto* source = reinterpret_cast<EventSource*>(base);
++        struct wl_display* display = source->display;
++
++        *timeout = -1;
++
++        while (wl_display_prepare_read(display) != 0) {
++            if (wl_display_dispatch_pending(display) < 0) {
++                fprintf(stderr, "Wayland::Display: error in wayland prepare\n");
++                return FALSE;
++            }
++        }
++        wl_display_flush(display);
++
++        return FALSE;
++    },
++    // check
++    [](GSource* base) -> gboolean
++    {
++        auto* source = reinterpret_cast<EventSource*>(base);
++        struct wl_display* display = source->display;
++
++        if (source->pfd.revents & G_IO_IN) {
++            if (wl_display_read_events(display) < 0) {
++                fprintf(stderr, "Wayland::Display: error in wayland read\n");
++                return FALSE;
++            }
++            return TRUE;
++        } else {
++            wl_display_cancel_read(display);
++            return FALSE;
++        }
++    },
++    // dispatch
++    [](GSource* base, GSourceFunc, gpointer) -> gboolean
++    {
++        auto* source = reinterpret_cast<EventSource*>(base);
++        struct wl_display* display = source->display;
++
++        if (source->pfd.revents & G_IO_IN) {
++            if (wl_display_dispatch_pending(display) < 0) {
++                fprintf(stderr, "Wayland::Display: error in wayland dispatch\n");
++                return G_SOURCE_REMOVE;
++            }
++        }
++
++        if (source->pfd.revents & (G_IO_ERR | G_IO_HUP))
++            return G_SOURCE_REMOVE;
++
++        source->pfd.revents = 0;
++        return G_SOURCE_CONTINUE;
++    },
++    nullptr, // finalize
++    nullptr, // closure_callback
++    nullptr, // closure_marshall
++};
++
++const struct wl_registry_listener g_registryListener = {
++    // global
++    [](void* data, struct wl_registry* registry, uint32_t name, const char* interface, uint32_t version)
++    {
++        auto& displayInfo = *static_cast<struct ViewBackend::display_info*>(data);
++        if (!std::strcmp(interface, "wl_output")) {
++            	displayInfo.outputInfo.output = static_cast<struct wl_output*>(wl_registry_bind(displayInfo.registry, name,
++                   &wl_output_interface, MIN(version, 2)));
++        }
++    },
++    // global_remove
++    [](void*, struct wl_registry*, uint32_t) { },
+ };
+ 
++static const struct wl_output_listener g_outputListener = {
++    //geometry
++    [](void*, struct wl_output*, int32_t, int32_t, int32_t, int32_t, int32_t,
++    	const char*, const char*, int32_t) { },
++    //mode
++    [](void *data, struct wl_output*, uint32_t flags, int32_t width, int32_t height, int32_t refresh)
++    {
++       auto& output = *static_cast<struct ViewBackend::output_info*>(data);
++
++       output.flags = flags;
++       output.width = width;
++       output.height = height;
++       output.refresh = refresh;
++
++       fprintf(stderr, "ViewBackend: width[%d], height[%d], refresh[%d]\n", width, height, refresh);
++       wpe_view_backend_dispatch_set_size( output.backend, width, height );
++    },
++    // done
++    [](void*, struct wl_output*) { },
++    // scale
++    [](void*, struct wl_output*, int32_t) { }
++};
++
++struct ViewBackend::display_info g_displayInfo = {0};
++
+ ViewBackend::ViewBackend(struct wpe_view_backend* backend)
+     : backend(backend)
+ {
+     ipcHost.initialize(*this);
++
++    g_displayInfo.display = wl_display_connect(nullptr);
++    g_displayInfo.registry = wl_display_get_registry(g_displayInfo.display);
++    wl_registry_add_listener(g_displayInfo.registry, &g_registryListener, &g_displayInfo);
++    wl_display_roundtrip(g_displayInfo.display);
++    g_displayInfo.outputInfo.backend = backend;
++
++    m_eventSource = g_source_new(&EventSource::sourceFuncs, sizeof(EventSource));
++    auto* source = reinterpret_cast<EventSource*>(m_eventSource);
++    source->display = g_displayInfo.display;
++
++    source->pfd.fd = wl_display_get_fd(g_displayInfo.display);
++    source->pfd.events = G_IO_IN | G_IO_ERR | G_IO_HUP;
++    source->pfd.revents = 0;
++    g_source_add_poll(m_eventSource, &source->pfd);
++    g_source_set_name(m_eventSource, "[WPE] View-backend");
++    g_source_set_priority(m_eventSource, G_PRIORITY_HIGH + 30);
++    g_source_set_can_recurse(m_eventSource, TRUE);
++    g_source_attach(m_eventSource, g_main_context_get_thread_default());
++
++    if ( g_displayInfo.outputInfo.output ) {
++        wl_output_add_listener(g_displayInfo.outputInfo.output, &g_outputListener, &(g_displayInfo.outputInfo));
++    }
+ }
+ 
+ ViewBackend::~ViewBackend()
+ {
++    if (m_eventSource)
++        g_source_unref(m_eventSource);
++    m_eventSource = nullptr;
++
+     ipcHost.deinitialize();
+ }
+ 
+@@ -106,9 +274,49 @@
+     }
+ }
+ 
++int ViewBackend::getSystemFbInfo(uint32_t* width, uint32_t* height)
++{
++    int fp=0;
++    struct fb_var_screeninfo vinfo;
++    //struct fb_fix_screeninfo finfo;
++    fp = open ("/dev/fb0",O_RDWR);
++
++    if (fp < 0) {
++        fprintf(stderr, "ViewBackend Error : Can not open framebuffer device\n");
++        return -1;
++    }
++
++    //if (ioctl(fp,FBIOGET_FSCREENINFO,&finfo)) {
++    //fprintf(stderr, "Error reading fixed information\n");
++    //return -1;
++    //}
++
++    if (ioctl(fp,FBIOGET_VSCREENINFO,&vinfo)) {
++        fprintf(stderr, "ViewBackend Error reading variable information\n");
++        return -1;
++    }
++
++    //fprintf(stderr, "The mem is :%d\n",finfo.smem_len);
++    //fprintf(stderr, "The line_length is :%d\n",finfo.line_length);
++    *width = vinfo.xres;
++    *height = vinfo.yres;
++    fprintf(stderr, "ViewBackend system xres[%d], yres[%d]\n", vinfo.xres, vinfo.yres);
++    //fprintf(stderr, "bits_per_pixel is :%d\n",vinfo.bits_per_pixel);
++
++    close (fp);
++
++    return 0;
++}
++
+ void ViewBackend::initialize()
+ {
+-    wpe_view_backend_dispatch_set_size( backend, WIDTH, HEIGHT );
++    uint32_t width, height;
++    if (0 != getSystemFbInfo(&width, &height)) {
++        width = WIDTH;
++        height = HEIGHT;
++    }
++    fprintf(stderr, "ViewBackend initialize [%dx%d]\n", width, height);
++    wpe_view_backend_dispatch_set_size( backend, width, height );
+ }
+ 
+ void ViewBackend::ackBufferCommit()

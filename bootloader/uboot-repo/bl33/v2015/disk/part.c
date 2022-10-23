@@ -10,6 +10,9 @@
 #include <ide.h>
 #include <malloc.h>
 #include <part.h>
+#include <ubifs_uboot.h>
+#include <errno.h>
+#include <ubifs_uboot.h>
 
 #undef	PART_DEBUG
 
@@ -18,7 +21,7 @@
 #else
 #define PRINTF(fmt,args...)
 #endif
-
+#define CONFIG_CMD_UUID
 struct block_drvr {
 	char *name;
 	block_dev_desc_t* (*get_dev)(int dev);
@@ -268,6 +271,7 @@ void init_part(block_dev_desc_t *dev_desc)
 /* must be placed before DOS partition detection */
 #ifdef CONFIG_EFI_PARTITION
 	if (test_part_efi(dev_desc) == 0) {
+		printf("%s() %d: PART_TYPE_EFI\n", __func__, __LINE__);
 		dev_desc->part_type = PART_TYPE_EFI;
 		return;
 	}
@@ -275,6 +279,7 @@ void init_part(block_dev_desc_t *dev_desc)
 
 #ifdef CONFIG_DOS_PARTITION
 	if (test_part_dos(dev_desc) == 0) {
+		printf("%s() %d: PART_TYPE_DOS\n", __func__, __LINE__);
 		dev_desc->part_type = PART_TYPE_DOS;
 		return;
 	}
@@ -283,6 +288,14 @@ void init_part(block_dev_desc_t *dev_desc)
 #ifdef CONFIG_AMIGA_PARTITION
 	if (test_part_amiga(dev_desc) == 0) {
 	    dev_desc->part_type = PART_TYPE_AMIGA;
+	    return;
+	}
+#endif
+
+#ifdef CONFIG_AML_PARTITION
+	if (test_part_aml(dev_desc) == 0) {
+		printf("%s() %d: PART_TYPE_AML\n", __func__, __LINE__);
+	    dev_desc->part_type = PART_TYPE_AML;
 	    return;
 	}
 #endif
@@ -376,6 +389,14 @@ void print_part(block_dev_desc_t * dev_desc)
 		print_part_efi (dev_desc);
 		return;
 #endif
+
+#ifdef CONFIG_AML_PARTITION
+	case PART_TYPE_AML:
+		PRINTF ("## Testing for valid EFI partition ##\n");
+		print_part_header ("AML", dev_desc);
+		print_part_aml (dev_desc);
+		return;
+#endif
 	}
 	puts ("## Unknown partition table\n");
 }
@@ -433,6 +454,15 @@ int get_partition_info(block_dev_desc_t *dev_desc, int part,
 	case PART_TYPE_EFI:
 		if (get_partition_info_efi(dev_desc, part, info) == 0) {
 			PRINTF("## Valid EFI partition found ##\n");
+			return 0;
+		}
+		break;
+#endif
+
+#ifdef CONFIG_AML_PARTITION
+	case PART_TYPE_AML:
+		if (get_partition_info_aml(dev_desc, part, info) == 0) {
+			PRINTF("## Valid AML partition found ##\n");
 			return 0;
 		}
 		break;
@@ -496,7 +526,6 @@ cleanup:
 
 #define PART_UNSPECIFIED -2
 #define PART_AUTO -1
-#define MAX_SEARCH_PARTITIONS 16
 int get_device_and_partition(const char *ifname, const char *dev_part_str,
 			     block_dev_desc_t **dev_desc,
 			     disk_partition_t *info, int allow_whole_dev)

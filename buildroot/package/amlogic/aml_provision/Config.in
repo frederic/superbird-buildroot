@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_PROVISION
+	bool "provision ca and ta"
+	help
+	  provision ca and ta
+

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MDNSRESPONDER
+	bool "mdnsresponder"
+	default n
+	help
+	  The mDNSResponder project is a component of Bonjour,
+	  Apple's initiative for zero-configuration networking.
+
+	  http://developer.apple.com/networking/bonjour/index.html

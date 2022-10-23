@@ -1,0 +1,12 @@
+diff -rNu mDNSResponder-878.200.35-ori/mDNSPosix/Responder.c mDNSResponder-878.200.35/mDNSPosix/Responder.c
+--- mDNSResponder-878.200.35-ori/mDNSPosix/Responder.c	2019-07-30 10:26:46.825895270 +0800
++++ mDNSResponder-878.200.35/mDNSPosix/Responder.c	2019-07-30 10:37:33.842869079 +0800
+@@ -428,7 +428,7 @@
+     domainname domain;
+ 
+     status = mStatus_NoError;
+-    thisServ = (PosixService *) malloc(sizeof(*thisServ));
++    thisServ = (PosixService *) calloc(1, sizeof(*thisServ));
+     if (thisServ == NULL) {
+         status = mStatus_NoMemoryErr;
+     }

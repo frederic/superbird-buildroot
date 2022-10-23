@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login Page</title>
+    <link href="../layui/css/layui.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <link href="../amlogic.ico" rel="shortcut icon" type="image/x-icon">
+</head>
+<body>
+<div class="login-main">
+    <header class="layui-elip">Welcome to IPC WebUI</header>
+    </br>
+    <form class="layui-form">
+        <div class="layui-input-inline">
+            <input autocomplete="off" class="layui-input" lay-verify="required" name="account" placeholder="account" required
+                   type="text">
+        </div>
+        <div class="layui-input-inline">
+            <input autocomplete="off" class="layui-input" lay-verify="required" name="password" placeholder="password"
+                   required
+                   type="password">
+        </div>
+        <div class="layui-input-inline login-btn">
+            <button class="layui-btn" lay-filter="login" lay-submit>login</button>
+        </div>
+    </form>
+</div>
+
+<script src="../layui/layui.js"></script>
+<script type="text/javascript">
+    layui.use(['form', 'layer', 'jquery'], function () {
+        // 操作对象
+        var form = layui.form;
+        var $ = layui.jquery;
+
+        form.on('submit(login)', function (data) {
+            $.ajax({
+                url: 'login.php',
+                data: data.field,
+                dataType: 'text',
+                type: 'post',
+                success: function (res) {
+                    if (res == '1') {
+                        location.href = "../index.php";
+                    } else {
+                        layer.msg('invalid account or password');
+                    }
+                }
+            })
+            return false;
+        })
+    });
+</script>
+</body>
+</html>

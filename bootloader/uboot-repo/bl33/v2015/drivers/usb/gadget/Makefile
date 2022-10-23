@@ -36,3 +36,9 @@ obj-$(CONFIG_MPC885_FAMILY) += mpc8xx_udc.o
 obj-$(CONFIG_CPU_PXA27X) += pxa27x_udc.o
 endif
 endif
+
+obj-$(CONFIG_AML_TINY_USBTOOL) += aml_tiny_usbtool/aml_tiny_usbtool.o \
+									aml_tiny_usbtool/burn_func.o
+obj-$(CONFIG_CMD_FASTBOOT) += fastboot/dwc_pcd.o fastboot/dwc_pcd_irq.o
+obj-$(CONFIG_CMD_FASTBOOT) += g_dnl.o
+obj-$(CONFIG_CMD_FASTBOOT) += f_fastboot.o

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_DOLBY_DAWS_SECURITY
+	bool "dolby_daws_security"
+	depends on BR2_PACKAGE_ALSA_LIB
+	help
+	  Advanced Linux Sound Architecture Plugins
+
+	  http://www.alsa-project.org/
+

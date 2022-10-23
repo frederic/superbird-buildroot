@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SLT_NN
+    bool "SLT for NN"
+    help
+        SLT program for NN
+    depends on BR2_PACKAGE_NPU

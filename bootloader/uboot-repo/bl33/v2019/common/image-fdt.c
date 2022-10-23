@@ -247,6 +247,17 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 
 	if (argc > 2)
 		select = argv[2];
+
+	if (!select) {
+		if (env_get("dtb_mem_addr")) {
+			select = env_get("dtb_mem_addr");
+			printf("env select addr: 0x%s\n", select);
+		}
+		else {
+			select = "0x01000000";
+		}
+	}
+
 	if (select || genimg_has_config(images)) {
 #if CONFIG_IS_ENABLED(FIT)
 		if (select) {

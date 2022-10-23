@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Amlogic Soundbar </title>
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .volumebox{ margin:0 auto; width:400px; height:100px; border:2px solid #FFF;float:left}
+    .postprocessbox{ margin:0 auto; width:400px; height:440px; border:2px solid #FFF;float:left}
+  </style>
+</head>
+
+<body background="./images/bg.PNG">
+
+<nav class="navbar">
+  <div class="container-fluid">
+    <div style="float:left" class="navbar-header">
+      <a class="navbar-brand" href="./index.html">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+      </a>
+    </div>
+
+  </div>
+  <!-- <div id="check_wifi" align="center"></div> -->
+  <div class="volumebox">
+    <form method="post">
+      <h4>Volume Control</h4>
+      <input id="audiovolume" type="range" min="0" max="100" value="60"/>
+    <!--
+      <input id="audiovolume" type="range" min="0" max="100" value="60" />
+    -->
+      <div class="input-group">
+        <span class="input-group-addon" id="basic-addon0">Mute</span>
+        <input id="audiomute" type="checkbox" checked="true" onclick="set_audio_mute()" > </input>
+      </div>
+    </form>
+  </div>
+
+</nav>
+
+  <div id="loadpoint" style="float:right" class="panel-heading"></div>
+    <div class="panel panel-default">
+	<div id="gettext" class="panel-heading">Audio Input LIST
+		<img src="./images/refresh.png" onclick="get_audio_input_list()"/>
+	</div>
+	<ul class="list-group" id="testtext"></ul>
+
+<!-- 模态(choose one for set)-->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+          <fieldset>
+            <div class="input-group">
+                <span class="input-group-addon" id="basic-addon0">Input Source</span>
+                <input type="text" class="form-control" placeholder="ssid" aria-describedby="basic-addon1" id="modal_ssid">
+            </div>
+          </fieldset>
+      </div>
+        <div class="modal-body">
+            <div class="input-group">
+                <input type="hidden" class="form-control" placeholder="please enter password here" aria-describedby="basic-addon1" id="modal_pwd">
+            </div>
+      </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal" >Cancel</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="set_audio_input();goTop()">Switch</button>
+      </div>
+    </div>
+  </div><!-- /.modal-content -->
+</div><!-- /.modal-dialog-->
+</div> <!-- /.modal fade-->
+</div> <!-- /panel panel-default-->
+</div> <!-- / loadpoint -->
+
+<!-- /for audio post process -->
+<div class="postprocessbox">
+  <h4 align="center">12 Band EQ </h4>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0">Enable EQ</span>
+    <input id="eq_status" type="checkbox" checked="true" onclick="set_audio_EQEnabled()" > </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">8Hz</span>
+    <input id="eqi1" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(1, this.value)"> </input>
+  </div>
+   <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">32Hz</span>
+    <input id="eqi2" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(2, this.value)"> </input>
+  </div>
+    <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">64Hz</span>
+    <input id="eqi3" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(3, this.value)"> </input>
+  </div>
+    <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">128Hz</span>
+    <input id="eqi4" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(4, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">256Hz</span>
+    <input id="eqi5" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(5, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">512Hz</span>
+    <input id="eqi6" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(6, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">1KHz</span>
+    <input id="eqi7" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(7, this.value)"> </input>
+  </div>
+    <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">2KHz</span>
+    <input id="eqi8" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(8, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">4KHz</span>
+    <input id="eqi9" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(9, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">8KHz</span>
+    <input id="eqi10" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(10, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">16KHz</span>
+    <input id="eqi11" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(11, this.value)"> </input>
+  </div>
+  <div class="input-group">
+    <span class="input-group-addon" id="basic-addon0" style="width:70px; text-align:right">22KHz</span>
+    <input id="eqi12" type="range" style="width:300px" min="0" max="100" oninput="change_audio_equalizer(12, this.value)"> </input>
+  </div>
+  <button type="button" align = "right" class="btn btn-primary" data-dismiss="modal" onclick="audio_reset_eq();">Reset</button>
+</div>
+
+<!-- Play mp3 file -->
+<div class="volumebox">
+<h4 align="center"> DataPlayer</h4>
+<input id="audioplayformat" type="text" list="audioformat" placeholder="mp3" value="mp3">
+<datalist id="audioformat">
+  <option value="mp3">
+  <option value="aac">
+  <option value="ac3">
+  <option value="dts">
+</datalist>
+</input>
+<input id="audioplaystate" type="button" value="Play" onclick="audio_dataplay_play()"/>
+</div>
+
+
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ajax.js"></script>
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+	window.onload = function(){
+		get_audio_input_list();
+	}
+  </script>
+
+</body>
+
+</html>

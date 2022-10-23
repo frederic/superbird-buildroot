@@ -1,0 +1,15 @@
+config BR2_PACKAGE_IPC_WEBUI
+  bool "ipc webui"
+  select BR2_PACKAGE_GETTEXT
+  select BR2_SYSTEM_ENABLE_NLS
+  select BR2_PACKAGE_NGINX
+  select BR2_PACKAGE_PHP
+  select BR2_PACKAGE_PHP_SAPI_CGI
+  select BR2_PACKAGE_PHP_SAPI_FPM
+  select BR2_PACKAGE_PHP_EXT_SQLITE
+  select BR2_PACKAGE_PHP_EXT_JSON
+  select BR2_PACKAGE_PHP_EXT_GETTEXT
+
+  help
+     include ipc webui
+

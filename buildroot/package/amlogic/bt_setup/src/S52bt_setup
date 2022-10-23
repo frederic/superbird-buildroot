@@ -1,0 +1,44 @@
+#!bin/sh
+#
+#start bt_setup
+#
+
+start() {
+    printf "Starting bt_setup"
+    umask 077
+    cd /etc/bsa/config
+    app_audio_source &
+    pactl load-module module-bsa-sink
+    pacmd set-default-sink bsa.vsink
+    echo "SUCCESS!"
+}
+
+stop() {
+    printf "Stopping pulseaudio :"
+    killall app_audio_source
+    rm /etc/bddr_file
+    echo "OK"
+}
+
+restart() {
+    stop
+    start
+}
+
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        restart
+        ;;
+    *)
+        echo " USAGE : $0 {start| stop | restart} "
+        exit 1
+
+esac
+exit $?

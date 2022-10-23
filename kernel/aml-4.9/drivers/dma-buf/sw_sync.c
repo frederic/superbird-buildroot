@@ -169,6 +169,13 @@ static bool timeline_fence_enable_signaling(struct fence *fence)
 	return true;
 }
 
+static void timeline_fence_disable_signaling(struct fence *fence)
+{
+	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
+
+	list_del_init(&pt->link);
+}
+
 static void timeline_fence_value_str(struct fence *fence,
 				    char *str, int size)
 {
@@ -187,6 +194,7 @@ static const struct fence_ops timeline_fence_ops = {
 	.get_driver_name = timeline_fence_get_driver_name,
 	.get_timeline_name = timeline_fence_get_timeline_name,
 	.enable_signaling = timeline_fence_enable_signaling,
+	.disable_signaling = timeline_fence_disable_signaling,
 	.signaled = timeline_fence_signaled,
 	.wait = fence_default_wait,
 	.release = timeline_fence_release,
@@ -360,8 +368,8 @@ static long sw_sync_ioctl_create_fence(struct sync_timeline *obj,
 	}
 
 	sync_file = sync_file_create(&pt->base);
+	fence_put(&pt->base);
 	if (!sync_file) {
-		fence_put(&pt->base);
 		err = -ENOMEM;
 		goto err;
 	}
@@ -422,3 +430,83 @@ const struct file_operations sw_sync_debugfs_fops = {
 	.unlocked_ioctl = sw_sync_ioctl,
 	.compat_ioctl	= sw_sync_ioctl,
 };
+
+#if 0
+/*api for amlogic use.*/
+void *aml_sync_create_timeline(const char *tname)
+{
+	struct sync_timeline *timeline;
+
+	timeline = sync_timeline_create(tname);
+	return (void *)timeline;
+}
+EXPORT_SYMBOL(aml_sync_create_timeline);
+
+int aml_sync_create_fence(void *timeline, unsigned int value)
+{
+	struct sync_timeline *tl = (struct sync_timeline *)timeline;
+	int fd;
+	int err;
+	struct sync_pt *pt;
+	struct sync_file *sync_file;
+
+	if (tl == NULL)
+		return -EPERM;
+
+	fd =  get_unused_fd_flags(O_CLOEXEC);
+	if (fd < 0)
+		return -EBADF;
+
+	pt = sync_pt_create(tl, value);
+	if (!pt) {
+		err = -ENOMEM;
+		goto err;
+	}
+
+	sync_file = sync_file_create(&pt->base);
+	fence_put(&pt->base);
+	if (!sync_file) {
+		err = -ENOMEM;
+		goto err;
+	}
+
+	fd_install(fd, sync_file->file);
+	return fd;
+
+err:
+	put_unused_fd(fd);
+	return err;
+}
+EXPORT_SYMBOL(aml_sync_create_fence);
+
+void aml_sync_inc_timeline(void *timeline, unsigned int value)
+{
+	struct sync_timeline *tl = (struct sync_timeline *)timeline;
+
+	if (tl == NULL)
+		return;
+	sync_timeline_signal(tl, value);
+}
+EXPORT_SYMBOL(aml_sync_inc_timeline);
+
+struct fence *aml_sync_get_fence(int syncfile_fd)
+{
+	return sync_file_get_fence(syncfile_fd);
+}
+EXPORT_SYMBOL(aml_sync_get_fence);
+
+int aml_sync_wait_fence(struct fence *fence, long timeout)
+{
+	long ret;
+
+	ret = fence_wait_timeout(fence, false, timeout);
+	return ret;
+}
+EXPORT_SYMBOL(aml_sync_wait_fence);
+
+void aml_sync_put_fence(struct fence *fence)
+{
+	fence_put(fence);
+}
+EXPORT_SYMBOL(aml_sync_put_fence);
+#endif

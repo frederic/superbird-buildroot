@@ -72,7 +72,7 @@ static int write_sr(struct spi_flash *flash, u8 ws)
 	return 0;
 }
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND) || defined(CONFIG_SPI_FLASH_GIGADEVICE)
 static int read_cr(struct spi_flash *flash, u8 *rc)
 {
 	int ret;
@@ -323,26 +323,49 @@ int spi_flash_write_common(struct spi_flash *flash, const u8 *cmd,
 	return ret;
 }
 
-int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
+/* erase whole chip in one command */
+static int spi_flash_erase_chip(struct spi_flash *flash)
+{
+	struct spi_slave *spi = flash->spi;
+	unsigned long timeout = SPI_FLASH_CHIP_ERASE_TIMEOUT;
+	int ret;
+
+	ret = spi_claim_bus(spi);
+	if (ret) {
+		debug("SF: unable to claim SPI bus\n");
+		return ret;
+	}
+
+	ret = spi_flash_cmd_write_enable(flash);
+	if (ret < 0) {
+		debug("SF: enabling write failed\n");
+		return ret;
+	}
+
+	ret = spi_flash_cmd_erase_chip(flash);
+	if (ret < 0) {
+		debug("SF: erase chip cmd failed\n");
+		return ret;
+	}
+
+	ret = spi_flash_wait_till_ready(flash, timeout);
+	if (ret < 0) {
+		debug("SF: chip erase timed out\n");
+		return ret;
+	}
+
+	spi_release_bus(spi);
+
+	return ret;
+}
+
+static int _spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 {
 	u32 erase_size, erase_addr;
 	u8 cmd[SPI_FLASH_CMD_LEN];
 	int ret = -1;
 
 	erase_size = flash->erase_size;
-	if (offset % erase_size || len % erase_size) {
-		printf("SF: Erase offset/length not multiple of erase size\n");
-		return -1;
-	}
-
-	if (flash->flash_is_locked) {
-		if (flash->flash_is_locked(flash, offset, len) > 0) {
-			printf("offset 0x%x is protected and cannot be erased\n",
-			       offset);
-			return -EINVAL;
-		}
-	}
-
 	cmd[0] = flash->erase_cmd;
 	while (len) {
 		erase_addr = offset;
@@ -378,8 +401,41 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 	return ret;
 }
 
-int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
+int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
+{
+	u32 erase_size;
+	int ret = -1;
+
+	erase_size = flash->erase_size;
+	if (offset % erase_size || len % erase_size) {
+		printf("SF: Erase offset/length not multiple of erase size\n");
+		return -1;
+	}
+
+	if (flash->flash_is_locked) {
+		if (flash->flash_is_locked(flash, offset, len) > 0) {
+			printf("offset 0x%x is protected and cannot be erased\n",
+			       offset);
+			return -EINVAL;
+		}
+	}
+
+	if ((offset == 0) && (len == flash->size))
+		ret = spi_flash_erase_chip(flash);
+	else
+		ret = _spi_flash_cmd_erase_ops(flash, offset, len);
+
+	return ret;
+
+}
+
+#ifndef CONFIG_AML_SPIFCV2
+static int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 		size_t len, const void *buf)
+#else
+static int _spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
+		size_t len, const void *buf)
+#endif
 {
 	struct spi_slave *spi = flash->spi;
 	unsigned long byte_addr, page_size;
@@ -439,6 +495,31 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 
 	return ret;
 }
+
+#ifdef CONFIG_AML_SPIFCV2
+int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
+		size_t len, const void *buf)
+{
+	int ret;
+	size_t lening = len;
+
+	if ((len > 16) && (len % 16)) {
+		lening >>= 4;
+		lening <<= 4;
+		ret = _spi_flash_cmd_write_ops(flash, offset,
+			lening, buf);
+
+		offset += lening;
+		len -= lening;
+		buf += lening;
+	}
+
+	ret = _spi_flash_cmd_write_ops(flash, offset,
+			len, buf);
+
+	return ret;
+}
+#endif
 
 int spi_flash_read_common(struct spi_flash *flash, const u8 *cmd,
 		size_t cmd_len, void *data, size_t data_len)
@@ -1035,7 +1116,7 @@ static int macronix_quad_enable(struct spi_flash *flash)
 }
 #endif
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND) || defined(CONFIG_SPI_FLASH_GIGADEVICE)
 static int spansion_quad_enable(struct spi_flash *flash)
 {
 	u8 qeb_status;
@@ -1063,7 +1144,7 @@ static int spansion_quad_enable(struct spi_flash *flash)
 }
 #endif
 
-static const struct spi_flash_info *spi_flash_read_id(struct spi_flash *flash)
+const struct spi_flash_info *spi_flash_read_id(struct spi_flash *flash)
 {
 	int				tmp;
 	u8				id[SPI_FLASH_MAX_ID_LEN];
@@ -1096,9 +1177,10 @@ static int set_quad_mode(struct spi_flash *flash,
 	case SPI_FLASH_CFI_MFR_MACRONIX:
 		return macronix_quad_enable(flash);
 #endif
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND) || defined(CONFIG_SPI_FLASH_GIGADEVICE)
 	case SPI_FLASH_CFI_MFR_SPANSION:
 	case SPI_FLASH_CFI_MFR_WINBOND:
+	case SPI_FLASH_CFI_MFR_GIGA:
 		return spansion_quad_enable(flash);
 #endif
 #ifdef CONFIG_SPI_FLASH_STMICRO
@@ -1320,6 +1402,8 @@ int spi_flash_scan(struct spi_flash *flash)
 	print_size(flash->size, "");
 	if (flash->memory_map)
 		printf(", mapped at %p", flash->memory_map);
+		printf(" erase_cmd = 0x%x read_cmd = 0x%x write_cmd = 0x%x\n",
+			flash->erase_cmd, flash->read_cmd, flash->write_cmd);
 	puts("\n");
 #endif
 

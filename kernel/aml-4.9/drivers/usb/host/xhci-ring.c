@@ -393,8 +393,13 @@ void xhci_ring_ep_doorbell(struct xhci_hcd *xhci,
 	 * pointer command pending because the device can choose to start any
 	 * stream once the endpoint is on the HW schedule.
 	 */
+#ifdef CONFIG_AMLOGIC_USB
+	if ((ep_state & EP_STOP_CMD_PENDING) || (ep_state & SET_DEQ_PENDING)
+		|| (ep_state & EP_HALTED))
+#else
 	if ((ep_state & EP_HALT_PENDING) || (ep_state & SET_DEQ_PENDING) ||
 	    (ep_state & EP_HALTED))
+#endif
 		return;
 	writel(DB_VALUE(ep_index, stream_id), db_addr);
 	/* The CPU has better things to do at this point than wait for a
@@ -632,13 +637,19 @@ static void td_to_noop(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 static void xhci_stop_watchdog_timer_in_irq(struct xhci_hcd *xhci,
 		struct xhci_virt_ep *ep)
 {
+#ifdef CONFIG_AMLOGIC_USB
+	ep->ep_state &= ~EP_STOP_CMD_PENDING;
+	/* Can't del_timer_sync in interrupt */
+	del_timer(&ep->stop_cmd_timer);
+#else
 	ep->ep_state &= ~EP_HALT_PENDING;
-	/* Can't del_timer_sync in interrupt, so we attempt to cancel.  If the
+	/* Can't del_timer_sync in interrupt, so we attempt to cancel.	If the
 	 * timer is running on another CPU, we don't decrement stop_cmds_pending
 	 * (since we didn't successfully stop the watchdog timer).
 	 */
 	if (del_timer(&ep->stop_cmd_timer))
 		ep->stop_cmds_pending--;
+#endif
 }
 
 /* Must be called with xhci->lock held in interrupt context */
@@ -902,10 +913,15 @@ static void xhci_kill_endpoint_urbs(struct xhci_hcd *xhci,
  * simple flag to say whether there is a pending stop endpoint command for a
  * particular endpoint.
  *
+#ifdef CONFIG_AMLOGIC_USB
+ * Instead we use a combination of that flag and checking if a new timer is
+ * pending.
+#else
  * Instead we use a combination of that flag and a counter for the number of
  * pending stop endpoint commands.  If the timer is the tail end of the last
  * stop endpoint command, and the endpoint's command is still pending, we assume
  * the host is dying.
+#endif
  */
 void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 {
@@ -919,12 +935,21 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 
 	spin_lock_irqsave(&xhci->lock, flags);
 
+#ifdef CONFIG_AMLOGIC_USB
+	/* bail out if cmd completed but raced with stop ep watchdog timer.*/
+	if (!(ep->ep_state & EP_STOP_CMD_PENDING) ||
+	    timer_pending(&ep->stop_cmd_timer)) {
+#else
 	ep->stop_cmds_pending--;
 	if (!(ep->stop_cmds_pending == 0 && (ep->ep_state & EP_HALT_PENDING))) {
 		xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 				"Stop EP timer ran, but no command pending, "
 				"exiting.");
+#endif
 		spin_unlock_irqrestore(&xhci->lock, flags);
+#ifdef CONFIG_AMLOGIC_USB
+		xhci_dbg(xhci, "Stop EP timer raced with cmd completion, exit");
+#endif
 		return;
 	}
 
@@ -933,7 +958,12 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 	/* Oops, HC is dead or dying or at least not responding to the stop
 	 * endpoint command.
 	 */
+
 	xhci->xhc_state |= XHCI_STATE_DYING;
+#ifdef CONFIG_AMLOGIC_USB
+	ep->ep_state &= ~EP_STOP_CMD_PENDING;
+#endif
+
 	/* Disable interrupts from the host controller and start halting it */
 	xhci_quiesce(xhci);
 	spin_unlock_irqrestore(&xhci->lock, flags);
@@ -1709,6 +1739,10 @@ cleanup:
 	xhci_dbg(xhci, "%s: starting port polling.\n", __func__);
 	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
 	spin_unlock(&xhci->lock);
+#ifdef CONFIG_AMLOGIC_USB
+	if (!(temp & PORT_CONNECT) || !(temp & PORT_PE))
+		set_usb_phy_host_tuning(faked_port_index, 1);
+#endif
 	/* Pass this up to the core */
 	usb_hcd_poll_rh_status(hcd);
 	spin_lock(&xhci->lock);
@@ -3364,6 +3398,169 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			start_cycle, start_trb);
 	return 0;
 }
+
+#ifdef CONFIG_AMLOGIC_USB
+/* Caller must have locked xhci->lock */
+int xhci_test_single_step(struct xhci_hcd *xhci, gfp_t mem_flags,
+		struct urb *urb, int slot_id,
+		unsigned int ep_index, int testflag)
+{
+	struct xhci_ring *ep_ring;
+	int num_trbs;
+	int ret;
+	struct usb_ctrlrequest *setup;
+	struct xhci_generic_trb *start_trb;
+	int start_cycle;
+	u32 field, length_field, remainder;
+	struct urb_priv *urb_priv;
+	struct xhci_td *td;
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&xhci->lock, flags);
+
+	ep_ring = xhci_urb_to_transfer_ring(xhci, urb);
+	if (!ep_ring) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return -EINVAL;
+	}
+
+	/*
+	 * Need to copy setup packet into setup TRB, so we can't use the setup
+	 * DMA address.
+	 */
+	if (!urb->setup_packet) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return -EINVAL;
+	}
+
+	/* 1 TRB for setup, 1 for status */
+	num_trbs = 2;
+	/*
+	 * Don't need to check if we need additional event data and normal TRBs,
+	 * since data in control transfers will never get bigger than 16MB
+	 * XXX: can we get a buffer that crosses 64KB boundaries?
+	 */
+	if (urb->transfer_buffer_length > 0)
+		num_trbs++;
+	ret = prepare_transfer(xhci, xhci->devs[slot_id],
+			ep_index, urb->stream_id,
+			num_trbs, urb, 0, mem_flags);
+	if (ret < 0) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return ret;
+	}
+
+	urb_priv = urb->hcpriv;
+	td = urb_priv->td[0];
+
+	/*
+	 * Don't give the first TRB to the hardware (by toggling the cycle bit)
+	 * until we've finished creating all the other TRBs.  The ring's cycle
+	 * state may change as we enqueue the other TRBs, so save it too.
+	 */
+	start_trb = &ep_ring->enqueue->generic;
+	start_cycle = ep_ring->cycle_state;
+
+	/* Queue setup TRB - see section 6.4.1.2.1 */
+	/* FIXME better way to translate setup_packet into two u32 fields? */
+	setup = (struct usb_ctrlrequest *) urb->setup_packet;
+	field = 0;
+	field |= TRB_IDT | TRB_TYPE(TRB_SETUP);
+	if (start_cycle == 0)
+		field |= 0x1;
+
+	/* xHCI 1.0/1.1 6.4.1.2.1: Transfer Type field */
+	if ((xhci->hci_version >= 0x100) || (xhci->quirks & XHCI_MTK_HOST)) {
+		if (urb->transfer_buffer_length > 0) {
+			if (setup->bRequestType & USB_DIR_IN)
+				field |= TRB_TX_TYPE(TRB_DATA_IN);
+			else
+				field |= TRB_TX_TYPE(TRB_DATA_OUT);
+		}
+	}
+
+	queue_trb(xhci, ep_ring, true,
+		  setup->bRequestType | setup->bRequest << 8 |
+		  le16_to_cpu(setup->wValue) << 16,
+		  le16_to_cpu(setup->wIndex) |
+		  le16_to_cpu(setup->wLength) << 16,
+		  TRB_LEN(8) | TRB_INTR_TARGET(0),
+		  /* Immediate data in pointer */
+		  field);
+	giveback_first_trb(xhci, slot_id, ep_index, 0,
+			start_cycle, start_trb);
+
+	/* 15 second delay per the test spec */
+	spin_unlock_irqrestore(&xhci->lock, flags);
+	xhci_err(xhci, "step 1\n");
+	msleep(15000);
+	spin_lock_irqsave(&xhci->lock, flags);
+
+	start_trb = &ep_ring->enqueue->generic;
+	start_cycle = ep_ring->cycle_state;
+
+	/* If there's data, queue data TRBs */
+	/* Only set interrupt on short packet for IN endpoints */
+	if (usb_urb_dir_in(urb))
+		field = TRB_ISP | TRB_TYPE(TRB_DATA);
+	else
+		field = TRB_TYPE(TRB_DATA);
+
+	remainder = xhci_td_remainder(xhci, 0,
+				   urb->transfer_buffer_length,
+				   urb->transfer_buffer_length,
+				   urb, 1);
+
+	length_field = TRB_LEN(urb->transfer_buffer_length) |
+		TRB_TD_SIZE(remainder) |
+		TRB_INTR_TARGET(0);
+
+	if (urb->transfer_buffer_length > 0) {
+		if (setup->bRequestType & USB_DIR_IN)
+			field |= TRB_DIR_IN;
+		queue_trb(xhci, ep_ring, true,
+				lower_32_bits(urb->transfer_dma),
+				upper_32_bits(urb->transfer_dma),
+				length_field,
+				field | ep_ring->cycle_state);
+		giveback_first_trb(xhci, slot_id, ep_index, 0,
+			start_cycle, start_trb);
+	}
+
+	/* 15 second delay per the test spec */
+	spin_unlock_irqrestore(&xhci->lock, flags);
+	xhci_err(xhci, "step 2\n");
+	msleep(15000);
+	spin_lock_irqsave(&xhci->lock, flags);
+
+	/* Save the DMA address of the last TRB in the TD */
+	td->last_trb = ep_ring->enqueue;
+
+	/* Queue status TRB - see Table 7 and sections 4.11.2.2 and 6.4.1.2.3 */
+	/* If the device sent data, the status stage is an OUT transfer */
+	if (urb->transfer_buffer_length > 0 && setup->bRequestType & USB_DIR_IN)
+		field = 0;
+	else
+		field = TRB_DIR_IN;
+	queue_trb(xhci, ep_ring, false,
+			0,
+			0,
+			TRB_INTR_TARGET(0),
+			/* Event on completion */
+			field | TRB_IOC |
+			TRB_TYPE(TRB_STATUS) | ep_ring->cycle_state);
+
+	giveback_first_trb(xhci, slot_id, ep_index, 0,
+			start_cycle, start_trb);
+
+	/* 15 second delay per the test spec */
+	spin_unlock_irqrestore(&xhci->lock, flags);
+	xhci_err(xhci, "step 3\n");
+	msleep(15000);
+
+	return 0;
+}
+#endif
 
 /* Caller must have locked xhci->lock */
 int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags,

@@ -1,0 +1,40 @@
+diff --git a/src/crypto/random.c b/src/crypto/random.c
+index 3a86a93..9ab3497 100644
+--- a/src/crypto/random.c
++++ b/src/crypto/random.c
+@@ -231,9 +231,9 @@ int random_pool_ready(void)
+ 	 * so use non-blocking read to avoid blocking the application
+ 	 * completely.
+ 	 */
+-	fd = open("/dev/random", O_RDONLY | O_NONBLOCK);
++	fd = open("/dev/hwrng", O_RDONLY | O_NONBLOCK);
+ 	if (fd < 0) {
+-		wpa_printf(MSG_ERROR, "random: Cannot open /dev/random: %s",
++		wpa_printf(MSG_ERROR, "random: Cannot open /dev/hwrng: %s",
+ 			   strerror(errno));
+ 		return -1;
+ 	}
+@@ -241,12 +241,12 @@ int random_pool_ready(void)
+ 	res = read(fd, dummy_key + dummy_key_avail,
+ 		   sizeof(dummy_key) - dummy_key_avail);
+ 	if (res < 0) {
+-		wpa_printf(MSG_ERROR, "random: Cannot read from /dev/random: "
++		wpa_printf(MSG_ERROR, "random: Cannot read from /dev/hwrng: "
+ 			   "%s", strerror(errno));
+ 		res = 0;
+ 	}
+ 	wpa_printf(MSG_DEBUG, "random: Got %u/%u bytes from "
+-		   "/dev/random", (unsigned) res,
++		   "/dev/hwrng", (unsigned) res,
+ 		   (unsigned) (sizeof(dummy_key) - dummy_key_avail));
+ 	dummy_key_avail += res;
+ 	close(fd);
+@@ -259,7 +259,7 @@ int random_pool_ready(void)
+ 	}
+ 
+ 	wpa_printf(MSG_INFO, "random: Only %u/%u bytes of strong "
+-		   "random data available from /dev/random",
++		   "random data available from /dev/hwrng",
+ 		   (unsigned) dummy_key_avail, (unsigned) sizeof(dummy_key));
+ 
+ 	if (own_pool_ready >= MIN_READY_MARK ||

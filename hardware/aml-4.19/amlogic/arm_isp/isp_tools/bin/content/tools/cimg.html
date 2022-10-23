@@ -1,0 +1,14 @@
+<!--
+//   The confidential and proprietary information contained in this file may
+//   only be used by a person authorised under and to the extent permitted
+//   by a subsisting licensing agreement from ARM Limited or its affiliates.
+//
+//          (C) COPYRIGHT 2018 ARM Limited or its affiliates.
+//                        ALL RIGHTS RESERVED
+//
+//   This entire notice must be reproduced on all copies of this file
+//   and copies of this file may only be made by a person if such person is
+//   permitted to do so under the terms of a subsisting license agreement
+//   from ARM Limited or its affiliates.
+//-->
+<!DOCTYPE html><html><head><meta charset="utf-8" content="text/html" property=""/><title>SD Card Image Converter</title><link rel="shortcut icon" href="../img/ct32.png"/><link rel="stylesheet" type="text/css" href="../css/tools.min.css"/></head><body><div class="content"><h3>SD Card Image Converter</h3><div class="toolbar"><p>Images: *.raw *.rgb *.yuv</p><input type="file" id="image-converter-file-select" multiple="multiple" accept=".raw,.rgb,.yuv"/><input id="override-depth" type="checkbox" class="control" checked="false"/><label for="override-depth">Override depth (RGB and RAW files only)</label><input title="Actual depths in bits" id="actual-depth" type="text" class="disabled bits-field control" value="10"/><input id="ppm-gen" type="checkbox" class="control"/><label for="ppm-gen">PPM (P6)</label><input id="jpg-gen" type="checkbox" checked="checked" class="control"/><label for="jpg-gen">JPEG</label><input id="jpg-quality" title="JPEG quality" class="control" type="range" min="0.1" max="1.0" step="0.05" value="0.95"/></div><div class="messages"></div><div class="toolbar footer hidden"><button id="download-all" class="disabled">Download all as tar</button><progress id="tar-progress" class="hidden"></progress></div></div><template id="template"><article class="entry"><div class="fname"></div><div class="display"><progress class="progress" value="0" max="100"></progress></div><div class="clickable"></div></article></template><script type="text/javascript" src="../js/download-tar.js"></script><script type="text/javascript" src="../js/tools.min.js"></script></body></html>

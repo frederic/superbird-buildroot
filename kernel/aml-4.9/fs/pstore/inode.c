@@ -36,7 +36,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
-#include <linux/syslog.h>
+#include <linux/amlogic/debug_ftrace_ramoops.h>
 
 #include "internal.h"
 
@@ -107,10 +107,13 @@ static int pstore_ftrace_seq_show(struct seq_file *s, void *v)
 	struct pstore_ftrace_seq_data *data = v;
 	struct pstore_ftrace_record *rec = (void *)(ps->data + data->off);
 
+#ifdef CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE
+	pstore_ftrace_dump(rec, s);
+#else
 	seq_printf(s, "%d %08lx  %08lx  %pf <- %pF\n",
 		pstore_ftrace_decode_cpu(rec), rec->ip, rec->parent_ip,
 		(void *)rec->ip, (void *)rec->parent_ip);
-
+#endif
 	return 0;
 }
 
@@ -120,18 +123,6 @@ static const struct seq_operations pstore_ftrace_seq_ops = {
 	.stop	= pstore_ftrace_seq_stop,
 	.show	= pstore_ftrace_seq_show,
 };
-
-static int pstore_check_syslog_permissions(struct pstore_private *ps)
-{
-	switch (ps->type) {
-	case PSTORE_TYPE_DMESG:
-	case PSTORE_TYPE_CONSOLE:
-		return check_syslog_permissions(SYSLOG_ACTION_READ_ALL,
-			SYSLOG_FROM_READER);
-	default:
-		return 0;
-	}
-}
 
 static ssize_t pstore_file_read(struct file *file, char __user *userbuf,
 						size_t count, loff_t *ppos)
@@ -150,10 +141,6 @@ static int pstore_file_open(struct inode *inode, struct file *file)
 	struct seq_file *sf;
 	int err;
 	const struct seq_operations *sops = NULL;
-
-	err = pstore_check_syslog_permissions(ps);
-	if (err)
-		return err;
 
 	if (ps->type == PSTORE_TYPE_FTRACE)
 		sops = &pstore_ftrace_seq_ops;
@@ -191,11 +178,6 @@ static const struct file_operations pstore_file_operations = {
 static int pstore_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct pstore_private *p = d_inode(dentry)->i_private;
-	int err;
-
-	err = pstore_check_syslog_permissions(p);
-	if (err)
-		return err;
 
 	if (p->psi->erase)
 		p->psi->erase(p->type, p->id, p->count,

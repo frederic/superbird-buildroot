@@ -62,7 +62,15 @@
 #include <asm/unwind.h>
 #include <asm/memblock.h>
 #include <asm/virt.h>
-
+#ifdef CONFIG_AMLOGIC_VMAP
+#include <linux/amlogic/vmap_stack.h>
+#endif
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+#include <linux/amlogic/cpu_version.h>
+#endif
+#ifdef CONFIG_AMLOGIC_KASAN32
+#include <asm/kasan.h>
+#endif
 #include "atags.h"
 
 
@@ -513,6 +521,17 @@ static void __init elf_hwcap_fixup(void)
 		elf_hwcap &= ~HWCAP_SWP;
 }
 
+#ifdef CONFIG_AMLOGIC_VMAP
+static void __init fixup_init_thread_union(void)
+{
+	void *p;
+
+	p = (void *)((unsigned long)&init_thread_union + THREAD_INFO_OFFSET);
+	memcpy(p, &init_thread_union, THREAD_INFO_SIZE);
+	memset(&init_thread_union, 0, THREAD_INFO_SIZE);
+}
+#endif
+
 /*
  * cpu_init - initialise one CPU.
  *
@@ -576,6 +595,9 @@ void notrace cpu_init(void)
 	      "I" (offsetof(struct stack, fiq[0])),
 	      PLC (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
 	    : "r14");
+#ifdef CONFIG_AMLOGIC_VMAP
+	__setup_vmap_stack(cpu);
+#endif
 #endif
 }
 
@@ -598,6 +620,9 @@ void __init smp_setup_processor_id(void)
 	 */
 	set_my_cpu_offset(0);
 
+#ifdef CONFIG_AMLOGIC_VMAP
+	fixup_init_thread_union();
+#endif
 	pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
 }
 
@@ -1105,6 +1130,9 @@ void __init setup_arch(char **cmdline_p)
 	early_ioremap_reset();
 
 	paging_init(mdesc);
+#ifdef CONFIG_AMLOGIC_KASAN32
+	kasan_init();
+#endif
 	request_standard_resources(mdesc);
 
 	if (mdesc->restart)
@@ -1215,6 +1243,9 @@ static int c_show(struct seq_file *m, void *v)
 {
 	int i, j;
 	u32 cpuid;
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	unsigned char chipid[CHIPID_LEN];
+#endif
 
 	for_each_online_cpu(i) {
 		/*
@@ -1270,9 +1301,18 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
 	}
 
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	cpuinfo_get_chipid(chipid, CHIPID_LEN);
+	seq_puts(m, "Serial\t\t: ");
+	for (i = 0; i < 16; i++)
+		seq_printf(m, "%02x", chipid[i]);
+	seq_puts(m, "\n");
+	seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
+#else
 	seq_printf(m, "Hardware\t: %s\n", machine_name);
 	seq_printf(m, "Revision\t: %04x\n", system_rev);
 	seq_printf(m, "Serial\t\t: %s\n", system_serial);
+#endif
 
 	return 0;
 }

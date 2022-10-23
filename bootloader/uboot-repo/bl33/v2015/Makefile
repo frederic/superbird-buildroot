@@ -12,7 +12,7 @@ NAME =
 
 # Do not use make's built-in rules and variables
 # (this increases performance and avoids hard-to-debug behaviour);
-MAKEFLAGS += -rR
+MAKEFLAGS += -rR --no-print-directory
 
 # Avoid funny character set dependencies
 unexport LC_ALL
@@ -118,6 +118,8 @@ ifeq ($(KBUILD_SRC),)
 # Do we want to locate output files in a separate directory?
 ifeq ("$(origin O)", "command line")
   KBUILD_OUTPUT := $(O)
+else
+  KBUILD_OUTPUT := build
 endif
 
 # That's our default target when none is given on the command line
@@ -156,7 +158,7 @@ ifeq ($(skip-makefile),)
 # Do not print "Entering directory ...",
 # but we want to display it when entering to the output directory
 # so that IDEs/editors are able to understand relative filenames.
-MAKEFLAGS += --no-print-directory
+#MAKEFLAGS += --no-print-directory
 
 # Call a source code checker (by default, "sparse") as part of the
 # C compilation.
@@ -210,9 +212,12 @@ objtree		:= .
 src		:= $(srctree)
 obj		:= $(objtree)
 
+buildsrc	:= $(abspath $(srctree))
+buildtree	:= $(abspath $(CURDIR)/$(KBUILD_OUTPUT))
+
 VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
-export srctree objtree VPATH
+export srctree objtree VPATH KBUILD_OUTPUT buildtree buildsrc
 
 # Make sure CDPATH settings don't interfere
 unexport CDPATH
@@ -240,6 +245,11 @@ export	HOSTARCH HOSTOS
 ifeq ($(HOSTARCH),$(ARCH))
 CROSS_COMPILE ?=
 endif
+
+CROSS_COMPILE ?= /opt/gcc-linaro-aarch64-none-elf-4.8-2013.11_linux/bin/aarch64-none-elf-
+CROSS_COMPILE_T32 ?= /opt/gcc-arm-none-eabi-6-2017-q2-update/bin/arm-none-eabi-
+export CROSS_COMPILE
+export CROSS_COMPILE_T32
 
 KCONFIG_CONFIG	?= .config
 export KCONFIG_CONFIG
@@ -582,6 +592,7 @@ include $(srctree)/scripts/Makefile.extrawarn
 KBUILD_CPPFLAGS += $(KCPPFLAGS)
 KBUILD_AFLAGS += $(KAFLAGS)
 KBUILD_CFLAGS += $(KCFLAGS)
+KBUILD_CFLAGS += -Werror
 
 # Use UBOOTINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
@@ -616,7 +627,9 @@ libs-y += drivers/gpio/
 libs-y += drivers/i2c/
 libs-y += drivers/mmc/
 libs-y += drivers/mtd/
+libs-$(CONFIG_AML_NAND) += drivers/nand/
 libs-$(CONFIG_CMD_NAND) += drivers/mtd/nand/
+libs-$(CONFIG_CMD_NAND) += drivers/mtd/nand/amlogic_mtd/
 libs-y += drivers/mtd/onenand/
 libs-$(CONFIG_CMD_UBI) += drivers/mtd/ubi/
 libs-y += drivers/mtd/spi/
@@ -645,7 +658,8 @@ libs-$(CONFIG_HAS_POST) += post/
 libs-y += test/
 libs-y += test/dm/
 
-libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
+#libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
+libs-y += $(if $(BOARDDIR),$(BOARDDIR)/)
 
 libs-y := $(sort $(libs-y))
 
@@ -709,7 +723,11 @@ endif
 
 # Always append ALL so that arch config.mk's can add custom ones
 ALL-y += u-boot.srec u-boot.bin System.map binary_size_check
-
+ALL-y += u-boot.hex
+ifeq ($(CONFIG_NEED_BL301), y)
+ALL-y += bl301.bin
+endif
+ALL-$(CONFIG_AML_DOLBY) += dovi
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
 ALL-$(CONFIG_RAMBOOT_PBL) += u-boot-with-spl-pbl.bin
@@ -819,7 +837,7 @@ binary_size_check: u-boot.bin FORCE
 
 u-boot.bin: u-boot FORCE
 	$(call if_changed,objcopy)
-	$(call DO_STATIC_RELA,$<,$@,$(CONFIG_SYS_TEXT_BASE))
+	@$(call DO_STATIC_RELA,$<,$@,$(CONFIG_SYS_TEXT_BASE))
 	$(BOARD_SIZE_CHECK)
 
 u-boot.ldr:	u-boot
@@ -833,6 +851,32 @@ OBJCOPYFLAGS_u-boot.ldr.srec := -I binary -O srec
 
 u-boot.ldr.hex u-boot.ldr.srec: u-boot.ldr FORCE
 	$(call if_changed,objcopy)
+
+.PHONY: u-boot-comp.bin
+u-boot-comp.bin:u-boot.bin
+	#tools/uclpack $< $@
+	cp $< $@
+#	$(objtree)/tools/uclpack $< $@
+
+ifeq ($(CONFIG_NEED_BL301), y)
+.PHONY : bl301.bin
+bl301.bin: tools prepare acs.bin bl21.bin
+	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/scp_task
+endif
+
+.PHONY : acs.bin
+acs.bin: tools prepare u-boot.bin
+	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/acs all FIRMWARE=$@
+
+.PHONY : bl21.bin
+bl21.bin: tools prepare u-boot.bin acs.bin
+	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/bl21 all FIRMWARE=$@
+
+.PHONY : dovi
+dovi: tools prepare
+ifeq ($(CONFIG_AML_DOLBY), y)
+	$(Q)$(MAKE) -C $(srctree)/drivers/display/osd/dv dovi.o
+endif
 
 #
 # U-Boot entry point, needed for booting of full-blown U-Boot
@@ -1071,7 +1115,7 @@ cmd_smap = \
 	$(CC) $(c_flags) -DSYSTEM_MAP="\"$${smap}\"" \
 		-c $(srctree)/common/system_map.c -o common/system_map.o
 
-u-boot:	$(u-boot-init) $(u-boot-main) u-boot.lds
+u-boot:	dovi $(u-boot-init) $(u-boot-main) u-boot.lds
 	$(call if_changed,u-boot__)
 ifeq ($(CONFIG_KALLSYMS),y)
 	$(call cmd,smap)
@@ -1161,13 +1205,16 @@ prepare: prepare0
 define filechk_version.h
 	(echo \#define PLAIN_VERSION \"$(UBOOTRELEASE)\"; \
 	echo \#define U_BOOT_VERSION \"U-Boot \" PLAIN_VERSION; \
+	echo \#define CONFIG_SYSTEM_AS_ROOT \"${SYSTEMMODE}\"; \
+	echo \#define CONFIG_AVB2 \"${AVBMODE}\"; \
 	echo \#define CC_VERSION_STRING \"$$($(CC) --version | head -n 1)\"; \
 	echo \#define LD_VERSION_STRING \"$$($(LD) --version | head -n 1)\"; )
 endef
 
 define filechk_timestamp.h
 	(LC_ALL=C date +'#define U_BOOT_DATE "%b %d %C%y"'; \
-	LC_ALL=C date +'#define U_BOOT_TIME "%T"')
+	LC_ALL=C date +'#define U_BOOT_TIME "%T"'; \
+	LC_ALL=C date +'#define U_BOOT_DATE_TIME "%y%m%d.%H%M%S"';)
 endef
 
 $(version_h): include/config/uboot.release FORCE
@@ -1335,9 +1382,21 @@ distclean: mrproper
 		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' -o -name '*%' -o -name 'core' \
-		-o -name '*.pyc' \) \
+		-o -name '*.o' \) \
 		-type f -print | xargs rm -f
 	@rm -f boards.cfg
+	@rm -rf $(buildtree)/*
+	@rm -f $(FIP_FOLDER_SOC)/acs.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl2_acs.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl301.bin
+	@rm -f $(FIP_FOLDER_SOC)/bl33.bin
+	@rm -f $(FIP_FOLDER_SOC)/fip.bin
+	@rm -f $(FIP_FOLDER_SOC)/boot.bin
+	@rm -f $(FIP_FOLDER_SOC)/boot_sd.bin
+	@rm -f $(FIP_FOLDER_SOC)/u-boot.bin
+	@rm -f $(FIP_FOLDER_SOC)/u-boot.bin.* $(FIP_FOLDER_SOC)/*.encrypt
+	@rm -f $(FIP_FOLDER)/u-boot.bin.* $(FIP_FOLDER)/*.bin $(FIP_FOLDER)/*.encrypt
+	@rm -f $(srctree)/fip/aml_encrypt_gxb
 
 backup:
 	F=`basename $(srctree)` ; cd .. ; \
@@ -1385,6 +1444,8 @@ help:
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info see the ./README file'
+	@export srctree
+	@$(srctree)/amlogic_help.sh
 
 
 # Documentation targets

@@ -37,7 +37,7 @@ $(error BR2_TOOLCHAIN_BUILDROOT_VENDOR cannot be 'unknown'. \
 endif
 
 # Compute GNU_TARGET_NAME
-GNU_TARGET_NAME = $(ARCH)-$(TARGET_VENDOR)-$(TARGET_OS)-$(LIBC)$(ABI)
+GNU_TARGET_NAME = $(ARCH)-$(TARGET_OS)-$(LIBC)$(ABI)
 
 # FLAT binary format needs uclinux
 ifeq ($(BR2_BINFMT_FLAT),y)
@@ -186,10 +186,20 @@ TARGET_FCFLAGS += -mid-shared-library -mshared-library-id=0
 TARGET_CXXFLAGS += -mid-shared-library -mshared-library-id=0
 endif
 
+ifneq ($(BR2_KERNEL_TOOLCHAIN_PATH),)
+KERNEL_TOOLCHAIN_DIR = $(call qstrip,$(BR2_KERNEL_TOOLCHAIN_PATH))
+endif
+
+ifneq ($(BR2_TOOLCHAIN_EXTERNAL_PATH),)
+EXTERNAL_TOOLCHAIN_DIR = $(call qstrip,$(BR2_TOOLCHAIN_EXTERNAL_PATH))
+endif
+
 ifeq ($(BR2_TOOLCHAIN_BUILDROOT),y)
 TARGET_CROSS = $(HOST_DIR)/bin/$(GNU_TARGET_NAME)-
+TARGET_KERNEL_CROSS = $(KERNEL_TOOLCHAIN_DIR)/bin/$(call qstrip,$(BR2_KERNEL_TOOLCHAIN_PREFIX))-
 else
 TARGET_CROSS = $(HOST_DIR)/bin/$(TOOLCHAIN_EXTERNAL_PREFIX)-
+TARGET_KERNEL_CROSS = $(KERNEL_TOOLCHAIN_DIR)/bin/$(call qstrip,$(BR2_KERNEL_TOOLCHAIN_PREFIX))-
 endif
 
 # Define TARGET_xx variables for all common binutils/gcc
@@ -210,9 +220,11 @@ ifeq ($(BR2_STRIP_strip),y)
 STRIP_STRIP_DEBUG := --strip-debug
 TARGET_STRIP = $(TARGET_CROSS)strip
 STRIPCMD = $(TARGET_CROSS)strip --remove-section=.comment --remove-section=.note
+KSTRIPCMD = $(TARGET_KERNEL_CROSS)strip $(STRIP_STRIP_UNNEEDED)
 else
 TARGET_STRIP = /bin/true
 STRIPCMD = $(TARGET_STRIP)
+KSTRIPCMD = $(TARGET_KERNEL_CROSS)strip
 endif
 INSTALL := $(shell which install || type -p install)
 UNZIP := $(shell which unzip || type -p unzip) -q

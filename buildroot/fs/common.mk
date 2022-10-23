@@ -32,6 +32,8 @@ ROOTFS_DEVICE_TABLES = $(call qstrip,$(BR2_ROOTFS_DEVICE_TABLE) \
 	$(BR2_ROOTFS_STATIC_DEVICE_TABLE))
 
 ROOTFS_USERS_TABLES = $(call qstrip,$(BR2_ROOTFS_USERS_TABLES))
+BLACKLIST_TABLE_TAR=$(BINARIES_DIR)/blacklist.txt
+BLACKLIST_TABLE_SRC=$(patsubst "%",%,$(BR2_ROOTFS_OVERLAY))
 
 ROOTFS_FULL_DEVICES_TABLE = $(FS_DIR)/full_devices_table.txt
 ROOTFS_FULL_USERS_TABLE = $(FS_DIR)/full_users_table.txt
@@ -108,6 +110,32 @@ ROOTFS_$(2)_DEPENDENCIES += host-xz
 ROOTFS_$(2)_COMPRESS_EXT = .xz
 ROOTFS_$(2)_COMPRESS_CMD = xz -9 -C crc32 -c
 endif
+
+define BLACKLIST_ENABLE
+    if [[ "$$(TARGET_OUTPUT_DIR)" =~ "s420" ]] || \
+        [[ "$$(TARGET_OUTPUT_DIR)" =~ "s400" ]]  \
+        && [[ "$$(TARGET_OUTPUT_DIR)" =~ "_release" ]]; then \
+        rm -rf $$(BLACKLIST_TABLE_TAR); \
+	if [ ! -f "$$(BLACKLIST_TABLE_TAR)" ]; then (\
+	cp -rf $$(TOPDIR)/$$(BLACKLIST_TABLE_SRC)../blacklist.txt \
+	$$(BLACKLIST_TABLE_TAR); \
+	); \
+	fi; \
+	for i in `cat $$(BLACKLIST_TABLE_TAR) | sed '/^#.*\|^$$$$/d'`; do \
+	if [ -f $$(TARGET_DIR)$$$$i ];then \
+	rm -rf $$(TARGET_DIR)$$$$i ; \
+	[ $$$$? = 0 ] && echo "remove blacklist [$$(TARGET_DIR)$$$$i] ...OK!" \
+	|| echo "remove blacklist $$(TARGET_DIR)$$$$i FAIL!!!"; \
+	else \
+	echo "target blacklist [$$(TARGET_DIR)$$$$i] has removed!" ;\
+	fi \
+	done; \
+    else \
+        echo "this filesystem is debug version or other platform; no need blacklist!"; \
+    fi
+endef
+
+ROOTFS_$(2)_PRE_GEN_HOOKS += BLACKLIST_ENABLE
 
 $$(BINARIES_DIR)/$$(ROOTFS_$(2)_FINAL_IMAGE_NAME): ROOTFS=$(2)
 $$(BINARIES_DIR)/$$(ROOTFS_$(2)_FINAL_IMAGE_NAME): FAKEROOT_SCRIPT=$$(ROOTFS_$(2)_DIR)/fakeroot

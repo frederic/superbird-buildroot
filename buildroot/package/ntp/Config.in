@@ -24,12 +24,6 @@ config BR2_PACKAGE_NTP_NTP_KEYGEN
 	help
 	  Create a NTP host key
 
-config BR2_PACKAGE_NTP_NTP_SHM_CLK
-	bool "SHM clock support"
-	help
-	  Compile ntp with support for a SHM clock attached through
-	  shared memory.
-
 config BR2_PACKAGE_NTP_NTP_WAIT
 	bool "ntp-wait"
 	depends on BR2_PACKAGE_PERL
@@ -46,15 +40,9 @@ config BR2_PACKAGE_NTP_NTPD
 	  system date and time in sync and optionally serving time and
 	  date information on the network via the NTP protocol.
 
-config BR2_PACKAGE_NTP_NTPD_ATOM_PPS
-	bool "PPS support"
-	depends on BR2_PACKAGE_NTP_NTPD
-	select BR2_PACKAGE_PPS_TOOLS
-	help
-	  Compile ntpd with the ability to use an ATOM PPS source.
-
 config BR2_PACKAGE_NTP_NTPDATE
 	bool "ntpdate"
+	default y
 	help
 	  The ntpdate utility program is used to set the local date
 	  and time from an NTP server given as an argument.
@@ -74,8 +62,6 @@ config BR2_PACKAGE_NTP_NTPQ
 
 config BR2_PACKAGE_NTP_NTPSNMPD
 	bool "ntpsnmpd"
-	depends on BR2_USE_MMU # netsnmp fork()
-	select BR2_PACKAGE_NETSNMP
 	help
 	  Install ntpsnmpd NTP SNMP MIB agent.
 

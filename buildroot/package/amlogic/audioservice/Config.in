@@ -1,0 +1,84 @@
+menuconfig BR2_PACKAGE_AUDIOSERVICE
+	bool  "aml audioservice"
+	select  BR2_PACKAGE_DBUS
+	select  BR2_PACKAGE_DBUS_GLIB
+	select  BR2_PACKAGE_CJSON
+	select  BR2_PACKAGE_AML_HALAUDIO
+	select  BR2_PACKAGE_RSYSLOG
+	help
+		demo app to show
+
+if BR2_PACKAGE_AUDIOSERVICE
+
+config BR2_PACKAGE_AUDIOSERVICE_PULSEAUDIO
+	bool  "Enable audioservice with PulseAudio"
+	select  BR2_PACKAGE_PULSEAUDIO
+	select  BR2_PACKAGE_PULSEAUDIO_DAEMON
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_FFMPEG
+	bool  "Enable audioservice with ffmpeg"
+	select  BR2_PACKAGE_FFMPEG
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_ASR
+	bool  "Enable audioservice client asr uartcmd"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_PYTHON
+	bool  "Enable audioservice python client"
+	select  BR2_PACKAGE_DBUS_PYTHON
+	select  BR2_PACKAGE_PYTHON_PYEXPAT
+	select  BR2_PACKAGE_PYTHON
+	select  BR2_PACKAGE_PYTHON_GOBJECT
+  default n
+
+config BR2_PACKAGE_AUDIOSERVICE_S400_SBR
+	bool  "Amlogic SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_S410_SBR
+	bool  "S410 SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_CONFIG_FILE
+	string "set the audioservice configuration file"
+	default "default_audioservice_s400_sb.conf"
+	help
+		It selects which default_audioservice.conf
+
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_M6350
+	bool "Enable external M6350 device"
+	default n
+	help
+		Enable external input handle m6350
+
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_962E
+	bool "Enable 962E device"
+	default n
+	help
+		Enable 962E
+
+config BR2_PACKAGE_AUDIOSERVICE_STRESSTEST
+	bool "Enable stress test"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_USBPLAYER
+	bool  "Enable usb Player in homeapp"
+	select BR2_PACKAGE_FFMPEG
+	select  BR2_PACKAGE_AML_AUDIO_PLAYER
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_AIRPLAY
+	bool  "Enable airplay client in homeapp"
+	select BR2_PACKAGE_AIRPLAY2
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_AMLUART
+	bool  "Enable AMLUART client in homeapp"
+	default n
+endif

@@ -1,0 +1,22 @@
+on early-init
+    insmod /vendor/lib/optee.ko
+    insmod /vendor/lib/optee_armtz.ko
+
+on init
+    chmod 666 /dev/teepriv0
+    chmod 666 /dev/tee0
+    start tee_supplicant
+
+on post-fs
+    restorecon_recursive /tee
+    restorecon_recursive /mnt/vendor/tee
+
+on property:vold.post_fs_data_done=1
+    start tee_supplicant
+
+service tee_supplicant /vendor/bin/tee-supplicant
+    oneshot
+    class core
+    user root
+    group system
+    seclabel u:r:tee:s0

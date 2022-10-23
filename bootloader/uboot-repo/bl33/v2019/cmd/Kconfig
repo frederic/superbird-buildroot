@@ -246,6 +246,19 @@ config CMD_BOOTEFI_HELLO
 	  for testing that EFI is working at a basic level, and for bringing
 	  up EFI support on a new architecture.
 
+
+config CMD_DSPRUN
+        bool "dsprun cmd"
+        default y
+        help
+          support dsprun cmd
+
+config CMD_DSPSET
+        bool "dspset cmd"
+        default y
+        help
+          support dspset cmd
+
 source lib/efi_selftest/Kconfig
 
 config CMD_BOOTMENU
@@ -629,6 +642,11 @@ config CMD_CLK
 	  clock values from associated drivers. However currently no command
 	  exists for this.
 
+config CMD_CLKMSR
+	bool "clkmsr - Show clock measurement for different clock index"
+	help
+	  Show clock measurement for different clock index
+
 config CMD_DEMO
 	bool "demo - Demonstration commands for driver model"
 	depends on DM
@@ -876,8 +894,15 @@ config CMD_MTD
 config CMD_NAND
 	bool "nand"
 	default y if NAND_SUNXI
+	default y if MESON_NFC
+	default y if SPI_NAND
 	help
 	  NAND support.
+
+config AML_STORAGE
+	bool "aml storage support"
+	help
+	  storage cmd support
 
 if CMD_NAND
 config CMD_NAND_TRIMFFS
@@ -1089,6 +1114,12 @@ config CMD_AXI
 	  Interface) busses, a on-chip interconnect specification for managing
 	  functional blocks in SoC designs, which is also often used in designs
 	  involving FPGAs (e.g.  communication with IP cores in Xilinx FPGAs).
+
+config CMD_SARADC
+	bool "saradc"
+	help
+	  SARADC support.
+
 endmenu
 
 
@@ -1323,7 +1354,6 @@ menu "Misc commands"
 
 config CMD_BMP
 	bool "Enable 'bmp' command"
-	depends on LCD || DM_VIDEO || VIDEO
 	help
 	  This provides a way to obtain information about a BMP-format iamge
 	  and to display it. BMP (which presumably stands for BitMaP) is a
@@ -1476,6 +1506,7 @@ config CMD_TERMINAL
 config CMD_UUID
 	bool "uuid, guid - generation of unique IDs"
 	select LIB_UUID
+	default y if AML_GPT
 	help
 	  This enables two commands:
 
@@ -1878,6 +1909,8 @@ config CMD_AVB
 	    avb verify - run full verification chain
 endmenu
 
+source "cmd/amlogic/Kconfig"
+
 config CMD_UBI
 	tristate "Enable UBI - Unsorted block images commands"
 	select CRC32
@@ -1900,5 +1933,22 @@ config CMD_UBIFS
 	select LZO
 	help
 	  UBIFS is a file system for flash devices which works on top of UBI.
+
+config CMD_WATCHDOG
+	bool "CMD_WATCHDOG"
+	help
+	 CMD_WATCHDOG support.
+
+config CMD_JTAG
+	bool "CMD_JTAG"
+	depends on MISC
+	help
+	 CMD_JTAG support.
+
+config CMD_EFUSE
+	bool "support efuse command"
+	default y
+	help
+	  support efuse command
 
 endmenu

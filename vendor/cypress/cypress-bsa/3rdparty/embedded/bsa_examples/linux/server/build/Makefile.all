@@ -1,0 +1,50 @@
+
+LIBBSA_DIR := ../../libbsa/build
+
+APP_DIRS := \
+	../../app_hh/build/ \
+	../../app_manager/build/ \
+	../../app_pbs/build/ \
+	../../app_pbc/build/ \
+	../../app_mce/build/ \
+	../../app_ops/build/ \
+	../../app_opc/build/ \
+	../../app_av/build/ \
+	../../app_avk/build/ \
+	../../app_fts/build/ \
+	../../app_ftc/build/ \
+	../../app_hs/build/ \
+	../../app_dg/build/ \
+	../../app_ag/build/ \
+	../../app_tm/build/ \
+	../../app_hl/build/ \
+	../../app_3d/build/ \
+	../../app_ble/build/ \
+	../../app_ble_pm/build/ \
+	../../app_ble_hrc/build/ \
+	../../app_sc/build/ \
+	../../app_sac/build/ \
+	../../simple_app/build/
+	../../app_fm/build/ \
+	../../app_switch/build/ \
+	../../app_headless/build
+
+# all applications require LIBBSA build
+$(APP_DIRS): $(LIBBSA_DIR)
+
+BUILD_DIRS := $(LIBBSA_DIR) $(APP_DIRS)
+
+all: $(BUILD_DIRS)
+
+.PHONY: $(BUILD_DIRS)
+
+$(BUILD_DIRS):
+	@echo Building $@
+	@$(MAKE) -C $@
+
+clean:
+	@for dir in $(BUILD_DIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+

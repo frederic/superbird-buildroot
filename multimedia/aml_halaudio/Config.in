@@ -1,0 +1,9 @@
+config BR2_PACKAGE_AML_HALAUDIO
+        bool "aml_halaudio"
+        select BR2_PACKAGE_ALSA_LIB
+        select BR2_PACKAGE_CJSON
+        help
+          amlogic lib hal audio.
+
+          http://openlinux.amlogic.com
+

@@ -1,0 +1,59 @@
+#!/bin/sh
+
+# This script file is used to create default system name.
+# system name is restored in /etc/board_info
+SYSNAMEFILE=/etc/board_info
+CHECK_LIST="wlan0 eth0"
+system_name=""
+name_prefix=""
+
+# If sys_name is exist and it's not empty, it will do nothing
+
+if [ -f $SYSNAMEFILE ] ; then
+	system_name=$(cat $SYSNAMEFILE | grep "default-name=")
+	if [ -n "$system_name" ]; then
+		# default-name has been created, do nothing
+		exit 0
+	fi
+	name_prefix=$(cat $SYSNAMEFILE | grep "default-name-prefix=")
+	name_prefix=${name_prefix#default-name-prefix=}
+	if [ -z "$name_prefix" ]; then
+		# Set default name_prefix
+		name_prefix="Amlogic"
+	fi
+else
+	# there is no /etc/board_info exist, do nothing
+	exit 0
+fi
+
+
+# create default sys_name
+# cat /sys/class/net/$1/address | sed 's/\://g' > /etc/wifi/ap_name
+# default-name-prefix=SoundBar
+
+for device in $CHECK_LIST
+do
+	# echo $device
+	if [ -f /sys/class/net/$device/address ] ; then
+		system_name=$(cat /sys/class/net/$device/address | sed 's/\://g')
+		# echo $system_name
+		system_name=${system_name#????????}
+		# echo $system_name
+		if [ -n "$system_name" ] ; then
+			if [ "$system_name" != "0000" ] ; then
+				break;
+			fi
+		fi
+	fi
+	# system_name=$(cat /sys/class/net/$device/address | sed 's/\://g')
+done
+
+# Check system_name is empty or "0000"
+if [ -z "$system_name" ] || [ "$system_name" == "0000" ] ; then
+	# create system_name with ramdom
+	system_name=$RANDOM
+fi
+
+echo "default-name=$name_prefix-$system_name"
+echo "default-name=$name_prefix-$system_name" >> $SYSNAMEFILE
+

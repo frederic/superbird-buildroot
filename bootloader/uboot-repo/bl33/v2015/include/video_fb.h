@@ -36,6 +36,7 @@
 #define GDF_24BIT_888RGB        4
 #define GDF__8BIT_332RGB        5
 
+#define CANVAS_ALIGNED(x)  (((x) + 63) & ~63)
 /******************************************************************************/
 /* Export Graphic Driver Control                                              */
 /******************************************************************************/
@@ -48,6 +49,8 @@ typedef struct graphic_device {
     unsigned int cprBase;
     unsigned int frameAdrs;
     unsigned int memSize;
+    unsigned int fb_width;
+    unsigned int fb_height;
     unsigned int mode;
     unsigned int gdfIndex;
     unsigned int gdfBytesPP;
@@ -65,7 +68,8 @@ typedef struct graphic_device {
 /* Export Graphic Functions                                                   */
 /******************************************************************************/
 
-void *video_hw_init (void);       /* returns GraphicDevice struct or NULL */
+void *video_hw_init (int display_mode);       /* returns GraphicDevice struct or NULL */
+int get_osd_layer(void);
 
 #ifdef VIDEO_HW_BITBLT
 void video_hw_bitblt (
@@ -100,5 +104,30 @@ void video_set_lut (
 void video_set_hw_cursor(int x, int y); /* x y in pixel */
 void video_init_hw_cursor(int font_width, int font_height);
 #endif
+
+enum display_mode_e {
+	MIDDLE_MODE,
+	RECT_MODE,
+	FULL_SCREEN_MODE,
+};
+
+enum pci_type_e {
+	BMP_PIC,
+	RAW_PIC,
+};
+
+typedef struct {
+	int width;
+	int height;
+	int row_bytes;
+	int pixel_bytes;
+	unsigned char* data;
+} GRSurface;
+
+typedef struct {
+	GRSurface* texture;
+	int char_width;
+	int char_height;
+} GRFont;
 
 #endif /*_VIDEO_FB_H_ */

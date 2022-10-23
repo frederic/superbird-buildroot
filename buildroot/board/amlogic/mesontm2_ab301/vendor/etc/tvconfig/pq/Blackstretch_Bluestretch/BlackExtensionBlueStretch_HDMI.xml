@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="BlackExtensionBlueStretch_HDMI" platform="txlx" commands="">
+<Group num="0" val="0">
+<Page tab_title="" layout="10x4">
+<Control ui_type="checkbox" name="demo_blackext_enable" range="0~1" addr="0x1da1" mask="3:3" dst="U" desc="demo black enxtension enable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="blackext_start" range="0~255" addr="0x1d80" mask="31:24" dst="U" desc="" default="0" value="80" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="blackext_slope1" range="0~255" addr="0x1d80" mask="23:16" dst="U" desc="" default="0" value="34" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="blackext_mid_point" range="0~255" addr="0x1d80" mask="15:8" dst="U" desc="" default="0" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="blackext_slope2" range="0~255" addr="0x1d80" mask="7:0" dst="U" desc="" default="0" value="28" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="demo_chroma_coring_enable" range="0~1" addr="0x1da1" mask="4:4" dst="U" desc="demo chroma coring enable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="chroma_coring_y_threshold" range="0~8191" addr="0x1da0" mask="27:16" dst="U" desc="Bypass chroma coring if Y less than this threshold" default="0" value="512" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="chroma_coring_threshold" range="0~255" addr="0x1da0" mask="15:8" dst="U" desc="Chroma coring threshold" default="0" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="chroma_coring_slope" range="0~15" addr="0x1da0" mask="3:0" dst="U" desc="Chroma coring slope" default="0" value="13" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="center_bar_enable" range="0~1" addr="0x1da3" mask="31:31" dst="U" desc="Center bar enable" default="0" value="0" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="demo_left_top_scrn_width" range="0~8191" addr="0x1da2" mask="12:0" dst="U" desc="demo left or top screen width" default="0" value="1" cmd="common:2,0xff900000"/>
+</Page>
+</Group>
+</Form>
+

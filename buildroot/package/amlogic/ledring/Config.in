@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LEDRING
+    bool "LED ring light"
+    select BR2_PACKAGE_POPT
+    help
+        led ring light.

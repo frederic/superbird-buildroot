@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=/usr
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/weston-drm-helper
+
+Name: libdrm-helper-client API
+Version: 0.0.1
+Description: A helper function framework fordrm display.
+Requires.private: json-c
+Cflags: -I${includedir}/
+Libs: -L${libdir} -ldrm-helper-client
+Libs.private: -pthread

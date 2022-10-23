@@ -1,0 +1,7 @@
+kso_enable=0
+ccode=CN
+regrev=38
+tcpack_sup_mode=1 
+dhd_txbound=80
+dhd_rxbound=80
+frameburst=1

@@ -1,0 +1,63 @@
+#!/bin/sh
+
+#
+#start spotift
+#
+
+conf_file="/var/www/cgi-bin/wifi/spotify.conf"
+status_file="/var/www/cgi-bin/wifi/spotify_status.txt"
+
+function run_or_stop(){
+	spotify_status=`cat $status_file`
+	if [ spotify_status == "yesyes" ];then
+		printf "Restarting spotify: "
+		username=`sed -n "1p" $conf_file`
+		pwd=`sed -n "2p" $conf_file`
+		dname=`sed -n "3p" $conf_file`
+		librespot -u $username -p $pwd -n $dname -c /tmp &
+		[ $? = 0 ] && echo "OK" || echo "FAIL"
+	else
+		echo "user had log out spotify"
+	fi
+
+}
+
+if [ -f $conf_file ];then
+	case "$1" in
+		start)
+			;;
+		netup)
+			run_or_stop;
+			;;
+		netdown)
+			killall librespot
+			;;
+		netchange)
+			killall librespot
+			run_or_stop;
+			;;
+		netready)
+			printf "Starting spotify: "
+			username=`sed -n "1p" $conf_file`
+			pwd=`sed -n "2p" $conf_file`
+			dname=`sed -n "3p" $conf_file`
+			librespot -u $username -p $pwd -n $dname -c /tmp &
+			[ $? = 0 ] && echo "OK" || echo "FAIL"
+			;;
+		stop)
+			printf "Stopping spotify : "
+			[ $? = 0 ] && echo "OK" || echo "FAIL"
+			;;
+		restart|reload)
+			"$0" stop
+			"$0" start
+			;;
+		*)
+			echo "Usage: $0 {start|stop|restart}"
+			exit 1
+	esac
+fi
+
+exit $?
+
+

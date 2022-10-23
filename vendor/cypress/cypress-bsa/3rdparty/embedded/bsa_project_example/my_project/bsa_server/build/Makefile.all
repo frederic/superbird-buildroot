@@ -1,0 +1,89 @@
+#######################################
+#  This makefile is written for a GNU make or equivalent.
+#  For example:
+#   make clean
+#   make
+# Copyright (c) 2015, Broadcom Corp., All Rights Reserved.
+# Broadcom Bluetooth Core. Proprietary and confidential.
+#######################################
+
+LIBBSA_DIR := ../../libbsa/build/
+
+SERVER_DIR := ../../bsa_server/build/
+
+APP_DIRS := ../../my_app/build/
+
+# Check if the local machine is 32 or 64 bits for x86
+LBIT := $(shell getconf LONG_BIT)
+ifeq ($(LBIT), 64)
+    BUILD_CPU := x86_64
+else
+#$(warning Defaulting CPU to x86)
+   BUILD_CPU := x86
+endif
+CPU ?= $(BUILD_CPU)
+
+# all applications require LIBBSA build
+$(APP_DIRS): $(LIBBSA_DIR)
+
+BUILD_DIRS := $(SERVER_DIR) \
+	      $(LIBBSA_DIR) \
+	      $(APP_DIRS)
+
+DELIVERY_DIRS := $(SERVER_DIR) \
+          $(LIBBSA_DIR) \
+          $(APP_DIRS)
+
+.PHONY: help all $(BUILD_DIRS) clean delivery 
+
+help:
+	@echo "Makefile.all supported targets"
+	@echo "  help               : this menu"
+	@echo "  all                : build the default server and all the applications"
+	@echo "  clean or nuke      : clean the default server and all the applications"
+	@echo "  delivery           : make a delivery"
+	@echo ""
+	@echo "Examples:"
+	@echo "  $(MAKE) -f Makefile.all all"
+	@echo "  $(MAKE) -f Makefile.all nuke"
+
+all: $(BUILD_DIRS)
+
+clean:
+	@for dir in $(BUILD_DIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+nuke:
+	@echo Nuking all potentially generated files
+	@for dir in $(BUILD_DIRS); do \
+		rm -rf $$dir/mips $$dir/arm $$dir/x86 $$dir/x86_64; \
+	done
+	@rm -f $(LIBBSA_DIR)/../include/*.h
+
+$(BUILD_DIRS):
+	@echo Building $@
+	@$(MAKE) -C $@
+
+applications: $(LIBBSA_DIR) $(APP_DIRS)
+
+# This target must be called from bsa_example/linux/server/build/Makefile.all (delivery target)
+delivery:
+	@echo Adding Project Example project
+	@for dir in $(DELIVERY_DIRS); do \
+		$(MAKE) -C $$dir delivery; \
+		if [ $$? != 0 ]; then exit 2; fi; \
+	done
+	$(MAKE) -C $(SERVER_DIR) builddelivery
+	$(MAKE) -C $(SERVER_DIR) cleandelivery
+
+# This target must be called from bsa_example/linux/server/build/Makefile.all (binarydelivery target)
+binarydelivery:
+	$(MAKE) -f Makefile.all all CPU=$(BUILD_CPU)
+	$(MAKE) -f Makefile.all all CPU=$(CPU)
+	@echo Adding Project Example project
+	@for dir in $(DELIVERY_DIRS); do \
+		$(MAKE) -C $$dir delivery; \
+		if [ $$? != 0 ]; then exit 2; fi; \
+	done
+

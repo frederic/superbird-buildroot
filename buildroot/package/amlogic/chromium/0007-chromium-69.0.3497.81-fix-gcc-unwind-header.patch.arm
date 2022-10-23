@@ -1,0 +1,236 @@
+diff -git a/src/buildtools/third_party/libc++abi/trunk/src/cxa_default_handlers.cpp b/src/buildtools/third_party/libc++abi/trunk/src/cxa_default_handlers.cpp
+--- a/src/buildtools/third_party/libc++abi/trunk/src/cxa_default_handlers.cpp	2018-03-06 14:20:54.000000000 -0500
++++ b/src/buildtools/third_party/libc++abi/trunk/src/cxa_default_handlers.cpp	2018-05-07 11:01:44.464845299 -0400
+@@ -36,13 +36,10 @@
+         {
+             _Unwind_Exception* unwind_exception =
+                 reinterpret_cast<_Unwind_Exception*>(exception_header + 1) - 1;
+-            bool native_exception =
+-                (unwind_exception->exception_class   & get_vendor_and_language) == 
+-                                 (kOurExceptionClass & get_vendor_and_language);
+-            if (native_exception)
++            if (__isOurExceptionClass(unwind_exception))
+             {
+                 void* thrown_object =
+-                    unwind_exception->exception_class == kOurDependentExceptionClass ?
++                    __getExceptionClass(unwind_exception) == kOurDependentExceptionClass ?
+                         ((__cxa_dependent_exception*)exception_header)->primaryException :
+                         exception_header + 1;
+                 const __shim_type_info* thrown_type =
+diff -git a/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.cpp b/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.cpp
+--- a/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.cpp	2018-03-06 14:20:54.000000000 -0500
++++ b/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.cpp	2018-05-07 11:01:44.472845276 -0400
+@@ -78,22 +78,37 @@
+                                    alignof(__cxa_exception));
+ }
+ 
+-static void setExceptionClass(_Unwind_Exception* unwind_exception) {
+-    unwind_exception->exception_class = kOurExceptionClass;
++void __setExceptionClass(_Unwind_Exception* unwind_exception, uint64_t newValue) {
++	::memcpy(&unwind_exception->exception_class, &newValue, sizeof(newValue));
++	}
++	
++
++static void setOurExceptionClass(_Unwind_Exception* unwind_exception) {
++    __setExceptionClass(unwind_exception, kOurExceptionClass);
+ }
+ 
+ static void setDependentExceptionClass(_Unwind_Exception* unwind_exception) {
+-    unwind_exception->exception_class = kOurDependentExceptionClass;
++    __setExceptionClass(unwind_exception, kOurDependentExceptionClass);
+ }
+ 
+ //  Is it one of ours?
+-static bool isOurExceptionClass(const _Unwind_Exception* unwind_exception) {
+-    return (unwind_exception->exception_class & get_vendor_and_language) == 
+-           (kOurExceptionClass                & get_vendor_and_language);
++uint64_t __getExceptionClass(const _Unwind_Exception* unwind_exception) {
++//	On x86 and some ARM unwinders, unwind_exception->exception_class is
++//		a uint64_t. On other ARM unwinders, it is a char[8]
++//	See: http://infocenter.arm.com/help/topic/com.arm.doc.ihi0038b/IHI0038B_ehabi.pdf
++//	So we just copy it into a uint64_t to be sure.
++	uint64_t exClass;
++	::memcpy(&exClass, &unwind_exception->exception_class, sizeof(exClass));
++	return exClass;
++}
++
++bool __isOurExceptionClass(const _Unwind_Exception* unwind_exception) {
++    return (__getExceptionClass(unwind_exception) & get_vendor_and_language) == 
++           (kOurExceptionClass                    & get_vendor_and_language);
+ }
+ 
+ static bool isDependentException(_Unwind_Exception* unwind_exception) {
+-    return (unwind_exception->exception_class & 0xFF) == 0x01;
++    return (__getExceptionClass(unwind_exception) & 0xFF) == 0x01;
+ }
+ 
+ //  This does not need to be atomic
+@@ -248,7 +263,7 @@
+     exception_header->terminateHandler  = std::get_terminate();
+     exception_header->exceptionType = tinfo;
+     exception_header->exceptionDestructor = dest;
+-    setExceptionClass(&exception_header->unwindHeader);
++    setOurExceptionClass(&exception_header->unwindHeader);
+     exception_header->referenceCount = 1;  // This is a newly allocated exception, no need for thread safety.
+     globals->uncaughtExceptions += 1;   // Not atomically, since globals are thread-local
+ 
+@@ -299,7 +314,7 @@
+     __cxa_exception* exception_header =
+         cxa_exception_from_exception_unwind_exception(unwind_exception);
+ 
+-    if (isOurExceptionClass(unwind_exception))
++    if (__isOurExceptionClass(unwind_exception))
+     {
+         if (0 == exception_header->propagationCount)
+         {
+@@ -342,7 +357,7 @@
+         std::terminate();
+     }
+ 
+-    if (isOurExceptionClass(&exception_header->unwindHeader))
++    if (__isOurExceptionClass(&exception_header->unwindHeader))
+     {
+         --exception_header->propagationCount;
+         if (0 == exception_header->propagationCount)
+@@ -407,7 +422,7 @@
+ __cxa_begin_catch(void* unwind_arg) throw()
+ {
+     _Unwind_Exception* unwind_exception = static_cast<_Unwind_Exception*>(unwind_arg);
+-    bool native_exception = isOurExceptionClass(unwind_exception);
++    bool native_exception = __isOurExceptionClass(unwind_exception);
+     __cxa_eh_globals* globals = __cxa_get_globals();
+     // exception_header is a hackish offset from a foreign exception, but it
+     //   works as long as we're careful not to try to access any __cxa_exception
+@@ -484,7 +499,7 @@
+     //    nothing more to be done.  Do nothing!
+     if (NULL != exception_header)
+     {
+-        bool native_exception = isOurExceptionClass(&exception_header->unwindHeader);
++        bool native_exception = __isOurExceptionClass(&exception_header->unwindHeader);
+         if (native_exception)
+         {
+             // This is a native exception
+@@ -549,7 +564,7 @@
+     __cxa_exception *exception_header = globals->caughtExceptions;
+     if (NULL == exception_header)
+         return NULL;        //  No current exception
+-    if (!isOurExceptionClass(&exception_header->unwindHeader))
++    if (!__isOurExceptionClass(&exception_header->unwindHeader))
+         return NULL;
+     return exception_header->exceptionType;
+ }
+@@ -571,7 +586,7 @@
+     __cxa_exception* exception_header = globals->caughtExceptions;
+     if (NULL == exception_header)
+         std::terminate();      // throw; called outside of a exception handler
+-    bool native_exception = isOurExceptionClass(&exception_header->unwindHeader);
++    bool native_exception = __isOurExceptionClass(&exception_header->unwindHeader);
+     if (native_exception)
+     {
+         //  Mark the exception as being rethrown (reverse the effects of __cxa_begin_catch)
+@@ -660,7 +675,7 @@
+     __cxa_exception* exception_header = globals->caughtExceptions;
+     if (NULL == exception_header)
+         return NULL;        //  No current exception
+-    if (!isOurExceptionClass(&exception_header->unwindHeader))
++    if (!__isOurExceptionClass(&exception_header->unwindHeader))
+         return NULL;        // Can't capture a foreign exception (no way to refcount it)
+     if (isDependentException(&exception_header->unwindHeader)) {
+         __cxa_dependent_exception* dep_exception_header =
+diff -git a/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.hpp b/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.hpp
+--- a/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.hpp	2018-03-06 14:20:54.000000000 -0500
++++ b/src/buildtools/third_party/libc++abi/trunk/src/cxa_exception.hpp	2018-05-07 13:09:05.371652989 -0400
+@@ -24,6 +24,17 @@
+ static const uint64_t kOurDependentExceptionClass = 0x434C4E47432B2B01; // CLNGC++\1
+ static const uint64_t get_vendor_and_language     = 0xFFFFFFFFFFFFFF00; // mask for CLNGC++
+ 
++uint64_t __getExceptionClass  (const _Unwind_Exception*);
++void     __setExceptionClass  (      _Unwind_Exception*, uint64_t);
++bool     __isOurExceptionClass(const _Unwind_Exception*);
++
++#if defined(__arm__) && defined(__GNUC__)
++// missing values from _Unwind_Reason_Code enum
++#define _URC_FATAL_PHASE2_ERROR ((_Unwind_Reason_Code)2)
++#define _URC_FATAL_PHASE1_ERROR ((_Unwind_Reason_Code)3)
++#define _URC_NORMAL_STOP ((_Unwind_Reason_Code)4)
++#endif
++
+ struct _LIBCXXABI_HIDDEN __cxa_exception {
+ #if defined(__LP64__) || defined(_LIBCXXABI_ARM_EHABI)
+     // This is a new field to support C++ 0x exception_ptr.
+diff -git a/src/buildtools/third_party/libc++abi/trunk/src/cxa_handlers.cpp b/src/buildtools/third_party/libc++abi/trunk/src/cxa_handlers.cpp
+--- a/src/buildtools/third_party/libc++abi/trunk/src/cxa_handlers.cpp	2018-03-06 14:20:54.000000000 -0500
++++ b/src/buildtools/third_party/libc++abi/trunk/src/cxa_handlers.cpp	2018-05-07 11:01:44.474845270 -0400
+@@ -89,10 +89,7 @@
+         {
+             _Unwind_Exception* unwind_exception =
+                 reinterpret_cast<_Unwind_Exception*>(exception_header + 1) - 1;
+-            bool native_exception =
+-                (unwind_exception->exception_class & get_vendor_and_language) ==
+-                               (kOurExceptionClass & get_vendor_and_language);
+-            if (native_exception)
++            if (__isOurExceptionClass(unwind_exception))
+                 __terminate(exception_header->terminateHandler);
+         }
+     }
+diff -git a/src/buildtools/third_party/libc++abi/trunk/src/cxa_personality.cpp b/src/buildtools/third_party/libc++abi/trunk/src/cxa_personality.cpp
+--- a/src/buildtools/third_party/libc++abi/trunk/src/cxa_personality.cpp	2018-03-06 14:20:54.000000000 -0500
++++ b/src/buildtools/third_party/libc++abi/trunk/src/cxa_personality.cpp	2018-05-07 15:08:40.666231128 -0400
+@@ -492,7 +492,7 @@
+     // Even for foreign exceptions, the exception object is *probably* at unwind_exception + 1
+     //    Regardless, this library is prohibited from touching a foreign exception
+     void* adjustedPtr = unwind_exception + 1;
+-    if (unwind_exception->exception_class == kOurDependentExceptionClass)
++    if (__getExceptionClass(unwind_exception) == kOurDependentExceptionClass)
+         adjustedPtr = ((__cxa_dependent_exception*)adjustedPtr - 1)->primaryException;
+     return adjustedPtr;
+ }
+@@ -1073,8 +1073,7 @@
+     if (unwind_exception == 0 || context == 0)
+         return _URC_FATAL_PHASE1_ERROR;
+ 
+-    bool native_exception = (unwind_exception->exception_class & get_vendor_and_language) ==
+-                            (kOurExceptionClass & get_vendor_and_language);
++    bool native_exception = __isOurExceptionClass(unwind_exception);
+ 
+ #if !defined(LIBCXXABI_USE_LLVM_UNWINDER)
+     // Copy the address of _Unwind_Control_Block to r12 so that
+@@ -1085,7 +1084,7 @@
+ 
+     // Check the undocumented force unwinding behavior
+     bool is_force_unwinding = state & _US_FORCE_UNWIND;
+-    state &= ~_US_FORCE_UNWIND;
++    state = (_Unwind_State)(state & ~_US_FORCE_UNWIND);
+ 
+     scan_results results;
+     switch (state) {
+@@ -1178,9 +1177,7 @@
+     if (unwind_exception == 0)
+         call_terminate(false, unwind_exception);
+     __cxa_begin_catch(unwind_exception);
+-    bool native_old_exception =
+-        (unwind_exception->exception_class & get_vendor_and_language) ==
+-        (kOurExceptionClass                & get_vendor_and_language);
++    bool native_old_exception = __isOurExceptionClass(unwind_exception);
+     std::unexpected_handler u_handler;
+     std::terminate_handler t_handler;
+     __cxa_exception* old_exception_header = 0;
+@@ -1242,16 +1239,14 @@
+             if (new_exception_header == 0)
+                 // This shouldn't be able to happen!
+                 std::__terminate(t_handler);
+-            bool native_new_exception =
+-                (new_exception_header->unwindHeader.exception_class & get_vendor_and_language) ==
+-                                                (kOurExceptionClass & get_vendor_and_language);
++            bool native_new_exception = __isOurExceptionClass(&new_exception_header->unwindHeader);
+             void* adjustedPtr;
+             if (native_new_exception && (new_exception_header != old_exception_header))
+             {
+                 const __shim_type_info* excpType =
+                     static_cast<const __shim_type_info*>(new_exception_header->exceptionType);
+                 adjustedPtr =
+-                    new_exception_header->unwindHeader.exception_class == kOurDependentExceptionClass ?
++                    __getExceptionClass(&new_exception_header->unwindHeader) == kOurDependentExceptionClass ?
+                         ((__cxa_dependent_exception*)new_exception_header)->primaryException :
+                         new_exception_header + 1;
+                 if (!exception_spec_can_catch(ttypeIndex, classInfo, ttypeEncoding,

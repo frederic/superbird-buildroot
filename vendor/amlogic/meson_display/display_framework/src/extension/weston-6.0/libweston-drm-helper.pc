@@ -1,0 +1,13 @@
+prefix=/usr
+exec_prefix=/usr
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/weston-drm-helper
+
+Name: libweston-drm-helper API
+Version: 0.0.1
+Description: A helper function framework for libweston compositors to change drm modesettings.
+Requires: libdrm
+Requires.private: json-c
+Cflags: -I${includedir}/
+Libs: -L${libdir} -lweston-drm-helper
+Libs.private: -pthread

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_AUDIO_PLAYER
+    bool "aml speaker process tool"
+    help
+        aml speaker process tool.

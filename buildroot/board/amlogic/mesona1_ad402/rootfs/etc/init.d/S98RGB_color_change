@@ -1,0 +1,13 @@
+#!/bin/sh
+echo 100 > /sys/devices/platform/pwmleds/leds/rgb_led_r/brightness
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_g/brightness
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_b/brightness
+sleep 2
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_r/brightness
+echo 100 > /sys/devices/platform/pwmleds/leds/rgb_led_g/brightness
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_b/brightness
+sleep 2
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_r/brightness
+echo 0 > /sys/devices/platform/pwmleds/leds/rgb_led_g/brightness
+echo 100 > /sys/devices/platform/pwmleds/leds/rgb_led_b/brightness
+

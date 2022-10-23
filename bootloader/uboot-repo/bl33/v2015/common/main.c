@@ -11,8 +11,18 @@
 #include <autoboot.h>
 #include <cli.h>
 #include <version.h>
+#include <asm/arch/timer.h>
 
+#ifdef CONFIG_MDUMP_COMPRESS
+#include <ramdump.h>
+#endif
 DECLARE_GLOBAL_DATA_PTR;
+
+#if defined(BL33_BOOT_TIME_PROBE)
+	#define TE TE_time
+#else
+	#define TE(...)
+#endif
 
 /*
  * Board-specific Platform code can reimplement show_boot_progress () if needed
@@ -42,8 +52,9 @@ static void run_preboot_environment_command(void)
 # ifdef CONFIG_AUTOBOOT_KEYED
 		int prev = disable_ctrlc(1);	/* disable Control C checking */
 # endif
-
+		TE("preboot");
 		run_command_list(p, -1, 0);
+		TE("preboot");
 
 # ifdef CONFIG_AUTOBOOT_KEYED
 		disable_ctrlc(prev);	/* restore Control C checking */
@@ -58,6 +69,9 @@ void main_loop(void)
 	const char *s;
 
 	bootstage_mark_name(BOOTSTAGE_ID_MAIN_LOOP, "main_loop");
+#ifdef CONFIG_MDUMP_COMPRESS
+	ramdump_init();
+#endif
 
 #ifndef CONFIG_SYS_GENERIC_BOARD
 	puts("Warning: Your board does not use generic board. Please read\n");
@@ -81,6 +95,36 @@ void main_loop(void)
 	s = bootdelay_process();
 	if (cli_process_fdt(&s))
 		cli_secure_boot_cmd(s);
+
+#if defined(CONFIG_AML_UBOOT_AUTO_TEST)
+	//stick 0 and stick 1 will be used to check the boot process of uboot
+	//stick 0 is the start counter (0xC8834400 + 0x7C<<2) = 0xc88345f0
+	//stick 1 is the end counter   (0xC8834400 + 0x7D<<2) = 0xc88345f4
+	if (*((volatile unsigned int*)(0xc88345f0)))
+	{
+		printf("\n\naml log : TE = %d\n",*((volatile unsigned int*)0xc1109988));
+		*((volatile unsigned int*)(0xc88345f4)) += 1; //stick 1
+		printf("\n\naml log : Boot success %d times @ %d\n",*((volatile unsigned int*)(0xc88345f4)),
+			*((volatile unsigned int*)(0xc88345f0))); //stick 0 set in bl2_main.c
+		int ndelay = 10;
+		int nabort = 0;
+		while (ndelay)
+		{
+			udelay(1);
+			if (tstc())
+			switch (getc())
+			{
+			//case 0x20: /* Space */
+			case 0x0d: /* Enter */
+				nabort = 1;
+				break;
+			}
+			ndelay -= 1;
+		}
+		if (!nabort)
+			run_command("reset",0);
+	}
+#endif //#if defined(CONFIG_AML_UBOOT_AUTO_TEST)
 
 	autoboot_command(s);
 

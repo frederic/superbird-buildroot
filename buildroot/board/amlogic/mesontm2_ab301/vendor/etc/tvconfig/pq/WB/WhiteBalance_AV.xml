@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="WhiteBalance_AV" platform="txlx" commands="">
+<Group num="0" val="">
+<Page tab_title="" layout="4x4">
+<Control ui_type="checkbox" name="wb_en" range="0~1" addr="" mask="31:0" dst="U" desc="wb_en" default="0" value="1" cmd="wb:en,wb_en"/>
+<Control ui_type="slider" name="pre_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_r" default="0" value="0" cmd="wb:pre_r,preofst_r"/>
+<Control ui_type="slider" name="pre_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_g" default="0" value="0" cmd="wb:pre_g,preofst_g"/>
+<Control ui_type="slider" name="pre_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_b" default="0" value="0" cmd="wb:pre_b,preofst_b"/>
+<Control ui_type="slider" name="gain_r" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_r" default="0" value="1029" cmd="wb:gain_r,gain_r"/>
+<Control ui_type="slider" name="gain_g" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_g" default="0" value="1024" cmd="wb:gain_g,gain_g"/>
+<Control ui_type="slider" name="gain_b" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_b" default="0" value="1032" cmd="wb:gain_b,gain_b"/>
+<Control ui_type="slider" name="post_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_r" default="0" value="0" cmd="wb:post_r,postofst_r"/>
+<Control ui_type="slider" name="post_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_g" default="0" value="-2" cmd="wb:post_g,postofst_g"/>
+<Control ui_type="slider" name="post_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_b" default="0" value="-1" cmd="wb:post_b,postofst_b"/>
+</Page>
+</Group>
+<Group num="1" val="">
+<Page tab_title="" layout="4x4">
+<Control ui_type="checkbox" name="wb_en" range="0~1" addr="" mask="31:0" dst="U" desc="wb_en" default="0" value="1" cmd="wb:en,wb_en"/>
+<Control ui_type="slider" name="pre_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_r" default="0" value="0" cmd="wb:pre_r,preofst_r"/>
+<Control ui_type="slider" name="pre_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_g" default="0" value="0" cmd="wb:pre_g,preofst_g"/>
+<Control ui_type="slider" name="pre_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_b" default="0" value="0" cmd="wb:pre_b,preofst_b"/>
+<Control ui_type="slider" name="gain_r" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_r" default="0" value="1026" cmd="wb:gain_r,gain_r"/>
+<Control ui_type="slider" name="gain_g" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_g" default="0" value="966" cmd="wb:gain_g,gain_g"/>
+<Control ui_type="slider" name="gain_b" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_b" default="0" value="825" cmd="wb:gain_b,gain_b"/>
+<Control ui_type="slider" name="post_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_r" default="0" value="0" cmd="wb:post_r,postofst_r"/>
+<Control ui_type="slider" name="post_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_g" default="0" value="-2" cmd="wb:post_g,postofst_g"/>
+<Control ui_type="slider" name="post_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_b" default="0" value="-1" cmd="wb:post_b,postofst_b"/>
+</Page>
+</Group>
+<Group num="2" val="">
+<Page tab_title="" layout="4x4">
+<Control ui_type="checkbox" name="wb_en" range="0~1" addr="" mask="31:0" dst="U" desc="wb_en" default="0" value="1" cmd="wb:en,wb_en"/>
+<Control ui_type="slider" name="pre_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_r" default="0" value="0" cmd="wb:pre_r,preofst_r"/>
+<Control ui_type="slider" name="pre_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_g" default="0" value="0" cmd="wb:pre_g,preofst_g"/>
+<Control ui_type="slider" name="pre_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_b" default="0" value="0" cmd="wb:pre_b,preofst_b"/>
+<Control ui_type="slider" name="gain_r" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_r" default="0" value="942" cmd="wb:gain_r,gain_r"/>
+<Control ui_type="slider" name="gain_g" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_g" default="0" value="964" cmd="wb:gain_g,gain_g"/>
+<Control ui_type="slider" name="gain_b" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_b" default="0" value="1056" cmd="wb:gain_b,gain_b"/>
+<Control ui_type="slider" name="post_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_r" default="0" value="0" cmd="wb:post_r,postofst_r"/>
+<Control ui_type="slider" name="post_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_g" default="0" value="-2" cmd="wb:post_g,postofst_g"/>
+<Control ui_type="slider" name="post_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_b" default="0" value="-1" cmd="wb:post_b,postofst_b"/>
+</Page>
+</Group>
+<Group num="3" val="">
+<Page tab_title="" layout="4x4">
+<Control ui_type="checkbox" name="wb_en" range="0~1" addr="" mask="31:0" dst="U" desc="wb_en" default="0" value="1" cmd="wb:en,wb_en"/>
+<Control ui_type="slider" name="pre_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_r" default="0" value="0" cmd="wb:pre_r,preofst_r"/>
+<Control ui_type="slider" name="pre_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_g" default="0" value="0" cmd="wb:pre_g,preofst_g"/>
+<Control ui_type="slider" name="pre_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="pre_b" default="0" value="0" cmd="wb:pre_b,preofst_b"/>
+<Control ui_type="slider" name="gain_r" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_r" default="0" value="1024" cmd="wb:gain_r,gain_r"/>
+<Control ui_type="slider" name="gain_g" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_g" default="0" value="1024" cmd="wb:gain_g,gain_g"/>
+<Control ui_type="slider" name="gain_b" range="0~2047" addr="" mask="31:0" dst="U" desc="gain_b" default="0" value="1012" cmd="wb:gain_b,gain_b"/>
+<Control ui_type="slider" name="post_r" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_r" default="0" value="0" cmd="wb:post_r,postofst_r"/>
+<Control ui_type="slider" name="post_g" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_g" default="0" value="0" cmd="wb:post_g,postofst_g"/>
+<Control ui_type="slider" name="post_b" range="-1024~1023" addr="" mask="31:0" dst="S" desc="post_b" default="0" value="0" cmd="wb:post_b,postofst_b"/>
+</Page>
+</Group>
+</Form>
+

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_ONVIF_WSDD
+  bool "onvif wsdd package"
+  help
+     onvif wsdd server

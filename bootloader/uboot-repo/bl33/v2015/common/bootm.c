@@ -6,6 +6,8 @@
  */
 
 #ifndef USE_HOSTCC
+#include <image-android-dt.h>
+#include <dt_table.h>
 #include <common.h>
 #include <bootstage.h>
 #include <bzlib.h>
@@ -18,6 +20,7 @@
 #include <lzma/LzmaTypes.h>
 #include <lzma/LzmaDec.h>
 #include <lzma/LzmaTools.h>
+#include <android_image.h>
 #if defined(CONFIG_CMD_USB)
 #include <usb.h>
 #endif
@@ -29,6 +32,20 @@
 #include <bootm.h>
 #include <image.h>
 
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+#include <ext_common.h>
+#endif
+
+#ifdef CONFIG_AML_ANTIROLLBACK
+#include "anti-rollback.h"
+#endif
+
+#if defined(BL33_BOOT_TIME_PROBE)
+	#define TE TE_time
+#else
+	#define TE(...)
+#endif
+
 #ifndef CONFIG_SYS_BOOTM_LEN
 /* use 8MByte as default max gunzip size */
 #define CONFIG_SYS_BOOTM_LEN	0x800000
@@ -36,9 +53,13 @@
 
 #define IH_INITRD_ARCH IH_ARCH_DEFAULT
 
+#ifdef CONFIG_MDUMP_COMPRESS
+#include <ramdump.h>
+#endif
 #ifndef USE_HOSTCC
 
 DECLARE_GLOBAL_DATA_PTR;
+#include <asm/arch/timer.h>
 
 static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 				   char * const argv[], bootm_headers_t *images,
@@ -82,6 +103,8 @@ static int bootm_start(cmd_tbl_t *cmdtp, int flag, int argc,
 static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 			 char * const argv[])
 {
+	TE(__func__);
+
 	const void *os_hdr;
 	bool ep_found = false;
 	int ret;
@@ -105,6 +128,10 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		images.os.end = image_get_image_end(os_hdr);
 		images.os.load = image_get_load(os_hdr);
 		images.os.arch = image_get_arch(os_hdr);
+		if (images.os.arch == IH_ARCH_ARM) {
+			setenv("initrd_high", "0A000000");
+			setenv("fdt_high", "0A000000");
+		}
 		break;
 #endif
 #if defined(CONFIG_FIT)
@@ -151,12 +178,25 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 #endif
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
+		if (image_get_magic((image_header_t *)images.os.image_start) == IH_MAGIC) {
+			setenv("initrd_high", "0A000000");
+			setenv("fdt_high", "0A000000");
+			images.os.arch = ((image_header_t *)(images.os.image_start))->ih_arch;
+			images.os.image_start += sizeof(image_header_t);
+		}
 		images.os.type = IH_TYPE_KERNEL;
-		images.os.comp = IH_COMP_NONE;
+
+		if (images.os.arch == IH_ARCH_ARM)
+			images.os.comp = image_get_comp(os_hdr + 0x800);
+		else
+			images.os.comp =  android_image_get_comp(os_hdr);
+
 		images.os.os = IH_OS_LINUX;
 
 		images.os.end = android_image_get_end(os_hdr);
 		images.os.load = android_image_get_kload(os_hdr);
+		if (images.os.load == 0x10008000)
+			images.os.load = 0x1080000;
 		images.ep = images.os.load;
 		ep_found = true;
 		break;
@@ -202,11 +242,15 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 
 	images.os.start = (ulong)os_hdr;
 
+	TE(__func__);
+
 	return 0;
 }
 
 static int bootm_find_ramdisk(int flag, int argc, char * const argv[])
 {
+	TE(__func__);
+
 	int ret;
 
 	/* find ramdisk */
@@ -217,23 +261,243 @@ static int bootm_find_ramdisk(int flag, int argc, char * const argv[])
 		return 1;
 	}
 
+	TE(__func__);
+
 	return 0;
 }
+
+	/*
+	 * load dtb overlay partition to mem
+	 */
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+static int read_fdto_partition(void)
+{
+	char	cmd[128];
+	int	ret = 0;
+	u64	tmp = 0;
+	void	*dtbo_mem_addr = NULL;
+	char	dtbo_partition[32];
+	char	*s1;
+	struct	dt_table_header hdr;
+
+	//run_command("get_valid_slot;", 0);
+	s1 = getenv("active_slot");
+	printf("active_slot is %s\n", s1);
+	if (strcmp(s1, "normal") == 0) {
+		strcpy(dtbo_partition, "dtbo");
+	} else if (strcmp(s1, "_a") == 0) {
+		strcpy(dtbo_partition, "dtbo_a");
+	} else if (strcmp(s1, "_b") == 0) {
+		strcpy(dtbo_partition, "dtbo_b");
+	}
+
+	/* check if dtbo partition exist */
+	sprintf(cmd, "store size %s 0x%p", dtbo_partition, &tmp);
+	ret = run_command(cmd, 0);
+	if (ret != 0) {
+		printf("No dtbo patitions found\n");
+		return ret;
+	} else {
+		/*
+		 * Though it is really no need to parse the dtimg infos
+		 * here, but wasting time to read the whole dtbo image
+		 * partition is unacceptable
+		 */
+		sprintf(cmd, "store read %s 0x%p 0 0x%lx",
+			dtbo_partition, &hdr,
+			sizeof(struct dt_table_header));
+		ret = run_command(cmd, 0);
+		if (ret != 0) {
+			printf("Fail to read header of DTBO partition\n");
+			return ret;
+		}
+
+		if (!android_dt_check_header((ulong)&hdr)) {
+			printf("DTBO partition header is incorrect\n");
+			return -1;
+		}
+
+		dtbo_mem_addr = malloc(fdt32_to_cpu(hdr.total_size));
+		if (!dtbo_mem_addr) {
+			printf("out of memory\n");
+			return -1;
+		} else {
+			sprintf(cmd, "store read %s 0x%p 0 0x%x",
+				dtbo_partition, dtbo_mem_addr,
+				fdt32_to_cpu(hdr.total_size));
+			ret = run_command(cmd, 0);
+			if (ret != 0) {
+				printf("Fail to read DTBO partition\n");
+				free(dtbo_mem_addr);
+				return ret;
+			} else {
+				sprintf(cmd,
+				"setenv dtbo_mem_addr 0x%p",
+				dtbo_mem_addr);
+				run_command(cmd, 0);
+			}
+		}
+	}
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+static int get_fdto_totalsize(u32 *tz)
+{
+	TE(__func__);
+
+	unsigned long long dtbo_mem_addr = NULL;
+	int ret;
+
+	ret = read_fdto_partition();
+	if (ret != 0)
+		return ret;
+
+	dtbo_mem_addr = simple_strtoul(getenv("dtbo_mem_addr"), NULL, 16);
+	*tz = android_dt_get_totalsize(dtbo_mem_addr);
+
+	TE(__func__);
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_OF_LIBFDT_OVERLAY
+static int do_fdt_overlay(void)
+{
+	unsigned long long dtbo_mem_addr = NULL;
+	int                dtbo_num = 0;
+	int                i;
+	char               cmd[128];
+	unsigned long long dtbo_start;
+	char               *dtbo_idx = NULL;
+	char		   idx[32];
+
+	if (!getenv("dtbo_mem_addr")) {
+		printf("No valid dtbo image found\n");
+		return -1;
+	}
+
+	dtbo_mem_addr = simple_strtoul(getenv("dtbo_mem_addr"), NULL, 16);
+	if (!android_dt_check_header(dtbo_mem_addr)) {
+		printf("Error: DTBO image header is incorrect\n");
+		return -1;
+	}
+
+	/* android_dt_print_contents(dtbo_mem_addr); */
+	dtbo_num = fdt32_to_cpu((
+		(const struct dt_table_header *)dtbo_mem_addr)->dt_entry_count);
+	printf("find %d dtbos\n", dtbo_num);
+
+	dtbo_idx = getenv("androidboot.dtbo_idx");
+	if (!dtbo_idx) {
+		printf("No androidboot.dtbo_idx configured\n");
+		printf("And no dtbos will be applied\n");
+		return -1;
+	}
+	printf("dtbos to be applied: %s\n", dtbo_idx);
+
+	#ifndef CONFIG_CMD_DTIMG
+	printf("Error: No dtimg support found\n");
+	return -1;
+	#endif
+
+	for (i = 0; i < dtbo_num; i++) {
+		memset(idx, 0x00, sizeof(idx));
+		sprintf(idx, "%d", i);
+		if (strstr(dtbo_idx, idx)) {
+			printf("Apply dtbo %d\n", i);
+			sprintf(cmd, "dtimg start 0x%llx %d dtbo_start",
+				dtbo_mem_addr, i);
+			run_command(cmd, 0);
+			dtbo_start = simple_strtoul(
+					getenv("dtbo_start"), NULL, 16);
+
+			sprintf(cmd, "fdt apply 0x%llx", dtbo_start);
+			run_command(cmd, 0);
+		}
+	}
+
+	free((void *)dtbo_mem_addr);
+	return 0;
+}
+#endif
 
 #if defined(CONFIG_OF_LIBFDT)
 static int bootm_find_fdt(int flag, int argc, char * const argv[])
 {
+	TE(__func__);
+
 	int ret;
+	#ifdef CONFIG_OF_LIBFDT_OVERLAY
+	struct fdt_header *fdth = NULL;
+	u32		  fdto_totalsize = 0;
+	#endif
 
 	/* find flattened device tree */
+	#ifdef CONFIG_DTB_MEM_ADDR
+	unsigned long long dtb_mem_addr =  -1;
+	char *ft_addr_bak;
+	ulong ft_len_bak;
+
+	//try to do store dtb decrypt ${dtb_mem_addr}
+	//because if load dtb.img from cache/udisk maybe encrypted.
+	run_command("store dtb decrypt ${dtb_mem_addr}", 0);
+
+	if (getenv("dtb_mem_addr"))
+		dtb_mem_addr = simple_strtoul(getenv("dtb_mem_addr"), NULL, 16);
+	else
+		dtb_mem_addr = CONFIG_DTB_MEM_ADDR;
+
+	ft_addr_bak = (char *)images.ft_addr;
+	ft_len_bak = images.ft_len;
+	images.ft_addr = (char *)map_sysmem(dtb_mem_addr, 0);
+	#ifdef CONFIG_OF_LIBFDT_OVERLAY
+	fdth = (struct fdt_header *)(images.ft_addr);
+	if (get_fdto_totalsize(&fdto_totalsize) == 0)
+		fdth->totalsize = cpu_to_fdt32(fdt_get_header(dtb_mem_addr,
+					       totalsize)) + cpu_to_fdt32(
+					       fdto_totalsize);
+	#endif
+	images.ft_len = fdt_get_header(dtb_mem_addr, totalsize);
+	#endif
+	printf("load dtb from 0x%lx ......\n", (unsigned long)(images.ft_addr));
+	#ifdef CONFIG_MULTI_DTB
+	extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
+	/* update dtb address, compatible with single dtb and multi dtbs */
+	images.ft_addr = (char*)get_multi_dt_entry((unsigned long)images.ft_addr);
+	#endif
 	ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
 			   &images.ft_addr, &images.ft_len);
+	#ifdef CONFIG_DTB_MEM_ADDR
+	if (ret) {
+		images.ft_addr = ft_addr_bak;
+		images.ft_len = ft_len_bak;
+
+		printf("load dtb from 0x%lx ......\n",
+			(unsigned long)(images.ft_addr));
+		#ifdef CONFIG_MULTI_DTB
+		extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
+		/* update dtb address, compatible with single dtb and multi dtbs */
+		images.ft_addr = (char*)get_multi_dt_entry((unsigned long)images.ft_addr);
+		#endif
+		ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
+			   &images.ft_addr, &images.ft_len);
+	}
+	#endif
 	if (ret) {
 		puts("Could not find a valid device tree\n");
 		return 1;
 	}
 
 	set_working_fdt_addr(images.ft_addr);
+
+	#ifdef CONFIG_OF_LIBFDT_OVERLAY
+	do_fdt_overlay();
+	#endif
+
+	TE(__func__);
 
 	return 0;
 }
@@ -283,14 +547,14 @@ static int decomp_image(int comp, ulong load, ulong image_start, int type,
 {
 	const char *type_name = genimg_get_type_name(type);
 	__attribute__((unused)) uint unc_len = CONFIG_SYS_BOOTM_LEN;
-
 	*load_end = load;
 	switch (comp) {
 	case IH_COMP_NONE:
-		if (load == image_start) {
+		/*if (load == image_start) {
 			printf("   XIP %s ... ", type_name);
-		} else {
-			printf("   Loading %s ... ", type_name);
+		} else */
+		{
+			printf("   Loading %s(COMP_NONE) ... ", type_name);
 			memmove_wd(load_buf, image_buf, image_len, CHUNKSZ);
 		}
 		*load_end = load + image_len;
@@ -352,7 +616,6 @@ static int decomp_image(int comp, ulong load, ulong image_start, int type,
 		int ret;
 
 		printf("   Uncompressing %s ... ", type_name);
-
 		ret = lzop_decompress(image_buf, image_len, load_buf, &size);
 		if (ret != LZO_E_OK) {
 			printf("LZO: uncompress or overwrite error %d - must RESET board to recover\n",
@@ -378,6 +641,8 @@ static int decomp_image(int comp, ulong load, ulong image_start, int type,
 static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 			 int boot_progress)
 {
+	TE(__func__);
+
 	image_info_t os = images->os;
 	ulong load = os.load;
 	ulong blob_start = os.start;
@@ -389,6 +654,7 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 	int err;
 
 	load_buf = map_sysmem(load, 0);
+
 	image_buf = map_sysmem(os.image_start, image_len);
 	err = decomp_image(os.comp, load, os.image_start, os.type, load_buf,
 			   image_buf, image_len, load_end);
@@ -398,7 +664,7 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 	}
 	flush_cache(load, (*load_end - load) * sizeof(ulong));
 
-	debug("   kernel loaded at 0x%08lx, end = 0x%08lx\n", load, *load_end);
+	printf("   kernel loaded at 0x%08lx, end = 0x%08lx\n", load, *load_end);
 	bootstage_mark(BOOTSTAGE_ID_KERNEL_LOADED);
 
 	no_overlap = (os.comp == IH_COMP_NONE && load == image_start);
@@ -408,7 +674,7 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 		      blob_start, blob_end);
 		debug("images.os.load = 0x%lx, load_end = 0x%lx\n", load,
 		      *load_end);
-
+#ifndef CONFIG_ANDROID_BOOT_IMAGE
 		/* Check what type of image this is. */
 		if (images->legacy_hdr_valid) {
 			if (image_get_type(&images->legacy_hdr_os_copy)
@@ -420,7 +686,18 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 			bootstage_error(BOOTSTAGE_ID_OVERWRITTEN);
 			return BOOTM_ERR_RESET;
 		}
+#else
+		if (images->os.arch != IH_ARCH_ARM) {
+		#define LINUX_ARM64_IMAGE_MAGIC	0x644d5241
+			if (*(uint32_t *)((images->ep) + 0x38) != le32_to_cpu(LINUX_ARM64_IMAGE_MAGIC)) {
+				printf("Bad Linux ARM64 Image magic!(Maybe unsupported zip mode.)\n");
+				return 1;
+			}
+		}
+#endif
 	}
+
+	TE(__func__);
 
 	return 0;
 }
@@ -571,6 +848,10 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		argc = 0;	/* consume the args */
 	}
 
+#ifdef CONFIG_MDUMP_COMPRESS
+	check_ramdump();
+#endif
+
 	/* Load the OS */
 	if (!ret && (states & BOOTM_STATE_LOADOS)) {
 		ulong load_end;
@@ -584,6 +865,7 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 			goto err;
 		else if (ret == BOOTM_ERR_OVERLAP)
 			ret = 0;
+
 #if defined(CONFIG_SILENT_CONSOLE) && !defined(CONFIG_SILENT_U_BOOT_ONLY)
 		if (images->os.os == IH_OS_LINUX)
 			fixup_silent_linux();
@@ -603,6 +885,18 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		}
 	}
 #endif
+
+	/* Check reserved memory region */
+#ifdef CONFIG_CMD_RSVMEM
+	if (images->os.type != IH_TYPE_STANDALONE) {
+		ret = run_command("rsvmem check", 0);
+		if (ret) {
+			puts("rsvmem check failed\n");
+			return ret;
+		}
+	}
+#endif
+
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_LMB)
 	if (!ret && (states & BOOTM_STATE_FDT)) {
 		boot_fdt_add_mem_rsv_regions(&images->lmb, images->ft_addr);
@@ -654,10 +948,10 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	}
 
 	/* Now run the OS! We hope this doesn't return */
-	if (!ret && (states & BOOTM_STATE_OS_GO))
+	if (!ret && (states & BOOTM_STATE_OS_GO)) {
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
 				images, boot_fn);
-
+		}
 	/* Deal with any fallout */
 err:
 	if (iflag)
@@ -715,7 +1009,7 @@ static image_header_t *image_get_kernel(ulong img_addr, int verify)
 	}
 	bootstage_mark(BOOTSTAGE_ID_CHECK_ARCH);
 
-	if (!image_check_target_arch(hdr)) {
+	if ((image_get_arch(hdr) != IH_ARCH_ARM) && ((image_get_arch(hdr) != IH_ARCH_ARM64))) {
 		printf("Unsupported Architecture 0x%x\n", image_get_arch(hdr));
 		bootstage_error(BOOTSTAGE_ID_CHECK_ARCH);
 		return NULL;
@@ -747,6 +1041,20 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 	const void *buf;
 	const char	*fit_uname_config = NULL;
 	const char	*fit_uname_kernel = NULL;
+
+	char *avb_s;
+	avb_s = getenv("avb2");
+	if (avb_s == NULL) {
+		run_command("get_avb_mode;", 0);
+		avb_s = getenv("avb2");
+	}
+	printf("avb2: %s\n", avb_s);
+	if (strcmp(avb_s, "1") != 0) {
+#ifdef CONFIG_AML_ANTIROLLBACK
+		struct andr_img_hdr **tmp_img_hdr = (struct andr_img_hdr **)&buf;
+#endif
+	}
+
 #if defined(CONFIG_FIT)
 	int		os_noffset;
 #endif
@@ -827,9 +1135,23 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
 		printf("## Booting Android Image at 0x%08lx ...\n", img_addr);
+		if (!android_image_need_move(&img_addr, buf))
+			buf = map_sysmem(img_addr, 0);
+		else
+			return NULL;
 		if (android_image_get_kernel(buf, images->verify,
 					     os_data, os_len))
 			return NULL;
+
+		if (strcmp(avb_s, "1") != 0) {
+#ifdef CONFIG_AML_ANTIROLLBACK
+			if (!check_antirollback((*tmp_img_hdr)->kernel_version)) {
+				*os_len = 0;
+				return NULL;
+			}
+#endif
+		}
+
 		break;
 #endif
 	default:

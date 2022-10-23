@@ -1,0 +1,338 @@
+/*
+ ============================================================================
+ Name        : NonMaxSuppression.vx
+ Author      : VSI
+ Version     :
+ Copyright   : Your copyright notice
+ Description : 
+ ============================================================================
+ */
+#include "cl_viv_vx_ext.h"
+#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+
+#define FACE_INFO_SIZE 10
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
+/* FaceInfo
+	f32 f32X1;     0
+	f32 f32Y1;     1
+	f32 f32X2;     2
+	f32 f32Y2;     3
+	f32 f32Score;  4 
+	f32 f32Reserved; 5
+	f32Reg[4]        6789
+*/
+#if 0
+#define THREAD_NUM 32
+
+__kernel void NonMaxSuppressionVXC_old
+    (
+	vx_array_float inputBox,
+	global int * inputBoxNum,
+	global float * thre,
+	global unsigned char * method,
+	vx_array_float outputBox,
+	global int * outputBoxNum,
+	global char * usedFroLinkGraphIn,
+	global char * usedForLinkGraphOut
+    )
+{
+    int x = get_global_id(0);
+	int boxNum1 = *inputBoxNum-1;	
+	
+	int numPerThread = (boxNum1+THREAD_NUM)/THREAD_NUM;
+	numPerThread = numPerThread+(numPerThread&1); //process even 
+	numPerThread = MAX(numPerThread,2);
+	int x2 = x*numPerThread;
+	int x3 = x2 + numPerThread;
+	int loop = boxNum1;
+	int outBoxNum  = *outputBoxNum;
+	 *outputBoxNum = 0;
+	while(true)
+	{
+		float score,score1; 
+		vxc_float4 rect,rect1,reg,reg1;
+		int offset;
+		 *outputBoxNum = 0;
+		barrier(CLK_GLOBAL_MEM_FENCE);
+		for(int i=x2;i<x3;i+=2) 
+		{
+		    if(i>=boxNum1)
+			  continue;
+		    offset = FACE_INFO_SIZE*i;	   
+		    score  = *(inputBox.item+offset+4);
+		    score1 = *(inputBox.item+offset+4+FACE_INFO_SIZE);
+		    if(score < score1)
+		    {
+			    VXC_Vload4(rect, inputBox.item + offset,   0);
+				VXC_Vload4(reg , inputBox.item + offset+6, 0);
+				VXC_Vload4(rect1, inputBox.item + offset+FACE_INFO_SIZE,   0);
+				VXC_Vload4(reg1 , inputBox.item + offset+6+FACE_INFO_SIZE, 0);
+				*(inputBox.item+offset+4) = score1 ;
+		        *(inputBox.item+offset+4+FACE_INFO_SIZE) = score;
+				VXC_Vstore4(inputBox.item + offset+  FACE_INFO_SIZE ,0, rect);
+				VXC_Vstore4(inputBox.item + offset+6+FACE_INFO_SIZE ,0, reg);
+				VXC_Vstore4(inputBox.item + offset  , 0 ,rect1);
+				VXC_Vstore4(inputBox.item + offset+6, 0,reg1 );		
+						
+				atomic_inc( outputBoxNum);
+			}
+		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
+		for(int i=x2+1;i<x3;i+=2) 
+		{
+			if(i>=boxNum1)
+			    continue;
+		    offset = FACE_INFO_SIZE*i;	   
+		    score  = *(inputBox.item+offset+4);
+		    score1 = *(inputBox.item+offset+4+FACE_INFO_SIZE);
+		    if(score < score1)
+		    {
+			    VXC_Vload4(rect, inputBox.item + offset,   0);
+				VXC_Vload4(reg , inputBox.item + offset+6, 0);
+				VXC_Vload4(rect1, inputBox.item + offset+FACE_INFO_SIZE,   0);
+				VXC_Vload4(reg1 , inputBox.item + offset+6+FACE_INFO_SIZE, 0);
+				*(inputBox.item+offset+4) = score1 ;
+		        *(inputBox.item+offset+4+FACE_INFO_SIZE) = score;
+				VXC_Vstore4(inputBox.item + offset+  FACE_INFO_SIZE ,0, rect);
+				VXC_Vstore4(inputBox.item + offset+6+FACE_INFO_SIZE ,0, reg);
+				VXC_Vstore4(inputBox.item + offset  , 0 ,rect1);
+				VXC_Vstore4(inputBox.item + offset+6, 0,reg1 );		
+						
+				atomic_inc( outputBoxNum);
+			}
+		}
+		barrier(CLK_GLOBAL_MEM_FENCE);
+
+	    if(*outputBoxNum == 0)
+	        break;	
+	}	
+	*outputBoxNum = outBoxNum;
+
+
+  	float score,score1; 
+	int offset,offset1;
+
+    int i, r, p=0;
+	r = *inputBoxNum ;
+	while ( p < r)
+    {
+        /* Pick p. And remove overlapped with p*/
+
+        offset =  FACE_INFO_SIZE*p;	 
+		score  = *(inputBox.item+offset+4);	
+		float4 rt_p;
+		float4 rg_p;
+		VXC_Vload4 (rt_p, inputBox.item+offset, 0);
+		VXC_Vload4 (rg_p, inputBox.item+offset+6, 0);
+
+		barrier(CLK_GLOBAL_MEM_FENCE);
+
+	    if(score>0.0)
+	    {
+			for (i= p+1+x; i<r; i+=THREAD_NUM )
+			{
+			    offset1 =  FACE_INFO_SIZE*i;
+				score1 = *(inputBox.item+offset1+4);			
+				if (score1 > 0.0)
+				{				
+					float4 rt_i;
+					VXC_Vload4 (rt_i, inputBox.item + offset1, 0);
+
+					float4 xy0  = MAX(rt_p,rt_i); 		   
+					float4 xy1  = MIN(rt_p,rt_i); 
+
+					float2 m1 = xy1.zw-xy0.xy+(float2)(1.0f,1.0f);
+					float2 sz = MAX((float2)(0.0f,0.0f), m1);					
+					float area_inter = sz.x*sz.y;	 
+					m1 = rt_i.zw-rt_i.xy+(float2)(1.0f,1.0f);
+					sz = MAX((float2)(0.0f,0.0f), m1); 				 
+					float area_i = 	sz.x*sz.y;
+					m1 = rt_p.zw-rt_p.xy+(float2)(1.0f,1.0f);
+					sz = MAX((float2)(0.0f,0.0f), m1); 		
+
+					float area_p = 	sz.x*sz.y;	  			 
+					float rate ;
+					if( *method == 0)
+					{
+					   rate = area_inter/(area_i + area_p - area_inter);  	
+					}
+					else
+					{
+					   rate =  area_inter/(MIN(area_i , area_p));						
+					}					
+	
+					if (rate > *thre) 					
+					{
+						*(inputBox.item + offset1+4) = -1.0f; /* remove */  
+					   
+					}
+				
+				}     
+			}
+			barrier(CLK_GLOBAL_MEM_FENCE);
+			if(x==0)
+			{
+				int offseto = atomic_inc(outputBoxNum);
+				offseto = offseto*FACE_INFO_SIZE;
+				VXC_Vstore4(outputBox.item + offseto   ,0, rt_p);
+				VXC_Vstore4(outputBox.item + offseto+6 ,0, rg_p);
+				*(outputBox.item+offseto + 4) = score;
+			}			
+		  }
+	  p++;      
+    }
+}
+#endif
+
+#define LOCAL_THREAD_NUM    16
+#define MASK_NUM            512
+#define ELEMENT_NUM         20
+
+typedef   struct
+{
+    float f32X1;
+    float f32Y1;
+    float f32X2;
+    float f32Y2;
+    float f32Score;
+    float f32Reserved;
+}TFaceRect;
+
+typedef struct
+{
+    float f32X[5];
+    float f32Y[5];
+}TFacePts;
+
+typedef struct
+{
+    TFaceRect tBox;
+    float reg[4];
+    TFacePts tPts;
+} TFaceInfo;
+
+
+__kernel __attribute__((reqd_work_group_size(16, 1, 1))) void NonMaxSuppressionVXC
+    (
+    vx_array_float inputBox,
+    global int * inputBoxNum,
+    global float * thre,
+    global unsigned char * method,
+    vx_array_float outputBox,
+    global int * outputBoxNum,
+    vx_array_int maskArray,
+    global char * usedFroLinkGraphIn,
+    global char * usedForLinkGraphOut
+    )
+{
+    int gidx = get_global_id(0);
+
+    int len = (*inputBoxNum);
+    if(len < 1)
+        return;
+
+    float f32Thre = *thre;
+    int faceCnt = 0;
+    __global int* mask = (__global int*)maskArray.item;
+
+    __global TFaceInfo* faceInfoPtr = (__global TFaceInfo*)inputBox.item;
+    __global float* input = (__global float*)inputBox.item;
+    __global float* output = (__global float*)outputBox.item + outputBoxNum[0] * ELEMENT_NUM;
+    int val = -1;
+    float4 tmp;
+    int i = 0;
+
+    for(int ii = gidx; ii < MASK_NUM; ii += LOCAL_THREAD_NUM)
+    {
+        mask[ii] = -1;
+    }
+
+    float f32X1S, f32Y1S, f32X2S, f32Y2S, f32AreaS;
+    float f32X1, f32Y1, f32X2, f32Y2;
+    int2 data = (int2)(0, 0);
+    int iter = (len + LOCAL_THREAD_NUM - 1) / LOCAL_THREAD_NUM;
+
+    int inOffset, outOffset;
+
+    for(i = 0; i < len; i++)
+    {
+        if(mask[i] > 0)
+            continue;
+
+        {
+#if 1
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        if(gidx == 0)
+        {
+            mask[i] = 1119;
+            
+            //outFaceInfoPtr[faceCnt++] = faceInfoPtr[i];
+            inOffset = i * ELEMENT_NUM;
+            outOffset = faceCnt * ELEMENT_NUM;
+            tmp = vload4(0, input + inOffset);
+            vstore4(tmp, 0, output + outOffset);
+
+            tmp = vload4(1, input + inOffset);
+            vstore4(tmp, 1, output + outOffset);
+
+            tmp = vload4(2, input + inOffset);
+            vstore4(tmp, 2, output + outOffset);
+
+            tmp = vload4(3, input + inOffset);
+            vstore4(tmp, 3, output + outOffset);
+
+            tmp = vload4(4, input + inOffset);
+            vstore4(tmp, 4, output + outOffset);
+
+            faceCnt++;
+        }
+#endif
+
+        f32X1S = faceInfoPtr[i].tBox.f32X1;
+        f32Y1S = faceInfoPtr[i].tBox.f32Y1;
+        f32X2S = faceInfoPtr[i].tBox.f32X2;
+        f32Y2S = faceInfoPtr[i].tBox.f32Y2;
+        f32AreaS = (f32X2S - f32X1S + 1) * (f32Y2S - f32Y1S + 1);
+
+        for(int j = 0; j < iter; j++)
+        {
+            int index = j * LOCAL_THREAD_NUM + gidx;
+            if(index <= i)
+                continue;
+
+            if(index >= len)
+                break;
+            f32X1 = faceInfoPtr[index].tBox.f32X1;
+            f32Y1 = faceInfoPtr[index].tBox.f32Y1;
+            f32X2 = faceInfoPtr[index].tBox.f32X2;
+            f32Y2 = faceInfoPtr[index].tBox.f32Y2;
+            float f32X = fmax(f32X1S, f32X1);
+            float f32Y = fmax(f32Y1S, f32Y1);
+
+            float f32W = fmax(fmin(f32X2S, f32X2) - f32X + 1, 0);
+            float f32H = fmax(fmin(f32Y2S, f32Y2) - f32Y + 1, 0);
+
+            float f32AreaT = (f32X2 - f32X1 + 1) * (f32Y2 - f32Y1 + 1);
+            float f32AreaIntersect = f32W * f32H;
+
+            //output_dbg[index] = f32AreaIntersect / (f32AreaS + f32AreaT - f32AreaIntersect);
+            if( f32AreaIntersect / (f32AreaS + f32AreaT - f32AreaIntersect) > f32Thre)
+            {
+                //mask[index] = index;
+                atom_max(mask+index, index);
+            }
+        }
+
+        }
+        barrier(CLK_GLOBAL_MEM_FENCE);
+    }
+    if(gidx == 0)
+    {
+        //inputBoxNum[0] = faceCnt;
+        outputBoxNum[0] += faceCnt;
+    }
+}
+
+

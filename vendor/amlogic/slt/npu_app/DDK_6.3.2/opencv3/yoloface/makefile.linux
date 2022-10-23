@@ -1,0 +1,34 @@
+include $(AQROOT)/makefile.linux.def
+INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc  -I./ -I$(OVXLIB_DIR)/include/utils -I$(OVXLIB_DIR)/include/client  -I$(OVXLIB_DIR)/include/ops -I$(OVXLIB_DIR)/include -I$(OVXLIB_DIR)/third-party/jpeg-9b
+INCLUDE += -I$(OPENCV_ROOT)/modules/highgui/include -I$(OPENCV_ROOT)/modules/core/include  -I$(OPENCV_ROOT)/modules/imgproc/include  -I$(OPENCV_ROOT)/modules/objdetect/include -I$(OPENCV_ROOT) -I$(OPENCV_ROOT)/modules/imgcodecs/include -I$(OPENCV_ROOT)/modules/videoio/include
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Supply necessary libraries.
+LIBS += -L$(VIVANTE_SDK_LIB) -l OpenVX -l OpenVXU -l CLC -l VSC -l m -lGAL -l ovxlib
+LIBS += $(OVXLIB_DIR)/lib/libjpeg.a
+LIBS += -L$(OVXLIB_DIR)/lib -l ovxlib
+LIBS += -lm -lpthread -ldl
+LIBS += -L$(OUTPUT_DIR) -l jpeg  -lz 
+LIBS += -L$(OPENCV_ROOT)/lib  -lopencv_imgproc -lopencv_core -lopencv_videoio -lopencv_imgcodecs -lopencv_highgui
+
+LIBS +=-L$(LIB_DIR) -lstdc++
+
+
+#############################################################################
+# Macros.
+PROGRAM = 1
+TARGET_NAME = yolofaceint8
+CUR_SOURCE = ${wildcard *.c}
+#############################################################################
+# Objects.
+OBJECTS =  ${patsubst %.c, $(OBJ_DIR)/%.o, $(CUR_SOURCE)}
+OBJECTS += $(OBJ_DIR)/post_process.o 
+OBJECTS += $(OBJ_DIR)/main.o
+# installation directory
+INSTALL_DIR := ./
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

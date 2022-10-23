@@ -1,0 +1,219 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for user HAL layer.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+ifeq ($(gcdSTATIC_LINK),1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGAL.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGAL.so
+  TARGET_SONAME     := libGAL.so
+endif
+
+################################################################################
+# Installation directory
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/user \
+           -I$(AQROOT)/compiler/libVSC/include
+
+ifeq ($(LINUX_VSIMULATOR),1)
+  INCLUDE += -I$(AQROOT)/vsimulator/os/linux/user \
+             -I$(AQROOT)/vsimulator/os/linux/inc
+else
+  INCLUDE += -I$(AQROOT)/hal/os/linux/user
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC),1)
+  CFLAGS += -fPIC -Werror
+
+    CFLAGS += -Werror -ansi
+endif
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC),1)
+  LFLAGS += -Wl,--version-script=libGAL.map
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+################################################################################
+# Supply dependent libraries.
+
+# Specify Vivante libraries twice to resolve references between libraries.
+  LIBS := -Wl,-whole-archive \
+          -lhalarchuser -lhalosuser \
+          -Wl,-no-whole-archive
+
+# Specify Vivante library paths.
+LIBS += -L$(AQROOT)/hal/user/arch/$(OBJ_DIR)
+
+ifeq ($(LINUX_VSIMULATOR),1)
+  LIBS += -L $(AQROOT)/vsimulator/os/linux/user/$(OBJ_DIR)
+
+  LIBS += -L$(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR) \
+          -lEmulator
+else
+  LIBS += -L $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)
+endif
+
+
+# Supply necessary libraries.
+LIBS += -lm -lpthread -ldl -lrt
+
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_hal_user_brush.o \
+           $(OBJ_DIR)/gc_hal_user_brush_cache.o \
+           $(OBJ_DIR)/gc_hal_user_dump.o \
+           $(OBJ_DIR)/gc_hal_user.o \
+           $(OBJ_DIR)/gc_hal_user_raster.o \
+           $(OBJ_DIR)/gc_hal_user_hash.o \
+           $(OBJ_DIR)/gc_hal_user_heap.o \
+           $(OBJ_DIR)/gc_hal_user_query.o \
+           $(OBJ_DIR)/gc_hal_user_rect.o \
+           $(OBJ_DIR)/gc_hal_user_buffer.o \
+           $(OBJ_DIR)/gc_hal_user_surface.o \
+           $(OBJ_DIR)/gc_hal_user_queue.o \
+           $(OBJ_DIR)/gc_hal_user_bitmask.o \
+           $(OBJ_DIR)/gc_hal_user_profiler.o
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+  OBJECTS += $(OBJ_DIR)/gc_hal_user_engine.o \
+             $(OBJ_DIR)/gc_hal_user_index.o \
+             $(OBJ_DIR)/gc_hal_user_vertex_array.o \
+             $(OBJ_DIR)/gc_hal_user_vertex.o \
+             $(OBJ_DIR)/gc_hal_user_format.o \
+             $(OBJ_DIR)/gc_hal_user_texture.o \
+             $(OBJ_DIR)/gc_hal_user_mem.o \
+             $(OBJ_DIR)/gc_hal_user_bufobj.o \
+             $(OBJ_DIR)/gc_hal_user_statistics.o \
+             $(OBJ_DIR)/gc_hal_user_shader.o
+
+  ifeq ($(USE_OPENCL),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_cl.o
+  endif
+
+  ifeq ($(USE_OPENVX),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_vx.o
+  endif
+else
+endif
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install extra_install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: extra_install
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+
+extra_install: all
+	@mkdir -p $(SDK_DIR)/drivers
+	@mkdir -p $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_enum.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_types.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_version.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_base.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_raster.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_options.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_profiler.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_dump.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver.h $(SDK_DIR)/include/HAL
+ifeq ($(VIVANTE_ENABLE_3D),1)
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_statistics.h $(SDK_DIR)/include/HAL
+endif
+	@-cd $(SDK_DIR)/include/HAL; echo "#include \"HAL/gc_hal.h\"" >aqHal.h
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	@$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+$(TARGET_MODULE): $(AQROOT)/hal/user/arch/$(OBJ_DIR)/libhalarchuser.a
+
+
+  ifeq ($(LINUX_VSIMULATOR),1)
+    $(TARGET_MODULE): $(AQROOT)/vsimulator/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+    $(TARGET_MODULE): $(wildcard $(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR)/libEmulator.so \
+                             $(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR)/libEmulator.a)
+  else
+    $(TARGET_MODULE): $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+  endif
+
+
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

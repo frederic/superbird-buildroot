@@ -48,6 +48,10 @@
 #include <asm/mach/arch.h>
 #include <asm/mpu.h>
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <asm/cp15.h>
+#define MIDR		__ACCESS_CP15(c0, 0, c0, 0)
+#endif
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
 
@@ -326,11 +330,20 @@ void arch_cpu_idle_dead(void)
 	 * cpu initialisation.  There's some initialisation which needs
 	 * to be repeated to undo the effects of taking the CPU offline.
 	 */
+#ifdef CONFIG_AMLOGIC_VMAP
+	__asm__("mov	sp, %0\n"
+	"	mov	fp, #0\n"
+	"	b	secondary_start_kernel"
+		:
+		: "r" (task_stack_page(current) + THREAD_SIZE - 8 -
+		       THREAD_INFO_SIZE));
+#else
 	__asm__("mov	sp, %0\n"
 	"	mov	fp, #0\n"
 	"	b	secondary_start_kernel"
 		:
 		: "r" (task_stack_page(current) + THREAD_SIZE - 8));
+#endif
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -566,6 +579,19 @@ static void ipi_cpu_stop(unsigned int cpu)
 	local_fiq_disable();
 	local_irq_disable();
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+/* CORTEX-A55 need power down here for shutdown*/
+/* If A55 enter WFI here, it is possible quit from wfi,
+ *  which cause CPU PACTIVE check fail.
+ */
+#ifdef CONFIG_HOTPLUG_CPU
+	if (((read_cpuid_id() >> 4) & 0xFFF) == 0xD05) {
+		flush_cache_louis();
+		if (smp_ops.cpu_die)
+			smp_ops.cpu_die(cpu);
+	}
+#endif
+#endif
 	while (1)
 		cpu_relax();
 }

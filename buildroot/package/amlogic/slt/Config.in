@@ -1,0 +1,11 @@
+# SLT Package
+config BR2_PACKAGE_SLT
+    bool  "Socket SLT"
+    help
+    SLT package collection
+
+if BR2_PACKAGE_SLT
+source "package/amlogic/slt/slt-isp/Config.in"
+source "package/amlogic/slt/slt-gpu/Config.in"
+source "package/amlogic/slt/slt-nn/Config.in"
+endif

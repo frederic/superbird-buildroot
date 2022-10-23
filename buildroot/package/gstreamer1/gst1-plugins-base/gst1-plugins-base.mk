@@ -15,7 +15,8 @@ GST1_PLUGINS_BASE_LICENSE = LGPL-2.0+, LGPL-2.1+
 GST1_PLUGINS_BASE_CONF_OPTS = \
 	--disable-examples \
 	--disable-valgrind \
-	--disable-introspection
+	--disable-introspection \
+	LIBS="-lconfig"
 
 # Options which require currently unpackaged libraries
 GST1_PLUGINS_BASE_CONF_OPTS += \
@@ -23,7 +24,7 @@ GST1_PLUGINS_BASE_CONF_OPTS += \
 	--disable-libvisual \
 	--disable-iso-codes
 
-GST1_PLUGINS_BASE_DEPENDENCIES = gstreamer1
+GST1_PLUGINS_BASE_DEPENDENCIES = gstreamer1 libconfig
 
 # These plugins are listed in the order from ./configure --help
 ifeq ($(BR2_PACKAGE_ORC),y)

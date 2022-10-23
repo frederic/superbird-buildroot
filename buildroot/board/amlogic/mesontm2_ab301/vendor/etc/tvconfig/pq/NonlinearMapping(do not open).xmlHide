@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="NonlinearMapping" platform="txlx" commands="">
+<Group num="SOURCE_TYPE_TV" val="0">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_AV1" val="1">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_AV2" val="2">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_HDMI1" val="5">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_HDMI2" val="6">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_HDMI3" val="7">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_HDMI4" val="8">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_MPEG" val="10">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+<Group num="SOURCE_TYPE_DTV" val="11">
+<Page tab_title="" layout="8x4">
+<Control brightness="0" contrast="0" saturation="0" hue="0" sharpness="0" volume="255" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="63" contrast="63" saturation="63" hue="63" sharpness="63" volume="191" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="127" contrast="127" saturation="127" hue="127" sharpness="127" volume="127" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="191" contrast="191" saturation="191" hue="191" sharpness="191" volume="63" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+<Control brightness="255" contrast="255" saturation="255" hue="255" sharpness="255" volume="0" backlight="0" redgain="0" greengain="0" bluegain="0" edgeenhancer="0"/>
+</Page>
+</Group>
+</Form>
+

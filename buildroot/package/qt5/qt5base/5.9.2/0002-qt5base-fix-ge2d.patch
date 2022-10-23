@@ -1,0 +1,206 @@
+commit 9b692ea57c932a2a003db4d62ac560d2277350d8
+Author: Renjun Xu <renjun.xu@amlogic.com>
+Date:   Wed Oct 25 18:33:43 2017 +0800
+
+    fix qt direct use ge2d and skip directFB
+
+diff --git a/src/gui/painting/ge2d_port.h b/src/gui/painting/ge2d_port.h
+old mode 100644
+new mode 100755
+index ab53ceb..d8b990d
+--- a/src/gui/painting/ge2d_port.h
++++ b/src/gui/painting/ge2d_port.h
+@@ -47,6 +47,7 @@ typedef enum  {
+     PIXEL_FORMAT_RGB_888            = 3,
+     PIXEL_FORMAT_RGB_565            = 4,
+     PIXEL_FORMAT_BGRA_8888          = 5,
++    PIXEL_FORMAT_ARGB_8888          = 6,
+     PIXEL_FORMAT_YV12               = 0x32315659, // YCrCb 4:2:0 Planar  YYYY......  U......V......
+     PIXEL_FORMAT_Y8                 = 0x20203859, // YYYY
+     PIXEL_FORMAT_YCbCr_422_SP       = 0x10, // NV16   YYYY.....UVUV....
+diff --git a/src/gui/painting/qdrawhelper.cpp b/src/gui/painting/qdrawhelper.cpp
+old mode 100644
+new mode 100755
+index c220c7f..1ee4cb1
+--- a/src/gui/painting/qdrawhelper.cpp
++++ b/src/gui/painting/qdrawhelper.cpp
+@@ -5339,7 +5339,6 @@ enum  {
+     PIXEL_FORMAT_BGRA_8888          = 5,
+     PIXEL_FORMAT_ARGB_8888          = 6,
+ }pixel_format_t;
+-
+ enum Format {
+     Format_Invalid,
+     Format_Mono,
+@@ -5382,6 +5381,9 @@ enum Format {
+         case Format_RGBX8888:
+             *pxiel_format = PIXEL_FORMAT_RGBX_8888;
+             break;
++        case Format_ARGB32_Premultiplied:
++            *pxiel_format = PIXEL_FORMAT_ARGB_8888;
++            break;
+         default:
+             printf("ge2d format is not support,format=%d\n",format);
+             ret = false;
+@@ -5409,6 +5411,7 @@ void qBlendTexture(int count, const QSpan *spans, void *userData)
+     if (is_continous_phys_addr(src_addr, &src_addr_phys) && is_continous_phys_addr(dst_addr, &dst_addr_phys) &&
+         is_format_support_ge2d(src_format, &ge2d_src_format) && is_format_support_ge2d(dst_format,&ge2d_dst_format)) {
+         aml_ge2d_info_t ge2dinfo;
++        //printf("src_addr_phys=%x,dst_addr_phys=%x\n",src_addr_phys,dst_addr_phys);
+         ge2dinfo.src_info[0].canvas_w = src_width;
+         ge2dinfo.src_info[0].canvas_h = src_height;
+         ge2dinfo.src_info[0].format = src_format;
+diff --git a/src/gui/painting/qdrawhelper_ge2d.cpp b/src/gui/painting/qdrawhelper_ge2d.cpp
+old mode 100644
+new mode 100755
+index 008e34e..6b0920b
+--- a/src/gui/painting/qdrawhelper_ge2d.cpp
++++ b/src/gui/painting/qdrawhelper_ge2d.cpp
+@@ -88,6 +88,11 @@ static int  pixel_to_ge2d_format(int img_format, int *pge2d_format,int *p_bpp)
+         *p_bpp = GE2D_BPP_32;
+         is_rgb = 1;
+         break;
++        case PIXEL_FORMAT_ARGB_8888:
++        *pge2d_format = GE2D_FORMAT_S32_BGRA;
++        *p_bpp = GE2D_BPP_32;
++        is_rgb = 1;
++        break;
+         case PIXEL_FORMAT_RGB_888:
+         *pge2d_format = GE2D_FORMAT_S24_RGB;
+         *p_bpp = GE2D_BPP_24;
+@@ -962,6 +967,7 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t
+         srect2->x,srect2->y,srect2->w,srect2->h,
+         drect->x,drect->y,drect->w,drect->h);
+     memset(&blend_op,0,sizeof(ge2d_blend_op));
++    #if 0
+     max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
+     max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
+     if ((drect->w > max_d_w) || (drect->h > max_d_h)) {
+@@ -969,7 +975,7 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t
+         E_GE2D("dst rect w=%d,h=%d out of range\n",drect->w,drect->h);
+         return ge2d_fail;
+     }
+-
++    #endif
+     op_ge2d_info.src1_rect.x = srect->x;
+     op_ge2d_info.src1_rect.y = srect->y;
+     op_ge2d_info.src1_rect.w = srect->w;
+diff --git a/src/platformsupport/fbconvenience/qfbscreen.cpp b/src/platformsupport/fbconvenience/qfbscreen.cpp
+old mode 100644
+new mode 100755
+index 1472558..5d3fc86
+--- a/src/platformsupport/fbconvenience/qfbscreen.cpp
++++ b/src/platformsupport/fbconvenience/qfbscreen.cpp
+@@ -74,7 +74,7 @@ void QFbScreen::initializeCompositor()
+
+ void QFbScreen::initializeCompositor(uchar *mem, int mBytesPerLine)
+ {
+-    mScreenImage = new QImage((uchar*)(mem + mGeometry.height()* mBytesPerLine), mGeometry.width(), mGeometry.height(), mBytesPerLine, mFormat);
++    mScreenImage = QImage((uchar*)(mem + mGeometry.height()* mBytesPerLine), mGeometry.width(), mGeometry.height(), mBytesPerLine, mFormat);
+     scheduleUpdate();
+ }
+
+@@ -266,4 +266,29 @@ QFbScreen::Flags QFbScreen::flags() const
+     return 0;
+ }
+
++void QFbScreen::setfbinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel)
++{
++
++    gfx_fb.mem = mem;
++    gfx_fb.size = size;
++    gfx_fb.phys = phys;
++    gfx_fb.xres = xres;
++    gfx_fb.yres= yres;
++    gfx_fb.bits_per_pixel = bits_per_pixel;
++}
++
++unsigned long QFbScreen::getfbinfo(unsigned long mem)
++{
++    unsigned long phys = 0;
++    unsigned long vir_mem_base = (unsigned long)gfx_fb.mem;
++
++
++    if ((mem >= vir_mem_base) && (mem - vir_mem_base) <= gfx_fb.size)
++        phys = gfx_fb.phys + (mem - vir_mem_base);
++    //if (phys > 0)
++    //    printf("!QFbScreen:: %s,phys=%x,gfx_fb.size=%x,mem=%x,vir_mem_base=%x\n",__func__,phys,gfx_fb.size,mem,vir_mem_base);
++    return phys;
++
++}
++
+ QT_END_NAMESPACE
+diff --git a/src/platformsupport/fbconvenience/qfbscreen_p.h b/src/platformsupport/fbconvenience/qfbscreen_p.h
+old mode 100644
+new mode 100755
+index d4b3d7c..cbd7d2e
+--- a/src/platformsupport/fbconvenience/qfbscreen_p.h
++++ b/src/platformsupport/fbconvenience/qfbscreen_p.h
+@@ -100,6 +100,9 @@ public:
+
+     void scheduleUpdate();
+
++	void setfbinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel);
++	unsigned long getfbinfo(unsigned long mem);
++
+ public slots:
+     virtual void setDirty(const QRect &rect);
+     void setPhysicalSize(const QSize &size);
+@@ -130,6 +133,15 @@ private:
+     QList<QFbBackingStore*> mPendingBackingStores;
+
+     friend class QFbWindow;
++    struct {
++        void            *mem;
++        int             size;
++        unsigned int    xres;
++        unsigned int    yres;
++        unsigned int    bits_per_pixel;
++        unsigned long   phys;
++    } gfx_fb;
++
+ };
+
+ Q_DECLARE_OPERATORS_FOR_FLAGS(QFbScreen::Flags)
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp b/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
+old mode 100644
+new mode 100755
+index 788d9d0..c6115b0
+--- a/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
++++ b/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
+@@ -383,12 +383,17 @@ bool QLinuxFbScreen::initialize()
+         qErrnoWarning(errno, "Failed to mmap framebuffer");
+         return false;
+     }
++    if (ioctl(mFbFd, FBIOGET_FSCREENINFO, &finfo) != 0) {
++        qErrnoWarning(errno, "Error reading fixed information");
++        return false;
++    }
+
+     mMmap.offset = geometry.y() * mBytesPerLine + geometry.x() * mDepth / 8;
+     mMmap.data = data + mMmap.offset;
++    printf("smem_start=%x,mMmap.offset=%x\n",finfo.smem_start,mMmap.offset);
+
+     QFbScreen::initializeCompositor(mMmap.data,mBytesPerLine);
+-    setfbinfo(mMmap.data,mMmap.size, finfo.smem_start + mMmap.offset,
++    QFbScreen::setfbinfo(mMmap.data,mMmap.size, finfo.smem_start + mMmap.offset,
+         vinfo.xres, vinfo.yres,vinfo.bits_per_pixel);
+
+     mFbScreenImage = QImage(mMmap.data, geometry.width(), geometry.height(), mBytesPerLine, mFormat);
+@@ -407,6 +412,7 @@ bool QLinuxFbScreen::initialize()
+
+ void QLinuxFbScreen::setfbinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel)
+ {
++    return ;
+     gfx_fb.mem = mem;
+     gfx_fb.size = size;
+     gfx_fb.phys = phys;
+@@ -419,6 +425,8 @@ unsigned long QLinuxFbScreen::getfbinfo(unsigned long mem)
+ {
+     unsigned long phys = 0;
+     unsigned long vir_mem_base = (unsigned long)gfx_fb.mem;
++
++    return 0;
+     if ((mem >= vir_mem_base) && (mem - vir_mem_base) <= gfx_fb.size)
+         phys = gfx_fb.phys + (mem - vir_mem_base);
+     return phys;

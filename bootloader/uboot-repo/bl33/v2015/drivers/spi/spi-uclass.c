@@ -92,10 +92,17 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 	return spi_get_ops(bus)->xfer(dev, bitlen, dout, din, flags);
 }
 
+static int spi_req_seq = 0;
 int spi_post_bind(struct udevice *dev)
 {
 	/* Scan the bus for devices */
+#ifdef CONFIG_OF_CONTROL
 	return dm_scan_fdt_node(dev, gd->fdt_blob, dev->of_offset, false);
+#else
+	dev->req_seq = spi_req_seq++;
+	printf("%s(%s): req_seq = %d\n", __func__, dev->name, dev->req_seq);
+#endif
+	return 0;
 }
 
 int spi_post_probe(struct udevice *dev)
@@ -258,6 +265,21 @@ int spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
 			goto err;
 		slave->cs = cs;
 		slave->dev = dev;
+		slave->max_hz = speed;
+		slave->mode = mode;
+
+		slave->op_mode_rx = SPI_OPM_RX_AF;
+		if (slave->mode & SPI_RX_QUAD)
+			slave->op_mode_rx |= SPI_OPM_RX_QOF;
+		else if (slave->mode & SPI_RX_DUAL)
+			slave->op_mode_rx |= SPI_OPM_RX_DOUT;
+		else if (slave->mode & SPI_RX_SLOW)
+			slave->op_mode_rx |= SPI_OPM_RX_AS;
+
+		slave->op_mode_tx = 0;
+		if (slave->mode & SPI_TX_QUAD)
+			slave->op_mode_tx = SPI_OPM_TX_QPP;
+
 		ret = device_probe_child(dev, slave);
 		free(slave);
 		if (ret)
@@ -324,6 +346,7 @@ void spi_free_slave(struct spi_slave *slave)
 int spi_ofdata_to_platdata(const void *blob, int node,
 			   struct spi_slave *spi)
 {
+#ifdef CONFIG_OF_CONTROL
 	int mode = 0;
 
 	spi->cs = fdtdec_get_int(blob, node, "reg", -1);
@@ -337,7 +360,7 @@ int spi_ofdata_to_platdata(const void *blob, int node,
 	if (fdtdec_get_bool(blob, node, "spi-half-duplex"))
 		mode |= SPI_PREAMBLE;
 	spi->mode = mode;
-
+#endif
 	return 0;
 }
 

@@ -34,6 +34,12 @@ obj-$(CONFIG_CMD_BOOTM) += cmd_bootm.o bootm.o bootm_os.o
 obj-y += cmd_help.o
 obj-y += cmd_version.o
 
+#partitions
+obj-y += partitions.o
+
+#remote support
+obj-$(CONFIG_IR_REMOTE) += cmd_irkey.o
+
 # environment
 obj-y += env_attr.o
 obj-y += env_callback.o
@@ -48,6 +54,15 @@ obj-$(CONFIG_ENV_IS_IN_FLASH) += env_flash.o
 obj-$(CONFIG_ENV_IS_IN_MMC) += env_mmc.o
 obj-$(CONFIG_ENV_IS_IN_FAT) += env_fat.o
 obj-$(CONFIG_ENV_IS_IN_NAND) += env_nand.o
+obj-$(CONFIG_ENV_IS_IN_AMLNAND) += env_amlnand.o
+ifneq ($(CONFIG_ENV_IS_NOWHERE),y)
+obj-$(CONFIG_STORE_COMPATIBLE) += env_mmc.o env_storage.o
+ifdef CONFIG_ENV_IS_IN_NAND
+obj-y += env_nand.o
+else
+obj-y += env_amlnand.o
+endif
+endif
 obj-$(CONFIG_ENV_IS_IN_NVRAM) += env_nvram.o
 obj-$(CONFIG_ENV_IS_IN_ONENAND) += env_onenand.o
 obj-$(CONFIG_ENV_IS_IN_SPI_FLASH) += env_sf.o
@@ -58,6 +73,7 @@ obj-$(CONFIG_ENV_IS_NOWHERE) += env_nowhere.o
 # command
 obj-$(CONFIG_CMD_AES) += cmd_aes.o
 obj-$(CONFIG_CMD_AMBAPP) += cmd_ambapp.o
+obj-$(CONFIG_CMD_AUTOSCRIPT) += cmd_autoscript.o
 obj-$(CONFIG_SOURCE) += cmd_source.o
 obj-$(CONFIG_CMD_SOURCE) += cmd_source.o
 obj-$(CONFIG_CMD_BDI) += cmd_bdinfo.o
@@ -70,11 +86,14 @@ obj-$(CONFIG_CMD_CACHE) += cmd_cache.o
 obj-$(CONFIG_CMD_CBFS) += cmd_cbfs.o
 obj-$(CONFIG_CMD_CLK) += cmd_clk.o
 obj-$(CONFIG_CMD_CONSOLE) += cmd_console.o
+obj-$(CONFIG_CMD_SARADC) += cmd_saradc.o
+obj-$(CONFIG_CMD_SARADC) += cmd_forceupdate.o
 obj-$(CONFIG_CMD_CPLBINFO) += cmd_cplbinfo.o
 obj-$(CONFIG_DATAFLASH_MMC_SELECT) += cmd_dataflash_mmc_mux.o
 obj-$(CONFIG_CMD_DATE) += cmd_date.o
 obj-$(CONFIG_CMD_DEMO) += cmd_demo.o
 obj-$(CONFIG_CMD_SOUND) += cmd_sound.o
+obj-$(CONFIG_CMD_IRBLASTER) += cmd_irblaster.o
 ifdef CONFIG_4xx
 obj-$(CONFIG_CMD_SETGETDCR) += cmd_dcr.o
 endif
@@ -92,7 +111,9 @@ obj-$(CONFIG_CMD_EXT4) += cmd_ext4.o
 obj-$(CONFIG_CMD_EXT2) += cmd_ext2.o
 obj-$(CONFIG_CMD_FAT) += cmd_fat.o
 obj-$(CONFIG_CMD_FDC) += cmd_fdc.o
-obj-$(CONFIG_OF_LIBFDT) += cmd_fdt.o fdt_support.o
+obj-$(CONFIG_OF_LIBFDT) += cmd_fdt.o fdt_support.o image-android-dt.o
+obj-y += aml_dt.o
+obj-$(CONFIG_MDUMP_COMPRESS) += ramdump.o
 obj-$(CONFIG_CMD_FITUPD) += cmd_fitupd.o
 obj-$(CONFIG_CMD_FLASH) += cmd_flash.o
 ifdef CONFIG_FPGA
@@ -108,7 +129,12 @@ obj-$(CONFIG_CMD_IOTRACE) += cmd_iotrace.o
 obj-$(CONFIG_CMD_HASH) += cmd_hash.o
 obj-$(CONFIG_CMD_IDE) += cmd_ide.o
 obj-$(CONFIG_CMD_IMMAP) += cmd_immap.o
+
+ifdef CONFIG_CMD_INI
+obj-y += ini/model.o ini/ini_proxy.o ini/UnifyKey.o ini/ini_platform.o ini/ini_io.o ini/ini_handler.o ini/ini_core.o ini/ini_log.o
+endif
 obj-$(CONFIG_CMD_INI) += cmd_ini.o
+
 obj-$(CONFIG_CMD_IRQ) += cmd_irq.o
 obj-$(CONFIG_CMD_ITEST) += cmd_itest.o
 obj-$(CONFIG_CMD_JFFS2) += cmd_jffs2.o
@@ -116,11 +142,21 @@ obj-$(CONFIG_CMD_CRAMFS) += cmd_cramfs.o
 obj-$(CONFIG_CMD_LDRINFO) += cmd_ldrinfo.o
 obj-$(CONFIG_CMD_LED) += cmd_led.o
 obj-$(CONFIG_CMD_LICENSE) += cmd_license.o
+ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
+obj-y += cmd_bcb.o
+obj-y += cmd_dynamic.o
+ifdef CONFIG_CMD_BOOTCTOL_AVB
+obj-y += cmd_bootctl_avb.o
+else
+obj-y += cmd_bootctl.o
+endif
+endif
 obj-y += cmd_load.o
 obj-$(CONFIG_LOGBUFFER) += cmd_log.o
 obj-$(CONFIG_ID_EEPROM) += cmd_mac.o
 obj-$(CONFIG_CMD_MD5SUM) += cmd_md5sum.o
 obj-$(CONFIG_CMD_MEMORY) += cmd_mem.o
+obj-$(CONFIG_CMD_MEMORY) += cmd_mem_mask.o
 obj-$(CONFIG_CMD_IO) += cmd_io.o
 obj-$(CONFIG_CMD_MFSL) += cmd_mfsl.o
 obj-$(CONFIG_MII) += miiphyutil.o
@@ -132,6 +168,11 @@ obj-$(CONFIG_CMD_MII) += cmd_mdio.o
 endif
 obj-$(CONFIG_CMD_MISC) += cmd_misc.o
 obj-$(CONFIG_CMD_MMC) += cmd_mmc.o
+obj-$(CONFIG_CMD_UUID) += cmd_uuid.o
+obj-$(CONFIG_CMD_GPT) += cmd_gpt.o
+obj-$(CONFIG_CMD_MMC) += cmd_aml_mmc.o
+obj-$(CONFIG_STORE_COMPATIBLE) += store_interface.o cmd_burnup.o
+obj-$(CONFIG_STORE_COMPATIBLE) += cmd_imgread.o
 obj-$(CONFIG_CMD_MMC_SPI) += cmd_mmc_spi.o
 obj-$(CONFIG_MP) += cmd_mp.o
 obj-$(CONFIG_CMD_MTDPARTS) += cmd_mtdparts.o
@@ -152,6 +193,7 @@ obj-$(CONFIG_CMD_REISER) += cmd_reiser.o
 obj-$(CONFIG_SANDBOX) += cmd_sandbox.o
 obj-$(CONFIG_CMD_SATA) += cmd_sata.o
 obj-$(CONFIG_CMD_SF) += cmd_sf.o
+obj-$(CONFIG_CMD_SHA2) += cmd_sha2.o
 obj-$(CONFIG_CMD_SCSI) += cmd_scsi.o
 obj-$(CONFIG_CMD_SHA1SUM) += cmd_sha1sum.o
 obj-$(CONFIG_CMD_SETEXPR) += cmd_setexpr.o
@@ -160,6 +202,7 @@ obj-$(CONFIG_CMD_SPI) += cmd_spi.o
 obj-$(CONFIG_CMD_SPIBOOTLDR) += cmd_spibootldr.o
 obj-$(CONFIG_CMD_STRINGS) += cmd_strings.o
 obj-$(CONFIG_CMD_TERMINAL) += cmd_terminal.o
+obj-$(CONFIG_CMD_DTIMG) += cmd_dtimg.o
 obj-$(CONFIG_CMD_TIME) += cmd_time.o
 obj-$(CONFIG_CMD_TRACE) += cmd_trace.o
 obj-$(CONFIG_SYS_HUSH_PARSER) += cmd_test.o
@@ -176,6 +219,7 @@ ifdef CONFIG_CMD_USB
 obj-y += cmd_usb.o
 obj-y += usb.o usb_hub.o
 obj-$(CONFIG_USB_STORAGE) += usb_storage.o
+obj-$(CONFIG_RTK_USB_BT) += rtk_fw.o
 endif
 obj-$(CONFIG_CMD_FASTBOOT) += cmd_fastboot.o
 obj-$(CONFIG_CMD_FS_UUID) += cmd_fs_uuid.o
@@ -187,6 +231,12 @@ obj-$(CONFIG_YAFFS2) += cmd_yaffs2.o
 obj-$(CONFIG_CMD_SPL) += cmd_spl.o
 obj-$(CONFIG_CMD_ZIP) += cmd_zip.o
 obj-$(CONFIG_CMD_ZFS) += cmd_zfs.o
+obj-$(CONFIG_AML_VPU) += cmd_vpu.o
+obj-$(CONFIG_CMD_DDR_D2PLL) += cmd_d2pll.o
+obj-$(CONFIG_CMD_DDR_TEST) += cmd_ddr_test.o
+obj-$(CONFIG_CMD_DDR_TEST_G12) += cmd_ddr_test_g12.o
+obj-$(CONFIG_CMD_DDR_DQS) += cmd_ddr_dqs.o
+obj-$(CONFIG_CMD_PLLTEST) += cmd_plltest.o
 
 # others
 obj-$(CONFIG_BOOTSTAGE) += bootstage.o
@@ -203,7 +253,14 @@ obj-$(CONFIG_MODEM_SUPPORT) += modem.o
 obj-$(CONFIG_UPDATE_TFTP) += update.o
 obj-$(CONFIG_USB_KEYBOARD) += usb_kbd.o
 obj-$(CONFIG_CMD_DFU) += cmd_dfu.o
-obj-$(CONFIG_CMD_GPT) += cmd_gpt.o
+obj-$(CONFIG_CMD_EFUSE) += cmd_efuse.o
+obj-$(CONFIG_CMD_CPU_TEMP) += cmd_cpu_temp.o
+obj-y += cmd_clkmsr.o
+obj-$(CONFIG_CMD_CEC) += cmd_cec.o
+obj-$(CONFIG_CMD_HDMIRX) += cmd_hdmirx.o
+ifndef CONFIG_AML_RPMB_DISABLE
+obj-y += cmd_rpmb.o
+endif
 endif
 
 ifdef CONFIG_SPL_BUILD
@@ -234,6 +291,7 @@ endif
 obj-y += cmd_nvedit.o
 #environment
 obj-y += env_common.o
+obj-y += cmd_defenv_without.o
 #others
 obj-$(CONFIG_DDR_SPD) += ddr_spd.o
 obj-$(CONFIG_SPD_EEPROM) += ddr_spd.o
@@ -259,8 +317,13 @@ ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
 obj-y += aboot.o
 obj-y += fb_mmc.o
 endif
+ifdef CONFIG_FASTBOOT_FLASH_NAND_DEV
+obj-y += fb_nand.o
+endif
 
 obj-$(CONFIG_CMD_BLOB) += cmd_blob.o
+
+obj-$(CONFIG_INSTABOOT) += cmd_wipeisb.o instaboot.o
 
 # We always have this since drivers/ddr/fs/interactive.c needs it
 obj-y += cli_simple.o
@@ -271,5 +334,32 @@ obj-y += command.o
 obj-y += s_record.o
 obj-y += xyzModem.o
 obj-y += cmd_disk.o
+
+# vpp module
+obj-y += cmd_vpp.o
+
+# amlogic commands
+obj-$(CONFIG_CMD_REBOOT) += cmd_reboot.o
+obj-y += cmd_scp.o
+obj-$(CONFIG_AML_HDMITX20) += hdmi_parameters.o hdmi_edid_parsing.o cmd_hdmitx.o
+obj-$(CONFIG_CMD_JTAG) += cmd_jtag.o
+obj-$(CONFIG_AML_OSD) += cmd_osd.o cmd_img_osd.o
+obj-$(CONFIG_AML_MINUI) += cmd_ui.o
+obj-$(CONFIG_AML_DOLBY) += cmd_dolbyvision.o
+obj-$(CONFIG_AML_CVBS) += cmd_cvbs.o
+obj-$(CONFIG_AML_VOUT) += cmd_vout.o
+obj-$(CONFIG_AML_LCD) += cmd_lcd.o
+obj-$(CONFIG_CMD_RSVMEM) += cmd_rsvmem.o
+obj-$(CONFIG_CMD_CHIPID) += cmd_chipid.o
+obj-$(CONFIG_CMD_WATCHDOG) += cmd_watchdog.o
+obj-$(CONFIG_CMD_VIU_PROBE) +=cmd_viuprobe.o
+obj-$(CONFIG_CMD_STARTDSP) +=cmd_startdsp.o
+obj-$(CONFIG_CMD_DSPJTAGRESET) +=cmd_dspjtagreset.o
+obj-$(CONFIG_CMD_LOAD_BL40) +=cmd_bl40.o
+obj-$(CONFIG_CMD_AML_MTEST) += cmd_testsmpcache.o
+obj-$(CONFIG_AML_ANTIROLLBACK) += anti-rollback.o
+obj-$(CONFIG_AML_SUPPORT_TLV) += aml_tlv.o
+obj-y += cmd_tee_log_level.o
+obj-y += cmd_avb.o
 
 CFLAGS_env_embedded.o := -Wa,--no-warn -DENV_CRC=$(shell tools/envcrc 2>/dev/null)

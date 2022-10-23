@@ -732,6 +732,46 @@ config TARGET_LS2085A_SIMU
 	bool "Support ls2085a_simu"
 	select ARM64
 
+config TARGET_MESON_GX
+	bool "Support meson gx-series 64bit"
+	select ARM64
+
+config TARGET_MESON_GXTV
+	bool "Support meson gxtv-series 64bit"
+	select ARM64
+
+config TARGET_MESON_TXL
+	bool "Support meson txl-series 64bit"
+	select ARM64
+
+config TARGET_MESON_TXLX
+	bool "Support meson txlx-series 64bit"
+	select ARM64
+
+config TARGET_MESON_AXG
+	bool "Support meson axg-series 64bit"
+	select ARM64
+
+config TARGET_MESON_TXHD
+	bool "Support meson txhd-series 64bit"
+	select ARM64
+
+config TARGET_MESON_G12A
+	bool "Support meson g12a-series 64bit"
+	select ARM64
+
+config TARGET_MESON_G12B
+	bool "Support meson g12b-series 64bit"
+	select ARM64
+
+config TARGET_MESON_TL1
+	bool "Support meson tl1-series 64bit"
+	select ARM64
+
+config TARGET_MESON_TM2
+	bool "Support meson tm2-series 64bit"
+	select ARM64
+
 config TARGET_LS1021AQDS
 	bool "Support ls1021aqds"
 	select CPU_V7
@@ -983,6 +1023,9 @@ source "board/wandboard/Kconfig"
 source "board/woodburn/Kconfig"
 source "board/xaeniax/Kconfig"
 source "board/zipitz2/Kconfig"
+
+source "board/amlogic/Kconfig"
+source "customer/board/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 

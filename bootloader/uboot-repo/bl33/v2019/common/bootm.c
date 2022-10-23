@@ -36,6 +36,10 @@
 
 #define IH_INITRD_ARCH IH_ARCH_DEFAULT
 
+#ifdef CONFIG_MDUMP_COMPRESS
+#include <ramdump.h>
+#endif
+
 #ifndef USE_HOSTCC
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -111,6 +115,10 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		images.os.end = image_get_image_end(os_hdr);
 		images.os.load = image_get_load(os_hdr);
 		images.os.arch = image_get_arch(os_hdr);
+		if (images.os.arch == IH_ARCH_ARM) {
+			env_set("initrd_high", "0A000000");
+			env_set("fdt_high", "0A000000");
+		}
 		break;
 #endif
 #if IMAGE_ENABLE_FIT
@@ -157,12 +165,26 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 #endif
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
+		if (image_get_magic((image_header_t *)images.os.image_start) == IH_MAGIC) {
+			env_set("initrd_high", "0A000000");
+			env_set("fdt_high", "0A000000");
+			images.os.arch = ((image_header_t *)(images.os.image_start))->ih_arch;
+			images.os.image_start += sizeof(image_header_t);
+		}
 		images.os.type = IH_TYPE_KERNEL;
-		images.os.comp = IH_COMP_NONE;
+
+		if (images.os.arch == IH_ARCH_ARM)
+			images.os.comp = image_get_comp(os_hdr + 0x800);
+		else
+			images.os.comp =  android_image_get_comp(os_hdr);
+
+		//images.os.comp =  android_image_get_comp(os_hdr);
 		images.os.os = IH_OS_LINUX;
 
 		images.os.end = android_image_get_end(os_hdr);
 		images.os.load = android_image_get_kload(os_hdr);
+		if (images.os.load == 0x10008000)
+			images.os.load = 0x1080000;
 		images.ep = images.os.load;
 		ep_found = true;
 		break;
@@ -256,8 +278,44 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 
 #if IMAGE_ENABLE_OF_LIBFDT
 	/* find flattened device tree */
+#ifdef CONFIG_DTB_MEM_ADDR
+	unsigned long long dtb_mem_addr =  -1;
+	char *ft_addr_bak;
+	ulong ft_len_bak;
+	if (env_get("dtb_mem_addr"))
+		dtb_mem_addr = simple_strtoul(env_get("dtb_mem_addr"), NULL, 16);
+	else
+		dtb_mem_addr = CONFIG_DTB_MEM_ADDR;
+	ft_addr_bak = (char *)images.ft_addr;
+	ft_len_bak = images.ft_len;
+	images.ft_addr = (char *)map_sysmem(dtb_mem_addr, 0);
+	images.ft_len = fdt_get_header(dtb_mem_addr, totalsize);
+#endif /* CONFIG_DTB_MEM_ADDR */
+	printf("load dtb from 0x%lx ......\n", (unsigned long)(images.ft_addr));
+#ifdef CONFIG_MULTI_DTB
+	extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
+	/* update dtb address, compatible with single dtb and multi dtbs */
+	images.ft_addr = (char*)get_multi_dt_entry((unsigned long)images.ft_addr);
+#endif /* CONFIG_MULTI_DTB */
+
 	ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
 			   &images.ft_addr, &images.ft_len);
+#ifdef CONFIG_DTB_MEM_ADDR
+	if (ret) {
+		images.ft_addr = ft_addr_bak;
+		images.ft_len = ft_len_bak;
+
+		printf("load dtb from 0x%lx ......\n",
+			(unsigned long)(images.ft_addr));
+#ifdef CONFIG_MULTI_DTB
+		extern unsigned long get_multi_dt_entry(unsigned long fdt_addr);
+		/* update dtb address, compatible with single dtb and multi dtbs */
+		images.ft_addr = (char*)get_multi_dt_entry((unsigned long)images.ft_addr);
+#endif /* CONFIG_MULTI_DTB */
+		ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
+			   &images.ft_addr, &images.ft_len);
+	}
+#endif /* CONFIG_DTB_MEM_ADDR */
 	if (ret) {
 		puts("Could not find a valid device tree\n");
 		return 1;
@@ -360,7 +418,9 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 		       uint unc_len, ulong *load_end)
 {
 	int ret = 0;
+	size_t size = 0;
 
+	const char *type_name = genimg_get_type_name(type);
 	*load_end = load;
 	print_decomp_msg(comp, type, load == image_start);
 
@@ -412,8 +472,8 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 #endif /* CONFIG_LZMA */
 #ifdef CONFIG_LZO
 	case IH_COMP_LZO: {
-		size_t size = unc_len;
-
+		size = unc_len;
+		printf("   Uncompressing %s ... ", type_name);
 		ret = lzop_decompress(image_buf, image_len, load_buf, &size);
 		image_len = size;
 		break;
@@ -421,7 +481,7 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 #endif /* CONFIG_LZO */
 #ifdef CONFIG_LZ4
 	case IH_COMP_LZ4: {
-		size_t size = unc_len;
+		size = unc_len;
 
 		ret = ulz4fn(image_buf, image_len, load_buf, &size);
 		image_len = size;
@@ -484,7 +544,7 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 		      blob_start, blob_end);
 		debug("images.os.load = 0x%lx, load_end = 0x%lx\n", load,
 		      load_end);
-
+#ifndef CONFIG_ANDROID_BOOT_IMAGE
 		/* Check what type of image this is. */
 		if (images->legacy_hdr_valid) {
 			if (image_get_type(&images->legacy_hdr_os_copy)
@@ -496,6 +556,7 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 			bootstage_error(BOOTSTAGE_ID_OVERWRITTEN);
 			return BOOTM_ERR_RESET;
 		}
+#endif
 	}
 
 	lmb_reserve(&images->lmb, images->os.load, (load_end -
@@ -649,6 +710,10 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (!ret && (states & BOOTM_STATE_FINDOTHER))
 		ret = bootm_find_other(cmdtp, flag, argc, argv);
 
+#ifdef CONFIG_MDUMP_COMPRESS
+	check_ramdump();
+#endif
+
 	/* Load the OS */
 	if (!ret && (states & BOOTM_STATE_LOADOS)) {
 		iflag = bootm_disable_interrupts();
@@ -677,6 +742,15 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		boot_fdt_add_mem_rsv_regions(&images->lmb, images->ft_addr);
 		ret = boot_relocate_fdt(&images->lmb, &images->ft_addr,
 					&images->ft_len);
+	}
+#endif
+
+	/* Check reserved memory region */
+#ifdef CONFIG_CMD_RSVMEM
+	ret = run_command("rsvmem check", 0);
+	if (ret) {
+		puts("rsvmem check failed\n");
+		return ret;
 	}
 #endif
 
@@ -729,10 +803,10 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	}
 
 	/* Now run the OS! We hope this doesn't return */
-	if (!ret && (states & BOOTM_STATE_OS_GO))
+	if (!ret && (states & BOOTM_STATE_OS_GO)) {
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
 				images, boot_fn);
-
+		}
 	/* Deal with any fallout */
 err:
 	if (iflag)
@@ -822,6 +896,16 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 	const void *buf;
 	const char	*fit_uname_config = NULL;
 	const char	*fit_uname_kernel = NULL;
+
+	char *avb_s;
+	avb_s = env_get("avb2");
+	printf("avb2: %s\n", avb_s);
+	if (strcmp(avb_s, "1") != 0) {
+#ifdef CONFIG_AML_ANTIROLLBACK
+		struct andr_img_hdr **tmp_img_hdr = (struct andr_img_hdr **)&buf;
+#endif
+	}
+
 #if IMAGE_ENABLE_FIT
 	int		os_noffset;
 #endif
@@ -899,9 +983,23 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
 		printf("## Booting Android Image at 0x%08lx ...\n", img_addr);
+		if (!android_image_need_move(&img_addr, buf))
+			buf = map_sysmem(img_addr, 0);
+		else
+			return NULL;
 		if (android_image_get_kernel(buf, images->verify,
 					     os_data, os_len))
 			return NULL;
+
+		if (strcmp(avb_s, "1") != 0) {
+#ifdef CONFIG_AML_ANTIROLLBACK
+			if (!check_antirollback((*tmp_img_hdr)->kernel_version)) {
+				*os_len = 0;
+				return NULL;
+			}
+#endif
+		}
+
 		break;
 #endif
 	default:

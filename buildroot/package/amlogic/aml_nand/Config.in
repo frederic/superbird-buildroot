@@ -1,0 +1,33 @@
+config BR2_PACKAGE_AML_NAND
+	bool "amlogic Nand FTL"
+	help
+	  amlogic Nand FTL support
+
+config BR2_PACKAGE_AML_NAND_VERSION
+	string "amlogic nand branch" 
+	depends on BR2_PACKAGE_AML_NAND
+	help
+	  the branch of amlogic nand
+
+config BR2_PACKAGE_AML_NAND_GIT_URL
+	string "amlogic nand git url"
+	depends on BR2_PACKAGE_AML_NAND
+	help
+	  the URL of amlogic nand git
+
+config BR2_PACKAGE_AML_NAND_LOCAL
+	bool "amlogic nand local"
+	help
+		amlogic nand local
+
+config BR2_PACKAGE_AML_NAND_LOCAL_PATH
+	string "amlogic nand local path"
+	depends on BR2_PACKAGE_AML_NAND_LOCAL
+	help
+		amlogic nand local path
+
+config BR2_PACKAGE_AML_NAND_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_AML_NAND
+	help
+	  compile ko directly

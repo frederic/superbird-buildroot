@@ -1,0 +1,31 @@
+config BR2_PACKAGE_QUALCOMM_WIFI
+	bool "qualcomm wifi"
+	depends on BR2_LINUX_KERNEL
+	help
+	qualcomm wifi
+
+config BR2_PACKAGE_QUALCOMM_QCA9377
+	bool "qca9377 wifi"
+	depends on BR2_LINUX_KERNEL
+	depends on BR2_PACKAGE_QUALCOMM_WIFI
+	help
+	qualcomm qca9377 driver
+
+config BR2_PACKAGE_QUALCOMM_QCA6174
+	bool "qca6174 wifi"
+	depends on BR2_LINUX_KERNEL
+	depends on BR2_PACKAGE_QUALCOMM_WIFI
+	help
+	qualcomm qca6174 driver
+
+config BR2_PACKAGE_QUALCOMM_WIFI_LOCAL_PATH
+	string "qualcomm wifi drivers local path"
+	depends on BR2_PACKAGE_QUALCOMM_WIFI
+	help
+	qualcomm wifi drivers local path
+
+config BR2_PACKAGE_QUALCOMM_WIFIFWM_LOCAL_PATH
+    string "qualcomm wifi fw local path"
+    depends on BR2_PACKAGE_QUALCOMM_WIFI
+    help
+    wifi fw local path

@@ -1,0 +1,79 @@
+diff -Naru alsa-utils-1.1.3_orig/bat/alsa.c alsa-utils-1.1.3/bat/alsa.c
+--- alsa-utils-1.1.3_orig/bat/alsa.c	2016-12-20 17:12:29.000000000 +0800
++++ alsa-utils-1.1.3/bat/alsa.c	2017-03-30 13:56:01.196698000 +0800
+@@ -51,6 +51,7 @@
+ 	{ BAT_PCM_FORMAT_U8, SND_PCM_FORMAT_U8 },
+ 	{ BAT_PCM_FORMAT_S16_LE, SND_PCM_FORMAT_S16_LE },
+ 	{ BAT_PCM_FORMAT_S24_3LE, SND_PCM_FORMAT_S24_3LE },
++	{ BAT_PCM_FORMAT_S24_LE, SND_PCM_FORMAT_S24_LE },
+ 	{ BAT_PCM_FORMAT_S32_LE, SND_PCM_FORMAT_S32_LE },
+ 	{ BAT_PCM_FORMAT_MAX, },
+ };
+diff -Naru alsa-utils-1.1.3_orig/bat/bat.c alsa-utils-1.1.3/bat/bat.c
+--- alsa-utils-1.1.3_orig/bat/bat.c	2016-12-20 17:12:29.000000000 +0800
++++ alsa-utils-1.1.3/bat/bat.c	2017-03-30 13:56:17.345458000 +0800
+@@ -148,6 +148,9 @@
+ 	} else if (strcasecmp(optarg, "S24_3LE") == 0) {
+ 		bat->format = BAT_PCM_FORMAT_S24_3LE;
+ 		bat->sample_size = 3;
++	} else if (strcasecmp(optarg, "S24_LE") == 0) {
++		bat->format = BAT_PCM_FORMAT_S24_LE;
++		bat->sample_size = 4;
+ 	} else if (strcasecmp(optarg, "S32_LE") == 0) {
+ 		bat->format = BAT_PCM_FORMAT_S32_LE;
+ 		bat->sample_size = 4;
+@@ -346,6 +349,7 @@
+ 
+ static void set_defaults(struct bat *bat)
+ {
++	int i;
+ 	memset(bat, 0, sizeof(struct bat));
+ 
+ 	/* Set default values */
+@@ -356,8 +360,13 @@
+ 	bat->convert_float_to_sample = convert_float_to_int16;
+ 	bat->convert_sample_to_float = convert_int16_to_float;
+ 	bat->frames = bat->rate * 2;
++#if 1
++	for (i = 0; i < MAX_CHANNELS; i ++)
++		bat->target_freq[i] = 997.0;
++#else
+ 	bat->target_freq[0] = 997.0;
+ 	bat->target_freq[1] = 997.0;
++#endif
+ 	bat->sigma_k = 3.0;
+ 	bat->snr_thd_db = SNR_DB_INVALID;
+ 	bat->playback.device = NULL;
+diff -Naru alsa-utils-1.1.3_orig/bat/common.h alsa-utils-1.1.3/bat/common.h
+--- alsa-utils-1.1.3_orig/bat/common.h	2016-12-20 17:12:29.000000000 +0800
++++ alsa-utils-1.1.3/bat/common.h	2017-03-30 13:54:24.437232000 +0800
+@@ -33,7 +33,7 @@
+ #define WAV_DATA			COMPOSE('d', 'a', 't', 'a')
+ #define WAV_FORMAT_PCM			1	/* PCM WAVE file encoding */
+ 
+-#define MAX_CHANNELS			2
++#define MAX_CHANNELS			16
+ #define MIN_CHANNELS			1
+ #define MAX_PEAKS			10
+ #define MAX_FRAMES			(10 * 1024 * 1024)
+@@ -141,6 +141,7 @@
+ enum _bat_pcm_format {
+ 	BAT_PCM_FORMAT_UNKNOWN = -1,
+ 	BAT_PCM_FORMAT_S16_LE = 0,
++	BAT_PCM_FORMAT_S24_LE,
+ 	BAT_PCM_FORMAT_S32_LE,
+ 	BAT_PCM_FORMAT_U8,
+ 	BAT_PCM_FORMAT_S24_3LE,
+diff -Naru alsa-utils-1.1.3_orig/bat/signal.c alsa-utils-1.1.3/bat/signal.c
+--- alsa-utils-1.1.3_orig/bat/signal.c	2016-12-20 17:12:29.000000000 +0800
++++ alsa-utils-1.1.3/bat/signal.c	2017-03-30 13:56:58.502461000 +0800
+@@ -126,6 +126,9 @@
+ 	case BAT_PCM_FORMAT_S24_3LE:
+ 		max = (1 << 23) - 1;
+ 		break;
++	case BAT_PCM_FORMAT_S24_LE:
++		max = INT32_MAX;
++		break;
+ 	case BAT_PCM_FORMAT_S32_LE:
+ 		max = INT32_MAX;
+ 		break;

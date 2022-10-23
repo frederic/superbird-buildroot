@@ -1,0 +1,193 @@
+diff --git a/examples/widgets/effects/blurpicker/blurpicker.cpp b/examples/widgets/effects/blurpicker/blurpicker.cpp
+old mode 100644
+new mode 100755
+index b5ac795..d81d2e5
+--- a/examples/widgets/effects/blurpicker/blurpicker.cpp
++++ b/examples/widgets/effects/blurpicker/blurpicker.cpp
+@@ -51,17 +51,102 @@
+
+ BlurPicker::BlurPicker(QWidget *parent): QGraphicsView(parent), m_index(0.0), m_animation(this, "index")
+ {
++	repaint_flag=false;
++	repaint_index=0;
++	mstep_flag=false;
++	mstep=0;
++	move_index=0;
+     setBackgroundBrush(QPixmap(":/images/background.jpg"));
+     setScene(new QGraphicsScene(this));
+
+     setupScene();
+     setIndex(0);
++
++	qlabl2=new QLabel("MOVE",this);
++	qlabl=new QLabel("Amlogic Inc. Shenzhen office",this);
++	qlabl->resize(510,100);
++	qlabl->move(0,50);
++	ft.setPointSize(30);
++	qlabl->setFont(ft);
++	pa.setColor(QPalette::WindowText,Qt::red);
++	qlabl->setPalette(pa);
++	qlabl->show();
++
++	qlabl2->resize(400,100);
++	qlabl2->move(350,850);
++	ft.setPointSize(40);
++	qlabl2->setFont(ft);
++	pa.setColor(QPalette::WindowText,Qt::red);
++	qlabl2->setPalette(pa);
++	qlabl2->show();
+
+     m_animation.setDuration(400);
+     m_animation.setEasingCurve(QEasingCurve::InOutSine);
+
+     setRenderHint(QPainter::Antialiasing, true);
+     setFrameStyle(QFrame::NoFrame);
++
++	timer =new QTimer();
++	timer->setInterval(2000);
++	timer->start();
++	connect(timer,SIGNAL(timeout()),this,SLOT(repaint()));
++
++	moveTimer=new QTimer();
++	moveTimer->setInterval(10);
++	moveTimer->start();
++	connect(moveTimer,SIGNAL(timeout()),this,SLOT(moveAction()));
++}
++
++void BlurPicker::moveAction(void)
++{
++	mstep++;
++	if(mstep % 250 == 0)
++	mstep_flag=!mstep_flag;
++
++	if(mstep_flag==true){
++		move_index--;
++	}else {
++		move_index++;
++	}
++
++	qlabl->move(move_index,50);
++}
++
++
++void BlurPicker::repaint(void)
++{
++	int mdelta=0;
++	i++;
++	if(i>9) i=1;
++	repaint_index++;
++	if( repaint_index % 8 == 0 ){
++		repaint_flag=!repaint_flag;
++	}
++
++	if(repaint_flag==true){
++		mdelta=-1;
++    	if (m_animation.state() == QAbstractAnimation::Stopped && mdelta) {
++        	m_animation.setEndValue(m_index + mdelta);
++        	m_animation.start();
++    	}
++	}else{
++		mdelta=1;
++    	if (m_animation.state() == QAbstractAnimation::Stopped && mdelta) {
++        	m_animation.setEndValue(m_index + mdelta);
++        	m_animation.start();
++    	}
++	}
++
++	//QString mstring[8];
++
++	//qlabl2->resize(400,100);
++	//qlabl2->move(350,850);
++	//qlabl2->setText(mstring);
++	//ft.setPointSize(18);
++	//qlabl2->setFont(ft);
++	//pa.setColor(QPalette::WindowText,Qt::red);
++	//qlabl2->setPalette(pa);
++	//qlabl2->show();
+ }
+
+ qreal BlurPicker::index() const
+@@ -77,11 +162,11 @@ void BlurPicker::setIndex(qreal index)
+     for (int i = 0; i < m_icons.count(); ++i) {
+         QGraphicsItem *icon = m_icons[i];
+         qreal a = ((i + m_index) * 2 * M_PI) / m_icons.count();
+-        qreal xs = 170 * qSin(a);
+-        qreal ys = 100 * qCos(a);
++        qreal xs = 270 * qSin(a);
++        qreal ys = 200 * qCos(a);
+         QPointF pos(xs, ys);
+         pos = QTransform().rotate(-20).map(pos);
+-        pos -= QPointF(40, 40);
++        pos -= QPointF(60, 60);
+         icon->setPos(pos);
+         baseline = qMax(baseline, ys);
+         static_cast<BlurEffect *>(icon->graphicsEffect())->setBaseLine(baseline);
+@@ -92,7 +177,7 @@ void BlurPicker::setIndex(qreal index)
+
+ void BlurPicker::setupScene()
+ {
+-    scene()->setSceneRect(-200, -120, 400, 240);
++    scene()->setSceneRect(-300, -220, 500, 340);
+
+     QStringList names;
+     names << ":/images/accessories-calculator.png";
+@@ -114,7 +199,7 @@ void BlurPicker::setupScene()
+
+     QGraphicsPixmapItem *bg = scene()->addPixmap(QPixmap(":/images/background.jpg"));
+     bg->setZValue(0);
+-    bg->setPos(-200, -150);
++    bg->setPos(-300, -250);
+ }
+
+ void BlurPicker::keyPressEvent(QKeyEvent *event)
+diff --git a/examples/widgets/effects/blurpicker/blurpicker.h b/examples/widgets/effects/blurpicker/blurpicker.h
+old mode 100644
+new mode 100755
+index a4ea7ed..6f6a0ad
+--- a/examples/widgets/effects/blurpicker/blurpicker.h
++++ b/examples/widgets/effects/blurpicker/blurpicker.h
+@@ -44,6 +44,8 @@
+ #include <QGraphicsEffect>
+ #include <QGraphicsView>
+ #include <QPropertyAnimation>
++#include <QTimer>
++#include <QLabel>
+
+ #include "blureffect.h"
+
+@@ -57,6 +59,22 @@ public:
+
+     qreal index() const;
+     void setIndex(qreal);
++	QTimer *timer;
++	QTimer *moveTimer;
++	int repaint_index;
++	bool repaint_flag;
++	QLabel *qlabl;
++	int mstep;
++	int i;
++	QPalette pa;
++	QFont ft;
++	bool mstep_flag;
++	int move_index;
++	QLabel *qlabl2;
++
++public slots:
++	void repaint(void);
++	void moveAction(void);
+
+ protected:
+     void keyPressEvent(QKeyEvent *event) Q_DECL_OVERRIDE;
+diff --git a/examples/widgets/effects/blurpicker/main.cpp b/examples/widgets/effects/blurpicker/main.cpp
+index 6c9730b..dc2130e 100644
+--- a/examples/widgets/effects/blurpicker/main.cpp
++++ b/examples/widgets/effects/blurpicker/main.cpp
+@@ -48,7 +48,7 @@ int main(int argc, char **argv)
+     BlurPicker blurPicker;
+     blurPicker.setWindowTitle(QT_TRANSLATE_NOOP(QGraphicsView, "Application Picker"));
+
+-    blurPicker.setFixedSize(400, 300);
++    blurPicker.setFixedSize(768, 1024);
+     blurPicker.show();
+
+     return app.exec();

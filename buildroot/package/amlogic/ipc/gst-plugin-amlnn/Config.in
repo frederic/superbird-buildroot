@@ -1,0 +1,9 @@
+config BR2_PACKAGE_GST_PLUGIN_AMLNN
+  bool "gstream1 plugin NN"
+  select BR2_PACKAGE_AML_NN_DETECT
+  select BR2_PACKAGE_SQLITE
+  select BR2_PACKAGE_AML_LIBGE2D
+  select BR2_PACKAGE_LIBJPEG
+  select BR2_PACKAGE_GST_AMLION_ALLOCATOR
+	help
+	  gstreamer 1.0 plugins

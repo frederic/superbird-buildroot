@@ -1,0 +1,4 @@
+config BR2_PACKAGE_G711
+    bool "g711"
+    help
+        G.711 lib

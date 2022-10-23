@@ -297,6 +297,36 @@ define BUSYBOX_INSTALL_TELNET_SCRIPT
 	fi
 endef
 
+# Enable "noclobber" in install.sh, to prevent BusyBox from overwriting any
+# full-blown versions of apps installed by other packages with sym/hard links.
+define BUSYBOX_INSTALL_INETD_SCRIPT 
+	if grep -q CONFIG_INETD=y $(@D)/.config; then \
+	  [ -f $(TARGET_DIR)/etc/init.d/S41inetd ] || \
+	  $(INSTALL) -m 0755 -D package/busybox/S41inetd \
+	  $(TARGET_DIR)/etc/init.d/S41inetd; \
+	else rm -f $(TARGET_DIR)/etc/init.d/S41inetd; fi 
+endef
+define BUSYBOX_INSTALL_INETD_CONF 
+	if grep -q CONFIG_INETD=y $(@D)/.config; then \
+	  [ -f $(TARGET_DIR)/etc/inetd.conf ] || \
+	  $(INSTALL) -D -m 0644 package/busybox/inetd.conf \
+	  $(TARGET_DIR)/etc/inetd.conf; \
+	  if grep -q CONFIG_TELNETD=y $(@D)/.config; then \
+	    if ! grep -q '^telnet' $(TARGET_DIR)/etc/inetd.conf; then \
+	      echo -e "telnet\tstream\ttcp\tnowait\troot\ttelnetd\ttelnetd -i" >> $(TARGET_DIR)/etc/inetd.conf; \
+	    fi; \
+	  else \
+	    $(SED) '/^telnet/d' $(TARGET_DIR)/etc/inetd.conf; \
+	  fi; \
+	else rm -f $(TARGET_DIR)/etc/inetd.conf; fi 
+endef 
+
+
+
+define BUSYBOX_NOCLOBBER_INSTALL
+	$(SED) 's/^noclobber="0"$$/noclobber="1"/' $(@D)/applets/install.sh
+endef
+
 # Add /bin/{a,hu}sh to /etc/shells otherwise some login tools like dropbear
 # can reject the user connection. See man shells.
 define BUSYBOX_INSTALL_ADD_TO_SHELLS
@@ -340,6 +370,8 @@ define BUSYBOX_INSTALL_INIT_SYSV
 	$(BUSYBOX_INSTALL_MDEV_SCRIPT)
 	$(BUSYBOX_INSTALL_LOGGING_SCRIPT)
 	$(BUSYBOX_INSTALL_WATCHDOG_SCRIPT)
+	$(BUSYBOX_INSTALL_INETD_SCRIPT) 
+	$(BUSYBOX_INSTALL_INETD_CONF)
 	$(BUSYBOX_INSTALL_TELNET_SCRIPT)
 	$(BUSYBOX_INSTALL_INDIVIDUAL_BINARIES)
 endef

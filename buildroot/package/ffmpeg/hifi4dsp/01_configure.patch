@@ -1,0 +1,16 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/configure
+===================================================================
+--- ffmpeg-3.4.5-ori/configure	2018-11-02 02:34:35.000000000 +0800
++++ ffmpeg-3.4.5/configure	2019-08-02 14:02:25.187768771 +0800
+@@ -2561,6 +2561,7 @@
+ opus_decoder_deps="swresample"
+ opus_decoder_select="mdct15"
+ opus_encoder_select="audio_frame_queue mdct15"
++mpegaudio_extralibs="-lhifi4rpc_client -lhifi4rpc"
+ png_decoder_select="zlib"
+ png_encoder_select="llvidencdsp zlib"
+ prores_decoder_select="blockdsp idctdsp"
+

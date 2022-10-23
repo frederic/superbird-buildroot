@@ -1,0 +1,44 @@
+diff --git a/src/daemon/default.pa.in b/src/daemon/default.pa.in
+--- a/src/daemon/default.pa.in	2017-10-23 14:24:00.534065782 +0800
++++ b/src/daemon/default.pa.in	2017-10-24 14:04:17.513999728 +0800
+@@ -28,14 +28,16 @@
+ 
+ ### Automatically augment property information from .desktop files
+ ### stored in /usr/share/application
+-load-module module-augment-properties
++#load-module module-augment-properties
+ 
+ ### Should be after module-*-restore but before module-*-detect
+-load-module module-switch-on-port-available
++#load-module module-switch-on-port-available
+ 
+ ### Load audio drivers statically
+ ### (it's probably better to not load these drivers manually, but instead
+ ### use module-udev-detect -- see below -- for doing this automatically)
++load-module module-alsa-sink device=hw:0,2
++load-module module-alsa-source device=hw:0,3
+ ifelse(@HAVE_ALSA@, 1, [dnl
+ #load-module module-alsa-sink
+ #load-module module-alsa-source device=hw:1,0
+@@ -65,7 +67,7 @@
+ .ifexists module-detect@PA_SOEXT@
+ ])dnl
+ ### Use the static hardware detection module (for systems that lack udev support)
+-load-module module-detect
++#load-module module-detect
+ .endif
+ 
+ ### Automatically connect sink and source if JACK server is present
+@@ -141,10 +143,10 @@
+ ### If autoexit on idle is enabled we want to make sure we only quit
+ ### when no local session needs us anymore.
+ .ifexists module-console-kit@PA_SOEXT@
+-load-module module-console-kit
++#load-module module-console-kit
+ .endif
+ .ifexists module-systemd-login@PA_SOEXT@
+-load-module module-systemd-login
++#load-module module-systemd-login
+ .endif
+ 
+ ### Enable positioned event sounds

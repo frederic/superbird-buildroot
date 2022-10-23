@@ -1,0 +1,17 @@
+#!/bin/sh
+
+case "$1" in
+    stop)
+        /usr/bin/killall -9 avs_moniter.sh
+        /usr/bin/killall -9 SampleApp
+    ;;
+    restart) ;;
+    start)
+        /etc/init.d/avs_moniter.sh &
+    ;;
+    netup|netdown|netchange|netready) ;;
+    *)
+    echo "Usage: $0 {start|stop|restart|netready|netup|netdown|netchange}"
+    exit 1
+    ;;
+esac

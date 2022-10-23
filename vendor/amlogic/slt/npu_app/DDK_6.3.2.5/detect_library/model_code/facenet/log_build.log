@@ -1,0 +1,3 @@
+/mnt/fileroot/deng.liu/liu/basesrc-6.3.2.5/common.target:83: warning: overriding commands for target `bin_r/libnn_facenet.so'
+/mnt/fileroot/deng.liu/liu/basesrc-6.3.2.5/common.target:64: warning: ignoring old commands for target `bin_r/libnn_facenet.so'
+make: Nothing to be done for `all'.

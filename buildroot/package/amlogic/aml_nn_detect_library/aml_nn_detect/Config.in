@@ -1,0 +1,14 @@
+config BR2_PACKAGE_AML_NN_DETECT
+    bool "aml nn_detect"
+    help
+        Support nn detection base library
+
+if BR2_PACKAGE_AML_NN_DETECT
+source "package/amlogic/aml_nn_detect_library/aml_nn_detect_mtcnn_v1/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_detect_yolo_v2/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_detect_yolo_v3/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_detect_yoloface/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_facenet/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_face_recognition/Config.in"
+source "package/amlogic/aml_nn_detect_library/aml_nn_face_detection/Config.in"
+endif

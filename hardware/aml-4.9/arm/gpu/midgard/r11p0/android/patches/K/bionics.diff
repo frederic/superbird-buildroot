@@ -1,0 +1,202 @@
+diff --git a/libc/Android.mk b/libc/Android.mk
+index 9610c14..d3dbe81 100644
+--- a/libc/Android.mk
++++ b/libc/Android.mk
+@@ -214,6 +215,7 @@ libc_bionic_src_:= \
+     bionic/libc_init_common.cpp \
+     bionic/libc_logging.cpp \
+     bionic/libgen.cpp \
++    bionic/locale.cpp \
+     bionic/mmap.cpp \
+     bionic/pthread_attr.cpp \
+     bionic/pthread_detach.cpp \
+@@ -232,7 +232,6 @@ libc_bionic_src_files := \
+     bionic/scandir.cpp \
+     bionic/sched_getaffinity.cpp \
+     bionic/__set_errno.cpp \
+-    bionic/setlocale.cpp \
+     bionic/signalfd.cpp \
+     bionic/sigwait.cpp \
+     bionic/statvfs.cpp \
+diff --git a/libc/bionic/wchar.cpp b/libc/bionic/wchar.cpp
+index 50a3875..cc830b7 100644
+--- a/libc/bionic/wchar.cpp
++++ b/libc/bionic/wchar.cpp
+@@ -96,6 +96,7 @@ int swscanf(const wchar_t* /*s*/, const wchar_t* /*format*/, ... ) {
+
+ int iswalnum(wint_t wc) { return isalnum(wc); }
+ int iswalpha(wint_t wc) { return isalpha(wc); }
++int iswblank(wint_t wc) { return isblank(wc); }
+ int iswcntrl(wint_t wc) { return iscntrl(wc); }
+ int iswdigit(wint_t wc) { return isdigit(wc); }
+ int iswgraph(wint_t wc) { return isgraph(wc); }
+diff --git a/libc/include/assert.h b/libc/include/assert.h
+index 62470f5..361a5ff 100644
+--- a/libc/include/assert.h
++++ b/libc/include/assert.h
+@@ -60,6 +60,6 @@
+ #endif
+
+ __BEGIN_DECLS
+-__dead void __assert(const char *, int, const char *);
+-__dead void __assert2(const char *, int, const char *, const char *);
++__dead void __assert(const char *, int, const char *) __noreturn;
++__dead void __assert2(const char *, int, const char *, const char *) __noreturn;
+ __END_DECLS
+diff --git a/libc/include/ctype.h b/libc/include/ctype.h
+index 5557e31..a66df12 100644
+--- a/libc/include/ctype.h
++++ b/libc/include/ctype.h
+@@ -45,11 +45,14 @@
+ #define	_CTYPE_U	0x01
+ #define	_CTYPE_L	0x02
+ #define	_CTYPE_N	0x04
++#define	_CTYPE_D	0x04
+ #define	_CTYPE_S	0x08
+ #define	_CTYPE_P	0x10
+ #define	_CTYPE_C	0x20
+ #define	_CTYPE_X	0x40
+ #define	_CTYPE_B	0x80
++#define	_CTYPE_R	(_CTYPE_P|_CTYPE_U|_CTYPE_L|_CTYPE_D|_CTYPE_B)
++#define	_CTYPE_A	(_CTYPE_L|_CTYPE_U)
+
+ __BEGIN_DECLS
+
+diff --git a/libc/include/locale.h b/libc/include/locale.h
+index 65b5c7d..6989851 100644
+--- a/libc/include/locale.h
++++ b/libc/include/locale.h
+@@ -29,6 +29,7 @@
+ #define _LOCALE_H_
+
+ #include <sys/cdefs.h>
++#include <xlocale.h>
+
+ __BEGIN_DECLS
+
+@@ -43,17 +44,65 @@ enum {
+     LC_PAPER     = 7,
+     LC_NAME      = 8,
+     LC_ADDRESS   = 9,
+-
+     LC_TELEPHONE      = 10,
+     LC_MEASUREMENT    = 11,
+     LC_IDENTIFICATION = 12
+ };
+
+-extern char *setlocale(int category, const char *locale);
++#define LC_CTYPE_MASK          (1 << LC_CTYPE)
++#define LC_NUMERIC_MASK        (1 << LC_NUMERIC)
++#define LC_TIME_MASK           (1 << LC_TIME)
++#define LC_COLLATE_MASK        (1 << LC_COLLATE)
++#define LC_MONETARY_MASK       (1 << LC_MONETARY)
++#define LC_MESSAGES_MASK       (1 << LC_MESSAGES)
++#define LC_PAPER_MASK          (1 << LC_PAPER)
++#define LC_NAME_MASK           (1 << LC_NAME)
++#define LC_ADDRESS_MASK        (1 << LC_ADDRESS)
++#define LC_TELEPHONE_MASK      (1 << LC_TELEPHONE)
++#define LC_MEASUREMENT_MASK    (1 << LC_MEASUREMENT)
++#define LC_IDENTIFICATION_MASK (1 << LC_IDENTIFICATION)
++
++#define LC_ALL_MASK (LC_CTYPE_MASK | LC_NUMERIC_MASK | LC_TIME_MASK | LC_COLLATE_MASK | \
++                     LC_MONETARY_MASK | LC_MESSAGES_MASK | LC_PAPER_MASK | LC_NAME_MASK | \
++                     LC_ADDRESS_MASK | LC_TELEPHONE_MASK | LC_MEASUREMENT_MASK | \
++                     LC_IDENTIFICATION_MASK)
++
++struct lconv {
++    char* decimal_point;
++    char* thousands_sep;
++    char* grouping;
++    char* int_curr_symbol;
++    char* currency_symbol;
++    char* mon_decimal_point;
++    char* mon_thousands_sep;
++    char* mon_grouping;
++    char* positive_sign;
++    char* negative_sign;
++    char  int_frac_digits;
++    char  frac_digits;
++    char  p_cs_precedes;
++    char  p_sep_by_space;
++    char  n_cs_precedes;
++    char  n_sep_by_space;
++    char  p_sign_posn;
++    char  n_sign_posn;
++    char  int_p_cs_precedes;
++    char  int_p_sep_by_space;
++    char  int_n_cs_precedes;
++    char  int_n_sep_by_space;
++    char  int_p_sign_posn;
++    char  int_n_sign_posn;
++};
++
++struct lconv* localeconv(void);
++
++locale_t duplocale(locale_t);
++void freelocale(locale_t);
++locale_t newlocale(int, const char*, locale_t);
++char* setlocale(int, const char*);
++locale_t uselocale(locale_t);
+
+-/* Make libstdc++-v3 happy.  */
+-struct lconv { };
+-struct lconv *localeconv(void);
++#define LC_GLOBAL_LOCALE ((locale_t) -1L)
+
+ __END_DECLS
+
+diff --git a/libc/include/stdio.h b/libc/include/stdio.h
+index 23fc944..28685c7 100644
+--- a/libc/include/stdio.h
++++ b/libc/include/stdio.h
+@@ -469,7 +469,10 @@ int vsprintf(char *dest, const char *format, __va_list ap)
+ }
+
+ #if defined(__clang__)
+-#define snprintf(dest, size, ...) __builtin___snprintf_chk(dest, size, 0, __bos(dest), __VA_ARGS__)
++  #if !defined(snprintf)
++    #define __wrap_snprintf(dest, size, ...) __builtin___snprintf_chk(dest, size, 0, __bos(dest), __VA_ARGS__)
++    #define snprintf(...) __wrap_snprintf(__VA_ARGS__)
++  #endif
+ #else
+ __BIONIC_FORTIFY_INLINE
+ __printflike(3, 4)
+@@ -481,7 +484,10 @@ int snprintf(char *dest, size_t size, const char *format, ...)
+ #endif
+
+ #if defined(__clang__)
+-#define sprintf(dest, ...) __builtin___sprintf_chk(dest, 0, __bos(dest), __VA_ARGS__)
++  #if !defined(sprintf)
++    #define __wrap_sprintf(dest, ...) __builtin___sprintf_chk(dest, 0, __bos(dest), __VA_ARGS__)
++    #define sprintf(...) __wrap_sprintf(__VA_ARGS__)
++  #endif
+ #else
+ __BIONIC_FORTIFY_INLINE
+ __printflike(2, 3)
+diff --git a/libc/include/stdlib.h b/libc/include/stdlib.h
+index 9fa84c1..188da69 100644
+--- a/libc/include/stdlib.h
++++ b/libc/include/stdlib.h
+@@ -68,6 +68,10 @@ static __inline__ float strtof(const char *nptr, char **endptr)
+     return (float)strtod(nptr, endptr);
+ }
+
++static __inline__ long double strtold(const char* s, char** end_ptr) {
++  return (long double)strtod(s, end_ptr);
++}
++
+ extern int atoi(const char *) __purefunc;
+ extern long atol(const char *) __purefunc;
+ extern long long atoll(const char *) __purefunc;
+diff --git a/libc/include/wchar.h b/libc/include/wchar.h
+index 76ac02c..c413806 100644
+--- a/libc/include/wchar.h
++++ b/libc/include/wchar.h
+@@ -77,6 +77,7 @@ extern int               fwprintf(FILE *, const wchar_t *, ...);
+ extern int               fwscanf(FILE *, const wchar_t *, ...);
+ extern int               iswalnum(wint_t);
+ extern int               iswalpha(wint_t);
++extern int               iswblank(wint_t);
+ extern int               iswcntrl(wint_t);
+ extern int               iswdigit(wint_t);
+ extern int               iswgraph(wint_t);

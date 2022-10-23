@@ -65,7 +65,7 @@ extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
  * adjust this accordingly.
  */
 #define NAND_MAX_OOBSIZE       744
-#define NAND_MAX_PAGESIZE      8192
+#define NAND_MAX_PAGESIZE      16384
 #endif
 
 /*
@@ -564,8 +564,7 @@ struct nand_buffers {
 #else
 	uint8_t	ecccalc[ALIGN(NAND_MAX_OOBSIZE, ARCH_DMA_MINALIGN)];
 	uint8_t	ecccode[ALIGN(NAND_MAX_OOBSIZE, ARCH_DMA_MINALIGN)];
-	uint8_t databuf[ALIGN(NAND_MAX_PAGESIZE + NAND_MAX_OOBSIZE,
-			      ARCH_DMA_MINALIGN)];
+	uint8_t databuf[ALIGN(NAND_MAX_PAGESIZE + NAND_MAX_OOBSIZE, ARCH_DMA_MINALIGN)];
 #endif
 };
 
@@ -732,7 +731,7 @@ struct nand_chip {
 	struct nand_onfi_params	onfi_params;
 #endif
 	struct nand_jedec_params jedec_params;
- 
+
 	int read_retries;
 
 	flstate_t state;
@@ -772,6 +771,12 @@ struct nand_chip {
 #define NAND_MFR_EON		0x92
 #define NAND_MFR_SANDISK	0x45
 #define NAND_MFR_INTEL		0x89
+#define NAND_ID_WINBOND		0xef
+#define NAND_ID_ESMT		0xc8
+#define NAND_MFR_GIGA		0xc8
+#define NAND_MFR_DOSILICON	0xf8
+#define NAND_MFR_ATO		0x9b
+#define NAND_MFR_ZETTA		0xba
 
 /* The maximum expected count of bytes in the NAND ID sequence */
 #define NAND_MAX_ID_LEN 8
@@ -1009,8 +1014,9 @@ static inline int nand_opcode_8bits(unsigned int command)
 /* return the supported JEDEC features. */
 static inline int jedec_feature(struct nand_chip *chip)
 {
-	return chip->jedec_version ? le16_to_cpu(chip->jedec_params.features)
-		: 0;
+	//return chip->jedec_version ? le16_to_cpu(chip->jedec_params.features)
+	//	: 0;
+	return 0;
 }
 
 #ifdef __UBOOT__

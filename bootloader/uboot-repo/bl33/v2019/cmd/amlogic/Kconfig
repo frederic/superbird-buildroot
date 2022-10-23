@@ -1,0 +1,75 @@
+menu "Amlogic commands"
+
+config AML_RPMB_DISABLE
+	bool "support RPMB set in bootargs"
+	default n
+	help
+	  Support RPMB set in bootargs.
+
+config AML_STORE_WRAPPER
+	depends on AML_STORAGE
+	bool "wrapper for store"
+	default y
+	help
+	  based on AML_STORAGE
+	  read/write don't care bad blocks
+
+config AML_STORE_WRAPPER
+	depends on AML_STORAGE
+	bool "wrapper for store"
+	default y
+	help
+	  based on AML_STORAGE
+	  read/write don't care bad blocks
+
+config AML_IMG_READ
+	depends on AML_STORAGE
+	bool "image read"
+	default y
+	help
+	  based on AML_STORAGE
+	  read image without specify size
+
+config AML_DEFENV
+	bool "aml defenv_without"
+	default y
+	help
+	  support reserv env from c array
+
+config BOOTLOADER_CONTROL_BLOCK
+	bool "bootloader control block support"
+	default n
+	help
+	  used for recovery and the bootloader to talk to each other
+
+config CMD_BOOTCTOL_AVB
+	bool "avb cmd"
+	default n
+	help
+	  support avb related cmds
+
+config CMD_RSVMEM
+	bool "rsvmem cmd"
+	default y
+	help
+	  support rsvmem cmd
+
+config CMD_DDR_D2PLL
+	bool "d2pll cmd"
+	default n
+	help
+	  support d2pll cmd
+
+config CMD_DDR_TEST
+	bool "ddr test cmd"
+	default y
+	help
+	  support ddr_test cmd
+
+config CMD_OS_IDENT
+	bool "os_ident"
+	default y
+	help
+	  Ident OS type
+
+endmenu

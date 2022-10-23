@@ -1,0 +1,308 @@
+# function list
+
+config PXP_EMULATOR
+	bool "Amlogic Pxp emulater flag"
+	help
+		Support PXP environment
+
+config AML_BL33_COMPRESS_ENABLE
+	bool "Amlogic U-boot compress"
+	help
+		Support U-boot compress function
+
+config AML_CRYPTO_AES
+	bool "Amlogic Crypto AES for Secure Boot"
+	help
+		"Support AES for Amlogic Secure Boot"
+
+config AML_SECURE_BOOT_V3
+	bool "Amlogic SecureBoot V3"
+	help
+		"Support Amlogic SecureBoot V3 version"
+
+config FIP_IMG_SUPPORT
+	bool "Amlogic FIP IMG format file"
+	help
+		"Support Amlogic FIP IMG format"
+
+config AML_SECURE_UBOOT
+	bool "Amlogic SecureBoot function"
+	help
+		"Support Amlogic SecureBoot function"
+
+config AML_CRYPTO_UBOOT
+	bool "Encrypt Amlogic U-boot"
+	help
+		"Support U-boot encrypt function"
+
+config AML_TSENSOR
+	bool "Amlogic Temp Sensor"
+	help
+		"Support Amlogic Thermal Sensor"
+
+config AML_TSENSOR_COOL
+	bool "Amlogic HIGH TEMP COOL"
+	depends on AML_TSENSOR
+	help
+		"Support Amlogic High Temperature Cool"
+
+config AML_OSCRING
+	bool "Amlogic OSCRING MSR"
+	help
+		"Support Amlogic chip oscring msr"
+
+config SYS_VENDOR
+	string "Vendor name"
+	default "amlogic"
+	help
+	  This option contains information about board name.
+	  Based on this option board/<CONFIG_SYS_VENDOR>/<CONFIG_SYS_BOARD> will
+	  be used.
+
+config NEED_BL32
+	bool "Enable bl32"
+	default n
+	help
+		"Support bl32 function"
+
+config DTB_MEM_ADDR
+	hex
+	default 0x01000000
+	help
+		"select Device tree load address"
+
+config MULTI_DTB
+	bool "Amlogic Multi-DT function"
+	default n
+	help
+		"Support Multi-DT function"
+
+if MESON_GXBB
+
+config TARGET_ODROID_C2
+	bool "ODROID-C2"
+	help
+	  ODROID-C2 is a single board computer based on Meson GXBaby
+	  with 2 GiB of RAM, Gigabit Ethernet, HDMI, 4 USB, micro-SD
+	  slot, eMMC, IR receiver and a 40-pin GPIO header.
+
+endif
+
+if MESON_GXL
+
+config SYS_SOC
+	default "gxl"
+
+config TARGET_P212
+	bool "P212"
+	help
+	  P212 is a reference dessign board based on Meson GXL S905X SoC
+	  with 2 GiB of RAM, Ethernet, HDMI, 2 USB, micro-SD slot,
+	  eMMC, IR receiver, CVBS+Audio jack and a SDIO WiFi module.
+
+config TARGET_LIBRETECH_CC
+	bool "LIBRETECH-CC"
+	help
+	  LibreTech CC is a single board computer based on Meson GXL
+	  with 2 GiB of RAM, Ethernet, HDMI, 4 USB, micro-SD slot,
+	  eMMC, IR receiver and a 40-pin GPIO header.
+
+config TARGET_KHADAS_VIM
+	bool "KHADAS-VIM"
+	help
+	  Khadas VIM is a single board computer based on Meson GXL
+	  with 2 GiB of RAM, Ethernet, HDMI, 4 USB, micro-SD slot,
+	  eMMC, IR receiver and a 40-pin GPIO header.
+
+endif
+
+# G12A series boards
+
+if MESON_A1
+
+config SYS_SOC
+	default "a1"
+
+choice
+	prompt "A1 Board"
+
+config A1_AD401_NOR_RTOS
+	bool "A1_AD401_NOR_RTOS"
+	select TARGET_A1_AD401
+	select MTD_SPI_FLASH
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD401 NOR RTOS board config
+
+config A1_AD401_NAND_RTOS
+	bool "A1_AD401_NAND_RTOS"
+	select TARGET_A1_AD401
+	select SPI_NAND
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD401 NOR RTOS board config
+
+config A1_AD401_NAND_LINUX
+	bool "A1_AD401_NAND_LINUX"
+	select TARGET_A1_AD401
+	select SPI_NAND
+	help
+	  Select A1 AD401 NOR RTOS board config
+
+config A1_AD402_NOR_RTOS
+	bool "A1_AD402_NOR_RTOS"
+	select TARGET_A1_AD402
+	select MTD_SPI_FLASH
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD402 NOR RTOS board config
+
+config A1_AD402_NAND_RTOS
+	bool "A1_AD402_NAND_RTOS"
+	select TARGET_A1_AD402
+	select SPI_NAND
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD402 NOR RTOS board config
+
+config A1_AD402_NAND_LINUX
+	bool "A1_AD402_NAND_LINUX"
+	select TARGET_A1_AD402
+	select SPI_NAND
+	help
+	  Select A1 AD402 NOR RTOS board config
+
+config A1_AD409_NOR_RTOS
+	bool "A1_AD409_NOR_RTOS"
+	select TARGET_A1_AD409
+	select MTD_SPI_FLASH
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD409 NOR RTOS board config
+
+config A1_AD409_NAND_RTOS
+	bool "A1_AD409_NAND_RTOS"
+	select TARGET_A1_AD409
+	select SPI_NAND
+	select SYSTEM_RTOS
+	help
+	  Select A1 AD409 NOR RTOS board config
+
+config A1_AD409_NAND_LINUX
+	bool "A1_AD409_NAND_LINUX"
+	select TARGET_A1_AD409
+	select SPI_NAND
+	help
+	  Select A1 AD409 NOR RTOS board config
+
+endchoice
+
+config TARGET_A1_AD401
+	bool "A1 AD401 board"
+	depends on A1_AD401_NOR_RTOS || A1_AD401_NAND_RTOS || A1_AD401_NAND_LINUX
+
+config TARGET_A1_AD402
+	bool "A1 AD402 board"
+	depends on A1_AD402_NOR_RTOS || A1_AD402_NAND_RTOS || A1_AD402_NAND_LINUX
+
+config TARGET_A1_AD409
+	bool "A1 AD409 board"
+	depends on A1_AD409_NOR_RTOS || A1_AD409_NAND_RTOS || A1_AD409_NAND_LINUX
+
+config SYSTEM_RTOS
+	bool "SYSTEM_RTOS_PARTITION"
+	default n
+	depends on A1_AD401_NOR_RTOS || A1_AD402_NOR_RTOS || A1_AD409_NOR_RTOS || A1_AD401_NAND_RTOS || A1_AD402_NAND_RTOS || A1_AD409_NAND_RTOS
+	help
+	  Select SYSTEM RTOS partition table
+
+endif
+
+
+if MESON_C1
+
+config SYS_SOC
+	default "c1"
+
+choice
+	prompt "C1 Board"
+
+config C1_AE409
+	bool "C1_AE409"
+	select TARGET_C1_AE409
+	help
+	  Select C1 SKT(AE409) config
+
+config C1_AE400
+	bool "C1_AE400"
+	select TARGET_C1_AE400
+	help
+	  Select C1 AE400 config
+
+config C1_AE401
+	bool "C1_AE401"
+	select TARGET_C1_AE401
+	help
+	  Select C1 AE401 config
+
+endchoice
+
+config TARGET_C1_AE409
+	bool "C1 AE409 board"
+	depends on C1_AE409
+
+config TARGET_C1_AE400
+	bool "C1 AE400 board"
+	depends on C1_AE400
+
+config TARGET_C1_AE401
+	bool "C1 AE401 board"
+	depends on C1_AE401
+
+endif
+
+if MESON_G12A
+
+config SYS_SOC
+	default "g12a"
+
+config TARGET_G12A_U200_V1
+	bool "G12A_U200_V1"
+
+config TARGET_G12A_U211_V1
+	bool "G12A_U211_V1"
+
+config TARGET_SM1_AC200_V1
+	bool "SM1_AC200_V1"
+
+endif
+
+if MESON_G12B
+
+config SYS_SOC
+	default "g12b"
+
+config TARGET_G12B_W400_V1
+	bool "G12B_W400_V1"
+
+endif
+
+# Amlogic boards
+
+source "board/amlogic/a1_ad409/Kconfig"
+
+source "board/amlogic/a1_ad401/Kconfig"
+
+source "board/amlogic/a1_ad402/Kconfig"
+
+source "board/amlogic/c1_ae400/Kconfig"
+
+source "board/amlogic/c1_ae401/Kconfig"
+
+source "board/amlogic/c1_ae409/Kconfig"
+
+source "board/amlogic/g12a_u200_v1/Kconfig"
+
+source "board/amlogic/g12b_w400_v1/Kconfig"
+
+source "board/amlogic/sm1_ac200_v1/Kconfig"

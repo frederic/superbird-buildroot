@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <linux/device.h>
 #include <linux/fault-inject.h>
+#include <linux/blkdev.h>
 
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
@@ -154,6 +155,7 @@ struct mmc_host_ops {
 					 int card_drv, int *drv_type);
 	void	(*hw_reset)(struct mmc_host *host);
 	void	(*card_event)(struct mmc_host *host);
+	int (*post_hs400_timming)(struct mmc_host *host);
 
 	/*
 	 * Optional callback to support controllers with HW issues for multiple
@@ -225,6 +227,10 @@ struct mmc_host {
 	unsigned int		f_min;
 	unsigned int		f_max;
 	unsigned int		f_init;
+#ifdef CONFIG_AMLOGIC_MMC
+	u8 first_init_flag;
+	int	wifi_down_f;
+#endif
 	u32			ocr_avail;
 	u32			ocr_avail_sdio;	/* SDIO-specific OCR */
 	u32			ocr_avail_sd;	/* SD-specific OCR */
@@ -278,6 +284,9 @@ struct mmc_host {
 #define MMC_CAP_UHS_SDR50	(1 << 17)	/* Host supports UHS SDR50 mode */
 #define MMC_CAP_UHS_SDR104	(1 << 18)	/* Host supports UHS SDR104 mode */
 #define MMC_CAP_UHS_DDR50	(1 << 19)	/* Host supports UHS DDR50 mode */
+#ifdef CONFIG_AMLOGIC_MMC
+#define MMC_CAP_RUNTIME_RESUME (1 << 20)	/* Resume at runtime_resume */
+#endif
 #define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports Driver Type A */
 #define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports Driver Type C */
 #define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports Driver Type D */
@@ -287,8 +296,11 @@ struct mmc_host {
 
 	u32			caps2;		/* More host capabilities */
 
-#define MMC_CAP2_BOOTPART_NOACC	(1 << 0)	/* Boot partition no access */
-#define MMC_CAP2_FULL_PWR_CYCLE	(1 << 2)	/* Can do full power cycle */
+#define MMC_CAP2_BOOTPART_NOACC	(1 << 0) /* Boot partition no access */
+#define MMC_CAP2_FULL_PWR_CYCLE	(1 << 2) /* Can do full power cycle */
+#ifdef CONFIG_AMLOGIC_MMC
+#define MMC_CAP2_NO_MULTI_READ  (1 << 3) /* Multiblock reads don't work */
+#endif
 #define MMC_CAP2_HS200_1_8V_SDR	(1 << 5)        /* can support */
 #define MMC_CAP2_HS200_1_2V_SDR	(1 << 6)        /* can support */
 #define MMC_CAP2_HS200		(MMC_CAP2_HS200_1_8V_SDR | \
@@ -397,6 +409,21 @@ struct mmc_host {
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	struct {
+		struct sdio_cis			*cis;
+		struct sdio_cccr		*cccr;
+		struct sdio_embedded_func	*funcs;
+		int				num_funcs;
+	} embedded_sdio_data;
+#endif
+
+#ifdef CONFIG_BLOCK
+	int			latency_hist_enabled;
+	struct io_latency_state io_lat_read;
+	struct io_latency_state io_lat_write;
+#endif
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -405,6 +432,14 @@ int mmc_add_host(struct mmc_host *);
 void mmc_remove_host(struct mmc_host *);
 void mmc_free_host(struct mmc_host *);
 int mmc_of_parse(struct mmc_host *host);
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
+				       struct sdio_cis *cis,
+				       struct sdio_cccr *cccr,
+				       struct sdio_embedded_func *funcs,
+				       int num_funcs);
+#endif
 
 static inline void *mmc_priv(struct mmc_host *host)
 {

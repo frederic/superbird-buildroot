@@ -1,0 +1,14 @@
+config BR2_PACKAGE_AML_NN_FACE_RECOGNITION
+    bool "aml nn face recognition library"
+    depends on BR2_PACKAGE_NPU
+    select BR2_PACKAGE_OPENCV3
+    select BR2_PACKAGE_OPENCV3_LIB_HIGHGUI
+    select BR2_PACKAGE_OPENCV3_GUI_NONE
+    select BR2_PACKAGE_OPENCV3_LIB_IMGCODECS
+    select BR2_PACKAGE_OPENCV3_LIB_IMGPROC
+    select BR2_PACKAGE_OPENCV3_LIB_VIDEOIO
+    select BR2_PACKAGE_OPENCV3_WITHOUT_GSTREAMER
+    select BR2_PACKAGE_OPENCV3_WITH_V4L
+    select BR2_PACKAGE_OPENCV3_LIB_VIDEO
+    help
+        Support nn face recognition library

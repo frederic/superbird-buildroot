@@ -1,0 +1,14 @@
+/*--------------------------------------------------------------------------*/
+/* The confidential and proprietary information contained in this file may  */
+/* only be used by a person authorised under and to the extent permitted    */
+/* by a subsisting licensing agreement from ARM Limited or its affiliates.  */
+/*                                                                          */
+/*          (C) COPYRIGHT 2018 ARM Limited or its affiliates.               */
+/*                        ALL RIGHTS RESERVED                               */
+/*                                                                          */
+/* This entire notice must be reproduced on all copies of this file         */
+/* and copies of this file may only be made by a person if such person is   */
+/* permitted to do so under the terms of a subsisting license agreementv    */
+/* from ARM Limited or its affiliates.                                      */
+/*--------------------------------------------------------------------------*/
+*{font-family:Tahoma,sans-serif}body{display:flex;flex-direction:column;overflow:hidden}.content{position:absolute;top:40px;right:50px;bottom:40px;left:40px;margin:0;display:flex;flex-direction:column}#toolbar{flex-wrap:nowrap}#toolbar label{margin-left:30px}#toolbar input{margin-left:10px}#toolbar button{margin-left:30px}#save{margin-right:10px}@keyframes dash{to{stroke-dashoffset:100}}.moving-connection-highlight[visible]{animation:dash 2s linear infinite}.component{position:absolute;transform-origin:center;-moz-transform-origin:0 0}text{font-weight:500}.hidden{display:none!important}#drawing-area-container{position:relative;flex:1}#drawing-area{background-color:#fafafa;position:absolute;top:0;right:0;bottom:0;left:0;overflow-x:auto;overflow-y:auto}#loading-screen{position:absolute;top:0;right:0;bottom:0;left:0;background-color:#000;opacity:.5;display:flex;justify-content:center;align-items:center}#loading-text{font-size:30px;color:#fff;font-family:Tahoma,sans-serif}#es6-warning-header{width:100%;background-color:red;font-weight:700;padding-top:5px;padding-bottom:5px;text-align:center}#component-properties{min-width:200px;width:15%;position:absolute;right:10px;top:10px;background-color:#f1f1f1}#component-properties h1{background-color:#dcdcdc;font-size:14px;padding:5px;margin:0}#component-properties table{width:100%;margin:5px}#component-properties td{padding:5px;font-size:14px}.highlighted-component{stroke:#ff0;stroke-width:7px;stroke-opacity:1}

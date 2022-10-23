@@ -1,0 +1,8 @@
+/etc/dhcpcd.conf
+/etc/network/interfaces
+/etc/default/ntpd
+/etc/hostname
+/etc/hosts
+/etc/wpa_supplicant.conf
+/etc/localtime
+/etc/ipc.json

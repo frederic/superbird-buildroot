@@ -1,0 +1,5 @@
+*.o
+*.lo
+*.libs/
+*.deps/
+*.dirstamp

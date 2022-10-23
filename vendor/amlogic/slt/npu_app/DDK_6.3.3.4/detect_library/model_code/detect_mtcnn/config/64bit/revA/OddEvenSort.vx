@@ -1,0 +1,178 @@
+/*
+ ============================================================================
+ Name        : OddEvenSort.vx
+ Author      : VSI
+ Version     :
+ Copyright   : Your copyright notice
+ Description : 
+ ============================================================================
+ */
+#include "cl_viv_vx_ext.h"
+#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+
+#define FACE_INFO_SIZE 10
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
+/* FaceInfo
+	f32 f32X1;     0
+	f32 f32Y1;     1
+	f32 f32X2;     2
+	f32 f32Y2;     3
+	f32 f32Score;  4 
+	f32 f32Reserved; 5
+	f32Reg[4]        6789
+*/
+
+#define ELEMENT_NUM 20
+typedef   struct
+{
+    float f32X1;
+    float f32Y1;
+    float f32X2;
+    float f32Y2;
+    float f32Score;
+    float f32Reserved;
+}TFaceRect;
+
+typedef struct
+{
+    float f32X[5];
+    float f32Y[5];
+}TFacePts;
+
+typedef struct
+{
+    TFaceRect tBox;
+    float reg[4];
+    TFacePts tPts;
+} TFaceInfo;
+
+#define THREAD_NUM 16
+#define MAX(a,b) ((a)>(b)?(a):(b))
+__kernel __attribute__((reqd_work_group_size(16,1,1)))
+void OddEvenSortVXC
+        (
+            vx_array_float inputData,
+            global int*changeFlag,
+            global int* len,
+            global char* usedFroLinkGraphIn,
+            global char* usedForLinkGraphOut
+        )
+{
+    int x = get_global_id(0);
+    int boxNum1 = *len - 1;
+    int numPerThread = (boxNum1 + THREAD_NUM) / THREAD_NUM;
+
+    *changeFlag = 0;
+    numPerThread = numPerThread + (numPerThread & 1);
+    numPerThread = MAX(numPerThread, 2);
+    int x2 = x  * numPerThread;
+    int x3 = x2 + numPerThread;
+    int j = 0, k = 0;
+
+    __global TFaceInfo* faceInfoPtr = (__global TFaceInfo*)inputData.item;
+    //__global TFaceInfo* outFaceInfoPtr = (__global TFaceInfo*)inputData.item;
+
+    __global float* input = (__global float*)inputData.item;
+    __global float* output = (__global float*)inputData.item;
+
+    //faceInfoPtr[x].tBox.f32Score = (float)(*len);
+#if 1
+    while (true)
+    {
+        if(x == 0)
+            *changeFlag = 0;
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        float4 tmp;
+        for (int i=x2; i<x3; i+=2)
+        {
+            if (i >= boxNum1)
+                continue;
+
+            float leftScore = faceInfoPtr[i].tBox.f32Score;
+            float rightScore = faceInfoPtr[i+1].tBox.f32Score;
+            j = i * ELEMENT_NUM;
+            k = j + ELEMENT_NUM;
+            if (leftScore < rightScore)
+            {
+                tmp = vload4(0, input + j);
+                vstore4(vload4(0, input + k), 0, output + j);
+                vstore4(tmp, 0, output + k);
+
+                tmp = vload4(1, input + j);
+                vstore4(vload4(1, input + k), 1, output + j);
+                vstore4(tmp, 1, output + k);
+
+                tmp = vload4(2, input + j);
+                vstore4(vload4(2, input + k), 2, output + j);
+                vstore4(tmp, 2, output + k);
+
+                tmp = vload4(3, input + j);
+                vstore4(vload4(3, input + k), 3, output + j);
+                vstore4(tmp, 3, output + k);
+
+                tmp = vload4(4, input + j);
+                vstore4(vload4(4, input + k), 4, output + j);
+                vstore4(tmp, 4, output + k);
+
+#if 0
+                TFaceInfo tmp = faceInfoPtr[i];
+                outFaceInfoPtr[i] = faceInfoPtr[i+1];
+                outFaceInfoPtr[i + 1] = tmp;
+#endif
+                atomic_inc(changeFlag);
+            }
+        }
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        for (int i=x2+1; i<x3; i+=2) 
+        {
+            if (i >= boxNum1)
+                continue;
+
+            float leftScore = faceInfoPtr[i].tBox.f32Score;
+            float rightScore = faceInfoPtr[i+1].tBox.f32Score;
+            //j = i + 1;
+            j = i * ELEMENT_NUM;
+            k = j + ELEMENT_NUM;
+            if (leftScore < rightScore)
+            {
+                tmp = vload4(0, input + j);
+                vstore4(vload4(0, input + k), 0, output + j);
+                vstore4(tmp, 0, output + k);
+
+                tmp = vload4(1, input + j);
+                vstore4(vload4(1, input + k), 1, output + j);
+                vstore4(tmp, 1, output + k);
+
+                tmp = vload4(2, input + j);
+                vstore4(vload4(2, input + k), 2, output + j);
+                vstore4(tmp, 2, output + k);
+
+                tmp = vload4(3, input + j);
+                vstore4(vload4(3, input + k), 3, output + j);
+                vstore4(tmp, 3, output + k);
+
+                tmp = vload4(4, input + j);
+                vstore4(vload4(4, input + k), 4, output + j);
+                vstore4(tmp, 4, output + k);
+
+#if 0
+                TFaceInfo tmp = faceInfoPtr[i];
+                outFaceInfoPtr[i] = faceInfoPtr[i+1];
+                outFaceInfoPtr[i + 1] = tmp;
+#endif
+                atomic_inc(changeFlag);
+            }
+        }
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        if (*changeFlag == 0)
+            break;
+        barrier(CLK_GLOBAL_MEM_FENCE);
+    }
+#endif
+}
+
+

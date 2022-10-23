@@ -1,0 +1,13 @@
+diff --git a/examples/widgets/animation/easing/main.cpp b/examples/widgets/animation/easing/main.cpp
+index 051ba1e..de04a8c 100644
+--- a/examples/widgets/animation/easing/main.cpp
++++ b/examples/widgets/animation/easing/main.cpp
+@@ -47,7 +47,7 @@ int main(int argc, char **argv)
+     QApplication app(argc, argv);
+     Window w;
+
+-    w.resize(400, 400);
++    w.resize(768, 1024);
+     w.show();
+
+     return app.exec();

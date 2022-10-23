@@ -268,7 +268,11 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 	if (of_device_is_compatible(np, "st,spear600-gmac") ||
 		of_device_is_compatible(np, "snps,dwmac-3.50a") ||
 		of_device_is_compatible(np, "snps,dwmac-3.70a") ||
-		of_device_is_compatible(np, "snps,dwmac")) {
+		of_device_is_compatible(np, "snps,dwmac")
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+		|| of_device_is_compatible(np, "amlogic, gxbb-eth-dwmac")
+#endif
+	   ) {
 		/* Note that the max-frame-size parameter as defined in the
 		 * ePAPR v1.1 spec is defined as max-frame-size, it's
 		 * actually used as the IEEE definition of MAC Client
@@ -437,7 +441,11 @@ EXPORT_SYMBOL_GPL(stmmac_pltfr_remove);
  * call the main suspend function and then, if required, on some platform, it
  * can call an exit helper.
  */
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+int stmmac_pltfr_suspend(struct device *dev)
+#else
 static int stmmac_pltfr_suspend(struct device *dev)
+#endif
 {
 	int ret;
 	struct net_device *ndev = dev_get_drvdata(dev);
@@ -460,7 +468,11 @@ static int stmmac_pltfr_suspend(struct device *dev)
  * the main resume function, on some platforms, it can call own init helper
  * if required.
  */
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+int stmmac_pltfr_resume(struct device *dev)
+#else
 static int stmmac_pltfr_resume(struct device *dev)
+#endif
 {
 	struct net_device *ndev = dev_get_drvdata(dev);
 	struct stmmac_priv *priv = netdev_priv(ndev);
@@ -475,10 +487,12 @@ static int stmmac_pltfr_resume(struct device *dev)
 }
 #endif /* CONFIG_PM_SLEEP */
 
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+#else
 SIMPLE_DEV_PM_OPS(stmmac_pltfr_pm_ops, stmmac_pltfr_suspend,
 				       stmmac_pltfr_resume);
 EXPORT_SYMBOL_GPL(stmmac_pltfr_pm_ops);
-
+#endif
 MODULE_DESCRIPTION("STMMAC 10/100/1000 Ethernet platform support");
 MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
 MODULE_LICENSE("GPL");

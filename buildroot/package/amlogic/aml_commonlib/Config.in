@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_COMMONLIB
+	bool "aml common library"
+	help
+	  aml common library
+

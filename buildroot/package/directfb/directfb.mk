@@ -66,6 +66,7 @@ DIRECTFB_CONF_OPTS += --disable-sawman
 endif
 
 DIRECTFB_GFX = \
+	$(if $(BR2_PACKAGE_DIRECTFB_AMLGFX),amlgfx) \
 	$(if $(BR2_PACKAGE_DIRECTFB_ATI128),ati128) \
 	$(if $(BR2_PACKAGE_DIRECTFB_CYBER5K),cyber5k) \
 	$(if $(BR2_PACKAGE_DIRECTFB_MATROX),matrox) \

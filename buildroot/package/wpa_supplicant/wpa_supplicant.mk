@@ -204,6 +204,8 @@ define WPA_SUPPLICANT_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/sbin/wpa_supplicant
 	$(INSTALL) -m 644 -D package/wpa_supplicant/wpa_supplicant.conf \
 		$(TARGET_DIR)/etc/wpa_supplicant.conf
+	$(INSTALL) -m 644 -D package/wpa_supplicant/wpa_supplicant.conf \
+		$(TARGET_DIR)/etc/wpa_supplicant.conf-orig
 	$(WPA_SUPPLICANT_INSTALL_CLI)
 	$(WPA_SUPPLICANT_INSTALL_PASSPHRASE)
 	$(WPA_SUPPLICANT_INSTALL_DBUS)

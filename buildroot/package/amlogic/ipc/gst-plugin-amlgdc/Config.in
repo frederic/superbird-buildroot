@@ -1,0 +1,7 @@
+config BR2_PACKAGE_GST_PLUGIN_AMLGDC
+	bool "Amlogic gstream1 gdc plugin"
+	select BR2_PACKAGE_AML_LIBGE2D
+	select BR2_PACKAGE_AML_LIBGDC
+	select BR2_PACKAGE_GST_AMLION_ALLOCATOR
+	help
+	  gstreamer 1.0 plugins

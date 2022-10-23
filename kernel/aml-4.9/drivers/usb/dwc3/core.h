@@ -33,6 +33,9 @@
 #include <linux/ulpi/interface.h>
 
 #include <linux/phy/phy.h>
+#ifdef CONFIG_AMLOGIC_USB
+#include <linux/clk.h>
+#endif
 
 #define DWC3_MSG_MAX	500
 
@@ -153,6 +156,12 @@
 #define DWC3_OSTS		0xcc10
 
 /* Bit fields */
+#ifdef CONFIG_AMLOGIC_USB
+/* Global User Control Register */
+#define DWC3_GUCTL_USBHSTINAUTORETRYEN	(1 << 14)
+#define DWC3_GUCTL_NAKPERENHHS			(1 << 18)
+#define DWC3_GUCTL_PARKMODEDISABLESS	 BIT(17)
+#endif
 
 /* Global Debug Queue/FIFO Space Available Register */
 #define DWC3_GDBGFIFOSPACE_NUM(n)	((n) & 0x1f)
@@ -979,6 +988,10 @@ struct dwc3 {
 
 	unsigned		tx_de_emphasis_quirk:1;
 	unsigned		tx_de_emphasis:2;
+#ifdef CONFIG_AMLOGIC_USB
+	unsigned		super_speed_support:1;
+	struct clk		*general_clk;
+#endif
 };
 
 /* -------------------------------------------------------------------------- */

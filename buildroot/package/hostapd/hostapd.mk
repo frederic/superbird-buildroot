@@ -128,6 +128,8 @@ define HOSTAPD_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/bin/hostapd_cli
 	$(INSTALL) -m 0644 -D $(@D)/$(HOSTAPD_SUBDIR)/hostapd.conf \
 		$(TARGET_DIR)/etc/hostapd.conf
+	$(INSTALL) -m 0644 -D package/hostapd/entropy.bin \
+		$(TARGET_DIR)/etc/entropy.bin
 endef
 
 $(eval $(generic-package))

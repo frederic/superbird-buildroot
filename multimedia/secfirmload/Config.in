@@ -1,0 +1,13 @@
+config BR2_PACKAGE_SECFIRMLOAD
+	bool "secfirmload"
+	default n
+	help
+	  secure load  video firmware under optee.
+	  
+config BR2_PACKAGE_LAUNCHER_USE_SECFIRMLOAD
+	bool "preload secure firmware when boot"
+	default n
+        depends on BR2_PACKAGE_SECFIRMLOAD
+	help
+	  preload secure firmware when boot.
+	  

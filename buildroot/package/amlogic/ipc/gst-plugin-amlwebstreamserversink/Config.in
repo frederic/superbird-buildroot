@@ -1,0 +1,5 @@
+config BR2_PACKAGE_GST_PLUGIN_AMLWEBSTREAMSERVERSINK
+	bool "Amlogic Websocket streaming server sink"
+	select BR2_PACKAGE_LIBWEBSOCKETS
+	help
+	  This package will enable a gstreamer plugin that can send GstBuffer to websocket client

@@ -66,4 +66,13 @@ ALSA_LIB_CONF_ENV = \
 	CFLAGS="$(ALSA_LIB_CFLAGS)" \
 	LDFLAGS="$(TARGET_LDFLAGS) -lm"
 
+define ALSA_LIB_INSTALL_STAGING_CMDS
+	 $(TARGET_MAKE_ENV) $(MAKE) -C $(@D) DESTDIR=$(STAGING_DIR) install
+endef
+
+define LIBFOO_POST_INSTALL_STAGING_HOOKS
+	-cp -f pcm.h $(STAGING_DIR)/usr/alsa/
+endef
+
 $(eval $(autotools-package))
+

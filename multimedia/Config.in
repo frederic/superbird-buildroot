@@ -1,0 +1,24 @@
+menu "Audio and video applications"
+source "../multimedia/alsa-plugins/Config.in"
+source "../multimedia/amaudio/Config.in"
+source "../multimedia/audiocapture/Config.in"
+source "../multimedia/mediasupport/Config.in"
+source "../multimedia/dolby_atmos_release/Config.in"
+
+# Gstreamer 0.10.x & Plugins
+source "../multimedia/gst-fluendo-mpegdemux/Config.in"
+source "../multimedia/gst-aml-plugins/Config.in"
+source "../multimedia/gst-aml-plugins1/Config.in"
+source "../multimedia/gst-app/Config.in"
+
+source "../multimedia/libplayer/Config.in"
+source "../multimedia/wifidisplay/Config.in"
+source "../multimedia/test_tool/spdif_in_dd_decoder/Config.in"
+
+# secure video firmware load 
+source "../multimedia/secfirmload/Config.in"
+# hal audio
+source "../multimedia/aml_halaudio/Config.in"
+# drm prebuild
+source "../multimedia/libmediadrm/Config.in"
+endmenu

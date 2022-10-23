@@ -30,6 +30,7 @@
  * PRZ_FLAG_NO_LOCK is used. For all other cases, locking is required.
  */
 #define PRZ_FLAG_NO_LOCK	BIT(0)
+#define PRZ_FLAG_BIG_LOCK	BIT(7)
 
 struct persistent_ram_buffer;
 struct rs_control;
@@ -79,6 +80,8 @@ void *persistent_ram_old(struct persistent_ram_zone *prz);
 void persistent_ram_free_old(struct persistent_ram_zone *prz);
 ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
 	char *str, size_t len);
+
+void ramoops_console_write_buf(const char *buf, size_t size);
 
 /*
  * Ramoops platform data

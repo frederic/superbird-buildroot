@@ -1,0 +1,18 @@
+#
+# Amlogic multimedia input configuration
+#
+menu "Amlogic Enhancement drivers"
+config AMLOGIC_MEDIA_ENHANCEMENT
+        bool "Amlogic driver of enhancement"
+		depends on AMLOGIC_MEDIA_DRIVERS
+        default n
+        help
+            "Amlogic amvecm module init"
+
+if AMLOGIC_MEDIA_ENHANCEMENT
+source "drivers/amlogic/media/enhancement/amvecm/Kconfig"
+source "drivers/amlogic/media/enhancement/amdolby_vision/Kconfig"
+source "drivers/amlogic/media/enhancement/amprime_sl/Kconfig"
+endif
+
+endmenu

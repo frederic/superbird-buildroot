@@ -213,10 +213,24 @@ static int show_dram_config(void)
 	size = gd->ram_size;
 #endif
 
+/* add HIDE mem size, print total ddr size */
+#if defined(CONFIG_SYS_MEM_TOP_HIDE)
+	size = size + CONFIG_SYS_MEM_TOP_HIDE;
+#endif
+
 	print_size(size, "");
 	board_add_ram_info(0);
 	putc('\n');
 
+#if defined(CONFIG_SYS_MEM_TOP_HIDE)
+	if ((gd->bd->bi_dram[0].size+CONFIG_SYS_MEM_TOP_HIDE) > (0xE0000000UL)) {
+		gd->bd->bi_dram[0].size = 0xE0000000UL - CONFIG_SYS_MEM_TOP_HIDE;
+	}
+#else
+	if (gd->bd->bi_dram[0].size > (0xE0000000UL)) {
+		gd->bd->bi_dram[0].size = 0xE0000000UL;
+	}
+#endif
 	return 0;
 }
 
@@ -388,6 +402,15 @@ static int setup_dest_addr(void)
 #endif
 	gd->ram_top += get_effective_memsize();
 	gd->ram_top = board_get_usable_ram_top(gd->mon_len);
+#if defined(CONFIG_SYS_MEM_TOP_HIDE)
+	if ((gd->ram_top+CONFIG_SYS_MEM_TOP_HIDE) > (0xE0000000UL)) {
+		gd->ram_top = 0xE0000000UL - CONFIG_SYS_MEM_TOP_HIDE;
+	}
+#else
+	if (gd->ram_top > (0xE0000000UL)) {
+		gd->ram_top = 0xE0000000UL;
+	}
+#endif
 	gd->relocaddr = gd->ram_top;
 	debug("Ram top: %08lX\n", (ulong)gd->ram_top);
 #if defined(CONFIG_MP) && (defined(CONFIG_MPC86xx) || defined(CONFIG_E500))
@@ -737,6 +760,8 @@ static int setup_reloc(void)
 	gd->reloc_off = gd->relocaddr - CONFIG_SYS_TEXT_BASE;
 #endif
 	memcpy(gd->new_gd, (char *)gd, sizeof(gd_t));
+
+	printf("Relocation Offset is: %08lx\n", gd->reloc_off);
 
 	debug("Relocation Offset is: %08lx\n", gd->reloc_off);
 	debug("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",

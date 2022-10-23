@@ -1,0 +1,9 @@
+if BR2_TOOLCHAIN_EXTERNAL_LINARO_AARCH64_4DOT9_201408_PREINSTALLED
+
+config BR2_TOOLCHAIN_EXTERNAL_PREFIX
+	default "aarch64-linux-gnu"
+
+config BR2_PACKAGE_PROVIDES_TOOLCHAIN_EXTERNAL
+	default "toolchain-external-linaro-aarch64-4dot9-201408-preinstalled"
+
+endif

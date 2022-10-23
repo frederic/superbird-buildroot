@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# secure video firmware load
+#
+
+start() {
+	echo "Starting sec preload video firm: "
+	/usr/bin/tee_preload_fw /lib/firmware/video/video_ucode.bin
+}
+stop() {
+	echo "OK"
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

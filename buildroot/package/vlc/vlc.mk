@@ -87,6 +87,30 @@ VLC_CONF_OPTS += \
 	--disable-zvbi \
 	--enable-run-as-root
 
+VLC_CONF_OPTS += \
+	--disable-atmo \
+	--disable-gles2 \
+	--disable-gles1 \
+	--disable-egl \
+	--disable-xvideo \
+	--disable-vdpau \
+	--disable-fontconfig \
+	--disable-aa \
+	--disable-nls
+
+ifeq ($(BR2_VLC_FOR_AUDIO),y)
+VLC_CONF_OPTS += \
+	--disable-ipv6  \
+	--disable-bonjour \
+	--disable-directfb \
+	--disable-avcodec \
+	--disable-swscale \
+	--disable-png \
+	--disable-qt \
+	--disable-libgcrypt \
+	--disable-lua
+endif
+
 # Uses __atomic_fetch_add_4
 ifeq ($(BR2_TOOLCHAIN_HAS_LIBATOMIC),y)
 VLC_CONF_ENV += LIBS="-latomic"

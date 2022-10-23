@@ -1,0 +1,11 @@
+config BR2_PACKAGE_LIBVPCODEC
+	bool "amlogic h264 video encoder"
+	help
+	  h264 video encoder library
+
+config BR2_PACKAGE_LIBVPCODEC_LOCAL_PATH
+    string "amlogic h264 video encoder local path"
+    depends on BR2_PACKAGE_LIBVPCODEC
+	help
+    aml h264 video encoder local path
+

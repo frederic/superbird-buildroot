@@ -1,0 +1,106 @@
+/*
+ ============================================================================
+ Name        : GenerateBoundingBox.vx
+ Author      : Shenglin.Xu
+ Version     :
+ Copyright   : Your copyright notice
+ Description : 
+ ============================================================================
+ */
+#include "cl_viv_vx_ext.h"
+#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+
+#define CELL_SIZE 12
+#define STRIDE 2
+
+typedef   struct
+{
+    float f32X1;
+    float f32Y1;
+    float f32X2;
+    float f32Y2;
+    float f32Score;
+    float f32Reserved;
+}TFaceRect;
+
+typedef struct
+{
+    float f32X[5];
+    float f32Y[5];
+}TFacePts;
+
+typedef struct
+{
+    TFaceRect tBox;
+    float reg[4];
+    TFacePts tPts;
+} TFaceInfo;
+
+_viv_uniform float rect_fl_scale;
+_viv_uniform VXC_512Bits uniConvertInt8Fp32Fst_4x4;
+_viv_uniform VXC_512Bits uniConvertFstFp16Fp32_4x4;
+
+__kernel void GenerateBoundingBoxVXC
+    (
+    image2d_array_t confidence,
+    image2d_array_t rect,
+    global int * faceCnt,
+    global float * inScale,
+    global float * thresh,
+    global int * imgWidth,
+    global int * imgHeight,
+    vx_array_float ptFaceInfo,
+    global char * useForLinkGraph
+    )
+{
+   __global TFaceInfo* outFaceInfoPtr = (__global TFaceInfo*)ptFaceInfo.item;
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord = (int4)(gidx, gidy, 1, 0);
+
+    int faceId = 0;
+    float vX1, vX2, vY1, vY2, score;
+    vxc_ushort8 val;
+    vxc_half8 hVal;
+    vxc_char8 rect_val;
+    vxc_float4 tmpVal, tmpVal1;
+
+    VXC_ReadImage2DArray(val, confidence, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, hVal, val, 16);
+    VXC_DP4x4(tmpVal, hVal, hVal, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertFstFp16Fp32_4x4);
+
+    if(tmpVal.s0 >= (*thresh))
+    {
+        vX1 = floor((gidx*STRIDE + 1) / (*inScale));
+        vY1 = floor((gidy*STRIDE + 1) / (*inScale));
+        vX2 = floor((gidx*STRIDE + CELL_SIZE) / (*inScale));
+        vY2 = floor((gidy*STRIDE + CELL_SIZE) / (*inScale));
+        score = tmpVal.s0;
+
+        coord.z = 0;
+        VXC_ReadImage2DArray(rect_val, rect, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+        coord.z = 1;
+        VXC_ReadImage2DArray(rect_val, rect, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0));
+        coord.z = 2;
+        VXC_ReadImage2DArray(rect_val, rect, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0));
+        coord.z = 3;
+        VXC_ReadImage2DArray(rect_val, rect, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0));
+
+        VXC_DP4x4(tmpVal1, rect_val, rect_val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertInt8Fp32Fst_4x4);
+        tmpVal1 *= rect_fl_scale;
+        faceId = atom_inc(faceCnt);
+        outFaceInfoPtr[faceId].tBox.f32X1 = vX1;
+        outFaceInfoPtr[faceId].tBox.f32Y1 = vY1;
+        outFaceInfoPtr[faceId].tBox.f32X2 = vX2;
+        outFaceInfoPtr[faceId].tBox.f32Y2 = vY2;
+        outFaceInfoPtr[faceId].tBox.f32Score = score;
+        outFaceInfoPtr[faceId].reg[0] = tmpVal1.s0;
+        outFaceInfoPtr[faceId].reg[1] = tmpVal1.s1;
+        outFaceInfoPtr[faceId].reg[2] = tmpVal1.s2;
+        outFaceInfoPtr[faceId].reg[3] = tmpVal1.s3;
+    }
+}
+
+
+

@@ -1,0 +1,17 @@
+config BR2_PACKAGE_AML_BRCM_BSA
+    bool "broadcom bsa server and app"
+    select BR2_PACKAGE_FDK_AAC
+    default n
+    help
+	broadcom bsa server and app
+
+config BR2_AML_BRCM_BSA_MEM_REDUCTION
+    bool "broadcom bsa mem reduction configure"
+    help
+    broadcom bsa mem reduction configure
+
+config BR2_AML_BT_DSPC
+    bool "bluetooth audio capture use libdspc"
+    default n
+    help
+	bluetooth audio capture use libdspc

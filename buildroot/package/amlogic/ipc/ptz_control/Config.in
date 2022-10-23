@@ -1,0 +1,5 @@
+config BR2_PACKAGE_PTZ_CONTROL
+	bool "ptz control package"
+	default n
+	help
+	  ptz control

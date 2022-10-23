@@ -1,0 +1,5 @@
+config BR2_PACKAGE_BROWSER_TOOLCHAIN_DEPOT_TOOLS
+    bool "depot-tools"
+    default n
+    help
+	depot-tools for browser compilation

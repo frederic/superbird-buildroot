@@ -9,6 +9,10 @@ case "$1" in
 	fi
 	;;
     stop) ;;
+    netready) ;;
+    netup) ;;
+    netdown) ;;
+    netchange) ;;
     *)
 	echo "Usage: S05avahi-setup.sh {start|stop}" >&2
 	exit 1

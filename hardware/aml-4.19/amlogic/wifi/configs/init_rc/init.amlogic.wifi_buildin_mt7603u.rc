@@ -1,0 +1,3 @@
+on boot
+    insmod /vendor/lib/modules/mtprealloc.ko
+    insmod /vendor/lib/modules/mt7603usta.ko

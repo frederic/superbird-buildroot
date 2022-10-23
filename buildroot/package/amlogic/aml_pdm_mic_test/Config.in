@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_PDM_MIC_TEST
+    bool "aml_pdm_mic_test"
+    help
+      aml_pdm_mic_test package is an algorithm and tool 
+	  for detecting virtual welding and sensitivity.

@@ -1,0 +1,26 @@
+/*
+ * Copyright:
+ * ----------------------------------------------------------------------------
+ * This confidential and proprietary software may be used only as authorized
+ * by a licensing agreement from ARM Limited.
+ *      (C) COPYRIGHT 2017 ARM Limited, ALL RIGHTS RESERVED
+ * The entire notice above must be reproduced on all authorized copies and
+ * copies may only be made to the extent permitted by a licensing agreement
+ * from ARM Limited.
+ * ----------------------------------------------------------------------------
+ */
+
+bob_kernel_module {
+    name: "ump",
+    srcs: [
+        "**/*.c",
+        "**/*.h",
+        "Kbuild",
+    ],
+    kbuild_options: ["CONFIG_UMP=m"],
+    defaults: ["kernel_defaults"],
+    enabled: false,
+    ump: {
+        enabled: true,
+    },
+}

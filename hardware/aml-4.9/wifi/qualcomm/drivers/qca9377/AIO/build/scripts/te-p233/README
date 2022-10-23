@@ -1,0 +1,33 @@
+The following are the key changes for QCA9377.LE.2.3.3 (board type te-p233)
+
+1. No more backports. Direct kernel stable versions and patches for the kernel
+	1.1 Do not specify DOWNLOAD_KERNEL_BACKPORT_3_12. Set always to n
+
+2. New variable DOWNLOAD_COMMON_PATCH added. This is default set to y. This downloads common patches.
+	2.1 This is not required for te-p233. Set to n in aio_gen.te-p233
+
+3. Kernel can be cloned from linux-stable branch git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+	3.1 Kernel version should be specified. See below for options.
+
+4. Kernel version is specified by -k comand line option
+	4.1 ./aio_gen_bit.sh -r -t te-p233 -k v4.4.15
+	4.2 If -k no opted, kernel will not be cloned and proper patches not selected
+        4.3 KTAG stores the kernel version. Note that -k should match the version tag on the git
+        4.4 CLONE_KERNEL specifies if the kernel should be cloned
+	4.5 CLONE_KERNEL_PATH should specify the kernel clone path
+
+5. WLAN host driver snapshot may not always be available. Clone is used in such cases.
+        5.1 release.te-p233 specifies the configurations
+	5.1 HOST_DRIVER_VERSION specifies the cut off commit id
+	5.2 HOST_DRIVER_BRANCH specifies the branch. Current is wlan-cld2.driver.lnx.1.0-rel
+ 
+5. Current functionality is
+	5.1 Clone the kernel version as specified
+	5.2 Apply kernel patches
+	5.3 Clone (if CLONE_DRIVER_WLAN_HOST=y) or download (if DOWNLOAD_DRIVER_WLAN_HOST=y) the WLAN host driver version as specified
+
+6. Note that before proceeding to "make" in AIO/build after ./aio_gen_bit.sh, cloned kernel should be installed.
+
+Note that there are two repos now:
+qca/third_party/fixce
+oss/third_party/fixce

@@ -1,0 +1,12 @@
+--- a/gst/rtpmanager/gstrtpsession.c	2019-08-30 11:25:06.020994289 +0800
++++ b/gst/rtpmanager/gstrtpsession.c	2019-08-30 11:25:12.000000000 +0800
+@@ -1246,7 +1246,8 @@
+       break;
+     case GST_STATE_CHANGE_READY_TO_PAUSED:
+       GST_RTP_SESSION_LOCK (rtpsession);
+-      rtpsession->priv->wait_send = TRUE;
++      if (rtpsession->send_rtp_src)
++        rtpsession->priv->wait_send = TRUE;
+       GST_RTP_SESSION_UNLOCK (rtpsession);
+       break;
+     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:

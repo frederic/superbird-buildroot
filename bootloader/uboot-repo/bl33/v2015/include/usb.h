@@ -13,6 +13,7 @@
 #include <linux/usb/ch9.h>
 #include <asm/cache.h>
 #include <part.h>
+#include <asm/arch/timer.h>
 
 /*
  * The EHCI spec says that we must align to at least 32 bytes.  However,
@@ -129,6 +130,7 @@ struct usb_device {
 	void *controller;		/* hardware controller private data */
 	/* slot_id - for xHCI enabled devices */
 	unsigned int slot_id;
+	unsigned int connect_status;
 };
 
 struct int_queue;
@@ -143,6 +145,15 @@ enum usb_init_type {
 	USB_INIT_DEVICE
 };
 
+#ifdef CONFIG_MTK_BT_USB
+typedef struct _os_usb_vid_pid_
+{
+    unsigned short vid;
+    unsigned short pid;
+    char name[16];
+} os_usb_vid_pid;
+#endif
+
 /**********************************************************************
  * this is how the lowlevel part communicate with the outer world
  */
@@ -156,6 +167,9 @@ enum usb_init_type {
 	defined(CONFIG_USB_MUSB_DSPS) || defined(CONFIG_USB_MUSB_AM35X) || \
 	defined(CONFIG_USB_MUSB_OMAP2PLUS) || defined(CONFIG_USB_XHCI) || \
 	defined(CONFIG_USB_DWC2)
+
+//void wait_ms(unsigned long ms);
+void _mdelay(unsigned long ms);
 
 int usb_lowlevel_init(int index, enum usb_init_type init, void **controller);
 int usb_lowlevel_stop(int index);
@@ -198,7 +212,7 @@ extern void udc_disconnect(void);
  * @param index USB controller number
  * @param init initializes controller as USB host or device
  */
-int board_usb_init(int index, enum usb_init_type init);
+//int board_usb_init(int index, enum usb_init_type init);
 
 /*
  * can be used to clean up after failed USB initialization attempt
@@ -246,8 +260,15 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 			void *data, unsigned short size, int timeout);
 int usb_bulk_msg(struct usb_device *dev, unsigned int pipe,
 			void *data, int len, int *actual_length, int timeout);
+
+#ifndef CONFIG_MTK_BT_USB
 int usb_submit_int_msg(struct usb_device *dev, unsigned long pipe,
 			void *buffer, int transfer_len, int interval);
+#else
+int usb_submit_int_msg(struct usb_device *dev, unsigned long pipe,
+	                void *buffer, int transfer_len, int *actual_length, int interval);
+#endif
+
 int usb_disable_asynch(int disable);
 int usb_maxpacket(struct usb_device *dev, unsigned long pipe);
 int usb_get_configuration_no(struct usb_device *dev, unsigned char *buffer,

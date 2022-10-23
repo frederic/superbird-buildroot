@@ -1,0 +1,8 @@
+http-port     = 8000
+hw_acc        = stream
+hw_channel    = chardev
+hw_mem_offset = 0x64000000
+hw_mem_size   = 0x8262000
+fw_acc        = stream
+fw_channel    = chardev
+fw_dev        = /dev/ac_isp

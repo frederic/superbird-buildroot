@@ -1,0 +1,44 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+             $(appdir)/../app_common/include \
+             $(appdir)/../aml_socket/include
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source \
+            $(appdir)/../app_common/source \
+            $(appdir)/../aml_socket/source
+
+# list of sources for the current application
+appsrcs := \
+    app_manager.c \
+    ring_buffer.c \
+    sco_handler.c \
+    alsa_volume.c \
+    wake_lock.c \
+    app_avk.c \
+    app_socket.c \
+    app_hs.c \
+    app_ble.c \
+    app_ble_client.c \
+    app_ble_server.c \
+    app_ble_client_xml.c \
+    app_ble_client_db.c \
+    main.c \
+    app_disc.c \
+    app_utils.c \
+    app_dm.c \
+    app_xml_param.c \
+    app_xml_utils.c \
+    app_services.c \
+    app_mgt.c \
+    app_wav.c \
+    nanoxml.c
+
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)
+

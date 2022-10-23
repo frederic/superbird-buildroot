@@ -1,0 +1,14 @@
+config BR2_PACKAGE_AIRPLAY2
+	bool "Build AirPlay2 package"
+    default n
+    select BR2_PACKAGE_MDNSRESPONDER
+    select BR2_PACKAGE_AML_COMMONLIB
+    help
+        airplay 2
+
+config BR2_PACKAGE_GPTP
+    bool "Build GPTP"
+    default n
+    depends on BR2_PACKAGE_AIRPLAY2
+    help
+        https://github.com/AVnu/gptp

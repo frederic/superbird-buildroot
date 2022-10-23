@@ -195,7 +195,9 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
 
 	return cma_alloc(dev_get_cma_area(dev), count, align);
 }
-
+#ifdef CONFIG_AMLOGIC_MODIFY
+EXPORT_SYMBOL(dma_alloc_from_contiguous);
+#endif
 /**
  * dma_release_from_contiguous() - release allocated pages
  * @dev:   Pointer to device for which the pages were allocated.
@@ -211,7 +213,9 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
 {
 	return cma_release(dev_get_cma_area(dev), pages, count);
 }
-
+#ifdef CONFIG_AMLOGIC_MODIFY
+EXPORT_SYMBOL(dma_release_from_contiguous);
+#endif
 /*
  * Support for reserved memory regions defined in device tree
  */
@@ -259,11 +263,17 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 
 	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
 	if (err) {
+	#ifndef CONFIG_AMLOGIC_MODIFY
 		pr_err("Reserved memory: unable to setup CMA region\n");
+	#endif
 		return err;
 	}
 	/* Architecture specific contiguous memory fixup. */
 	dma_contiguous_early_fixup(rmem->base, rmem->size);
+#ifdef CONFIG_AMLOGIC_CMA
+	if (of_get_flat_dt_prop(node, "clear-map", NULL))
+		cma_init_clear(cma, 1);
+#endif
 
 	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
 		dma_contiguous_set_default(cma);
@@ -271,8 +281,10 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 	rmem->ops = &rmem_cma_ops;
 	rmem->priv = cma;
 
+#ifndef CONFIG_AMLOGIC_MODIFY
 	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
 		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+#endif
 
 	return 0;
 }

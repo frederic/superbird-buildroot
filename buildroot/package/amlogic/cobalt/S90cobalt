@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# cobalt
+#
+
+# solve problem of initial no sound output
+source /etc/property_set.sh
+
+COBALT_LAUNCHER_PID_FILE=/tmp/cobalt-luncher.pid
+COBALT_HOMEKEY_EVENT0_PID_FILE=/tmp/cobalt-homekey-event0.pid
+COBALT_HOMEKEY_EVENT1_PID_FILE=/tmp/cobalt-homekey-event1.pid
+
+start() {
+  printf "Starting cobalt: "
+  export XDG_RUNTIME_DIR=/run/wayland/
+  (
+  while true; do
+      if ! grep -q "Compositor capabilities" /tmp/weston.log 2>&1 >> /dev/null;
+      then
+          echo "Weston is not ready..."
+          sleep 0.5
+      else
+          break;
+      fi
+  done
+  while true; do
+      echo "Trying to launching Cobalt..."
+      export sys_amplayer_drop_pcm=0
+      export  media_amadec_prefilltime=0
+      export media_amadec_use_renderadd=1
+      /usr/bin/cobalt/cobalt --web_file_path=/var/www --url=file:///launcher/launcher.html
+  done
+  ) &
+  echo $! > $COBALT_LAUNCHER_PID_FILE
+
+  # homekey listener
+  if [ -f $COBALT_HOMEKEY_EVENT0_PID_FILE ] && kill -0 $(cat $COBALT_HOMEKEY_EVENT0_PID_FILE); then
+    echo "homekey listener (/dev/input/event0) already running"
+  else
+    (
+    while true; do
+      if xxd -l 24 /dev/input/event0 | grep -q '0100 6600 0100 0000'; then
+        restart&
+      fi
+    done
+    ) &
+    echo $! > $COBALT_HOMEKEY_EVENT0_PID_FILE
+  fi
+
+  if [ -f $COBALT_HOMEKEY_EVENT1_PID_FILE ] && kill -0 $(cat $COBALT_HOMEKEY_EVENT1_PID_FILE); then
+    echo "homekey listener (/dev/input/event1) already running"
+  else
+    (
+    while true; do
+      if xxd -l 24 /dev/input/event1 | grep -q '0100 6600 0100 0000'; then
+        restart&
+      fi
+    done
+    ) &
+  echo $! > $COBALT_HOMEKEY_EVENT1_PID_FILE
+  fi
+}
+
+stop() {
+  printf "Stopping cobalt: "
+  kill $(cat $COBALT_LAUNCHER_PID_FILE)
+  killall cobalt
+  echo "OK"
+}
+restart() {
+  stop
+  start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload)
+    restart
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit $?
+

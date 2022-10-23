@@ -19,6 +19,7 @@ define CUPS_RUN_AUTOCONF
 endef
 CUPS_PRE_CONFIGURE_HOOKS += CUPS_RUN_AUTOCONF
 
+CUPS_CONF_ENV += PKGCONFIG=$(HOST_DIR)/usr/bin/pkg-config
 CUPS_CONF_OPTS = \
 	--without-perl \
 	--without-java \

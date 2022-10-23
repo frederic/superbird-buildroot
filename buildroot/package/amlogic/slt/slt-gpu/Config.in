@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SLT_GPU
+    bool "SLT for GPU"
+    help
+        SLT program for GPU
+    depends on BR2_PACKAGE_GPU

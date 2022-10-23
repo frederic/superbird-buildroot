@@ -217,9 +217,14 @@ static enum dvbv3_emulation_type dvbv3_type(u32 delivery_system)
 		return DVBV3_UNKNOWN;
 	}
 }
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+void dvb_frontend_add_event(struct dvb_frontend *fe,
+				   enum fe_status status)
+#else
 static void dvb_frontend_add_event(struct dvb_frontend *fe,
 				   enum fe_status status)
+
+#endif
 {
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
@@ -250,6 +255,9 @@ static void dvb_frontend_add_event(struct dvb_frontend *fe,
 
 	wake_up_interruptible (&events->wait_queue);
 }
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+EXPORT_SYMBOL(dvb_frontend_add_event);
+#endif
 
 static int dvb_frontend_test_event(struct dvb_frontend_private *fepriv,
 				   struct dvb_fe_events *events)
@@ -1044,7 +1052,19 @@ static struct dtv_cmds_h dtv_cmds[DTV_MAX_COMMAND + 1] = {
 	_DTV_CMD(DTV_STREAM_ID, 1, 0),
 	_DTV_CMD(DTV_DVBT2_PLP_ID_LEGACY, 1, 0),
 	_DTV_CMD(DTV_LNA, 1, 0),
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	/*set blind scan cmd*/
+	_DTV_CMD(DTV_START_BLIND_SCAN, 1, 0),
+	_DTV_CMD(DTV_CANCEL_BLIND_SCAN, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_MIN_FRE, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_MAX_FRE, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_MIN_SRATE, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_MAX_SRATE, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_FRE_RANGE, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_FRE_STEP, 1, 0),
+	_DTV_CMD(DTV_BLIND_SCAN_TIMEOUT, 1, 0),
+	/*set blind scan cmd end*/
+#endif
 	/* Get */
 	_DTV_CMD(DTV_DISEQC_SLAVE_REPLY, 0, 1),
 	_DTV_CMD(DTV_API_VERSION, 0, 0),
@@ -1499,6 +1519,13 @@ static int dtv_property_process_get(struct dvb_frontend *fe,
 	case DTV_STAT_TOTAL_BLOCK_COUNT:
 		tvp->u.st = c->block_count;
 		break;
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	case DTV_DELIVERY_SUB_SYSTEM:
+	case DTV_TS_INPUT:
+		r = 0;
+		//printk("dvb-core get sub sys\r\n");
+		break;
+#endif
 	default:
 		dev_dbg(fe->dvb->device,
 			"%s: FE property %d doesn't exist\n",
@@ -1524,8 +1551,15 @@ static bool is_dvbv3_delsys(u32 delsys)
 {
 	bool status;
 
+#ifdef CONFIG_AMLOGIC_MODIFY /* added by Amlogic 20180720 */
+	status = (delsys == SYS_DVBT) || (delsys == SYS_DVBC_ANNEX_A) ||
+		 (delsys == SYS_DVBS) || (delsys == SYS_ATSC) ||
+		 (delsys == SYS_DTMB) || (delsys == SYS_DVBS2) ||
+		 (delsys == SYS_DVBT2);
+#else
 	status = (delsys == SYS_DVBT) || (delsys == SYS_DVBC_ANNEX_A) ||
 		 (delsys == SYS_DVBS) || (delsys == SYS_ATSC);
+#endif
 
 	return status;
 }
@@ -1802,6 +1836,11 @@ static int dtv_property_process_set(struct dvb_frontend *fe,
 	case DTV_DELIVERY_SYSTEM:
 		r = dvbv5_set_delivery_system(fe, tvp->u.data);
 		break;
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	case DTV_DELIVERY_SUB_SYSTEM:
+		r = 0;
+		break;
+#endif
 	case DTV_VOLTAGE:
 		c->voltage = tvp->u.data;
 		r = dvb_frontend_ioctl_legacy(file, FE_SET_VOLTAGE,
@@ -1908,14 +1947,82 @@ static int dtv_property_process_set(struct dvb_frontend *fe,
 		if (r < 0)
 			c->lna = LNA_AUTO;
 		break;
-
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	case DTV_START_BLIND_SCAN:
+	case DTV_CANCEL_BLIND_SCAN:
+	case DTV_BLIND_SCAN_MIN_FRE:
+	case DTV_BLIND_SCAN_MAX_FRE:
+	case DTV_BLIND_SCAN_MIN_SRATE:
+	case DTV_BLIND_SCAN_MAX_SRATE:
+	case DTV_BLIND_SCAN_FRE_RANGE:
+	case DTV_BLIND_SCAN_FRE_STEP:
+	case DTV_BLIND_SCAN_TIMEOUT:
+		r = 0;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
 
 	return r;
 }
+static void dtv_property_32to64(struct dtv_property *dest,
+		struct dtv_property_32 *src)
+{
+	int i = 0;
+	long tmp = 0;
 
+	dest->cmd = src->cmd;
+//	printk("%s cmd:%d\n",__func__,dest->cmd);
+
+	for (i = 0; i < 3; i++)
+		dest->reserved[i] = src->reserved[i];
+
+	dest->u.data = src->u.data;
+	dest->u.st.len = src->u.st.len;
+
+	for (i = 0; i < MAX_DTV_STATS; i++) {
+		dest->u.st.stat[i].scale  = src->u.st.stat[i].scale;
+		dest->u.st.stat[i].uvalue = src->u.st.stat[i].uvalue;
+		dest->u.st.stat[i].svalue = src->u.st.stat[i].svalue;
+	}
+	for (i = 0; i < 32; i++)
+		dest->u.buffer.data[i] = src->u.buffer.data[i];
+	dest->u.buffer.len = src->u.buffer.len;
+	for (i = 0; i < 3; i++)
+		dest->u.buffer.reserved1[i] = src->u.buffer.reserved1[i];
+	tmp = (long)(src->u.buffer.reserved2);
+	dest->u.buffer.reserved2 = (void *)tmp;
+	dest->result = src->result;
+}
+
+static void dtv_property_64to32(struct dtv_property_32 *dest,
+		struct dtv_property *src)
+{
+	int i = 0;
+	long tmp = 0;
+
+	dest->cmd = src->cmd;
+//	printk("%s cmd:%d\n",__func__,dest->cmd);
+	for (i = 0; i < 3; i++)
+		dest->reserved[i] = src->reserved[i];
+	dest->u.data = src->u.data;
+//	printk("%s data:%d\n",__func__,dest->u.data);
+	dest->u.st.len = src->u.st.len;
+	for (i = 0; i < MAX_DTV_STATS; i++) {
+		dest->u.st.stat[i].scale  = src->u.st.stat[i].scale;
+		dest->u.st.stat[i].uvalue = src->u.st.stat[i].uvalue;
+		dest->u.st.stat[i].svalue = src->u.st.stat[i].svalue;
+	}
+	for (i = 0; i < 32; i++)
+		dest->u.buffer.data[i] = src->u.buffer.data[i];
+	dest->u.buffer.len = src->u.buffer.len;
+	for (i = 0; i < 3; i++)
+		dest->u.buffer.reserved1[i] = src->u.buffer.reserved1[i];
+	tmp = (long)(src->u.buffer.reserved2);
+	dest->u.buffer.reserved2 = (__u32)tmp;
+	dest->result = src->result;
+}
 static int dvb_frontend_ioctl(struct file *file,
 			unsigned int cmd, void *parg)
 {
@@ -1941,7 +2048,9 @@ static int dvb_frontend_ioctl(struct file *file,
 		return -EPERM;
 	}
 
-	if ((cmd == FE_SET_PROPERTY) || (cmd == FE_GET_PROPERTY))
+	if ((cmd == FE_SET_PROPERTY_32) || (cmd == FE_GET_PROPERTY_32)
+			|| (cmd == FE_SET_PROPERTY_64)
+			|| (cmd == FE_GET_PROPERTY_64))
 		err = dvb_frontend_ioctl_properties(file, cmd, parg);
 	else {
 		c->state = DTV_UNDEFINED;
@@ -1962,12 +2071,45 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 	int err = 0;
 
 	struct dtv_properties *tvps = parg;
+	struct dtv_properties_32 *tvps_32_tmp = parg;
+	struct dtv_properties tvps_tmp;
 	struct dtv_property *tvp = NULL;
+	struct dtv_property_32 *tvp_32 = NULL;
 	int i;
+	int prop = 0;
+	int convert = 0;
 
 	dev_dbg(fe->dvb->device, "%s:\n", __func__);
+	if ((cmd == FE_SET_PROPERTY_32) || (cmd == FE_SET_PROPERTY_64)
+			|| (cmd == FE_GET_PROPERTY_32)
+			|| (cmd == FE_GET_PROPERTY_64)) {
+		prop = 1;
 
-	if (cmd == FE_SET_PROPERTY) {
+		if ((cmd == FE_SET_PROPERTY_32) ||
+				(cmd == FE_GET_PROPERTY_32)) {
+			if (FE_SET_PROPERTY == FE_SET_PROPERTY_64)
+				convert = 1;
+		}
+	}
+	if (prop) {
+		if (convert) {
+			tvps_tmp.num  = tvps_32_tmp->num;
+	tvps_tmp.props = (struct dtv_property *)(long)(tvps_32_tmp->props);
+			tvps = &tvps_tmp;
+
+			tvp_32 = memdup_user(tvps->props,
+				tvps->num * sizeof(struct dtv_property_32));
+			if (IS_ERR(tvp_32)) {
+				err = -EFAULT;
+				goto out;
+			}
+		}
+	}
+#ifdef CONFIG_COMPAT
+	tvps->props = compat_ptr((unsigned long)tvps->props);
+#endif
+
+	if ((cmd == FE_SET_PROPERTY_32) || (cmd == FE_SET_PROPERTY_64)) {
 		dev_dbg(fe->dvb->device, "%s: properties.num = %d\n", __func__, tvps->num);
 		dev_dbg(fe->dvb->device, "%s: properties.props = %p\n", __func__, tvps->props);
 
@@ -1976,9 +2118,22 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 		if ((tvps->num == 0) || (tvps->num > DTV_IOCTL_MAX_MSGS))
 			return -EINVAL;
 
-		tvp = memdup_user(tvps->props, tvps->num * sizeof(*tvp));
-		if (IS_ERR(tvp))
-			return PTR_ERR(tvp);
+		if (convert) {
+			tvp = kmalloc_array(tvps->num,
+					sizeof(*tvp), GFP_KERNEL);
+			if (IS_ERR(tvp)) {
+				err = -EFAULT;
+				goto out;
+			}
+
+			for (i = 0; i < tvps->num; i++)
+				dtv_property_32to64(tvp + i, tvp_32+i);
+		} else {
+			tvp = memdup_user(tvps->props,
+					tvps->num * sizeof(*tvp));
+			if (IS_ERR(tvp))
+				return PTR_ERR(tvp);
+		}
 
 		for (i = 0; i < tvps->num; i++) {
 			err = dtv_property_process_set(fe, tvp + i, file);
@@ -1990,7 +2145,7 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 		if (c->state == DTV_TUNE)
 			dev_dbg(fe->dvb->device, "%s: Property cache is full, tuning\n", __func__);
 
-	} else if (cmd == FE_GET_PROPERTY) {
+	} else if ((cmd == FE_GET_PROPERTY_32) || (cmd == FE_GET_PROPERTY_64)) {
 		struct dtv_frontend_properties getp = fe->dtv_property_cache;
 
 		dev_dbg(fe->dvb->device, "%s: properties.num = %d\n", __func__, tvps->num);
@@ -2001,9 +2156,20 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 		if ((tvps->num == 0) || (tvps->num > DTV_IOCTL_MAX_MSGS))
 			return -EINVAL;
 
-		tvp = memdup_user(tvps->props, tvps->num * sizeof(*tvp));
-		if (IS_ERR(tvp))
-			return PTR_ERR(tvp);
+		if (convert) {
+			tvp = kmalloc_array(tvps->num,
+					sizeof(*tvp), GFP_KERNEL);
+			if (IS_ERR(tvp))
+				return PTR_ERR(tvp);
+
+			for (i = 0; i < tvps->num; i++)
+				dtv_property_32to64(tvp + i, tvp_32+i);
+		} else {
+			tvp = memdup_user(tvps->props,
+					tvps->num * sizeof(*tvp));
+			if (IS_ERR(tvp))
+				return PTR_ERR(tvp);
+		}
 
 		/*
 		 * Let's use our own copy of property cache, in order to
@@ -2023,16 +2189,28 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 			(tvp + i)->result = err;
 		}
 
-		if (copy_to_user((void __user *)tvps->props, tvp,
-				 tvps->num * sizeof(struct dtv_property))) {
-			err = -EFAULT;
-			goto out;
-		}
+		if (convert) {
+			for (i = 0; i < tvps->num; i++)
+				dtv_property_64to32(tvp_32 + i,
+						(struct dtv_property *)(tvp+i));
 
+			if (copy_to_user((void __user *)tvps->props, tvp_32,
+		tvps->num * sizeof(struct dtv_property_32))) {
+				err = -EFAULT;
+				goto out;
+			}
+		} else {
+			if (copy_to_user((void __user *)tvps->props, tvp,
+		tvps->num * sizeof(struct dtv_property))) {
+				err = -EFAULT;
+				goto out;
+			}
+		}
 	} else
 		err = -EOPNOTSUPP;
 
 out:
+	kfree(tvp_32);
 	kfree(tvp);
 	return err;
 }
@@ -2165,6 +2343,8 @@ static int dtv_set_frontend(struct dvb_frontend *fe)
 	/* Request the search algorithm to search */
 	fepriv->algo_status |= DVBFE_ALGO_SEARCH_AGAIN;
 
+//	if (fe->ops.set_frontend)
+//		fe->ops.set_frontend(fe);
 	dvb_frontend_clear_events(fe);
 	dvb_frontend_add_event(fe, 0);
 	dvb_frontend_wakeup(fe);
@@ -2607,6 +2787,22 @@ static int dvb_frontend_release(struct inode *inode, struct file *file)
 	return ret;
 }
 
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+static long dvb_frontend_compat_ioctl(struct file *filp,
+			unsigned int cmd, unsigned long args)
+{
+	long ret;
+
+#ifdef CONFIG_COMPAT
+	args  = (unsigned long)compat_ptr(args);
+#endif
+
+	ret = dvb_generic_ioctl(filp, cmd, args);
+
+	return ret;
+}
+#endif
+
 static const struct file_operations dvb_frontend_fops = {
 	.owner		= THIS_MODULE,
 	.unlocked_ioctl	= dvb_generic_ioctl,
@@ -2614,6 +2810,9 @@ static const struct file_operations dvb_frontend_fops = {
 	.open		= dvb_frontend_open,
 	.release	= dvb_frontend_release,
 	.llseek		= noop_llseek,
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	.compat_ioctl	= dvb_frontend_compat_ioctl,
+#endif
 };
 
 int dvb_frontend_suspend(struct dvb_frontend *fe)

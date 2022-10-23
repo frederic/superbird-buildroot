@@ -1,0 +1,71 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/libavcodec/aacdec_template.c
+===================================================================
+--- ffmpeg-3.4.5-ori/libavcodec/aacdec_template.c	2018-11-02 02:34:22.000000000 +0800
++++ ffmpeg-3.4.5/libavcodec/aacdec_template.c	2019-08-20 17:07:33.541961999 +0800
+@@ -90,6 +90,7 @@
+  */
+ 
+ #include "libavutil/thread.h"
++#include "amldec.h"
+ 
+ static VLC vlc_scalefactors;
+ static VLC vlc_spectral[11];
+@@ -1238,7 +1239,9 @@
+         return ret;
+ #endif
+ 
+-    return 0;
++    ret = aml_decode_open(avctx);
++
++    return ret;
+ }
+ 
+ /**
+@@ -3281,6 +3284,7 @@
+     AACContext *ac = avctx->priv_data;
+     const uint8_t *buf = avpkt->data;
+     int buf_size = avpkt->size;
++#if 0 // If for original aa3 decoder frame code
+     GetBitContext gb;
+     int buf_consumed;
+     int buf_offset;
+@@ -3342,6 +3346,26 @@
+             break;
+ 
+     return buf_size > buf_offset ? buf_consumed : buf_size;
++#else
++    int ret;
++    ret = aml_decode_frame(avctx, data, buf, buf_size);
++
++    if (ret >= 0) {
++      *got_frame_ptr       = 1;
++
++    } else {
++      av_log(avctx, AV_LOG_ERROR, "Error while decoding AAC audio frame.\n");
++        /* Only return an error if the bad frame makes up the whole packet or
++         * the error is related to buffer management.
++         * If there is more data in the packet, just consume the bad frame
++         * instead of returning an error, which would discard the whole
++         * packet. */
++        *got_frame_ptr = 0;
++        return ret;
++    }
++//    s->frame_size = 0;
++    return buf_size - ret;
++#endif
+ }
+ 
+ static av_cold int aac_decode_close(AVCodecContext *avctx)
+@@ -3367,6 +3391,8 @@
+     ff_mdct15_uninit(&ac->mdct960);
+ #endif
+     av_freep(&ac->fdsp);
++
++    aml_decode_close(avctx);
+     return 0;
+ }
+ 
+

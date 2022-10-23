@@ -45,6 +45,7 @@
 #include <linux/personality.h>
 #include <linux/notifier.h>
 #include <trace/events/power.h>
+#include <linux/percpu.h>
 
 #include <asm/alternative.h>
 #include <asm/compat.h>
@@ -59,6 +60,10 @@
 #include <linux/stackprotector.h>
 unsigned long __stack_chk_guard __read_mostly;
 EXPORT_SYMBOL(__stack_chk_guard);
+#endif
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <linux/amlogic/secmon.h>
 #endif
 
 /*
@@ -88,6 +93,18 @@ void arch_cpu_idle(void)
 void arch_cpu_idle_dead(void)
 {
        cpu_die();
+}
+#endif
+
+#ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
+void arch_cpu_idle_enter(void)
+{
+	__arch_cpu_idle_enter();
+}
+
+void arch_cpu_idle_exit(void)
+{
+	__arch_cpu_idle_exit();
 }
 #endif
 
@@ -166,6 +183,285 @@ void machine_restart(char *cmd)
 	while (1);
 }
 
+/*
+ * dump a block of kernel memory from around the given address
+ */
+static void show_data(unsigned long addr, int nbytes, const char *name)
+{
+	int	i, j;
+	int	nlines;
+	u32	*p;
+
+	/*
+	 * don't attempt to dump non-kernel addresses or
+	 * values that are probably just small negative numbers
+	 */
+	if (addr < PAGE_OFFSET || addr > -256UL)
+		return;
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+	/*
+	 * Treating data in general purpose register as an address
+	 * and dereferencing it is quite a dangerous behaviour,
+	 * especially when it belongs to secure monotor region or
+	 * ioremap region(for arm64 vmalloc region is already filtered
+	 * out), which can lead to external abort on non-linefetch and
+	 * can not be protected by probe_kernel_address.
+	 * We need more strict filtering rules
+	 */
+
+#ifdef CONFIG_AMLOGIC_SEC
+	/*
+	 * filter out secure monitor region
+	 */
+	if (addr <= (unsigned long)high_memory)
+		if (within_secmon_region(addr))
+			return;
+#endif
+#endif
+
+	printk("\n%s: %#lx:\n", name, addr);
+
+	/*
+	 * round address down to a 32 bit boundary
+	 * and always dump a multiple of 32 bytes
+	 */
+	p = (u32 *)(addr & ~(sizeof(u32) - 1));
+	nbytes += (addr & (sizeof(u32) - 1));
+	nlines = (nbytes + 31) / 32;
+
+
+	for (i = 0; i < nlines; i++) {
+		/*
+		 * just display low 16 bits of address to keep
+		 * each line of the dump < 80 characters
+		 */
+		printk("%04lx ", (unsigned long)p & 0xffff);
+		for (j = 0; j < 8; j++) {
+			u32	data;
+			if (probe_kernel_address(p, data)) {
+				pr_cont(" ********");
+			} else {
+				pr_cont(" %08x", data);
+			}
+			++p;
+		}
+		pr_cont("\n");
+	}
+}
+
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+/*
+ * dump a block of user memory from around the given address
+ */
+static void show_user_data(unsigned long addr, int nbytes, const char *name)
+{
+	int	i, j;
+	int	nlines;
+	u32	*p;
+
+	if (!access_ok(VERIFY_READ, (void *)addr, nbytes))
+		return;
+
+	pr_info("\n%s: %#lx:\n", name, addr);
+
+	/*
+	 * round address down to a 32 bit boundary
+	 * and always dump a multiple of 32 bytes
+	 */
+	p = (u32 *)(addr & ~(sizeof(u32) - 1));
+	nbytes += (addr & (sizeof(u32) - 1));
+	nlines = (nbytes + 31) / 32;
+
+	for (i = 0; i < nlines; i++) {
+		/*
+		 * just display low 16 bits of address to keep
+		 * each line of the dump < 80 characters
+		 */
+		pr_info("%04lx ", (unsigned long)p & 0xffff);
+		for (j = 0; j < 8; j++) {
+			u32	data;
+			int bad;
+
+			bad = __get_user(data, p);
+			if (bad)
+				pr_cont(" ********");
+			else
+				pr_cont(" %08x", data);
+			++p;
+		}
+		pr_cont("\n");
+	}
+}
+
+static void show_vmalloc_pfn(struct pt_regs *regs)
+{
+	int i;
+	struct page *page;
+
+	for (i = 0; i < 16; i++) {
+		if (is_vmalloc_or_module_addr((void *)regs->regs[i])) {
+			page = vmalloc_to_page((void *)regs->regs[i]);
+			if (!page)
+				continue;
+			pr_info("R%-2d : %016llx, PFN:%5lx\n",
+				i, regs->regs[i], page_to_pfn(page));
+		}
+	}
+
+}
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
+
+static void show_extra_register_data(struct pt_regs *regs, int nbytes)
+{
+	mm_segment_t fs;
+	unsigned int i;
+
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+	show_data(regs->pc - nbytes, nbytes * 2, "PC");
+	show_data(regs->regs[30] - nbytes, nbytes * 2, "LR");
+	show_data(regs->sp - nbytes, nbytes * 2, "SP");
+	for (i = 0; i < 30; i++) {
+		char name[4];
+		snprintf(name, sizeof(name), "X%u", i);
+		show_data(regs->regs[i] - nbytes, nbytes * 2, name);
+	}
+	set_fs(fs);
+}
+
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+static void show_user_extra_register_data(struct pt_regs *regs, int nbytes)
+{
+	mm_segment_t fs;
+	unsigned int i, top_reg;
+	u64 sp, lr;
+
+	if (compat_user_mode(regs)) {
+		lr = regs->compat_lr;
+		sp = regs->compat_sp;
+		top_reg = 13;
+	} else {
+		lr = regs->regs[30];
+		sp = regs->sp;
+		top_reg = 29;
+	}
+
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+	show_user_data(regs->pc - nbytes, nbytes * 2, "PC");
+	show_user_data(lr - nbytes, nbytes * 2, "LR");
+	show_user_data(sp - nbytes, nbytes * 2, "SP");
+	for (i = 0; i < top_reg; i++) {
+		char name[4];
+
+		snprintf(name, sizeof(name), "r%u", i);
+		show_user_data(regs->regs[i] - nbytes, nbytes * 2, name);
+	}
+	set_fs(fs);
+}
+
+void show_vma(struct mm_struct *mm, unsigned long addr)
+{
+	struct vm_area_struct *vma;
+	struct file *file;
+	vm_flags_t flags;
+	unsigned long ino = 0;
+	unsigned long long pgoff = 0;
+	unsigned long start, end;
+	dev_t dev = 0;
+	const char *name = NULL;
+
+	vma = find_vma(mm, addr);
+	if (!vma) {
+		pr_info("can't find vma for %lx\n", addr);
+		return;
+	}
+
+	file = vma->vm_file;
+	flags = vma->vm_flags;
+	if (file) {
+		struct inode *inode = file_inode(vma->vm_file);
+
+		dev = inode->i_sb->s_dev;
+		ino = inode->i_ino;
+		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+	}
+
+	/* We don't show the stack guard page in /proc/maps */
+	start = vma->vm_start;
+	end = vma->vm_end;
+
+	pr_info("vma for %lx:\n", addr);
+	pr_info("%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+		start,
+		end,
+		flags & VM_READ ? 'r' : '-',
+		flags & VM_WRITE ? 'w' : '-',
+		flags & VM_EXEC ? 'x' : '-',
+		flags & VM_MAYSHARE ? 's' : 'p',
+		pgoff,
+		MAJOR(dev), MINOR(dev), ino);
+
+	/*
+	 * Print the dentry name for named mappings, and a
+	 * special [heap] marker for the heap:
+	 */
+	if (file) {
+		char file_name[256] = {};
+		char *p = d_path(&file->f_path, file_name, 256);
+
+		if (!IS_ERR(p)) {
+			mangle_path(file_name, p, "\n");
+			pr_info("%s", p);
+		} else
+			pr_info(" get file path failed\n");
+		goto done;
+	}
+
+	name = arch_vma_name(vma);
+	if (!name) {
+		pid_t tid;
+
+		if (!mm) {
+			name = "[vdso]";
+			goto done;
+		}
+
+		if (vma->vm_start <= mm->brk &&
+		    vma->vm_end >= mm->start_brk) {
+			name = "[heap]";
+			goto done;
+		}
+
+		tid = vma_is_stack_for_current(vma);
+
+		if (tid != 0) {
+			/*
+			 * Thread stack in /proc/PID/task/TID/maps or
+			 * the main process stack.
+			 */
+			if ((vma->vm_start <= mm->start_stack &&
+			    vma->vm_end >= mm->start_stack)) {
+				name = "[stack]";
+			} else {
+				/* Thread stack in /proc/PID/maps */
+				pr_info("[stack:%d]", tid);
+			}
+			goto done;
+		}
+
+		if (vma_get_anon_name(vma))
+			pr_info("[anon]");
+	}
+
+done:
+	if (name)
+		pr_info("%s", name);
+	pr_info("\n");
+}
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
+
 void __show_regs(struct pt_regs *regs)
 {
 	int i, top_reg;
@@ -184,6 +480,13 @@ void __show_regs(struct pt_regs *regs)
 	show_regs_print_info(KERN_DEFAULT);
 	print_symbol("PC is at %s\n", instruction_pointer(regs));
 	print_symbol("LR is at %s\n", lr);
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+	if (user_mode(regs)) {
+		show_vma(current->mm, instruction_pointer(regs));
+		show_vma(current->mm, lr);
+	}
+	show_vmalloc_pfn(regs);
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
 	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
 	       regs->pc, lr, regs->pstate);
 	printk("sp : %016llx\n", sp);
@@ -201,6 +504,12 @@ void __show_regs(struct pt_regs *regs)
 
 		pr_cont("\n");
 	}
+	if (!user_mode(regs))
+		show_extra_register_data(regs, 128);
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+	else
+		show_user_extra_register_data(regs, 128);
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
 	printk("\n");
 }
 
@@ -331,6 +640,20 @@ void uao_thread_switch(struct task_struct *next)
 }
 
 /*
+ * We store our current task in sp_el0, which is clobbered by userspace. Keep a
+ * shadow copy so that we can restore this upon entry from userspace.
+ *
+ * This is *only* for exception entry from EL0, and is not valid until we
+ * __switch_to() a user task.
+ */
+DEFINE_PER_CPU(struct task_struct *, __entry_task);
+
+static void entry_task_switch(struct task_struct *next)
+{
+	__this_cpu_write(__entry_task, next);
+}
+
+/*
  * Thread switching.
  */
 struct task_struct *__switch_to(struct task_struct *prev,
@@ -342,6 +665,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	tls_thread_switch(next);
 	hw_breakpoint_thread_switch(next);
 	contextidr_thread_switch(next);
+	entry_task_switch(next);
 	uao_thread_switch(next);
 
 	/*
@@ -359,9 +683,13 @@ struct task_struct *__switch_to(struct task_struct *prev,
 unsigned long get_wchan(struct task_struct *p)
 {
 	struct stackframe frame;
-	unsigned long stack_page;
+	unsigned long stack_page, ret = 0;
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
+		return 0;
+
+	stack_page = (unsigned long)try_get_task_stack(p);
+	if (!stack_page)
 		return 0;
 
 	frame.fp = thread_saved_fp(p);
@@ -370,16 +698,20 @@ unsigned long get_wchan(struct task_struct *p)
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	frame.graph = p->curr_ret_stack;
 #endif
-	stack_page = (unsigned long)task_stack_page(p);
 	do {
 		if (frame.sp < stack_page ||
 		    frame.sp >= stack_page + THREAD_SIZE ||
 		    unwind_frame(p, &frame))
-			return 0;
-		if (!in_sched_functions(frame.pc))
-			return frame.pc;
+			goto out;
+		if (!in_sched_functions(frame.pc)) {
+			ret = frame.pc;
+			goto out;
+		}
 	} while (count ++ < 16);
-	return 0;
+
+out:
+	put_task_stack(p);
+	return ret;
 }
 
 unsigned long arch_align_stack(unsigned long sp)

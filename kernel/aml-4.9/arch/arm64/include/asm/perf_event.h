@@ -17,6 +17,11 @@
 #ifndef __ASM_PERF_EVENT_H
 #define __ASM_PERF_EVENT_H
 
+#include <asm/stack_pointer.h>
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <linux/hrtimer.h>
+#endif
+
 #define	ARMV8_PMU_MAX_COUNTERS	32
 #define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
 
@@ -85,5 +90,8 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
 	(regs)->sp = current_stack_pointer; \
 	(regs)->pstate = PSR_MODE_EL1h;	\
 }
+
+
+
 
 #endif

@@ -1,0 +1,28 @@
+if [ "${1}" = "" ]; then
+	echo "None KDIR. Set NULL as defalut"
+	KERNEL_DIR=$(cd $(dirname $0); pwd)
+else
+	echo "KDIR Target is $1"
+	KERNEL_DIR=$1
+fi
+
+echo $KERNEL_DIR
+
+rm -f *.ko
+
+KERNEL_DIR=/mnt/fileroot2/xiaoxin.cao/AndroidAOSP/out/target/product/galilei/obj/KERNEL_OBJ/
+export KERNEL_DIR
+
+cd ./v4l2_dev
+make KDIR=$KERNEL_DIR ARCH=arm CROSS_COMPILE=/opt/gcc-linaro-6.3.1-2017.02-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf- clean
+
+cd .././subdev/iq
+make KDIR=$KERNEL_DIR ARCH=arm CROSS_COMPILE=/opt/gcc-linaro-6.3.1-2017.02-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf- clean
+
+cd ../.././subdev/lens
+make KDIR=$KERNEL_DIR ARCH=arm CROSS_COMPILE=/opt/gcc-linaro-6.3.1-2017.02-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf- clean
+
+cd ../.././subdev/sensor
+make KDIR=$KERNEL_DIR ARCH=arm CROSS_COMPILE=/opt/gcc-linaro-6.3.1-2017.02-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf- clean
+
+unset KERNEL_DIR

@@ -1,0 +1,13 @@
+diff --git a/examples/widgets/effects/lighting/main.cpp b/examples/widgets/effects/lighting/main.cpp
+index bcce06f..f33607e 100644
+--- a/examples/widgets/effects/lighting/main.cpp
++++ b/examples/widgets/effects/lighting/main.cpp
+@@ -48,7 +48,7 @@ int main(int argc, char **argv)
+     Lighting lighting;
+     lighting.setWindowTitle(QT_TRANSLATE_NOOP(QGraphicsView, "Lighting and Shadows"));
+
+-    lighting.resize(640, 480);
++    lighting.resize(768, 1024);
+     lighting.show();
+
+     return app.exec();

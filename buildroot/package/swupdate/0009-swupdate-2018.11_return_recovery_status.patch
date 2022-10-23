@@ -1,0 +1,105 @@
+--- swupdate-2018.11/core/pctl.c	2019-07-11 18:08:03.137924200 +0800
++++ swupdate-2018.11/core/pctl.c	2019-07-11 18:06:20.741520300 +0800
+@@ -27,6 +27,8 @@
+ #define WAIT_ANY (-1)
+ #endif
+ 
++#define EXIT_RECOVERY   (10)
++
+ /* the array contains the pid of the subprocesses */
+ #define MAX_PROCESSES	10
+ static struct swupdate_task procs[MAX_PROCESSES];
+@@ -260,7 +262,15 @@
+ 				kill(procs[i].pid, SIGTERM);
+ 			}
+ 		}
+-
++        
++		char *recovery_status = bootloader_env_get("recovery_status");
++		printf("recovery_status:%s\n", recovery_status);
++		if (recovery_status) {
++			if ((!strcmp(recovery_status, "failed")) || (!strcmp(recovery_status, "in_progress"))) {
++				printf("swupdate upgrade failed, wait for continue again!\n");
++				exitstatus = EXIT_RECOVERY;
++			}
++		}
+ 		exit(exitstatus);
+ 	}
+ 
+--- swupdate-2018.11/core/swupdate.c	2019-07-11 14:58:00.206813000 +0800
++++ swupdate-2018.11/core/swupdate.c	2019-07-11 18:10:47.359555200 +0800
+@@ -54,6 +54,8 @@
+ 
+ #define MODULE_NAME	"swupdate"
+ 
++#define EXIT_RECOVERY   (10)
++
+ static pthread_t network_daemon;
+ 
+ /* Tree derived from the configuration file */
+@@ -368,9 +370,6 @@
+ 	 * Set "recovery_status" as begin of the transaction"
+ 	 */
+ 	bootloader_env_set("recovery_status", "in_progress");
+-#ifdef HAVE_RECOVERY
+-	set_recovery();
+-#endif
+ 
+ 	ret = install_images(&swcfg, fdsw, 1);
+ 
+@@ -630,10 +629,7 @@
+ 	/* Initialize internal database */
+ 	swupdate_init(&swcfg);
+ 
+-    mtd_scan_partitions();
+-#ifdef HAVE_RECOVERY
+-	clear_recovery();
+-#endif
++	mtd_scan_partitions();
+ 	/*
+ 	 * Initialize notifier to enable at least output
+ 	 * on the console
+@@ -942,8 +938,6 @@
+ 			get_active_slot(&slot);
+ 			slot = slot ? 0 : 1;
+ 			set_active_slot(slot);
+-		} else {
+-			clear_recovery();
+ 		}
+ 	}
+ 
+@@ -989,6 +983,7 @@
+ 		switch (result) {
+ 		case EXIT_FAILURE:
+ 			bootloader_env_set("recovery_status", "failed");
++			result = EXIT_RECOVERY;
+ 			break;
+ 		case EXIT_SUCCESS:
+ 			notify(SUCCESS, 0, INFOLEVEL, NULL);
+@@ -1001,8 +996,6 @@
+ 				get_active_slot(&slot);
+ 				slot = slot ? 0 : 1;
+ 				set_active_slot(slot);
+-			} else {
+-				clear_recovery();
+ 			}
+ 			break;
+ 		}
+--- swupdate-2018.11/corelib/stream_interface.c	2019-07-11 14:58:00.218813000 +0800
++++ swupdate-2018.11/corelib/stream_interface.c	2019-07-11 13:50:13.836736000 +0800
+@@ -446,7 +446,6 @@
+ 			bootloader_env_set("recovery_status", "in_progress");
+ 
+ 			notify(RUN, RECOVERY_NO_ERROR, INFOLEVEL, "Installation in progress");
+-            set_recovery();
+ 			ret = install_images(software, 0, 0);
+ 			if (ret != 0) {
+ 				bootloader_env_set("recovery_status", "failed");
+@@ -459,7 +458,6 @@
+ 				 * that it is not required to start recovery again
+ 				 */
+ 				bootloader_env_unset("recovery_status");
+-                clean_recovery_otapath();
+ 				notify(SUCCESS, RECOVERY_NO_ERROR, INFOLEVEL, "SWUPDATE successful !");
+ 				inst.last_install = SUCCESS;
+ 			}

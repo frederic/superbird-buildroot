@@ -1,0 +1,10 @@
+<config>
+  <image_tree>
+    <name>CHSS.LNX_TP.1.1.c12</name>
+    <build_id>CHSS.LNX_TP.1.1.c12-00007-QCALNXTPNAPZ-1</build_id>
+    <branch_point_revision/>
+    <revision>00007</revision>
+    <spin>1</spin>
+    <client>QCALNXTPNAPZ</client>
+  </image_tree>
+</config>

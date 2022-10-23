@@ -127,7 +127,7 @@ config BR2_PACKAGE_MTD_UBIATTACH
 
 config BR2_PACKAGE_MTD_UBICRC32
 	bool "ubicrc32"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_UBIDETACH
 	bool "ubidetach"
@@ -151,23 +151,23 @@ config BR2_PACKAGE_MTD_UBINIZE
 
 config BR2_PACKAGE_MTD_UBIRENAME
 	bool "ubirename"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_UBIRMVOL
 	bool "ubirmvol"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_UBIRSVOL
 	bool "ubirsvol"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_UBIUPDATEVOL
 	bool "ubiupdatevol"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_UBIBLOCK
 	bool "ubiblock"
-	default y
+	default n
 
 config BR2_PACKAGE_MTD_TESTS
 	bool "MTD test tools"

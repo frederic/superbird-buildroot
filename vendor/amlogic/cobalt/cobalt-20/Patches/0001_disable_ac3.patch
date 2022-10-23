@@ -1,0 +1,13 @@
+diff --git a/src/starboard/configuration.h b/src/starboard/configuration.h
+index e06b52e..88aa403 100644
+--- a/src/starboard/configuration.h
++++ b/src/starboard/configuration.h
+@@ -641,7 +641,7 @@ SB_COMPILE_ASSERT(sizeof(long) == 8,  // NOLINT(runtime/int)
+ #error "SB_HAS_AC3_AUDIO is required in this API version."
+ #endif  // !SB_HAS(AC3_AUDIO)
+ #else   // defined(SB_HAS_AC3_AUDIO)
+-#define SB_HAS_AC3_AUDIO 1
++#define SB_HAS_AC3_AUDIO 0
+ #endif  // defined(SB_HAS_AC3_AUDIO)
+ #endif  // SB_API_VERSION >= 11
+ // --- Derived Configuration -------------------------------------------------

@@ -1,0 +1,62 @@
+# Build list
+
+targetList := drivers
+
+default: ${targetList}
+
+#################################################################################################################################
+export SIGMADUT_TOPDIR=${ATH_TOPDIR}/apps/sigma-dut
+export BE_TEST_TOPDIR=${ATH_TOPDIR}/build/scripts/x86
+export WLAN_DRIVER_TOPDIR=$(ATH_TOPDIR)/drivers
+export ATHDIAG_TOPDIR=${ATH_TOPDIR}/drivers/qcacld-new/tools/athdiag
+
+#################################################################################################################################
+#
+# driver patch
+#
+
+drivers_patch:
+	@echo Patch drivers
+drivers_patch_R:
+	@echo Revert drivers patch
+
+wpa_supplicant_config:
+	@cp ${ATH_TOPDIR}/drivers/patches/te-p233/WLAN/wpa_supplicant.config ${ATH_TOPDIR}/apps/wpa_supplicant_8/wpa_supplicant/.config
+	@cp ${ATH_TOPDIR}/drivers/patches/te-p233/WLAN/hostapd.config ${ATH_TOPDIR}/apps/wpa_supplicant_8/hostapd/.config
+#################################################################################################################################
+#
+# Sigma-DUT package
+#
+sigmadut_build: rootfs_prep sigmadut_clean
+	@echo Build Sigma-DUT
+	cd $(SIGMADUT_TOPDIR) && \
+	${MAKEARCH} && \
+	cp $(SIGMADUT_TOPDIR)/sigma_dut $(INSTALL_ROOT)/sbin
+
+sigmadut_clean:
+	@echo Clean Sigma-DUT
+	cd $(SIGMADUT_TOPDIR) && \
+	${MAKEARCH} clean
+
+#################################################################################################################################
+#
+# athdiag
+#
+athdiag_build: rootfs_prep athdiag_clean
+	@echo Build athdiag tool
+	cd $(ATHDIAG_TOPDIR) && \
+	${MAKEARCH} && \
+	cp $(ATHDIAG_TOPDIR)/athdiag $(INSTALL_ROOT)/sbin
+
+athdiag_clean:
+	@echo Clean athdiag tool
+	cd $(ATHDIAG_TOPDIR) && \
+	${MAKEARCH} clean
+
+#
+# SPE_BE_TEST package
+#
+spe_package:
+	@echo Build SPE_BE_TEST
+	cd ${BE_TEST_TOPDIR} && \
+	./gen_spe_package.sh

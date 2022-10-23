@@ -23,6 +23,9 @@ struct xhci_dwc3_platdata {
 	struct phy *usb_phys;
 	int num_phys;
 };
+#ifdef CONFIG_AML_USB
+unsigned int usb2portnum;
+#endif
 
 void dwc3_set_mode(struct dwc3 *dwc3_reg, u32 mode)
 {
@@ -33,19 +36,39 @@ void dwc3_set_mode(struct dwc3 *dwc3_reg, u32 mode)
 
 static void dwc3_phy_reset(struct dwc3 *dwc3_reg)
 {
+	int i;
+	u32 reg;
+
 	/* Assert USB3 PHY reset */
 	setbits_le32(&dwc3_reg->g_usb3pipectl[0], DWC3_GUSB3PIPECTL_PHYSOFTRST);
 
 	/* Assert USB2 PHY reset */
 	setbits_le32(&dwc3_reg->g_usb2phycfg, DWC3_GUSB2PHYCFG_PHYSOFTRST);
+#ifdef CONFIG_AML_USB
+	for (i=1; i <= usb2portnum; i++) {
+		setbits_le32(&dwc3_reg->g_usb2phycfg[i], DWC3_GUSB2PHYCFG_PHYSOFTRST);
+	}
+#endif
 
 	mdelay(100);
 
 	/* Clear USB3 PHY reset */
 	clrbits_le32(&dwc3_reg->g_usb3pipectl[0], DWC3_GUSB3PIPECTL_PHYSOFTRST);
 
-	/* Clear USB2 PHY reset */
+#ifndef CONFIG_AML_USB
+		/* Clear USB2 PHY reset */
 	clrbits_le32(&dwc3_reg->g_usb2phycfg, DWC3_GUSB2PHYCFG_PHYSOFTRST);
+#else
+	for (i=0; i <= usb2portnum; i++) {
+		/* Clear USB2 PHY reset, DWC3_GUSB2PHYCFG_PHYIF must clear, */
+		/* otherwise the sof would occur many errors */
+		reg = readl(&dwc3_reg->g_usb2phycfg[i]);
+		reg &= ~DWC3_GUSB2PHYCFG_PHYSOFTRST;
+		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
+		reg &= ~DWC3_GUSB2PHYCFG_PHYIF;
+		writel(reg, &dwc3_reg->g_usb2phycfg[i]);
+	}
+#endif
 }
 
 void dwc3_core_soft_reset(struct dwc3 *dwc3_reg)
@@ -111,6 +134,127 @@ void dwc3_set_fladj(struct dwc3 *dwc3_reg, u32 val)
 }
 
 #if CONFIG_IS_ENABLED(DM_USB)
+
+void xhci_dwc3_phy_tuning_1(struct udevice *dev, int port)
+{
+    unsigned long phy_reg_base;
+    int ret, i;
+    struct xhci_dwc3_platdata *plat;
+    struct udevice *udev = dev;
+
+	plat = dev_get_platdata(udev);
+
+    for (i = 0; i < plat->num_phys; i++) {
+		ret = generic_phy_tuning(&plat->usb_phys[i], port);
+		if (ret) {
+			pr_err("Can't tuning USB PHY%d for %s\n",
+			       i, dev->name);
+			return ;
+		}
+	}
+
+}
+
+static int xhci_dwc3_setup_phy(struct udevice *dev)
+{
+	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
+	int i, ret, count;
+
+	/* Return if no phy declared */
+	if (!dev_read_prop(dev, "phys", NULL))
+		return 0;
+
+	count = dev_count_phandle_with_args(dev, "phys", "#phy-cells");
+	if (count <= 0)
+		return count;
+
+	plat->usb_phys = devm_kcalloc(dev, count, sizeof(struct phy),
+				      GFP_KERNEL);
+	if (!plat->usb_phys)
+		return -ENOMEM;
+
+#ifdef CONFIG_AML_USB
+	plat->num_phys = 0;
+#endif
+
+	for (i = 0; i < count; i++) {
+		ret = generic_phy_get_by_index(dev, i, &plat->usb_phys[i]);
+		if (ret && ret != -ENOENT) {
+			pr_err("Failed to get USB PHY%d for %s\n",
+			       i, dev->name);
+			return ret;
+		}
+
+		++plat->num_phys;
+	}
+
+	for (i = 0; i < plat->num_phys; i++) {
+		ret = generic_phy_init(&plat->usb_phys[i]);
+		if (ret) {
+			pr_err("Can't init USB PHY%d for %s\n",
+			       i, dev->name);
+			goto phys_init_err;
+		}
+	}
+
+	for (i = 0; i < plat->num_phys; i++) {
+		ret = generic_phy_power_on(&plat->usb_phys[i]);
+		if (ret) {
+			pr_err("Can't power USB PHY%d for %s\n",
+			       i, dev->name);
+			goto phys_poweron_err;
+		}
+	}
+
+#ifdef CONFIG_AML_USB
+	int usb_type = 0;
+
+	for (i = 0; i < plat->num_phys; i++) {
+		dev_read_u32((&plat->usb_phys[i])->dev, "phy-version", &usb_type);
+		if (usb_type == 2) {
+			dev_read_u32((&plat->usb_phys[i])->dev, "portnum", &usb2portnum);
+		}
+	}
+#endif
+
+	return 0;
+
+phys_poweron_err:
+	for (; i >= 0; i--)
+		generic_phy_power_off(&plat->usb_phys[i]);
+
+	for (i = 0; i < plat->num_phys; i++)
+		generic_phy_exit(&plat->usb_phys[i]);
+
+	return ret;
+
+phys_init_err:
+	for (; i >= 0; i--)
+		generic_phy_exit(&plat->usb_phys[i]);
+
+	return ret;
+}
+
+static int xhci_dwc3_shutdown_phy(struct udevice *dev)
+{
+	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
+	int i, ret;
+
+	for (i = 0; i < plat->num_phys; i++) {
+		if (!generic_phy_valid(&plat->usb_phys[i]))
+			continue;
+
+		ret = generic_phy_power_off(&plat->usb_phys[i]);
+		ret |= generic_phy_exit(&plat->usb_phys[i]);
+		if (ret) {
+			pr_err("Can't shutdown USB PHY%d for %s\n",
+			       i, dev->name);
+		}
+	}
+
+	return 0;
+}
+
 static int xhci_dwc3_probe(struct udevice *dev)
 {
 	struct xhci_hcor *hcor;
@@ -120,13 +264,23 @@ static int xhci_dwc3_probe(struct udevice *dev)
 	struct xhci_dwc3_platdata *plat = dev_get_platdata(dev);
 	int ret;
 
+#ifdef CONFIG_AML_USB
+	ret = xhci_dwc3_setup_phy(dev);
+	if (ret)
+		return ret;
+
+	hccr = (struct xhci_hccr *)((uintptr_t)dev_read_addr(dev));
+	hcor = (struct xhci_hcor *)((uintptr_t)hccr +
+			HC_LENGTH(xhci_readl(&(hccr)->cr_capbase)));
+#else
 	hccr = (struct xhci_hccr *)((uintptr_t)dev_read_addr(dev));
 	hcor = (struct xhci_hcor *)((uintptr_t)hccr +
 			HC_LENGTH(xhci_readl(&(hccr)->cr_capbase)));
 
 	ret = dwc3_setup_phy(dev, &plat->usb_phys, &plat->num_phys);
-	if (ret && (ret != -ENOTSUPP))
-		return ret;
+		if (ret && (ret != -ENOTSUPP))
+			return ret;
+#endif
 
 	dwc3_reg = (struct dwc3 *)((char *)(hccr) + DWC3_REG_OFFSET);
 

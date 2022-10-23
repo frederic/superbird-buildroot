@@ -433,7 +433,9 @@ QUIET := $(if $(findstring s,$(filter-out --%,$(MAKEFLAGS))),-q)
 # Strip off the annoying quoting
 ARCH := $(call qstrip,$(BR2_ARCH))
 
-KERNEL_ARCH := $(shell echo "$(ARCH)" | sed -e "s/-.*//" \
+KERNEL_ARCH := $(call qstrip,$(BR2_KERNEL_ARCH))
+
+KERNEL_ARCH ?= $(shell echo "$(ARCH)" | sed -e "s/-.*//" \
 	-e s/i.86/i386/ -e s/sun4u/sparc64/ \
 	-e s/arcle/arc/ \
 	-e s/arceb/arc/ \
@@ -482,7 +484,10 @@ HOSTCXX = $(CCACHE) $(HOSTCXX_NOCCACHE)
 else
 export BR_NO_CCACHE
 endif
-
+ifdef BR2_TARGET_BOARD_PLATFORM
+	export BR2_TARGET_BOARD_PLATFORM
+	#echo $ (BR2_TARGET_BOARD_PLATFORM)
+endif
 # Scripts in support/ or post-build scripts may need to reference
 # these locations, so export them so it is easier to use
 export BR2_CONFIG
@@ -536,6 +541,7 @@ include $(sort $(wildcard package/*/*.mk))
 include boot/common.mk
 include linux/linux.mk
 include fs/common.mk
+include ../multimedia/multimedia.mk
 
 # If using a br2-external tree, the BR2_EXTERNAL_$(NAME)_PATH variables
 # are also present in the .config file. Since .config is included after
@@ -646,6 +652,13 @@ STRIP_FIND_SPECIAL_LIBS_CMD = \
 	$(STRIP_FIND_COMMON_CMD) \
 	\( -name 'ld-*.so*' -o -name 'libpthread*.so*' \) \
 	-print0
+
+# Kernel module stripping
+STRIP_FIND_KERNEL_MODULE_CMD = \
+	$(STRIP_FIND_COMMON_CMD) \
+	\( -name '*.ko' \) \
+	-print0
+
 
 ifeq ($(BR2_ECLIPSE_REGISTER),y)
 define TOOLCHAIN_ECLIPSE_REGISTER
@@ -764,6 +777,7 @@ endif
 	rmdir $(TARGET_DIR)/usr/share 2>/dev/null || true
 	$(STRIP_FIND_CMD) | xargs -0 $(STRIPCMD) 2>/dev/null || true
 	$(STRIP_FIND_SPECIAL_LIBS_CMD) | xargs -0 -r $(STRIPCMD) $(STRIP_STRIP_DEBUG) 2>/dev/null || true
+	$(STRIP_FIND_KERNEL_MODULE_CMD) | xargs -0 -r $(KSTRIPCMD) $(STRIP_STRIP_DEBUG) 2>/dev/null || true
 
 	test -f $(TARGET_DIR)/etc/ld.so.conf && \
 		{ echo "ERROR: we shouldn't have a /etc/ld.so.conf file"; exit 1; } || true
@@ -797,6 +811,12 @@ ifeq ($(BR2_ROOTFS_MERGED_USR),y)
 		} || true$(sep))
 
 endif # merged /usr
+
+	@$(foreach d, $(call qstrip,$(BR2_ROOTFS_COMMON_OVERLAY)), \
+		$(call MESSAGE,"Copying overlay $(d)"); \
+		rsync -a --ignore-times --keep-dirlinks $(RSYNC_VCS_EXCLUSIONS) \
+			--chmod=u=rwX,go=rX --exclude .empty --exclude '*~' \
+			$(d)/ $(TARGET_DIR)$(sep))
 
 	@$(foreach d, $(call qstrip,$(BR2_ROOTFS_OVERLAY)), \
 		$(call MESSAGE,"Copying overlay $(d)"); \
@@ -981,8 +1001,14 @@ defconfig: $(BUILD_DIR)/buildroot-config/conf prepare-kconfig
 define percent_defconfig
 # Override the BR2_DEFCONFIG from COMMON_CONFIG_ENV with the new defconfig
 %_defconfig: $(BUILD_DIR)/buildroot-config/conf $(1)/configs/%_defconfig prepare-kconfig
-	@$$(COMMON_CONFIG_ENV) BR2_DEFCONFIG=$(1)/configs/$$@ \
-		$$< --defconfig=$(1)/configs/$$@ $$(CONFIG_CONFIG_IN)
+	@if support/scripts/br2-fragments-merge $(1)/configs/$$@ ; then \
+		$$(COMMON_CONFIG_ENV) BR2_DEFCONFIG=$(1)/configs/$$@ \
+			$$< --defconfig=$(1)/configs/$$@.tmp $$(CONFIG_CONFIG_IN); \
+		rm -fr $(1)/configs/$$@.tmp; \
+	else \
+		$$(COMMON_CONFIG_ENV) BR2_DEFCONFIG=$(1)/configs/$$@ \
+			$$< --defconfig=$(1)/configs/$$@ $$(CONFIG_CONFIG_IN); \
+	fi
 endef
 $(eval $(foreach d,$(call reverse,$(TOPDIR) $(BR2_EXTERNAL_DIRS)),$(call percent_defconfig,$(d))$(sep)))
 

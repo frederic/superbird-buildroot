@@ -1,0 +1,28 @@
+include $(AQROOT)/makefile.linux.def
+
+INCLUDE += -I$(SDK_LIB)/sdk/inc -I$(SDK_LIB)/applib/ovxinc/include -I$(OVX_DIR)/build/libjpeg-9b
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Supply necessary libraries.
+LIBS += -L$(SDK_LIB)/sharelib -l OpenVX -l OpenVXU -l CLC -l VSC -l m -lGAL
+LIBS += -L$(SDK_LIB)/sharelib -l ovxlib
+LIBS += -L$(OVX_DIR)/target/usr/lib64 -l jpeg
+LIBS +=-L$(LIB_DIR) -l stdc++
+
+#############################################################################
+# Macros.
+PROGRAM = 1
+TARGET_NAME = inceptionv1
+CUR_SOURCE = ${wildcard *.c}
+#############################################################################
+# Objects.
+OBJECTS =  ${patsubst %.c, $(OBJ_DIR)/%.o, $(CUR_SOURCE)}
+
+# installation directory
+INSTALL_DIR := ./
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

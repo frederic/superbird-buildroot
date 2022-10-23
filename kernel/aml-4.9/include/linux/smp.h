@@ -73,7 +73,6 @@ extern void smp_send_stop(void);
  */
 extern void smp_send_reschedule(int cpu);
 
-
 /*
  * Prepare machine for booting other CPUs.
  */

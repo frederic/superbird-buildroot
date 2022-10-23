@@ -24,16 +24,32 @@ null::sysinit:/bin/ln -sf /proc/self/fd/0 /dev/stdin
 null::sysinit:/bin/ln -sf /proc/self/fd/1 /dev/stdout
 null::sysinit:/bin/ln -sf /proc/self/fd/2 /dev/stderr
 ::sysinit:/bin/hostname -F /etc/hostname
+null::sysinit:/sbin/ifconfig lo 127.0.0.1 up
+null::sysinit:/sbin/route add -net 127.0.0.0 netmask 255.0.0.0 lo
 # now run any rc scripts
 ::sysinit:/etc/init.d/rcS
 
 # Put a getty on the serial port
-#ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100 # GENERIC_SERIAL
+#ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100 # UNSUPPORT GENERIC_SERIAL
+ttyS0::respawn:-/bin/sh  # AMLOGIC_GENERAL_SERIAL
+
+# Logging junk
+null::sysinit:/bin/touch /var/log/messages
+null::respawn:/sbin/syslogd -n
+null::respawn:/sbin/klogd -n
+tty3::once:/usr/bin/tail -f /var/log/messages
+null::respawn:/usr/sbin/telnetd -l /bin/sh
 
 # Stuff to do for the 3-finger salute
 #::ctrlaltdel:/sbin/reboot
 
 # Stuff to do before rebooting
+::shutdown:/usr/bin/killall klogd
+::shutdown:/usr/bin/killall syslogd
 ::shutdown:/etc/init.d/rcK
 ::shutdown:/sbin/swapoff -a
 ::shutdown:/bin/umount -a -r
+#null::sysinit:/usr/sbin/fbset -fb /dev/fb0 -g 1024 600 1024 1200 32
+null::sysinit:echo 1 >  /sys/class/graphics/fb1/blank 
+#null::sysinit:/usr/sbin/gui &
+

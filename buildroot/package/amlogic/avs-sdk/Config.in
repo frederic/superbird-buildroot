@@ -1,0 +1,36 @@
+config BR2_PACKAGE_AVS_SDK
+	bool "avs-sdk"
+	select BR2_PACKAGE_LIBGMIME
+	select BR2_PACKAGE_LIBTOTEM
+	select BR2_PACKAGE_LIBCURL
+	select BR2_PACKAGE_NGHTTP2
+	select BR2_PACKAGE_OPENSSL
+	select BR2_PACKAGE_SQLITE
+	select BR2_PACKAGE_GSTREAMER1
+	select BR2_PACKAGE_GST1_PLUGINS_BASE
+	select BR2_PACKAGE_PKGCONF
+	select BR2_PACKAGE_LEDRING
+	select BR2_PACKAGE_DBUS
+	help
+		The Alexa Voice Service (AVS) enables developers to integrate Alexa directly
+	   	into their products, bringing the
+		convenience of voice control to any connected device. AVS provides developers
+	   	with access to a suite of resources
+		to quickly and easily build Alexa-enabled products, including APIs, hardware
+	   	development kits, software development kits, and documentation.
+
+config BR2_AVS_DSPC_AEC
+        bool "only enable DSPC AEC"
+
+config BR2_AVS_AMAZON_WWE
+        bool "enable amazon wwe"
+
+config BR2_AVS_RDSPC
+        bool "enable RDSPC AFE"
+
+config BR2_PACKAGE_DISPLAYCARD_AML_IMP
+        bool "enable avs displaycard ."
+        default n
+
+config BR2_AVS_CLIENT_API
+        bool "enable client api support"

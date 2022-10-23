@@ -17,8 +17,8 @@ config BR2_PACKAGE_WESTON
 	select BR2_PACKAGE_CAIRO_PNG
 	select BR2_PACKAGE_LIBPNG
 	select BR2_PACKAGE_JPEG
+	select BR2_PACKAGE_MTDEV
 	select BR2_PACKAGE_LIBINPUT
-	select BR2_PACKAGE_LIBDRM
 	# Runtime dependency
 	select BR2_PACKAGE_XKEYBOARD_CONFIG
 	# Make sure at least one compositor is selected.
@@ -39,12 +39,26 @@ config BR2_PACKAGE_WESTON_HAS_COMPOSITOR
 
 config BR2_PACKAGE_WESTON_DRM
 	bool "DRM compositor"
-	depends on BR2_PACKAGE_MESA3D_OPENGL_EGL
+	depends on BR2_PACKAGE_MESON_MALI
+	select BR2_PACKAGE_LIBDRM
 	select BR2_PACKAGE_WESTON_HAS_COMPOSITOR
 
 # Uses libgbm from mesa3d
 comment "DRM compositor needs an OpenGL EGL backend provided by mesa3d"
 	depends on !BR2_PACKAGE_MESA3D_OPENGL_EGL
+
+if BR2_PACKAGE_WESTON_DRM
+
+config BR2_PACKAGE_WESTON_DRM_HELPER
+	bool "Meson DRM compositor helper framework"
+	select BR2_PACKAGE_MESON_DISPLAY
+	select BR2_PACKAGE_MESON_WESTON_DRM_HELPER
+	help
+	  This enable meson weston drm helper framework, which allows
+	  weston through the ipc with ipc client.
+
+endif
+
 
 config BR2_PACKAGE_WESTON_FBDEV
 	bool "fbdev compositor"
@@ -67,9 +81,9 @@ config BR2_PACKAGE_WESTON_RDP
 	    --rdp-tls-cert=/path/to/server.crt
 	    --rdp-tls-key=/path/to/server.key
 
-	  By default, Buildroot installs such files in
-	  /etc/freerdp/server/ so you may want to change them in a
-	  post-build script or a rootfs overlay.
+	  By default, Buildroot installs such files in /etc/freerdp/server/
+	  so you may want to change them in a post-build script or a rootfs
+	  overlay.
 
 comment "RDP compositor needs a toolchain w/ wchar, C++"
 	depends on BR2_USE_MMU
@@ -102,5 +116,12 @@ config BR2_PACKAGE_WESTON_DEMO_CLIENTS
 	bool "demo clients"
 	help
 	  This enables the installation of Weston's demo clients.
+
+config BR2_PACKAGE_WESTON_DRM_FIX_UI_SIZE
+	bool "Use fixed ui size on differ display mode"
+	help
+	  Use fixed ui size on differ display mode.
+
+source "package/weston/weston-daemon/Config.in"
 
 endif

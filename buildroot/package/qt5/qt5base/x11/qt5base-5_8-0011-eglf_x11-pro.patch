@@ -1,0 +1,13 @@
+Index: qtbase-opensource-src-5.8.0/src/plugins/platforms/eglfs/deviceintegration/eglfs_x11/eglfs_x11.pro
+===================================================================
+--- qtbase-opensource-src-5.8.0.orig/src/plugins/platforms/eglfs/deviceintegration/eglfs_x11/eglfs_x11.pro	2017-01-18 22:20:58.000000000 +0800
++++ qtbase-opensource-src-5.8.0/src/plugins/platforms/eglfs/deviceintegration/eglfs_x11/eglfs_x11.pro	2017-02-10 23:16:37.504444349 +0800
+@@ -3,7 +3,7 @@
+ QT += core-private gui-private eglfsdeviceintegration-private
+ 
+ # Avoid X11 header collision, use generic EGL native types
+-DEFINES += QT_EGL_NO_X11
++#DEFINES += QT_EGL_NO_X11
+ 
+ INCLUDEPATH += $$PWD/../../api
+ 

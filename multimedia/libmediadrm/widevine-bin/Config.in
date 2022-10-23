@@ -1,0 +1,25 @@
+config BR2_PACKAGE_WIDEVINE_BIN
+        bool "widevine prebuilt"
+        select BR2_PACKAGE_TDK
+        help
+          widevine prebuilt files.
+
+          http://openlinux.amlogic.com
+choice
+        prompt "Widevine Version"
+        default BR2_PACKAGE_WIDEVINE_BIN_VERSION_14
+        depends on BR2_PACKAGE_WIDEVINE_BIN
+        help
+          Select the version of widevine so.
+
+config BR2_PACKAGE_WIDEVINE_BIN_VERSION_10
+        bool "widevine v10"
+        help
+          widevine prebuilt version v10 for 2017.
+
+config BR2_PACKAGE_WIDEVINE_BIN_VERSION_14
+        bool "widevine v14"
+        help
+          widevine prebuilt version v14 for 2019.
+
+endchoice

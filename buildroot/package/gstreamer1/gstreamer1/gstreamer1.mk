@@ -32,4 +32,21 @@ GSTREAMER1_DEPENDENCIES = \
 	libglib2 \
 	$(if $(BR2_PACKAGE_LIBUNWIND),libunwind)
 
+ifeq ($(BR2_PACKAGE_PULSEAUDIO), y)
+GSTTREAMER1_SOUNDCARD_CONFIG_ARCH = gst-soundcard.conf
+else
+ifeq ($(BR2_aarch64),y)
+GSTTREAMER1_SOUNDCARD_CONFIG_ARCH = gst-soundcard-64.conf
+else
+GSTTREAMER1_SOUNDCARD_CONFIG_ARCH = gst-soundcard-32.conf
+endif
+endif
+
+define GSTREAMER1_INSTALL_TARGET_FIXUP
+ ${INSTALL} -D -m 0755  $(TOPDIR)/package/gstreamer1/gstreamer1/$(GSTTREAMER1_SOUNDCARD_CONFIG_ARCH)  ${TARGET_DIR}/etc/gst-soundcard.conf
+endef
+
+GSTREAMER1_POST_INSTALL_TARGET_HOOKS += GSTREAMER1_INSTALL_TARGET_FIXUP
+
+
 $(eval $(autotools-package))

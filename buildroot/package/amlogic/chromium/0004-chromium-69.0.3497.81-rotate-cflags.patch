@@ -1,0 +1,13 @@
+diff --git a/src/build/toolchain/gcc_toolchain.gni b/src/build/toolchain/gcc_toolchain.gni
+index b6f63d7..d2d495e 100644
+--- a/src/build/toolchain/gcc_toolchain.gni
++++ b/src/build/toolchain/gcc_toolchain.gni
+@@ -295,7 +295,7 @@ template("gcc_toolchain") {
+ 
+     tool("cxx") {
+       depfile = "{{output}}.d"
+-      command = "$cxx -MMD -MF $depfile ${rebuild_string}{{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}}${extra_cppflags}${extra_cxxflags} -c {{source}} -o {{output}}"
++      command = "$cxx -MMD -MF $depfile ${rebuild_string}{{defines}} {{include_dirs}} {{cflags_cc}} {{cflags}}${extra_cppflags}${extra_cxxflags} -c {{source}} -o {{output}}"
+       depsformat = "gcc"
+       description = "CXX {{output}}"
+       outputs = [

@@ -1,0 +1,3 @@
+# ota package file list for nand
+HASH_FILES="u-boot.bin.usb.bl2 u-boot.bin.usb.tpl dtb.img boot.img rootfs.ubifs update.sh"
+FILES="sw-description sw-description.sig u-boot.bin.usb.bl2 u-boot.bin.usb.tpl dtb.img boot.img rootfs.ubifs update.sh"

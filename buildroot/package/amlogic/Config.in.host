@@ -1,0 +1,2 @@
+source "package/amlogic/aml_image_packer/Config.in.host"
+source "package/amlogic/aml_img_packer_new/Config.in.host"

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_IPC_PROPERTY_JSON
+  bool "nlohmann json library"
+
+  help
+     the json library used by ipc property

@@ -1,0 +1,15 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/libavcodec/mpegaudiodec_fixed.c
+===================================================================
+--- ffmpeg-3.4.5-ori/libavcodec/mpegaudiodec_fixed.c	2018-11-02 02:34:24.000000000 +0800
++++ ffmpeg-3.4.5/libavcodec/mpegaudiodec_fixed.c	2019-08-05 10:51:00.673879073 +0800
+@@ -81,6 +81,7 @@
+     .decode         = decode_frame,
+     .capabilities   = AV_CODEC_CAP_DR1,
+     .flush          = flush,
++    .close          = decode_close,
+     .sample_fmts    = (const enum AVSampleFormat[]) { AV_SAMPLE_FMT_S16P,
+                                                       AV_SAMPLE_FMT_S16,
+                                                       AV_SAMPLE_FMT_NONE },

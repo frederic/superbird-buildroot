@@ -1,0 +1,9 @@
+# This is map table for buildroot, use this define the key map for buildroot system
+
+# type                  key
+#up                      106    #this key uesd avs mute
+#down                    105
+WifiConfig              139
+VolumeUp                115    #this key used  VolumeUp
+VolumeDown              114    #this key used VolumeDown
+power                   116

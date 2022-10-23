@@ -31,10 +31,11 @@ restart() {
 case "$1" in
   start)
 	start
-	;;
+    ;;
   stop)
 	stop
 	;;
+  netready|netup|netdown|netchange) ;;
   restart|reload)
 	restart
 	;;

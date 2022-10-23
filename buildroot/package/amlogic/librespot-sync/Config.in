@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LIBRESPOT_SYNC
+	bool "librespot-sync"
+	help
+		spotify connector call librespot_sync
+

@@ -23,6 +23,16 @@ BLUEZ_UTILS_CONF_OPTS += \
 	--enable-dund
 endif
 
+# pair agent needs check package
+ifeq ($(BR2_PACKAGE_CHECK),y)
+BLUEZ_UTILS_DEPENDENCIES +=	check
+
+define BLUEZ_UTILS_INSTALL_AGENT
+	$(INSTALL) -m 755 $(@D)/test/agent $(TARGET_DIR)/usr/bin
+endef
+
+endif
+
 # audio support
 ifeq ($(BR2_PACKAGE_BLUEZ_UTILS_AUDIO),y)
 BLUEZ_UTILS_DEPENDENCIES += \
@@ -57,5 +67,10 @@ endif
 ifeq ($(BR2_TOOLCHAIN_SUPPORTS_PIE),)
 BLUEZ_UTILS_CONF_OPTS += --disable-pie
 endif
+
+define BLUEZ_UTILS_INSTALL_INIT_SYSV
+	$(BLUEZ_UTILS_INSTALL_AGENT)
+	$(INSTALL) -D -m 755 package/bluez_utils/bluez_tool.sh $(TARGET_DIR)/usr/bin
+endef
 
 $(eval $(autotools-package))

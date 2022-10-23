@@ -1,0 +1,34 @@
+diff --git a/src/ui/ozone/platform/wayland/wayland_window.cc b/src/ui/ozone/platform/wayland/wayland_window.cc
+--- a/src/ui/ozone/platform/wayland/wayland_window.cc	2018-08-08 17:33:28.000000000 +0800
++++ b/src/ui/ozone/platform/wayland/wayland_window.cc	2018-08-28 16:57:46.205229659 +0800
+@@ -295,7 +295,11 @@
+     // maximized window instead.
+     if (restored_bounds_.IsEmpty())
+       restored_bounds_ = bounds_;
+-    xdg_surface_->SetFullscreen();
++
++    // replace SetFullscreen to SetMaximized for solving the issue of 
++    // video quad not transparent after fullscreen was set. (temporary solution)
++    //xdg_surface_->SetFullscreen();
++    xdg_surface_->SetMaximized();
+   } else {
+     // Check the comment above. If it's not handled synchronously, media files
+     // may not leave the fullscreen mode.
+@@ -457,9 +461,15 @@
+     old_state = PlatformWindowState::PLATFORM_WINDOW_STATE_UNKNOWN;
+     DCHECK(state_ == PlatformWindowState::PLATFORM_WINDOW_STATE_FULLSCREEN);
+   } else if (is_maximized) {
+-    state_ = PlatformWindowState::PLATFORM_WINDOW_STATE_MAXIMIZED;
++    if(state_ != PlatformWindowState::PLATFORM_WINDOW_STATE_FULLSCREEN) {
++      // if is set to fullscreen, do not change to maximized status
++      // due to the xdg_surface_->SetFullScreen was replaced by SetMaximized
++      state_ = PlatformWindowState::PLATFORM_WINDOW_STATE_MAXIMIZED;
++    }
+   } else {
+-    state_ = PlatformWindowState::PLATFORM_WINDOW_STATE_NORMAL;
++    if(state_ != PlatformWindowState::PLATFORM_WINDOW_STATE_FULLSCREEN) {
++      state_ = PlatformWindowState::PLATFORM_WINDOW_STATE_NORMAL;
++    }
+   }
+ 
+   // Update state before notifying delegate.

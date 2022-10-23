@@ -1,0 +1,28 @@
+config BR2_PACKAGE_BRCMUSI
+	bool "brcmusi"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  brcm dhd driver
+
+config BR2_PACKAGE_BRCMUSI_GIT_VERSION
+	string "brcm usi branch"
+	depends on BR2_PACKAGE_BRCMUSI
+	help
+		Branch for brcm usi
+
+config BR2_PACKAGE_BRCMUSI_GIT_REPO_URL
+	string "brcm usi git"
+	depends on BR2_PACKAGE_BRCMUSI
+	help
+		brcm usi git
+
+config BR2_PACKAGE_BRCMUSI_LOCAL
+	bool "brcm usi local"
+	help
+		brcm usi local
+
+config BR2_PACKAGE_BRCMUSI_LOCAL_PATH
+	string "brcm usi local path"
+	depends on BR2_PACKAGE_BRCMUSI_LOCAL
+	help
+		brcm usi local path

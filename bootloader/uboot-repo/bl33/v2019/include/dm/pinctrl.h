@@ -134,6 +134,19 @@ struct pinctrl_ops {
 	 */
 	int (*get_gpio_mux)(struct udevice *dev, int banknum, int index);
 
+	/* set_gpio_mux() - set the mux value for a particular GPIO
+	 *
+	 * This is useful for setting the mux value before a pin used as GPIO.
+	 * such as with the 'gpio' command. This function is internal to the GPIO
+	 * subsystem and shoud not be used by generic code. Typically it is used
+	 * by a GPIO driver with knowledge of the SoC pinctrl setup.
+	 *
+	 * @dev:	Pinctrl device to use
+	 * @banknum:	GPIO bank number
+	 * @index:	GPIO index within the bank
+	 */
+	int (*set_gpio_mux)(struct udevice *dev, int index);
+
 	/**
 	 * get_pin_muxing() - show pin muxing
 	 *
@@ -382,6 +395,21 @@ int pinctrl_decode_pin_config_dm(struct udevice *dev);
 */
 int pinctrl_get_gpio_mux(struct udevice *dev, int banknum, int index);
 
+
+/**
+ * pinctrl_set_gpio_mux() - set the mux value for a particular GPIO
+ *
+ * This is useful for setting the mux value before a pin used as GPIO.
+ * such as with the 'gpio' command. This function is internal to the GPIO
+ * subsystem and shoud not be used by generic code. Typically it is used
+ * by a GPIO driver with knowledge of the SoC pinctrl setup.
+ *
+ * @dev:	Pinctrl device to use
+ * @banknum:	GPIO bank number
+ * @index:	GPIO index within the bank
+ */
+int pinctrl_set_gpio_mux(struct udevice *dev, int banknum, int index);
+
 /**
  * pinctrl_get_pin_muxing() - Returns the muxing description
  *
@@ -419,4 +447,5 @@ int pinctrl_get_pins_count(struct udevice *dev);
  */
 int pinctrl_get_pin_name(struct udevice *dev, int selector, char *buf,
 			 int size);
+
 #endif /* __PINCTRL_H */

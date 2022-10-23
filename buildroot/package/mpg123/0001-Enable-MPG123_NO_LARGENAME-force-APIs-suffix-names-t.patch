@@ -1,0 +1,27 @@
+From 01f4cd444f8f51412bc4fb25db0a720d9d63595a Mon Sep 17 00:00:00 2001
+From: Frank Chen <frank.chen@amlogic.com>
+Date: Fri, 31 Aug 2018 17:12:38 +0800
+Subject: [PATCH] Enable MPG123_NO_LARGENAME force APIs suffix names to none
+
+By default, when the app defines _FILE_OFFSET_BITS, it wants non-default
+large file support, and thus functions with added suffix (mpg123_feedseek_64)
+---
+ src/libmpg123/mpg123.h.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libmpg123/mpg123.h.in b/src/libmpg123/mpg123.h.in
+index 004d5f3..58b94c1 100644
+--- a/src/libmpg123/mpg123.h.in
++++ b/src/libmpg123/mpg123.h.in
+@@ -18,7 +18,7 @@
+  * to the header.
+  */
+ #define MPG123_API_VERSION @API_VERSION@
+-
++#define MPG123_NO_LARGENAME
+ #ifndef MPG123_EXPORT
+ /** Defines needed for MS Visual Studio(tm) DLL builds.
+  * Every public function must be prefixed with MPG123_EXPORT. When building 
+-- 
+2.18.0
+

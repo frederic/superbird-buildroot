@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_NN_DETECT_YOLO_V3
+    bool "aml nn_detect yolo_v3 library"
+    depends on BR2_PACKAGE_NPU
+    help
+        Support yolo_v3 detection

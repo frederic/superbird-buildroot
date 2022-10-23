@@ -35,8 +35,18 @@
 #include <asm/unaligned.h>
 #include <errno.h>
 #include <usb.h>
+#include <asm/arch/usb.h>
 #ifdef CONFIG_4xx
 #include <asm/4xx_pci.h>
+#endif
+
+#ifdef CONFIG_MTK_BT_USB
+extern int max_mtk_wifi_id;
+extern os_usb_vid_pid *pmtk_wifi;
+#endif
+
+#ifdef CONFIG_USB_DEVICE_V2
+extern void set_usb_phy_tuning_1(int port);
 #endif
 
 #define USB_BUFSIZ	512
@@ -51,6 +61,27 @@ char usb_started; /* flag for the started/stopped USB status */
 #define CONFIG_USB_MAX_CONTROLLER_COUNT 1
 #endif
 
+extern int usb_lowlevel_init(int index,enum usb_init_type init, void **controller);
+extern int usb_lowlevel_stop(int index);
+extern int submit_int_msg(struct usb_device *dev, unsigned long pipe, void *buffer, int len, int interval);
+extern int submit_control_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
+                   int len, struct devrequest *setup);
+extern int submit_bulk_msg(struct usb_device *dev, unsigned long pipe, void *buf, int len);
+
+/***********************************************************************
+ * wait_ms
+
+void wait_ms(unsigned long ms)
+{
+	while (ms-- > 0)
+		_udelay(1000);
+}*/
+void _mdelay(unsigned long ms)
+{
+	while (ms-- > 0)
+		_udelay(1000);
+}
+
 /***************************************************************************
  * Init USB Device
  */
@@ -60,7 +91,7 @@ int usb_init(void)
 	struct usb_device *dev;
 	int i, start_index = 0;
 	int ret;
-
+	int usb_count = get_usb_count();
 	dev_index = 0;
 	asynch_allowed = 1;
 	usb_hub_reset();
@@ -72,7 +103,7 @@ int usb_init(void)
 	}
 
 	/* init low_level USB */
-	for (i = 0; i < CONFIG_USB_MAX_CONTROLLER_COUNT; i++) {
+	for (i = 0; i < usb_count; i++) {
 		/* init low_level USB */
 		printf("USB%d:   ", i);
 		ret = usb_lowlevel_init(i, USB_INIT_HOST, &ctrl);
@@ -99,13 +130,28 @@ int usb_init(void)
 		if (dev)
 			usb_new_device(dev);
 
+/* Support MTK BT device. */
+#ifdef CONFIG_MTK_BT_USB
+               for (i = 0; i < max_mtk_wifi_id; i++) {
+                       if ((dev->descriptor.idVendor == (pmtk_wifi+i)->vid) && (dev->descriptor.idProduct == (pmtk_wifi+i)->pid)) {
+							   printf("Found USB WIFI [%s] in usb port %d\n", (pmtk_wifi+i)->name, dev->portnr);
+
+					   /* Amlogic USB need to support interrupt pipe/endpoint.
+						* If Amlogic has already enabled intr endpoint, then skip it.
+						*/
+					   }
+			   }
+#endif
+
 		if (start_index == dev_index)
 			puts("No USB Device found\n");
-		else
+		else {
 			printf("%d USB Device(s) found\n",
 				dev_index - start_index);
 
-		usb_started = 1;
+			usb_started = 1;
+			break;
+		}
 	}
 
 	debug("scan end\n");
@@ -161,11 +207,22 @@ int usb_disable_asynch(int disable)
 /*
  * submits an Interrupt Message
  */
+#ifndef CONFIG_MTK_BT_USB
 int usb_submit_int_msg(struct usb_device *dev, unsigned long pipe,
 			void *buffer, int transfer_len, int interval)
 {
 	return submit_int_msg(dev, pipe, buffer, transfer_len, interval);
 }
+#else
+int usb_submit_int_msg(struct usb_device *dev, unsigned long pipe,
+					   void *buffer, int transfer_len, int *actual_length, int interval)
+{
+	   submit_int_msg(dev, pipe, buffer, transfer_len, interval);
+	   *actual_length = dev->act_len;
+	   printf("usb_submit_int_msg:act_len:%d\n", dev->act_len);
+	   return 0;
+}
+#endif
 
 /*
  * submits a control message and waits for comletion (at least timeout * 1ms)
@@ -212,7 +269,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 	while (timeout--) {
 		if (!((volatile unsigned long)dev->status & USB_ST_NOT_PROC))
 			break;
-		mdelay(1);
+		_mdelay(1);
 	}
 	if (dev->status)
 		return -1;
@@ -237,7 +294,7 @@ int usb_bulk_msg(struct usb_device *dev, unsigned int pipe,
 	while (timeout--) {
 		if (!((volatile unsigned long)dev->status & USB_ST_NOT_PROC))
 			break;
-		mdelay(1);
+		_mdelay(1);
 	}
 	*actual_length = dev->act_len;
 	if (dev->status == 0)
@@ -578,6 +635,19 @@ static int usb_set_address(struct usb_device *dev)
 	return res;
 }
 
+static int usb_enable_device(struct usb_device *dev)
+{
+	int res;
+
+	debug("usb enable %d\n", dev->devnum);
+	res = usb_control_msg(dev, usb_snddefctrl(dev),
+				USB_ENABLE, 0,
+				(dev->devnum), 0,
+				NULL, 0, USB_CNTL_TIMEOUT);
+	return res;
+}
+
+
 /********************************************************************
  * set interface number to interface
  */
@@ -878,11 +948,14 @@ __weak int usb_alloc_device(struct usb_device *udev)
  *
  * Returns 0 for success, != 0 for error.
  */
+
 int usb_new_device(struct usb_device *dev)
 {
 	int addr, err;
 	int tmp;
+	int retry_count = 0;
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, tmpbuf, USB_BUFSIZ);
+retry:
 
 	/*
 	 * Allocate usb 3.0 device context.
@@ -898,6 +971,7 @@ int usb_new_device(struct usb_device *dev)
 	/* We still haven't set the Address yet */
 	addr = dev->devnum;
 	dev->devnum = 0;
+	dev->connect_status = 1;
 
 #ifdef CONFIG_LEGACY_USB_INIT_SEQ
 	/* this is the old and known way of initializing devices, it is
@@ -969,6 +1043,12 @@ int usb_new_device(struct usb_device *dev)
 			printf("\n     Couldn't reset port %i\n", dev->portnr);
 			return 1;
 		}
+
+#ifdef CONFIG_USB_DEVICE_V2
+		if (parent->parent == NULL) {
+			set_usb_phy_tuning_1(dev->portnr - 1);
+		}
+#endif
 	}
 #endif
 
@@ -991,20 +1071,34 @@ int usb_new_device(struct usb_device *dev)
 	dev->devnum = addr;
 
 	err = usb_set_address(dev); /* set address */
-
 	if (err < 0) {
-		printf("\n      USB device not accepting new address " \
-			"(error=%lX)\n", dev->status);
-		return 1;
+		err = hub_port_reset(dev->parent, dev->portnr - 1, &portstatus);
+		if (err < 0) {
+			printf("\n     Couldn't reset port %i\n", dev->portnr);
+			return 1;
+		}
+		usb_enable_device(dev);
+		_mdelay(100);
+		err = hub_port_reset(dev->parent, dev->portnr - 1, &portstatus);
+		if (err < 0) {
+			printf("\n     Couldn't reset port %i\n", dev->portnr);
+			return 1;
+		}
+		usb_set_address(dev); /* set address */
 	}
 
-	mdelay(10);	/* Let the SET_ADDRESS settle */
+	_mdelay(10);	/* Let the SET_ADDRESS settle */
 
 	tmp = sizeof(dev->descriptor);
 
 	err = usb_get_descriptor(dev, USB_DT_DEVICE, 0,
 				 tmpbuf, sizeof(dev->descriptor));
 	if (err < tmp) {
+		if (retry_count == 0) {
+			retry_count++;
+			printf("retry new usb device\n");
+			goto retry;
+		}
 		if (err < 0)
 			printf("unable to get device descriptor (error=%d)\n",
 			       err);
@@ -1041,6 +1135,13 @@ int usb_new_device(struct usb_device *dev)
 	memset(dev->mf, 0, sizeof(dev->mf));
 	memset(dev->prod, 0, sizeof(dev->prod));
 	memset(dev->serial, 0, sizeof(dev->serial));
+
+/* For MTK BT. */
+#ifdef CONFIG_MTK_BT_USB
+       if (!((dev->descriptor.idVendor == 0x0e8d) && (dev->descriptor.idProduct == 0x7668)))
+			   mdelay(200);
+#endif
+
 	if (dev->descriptor.iManufacturer)
 		usb_string(dev, dev->descriptor.iManufacturer,
 			   dev->mf, sizeof(dev->mf));
@@ -1058,9 +1159,4 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 }
 
-__weak
-int board_usb_init(int index, enum usb_init_type init)
-{
-	return 0;
-}
 /* EOF */

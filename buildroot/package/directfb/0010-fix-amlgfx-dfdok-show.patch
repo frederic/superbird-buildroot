@@ -1,0 +1,22 @@
+diff --git a/gfxdrivers/amlgfx/aml.h b/gfxdrivers/amlgfx/aml.h
+index 1cd5d70..f0a1678 100644
+--- a/gfxdrivers/amlgfx/aml.h
++++ b/gfxdrivers/amlgfx/aml.h
+@@ -80,6 +80,7 @@
+ #define GE2D_ANTIFLICKER_VALUE				0x46f5
+ #define	GE2D_SET_BLIT_PALETTE				0x46f4
+ 
++#define CONFIG_GE2D_SRC2
+ 
+ #define GE2D_ENDIAN_SHIFT       		24
+ #define GE2D_ENDIAN_MASK                  (0x1 << GE2D_ENDIAN_SHIFT)
+@@ -282,6 +283,9 @@ typedef    struct {
+ 
+ 	int alu_const_color;
+ 	unsigned src1_gb_alpha;
++#ifdef CONFIG_GE2D_SRC2
++	unsigned int src2_gb_alpha;
++#endif
+ 	unsigned op_mode;
+ 	unsigned char bitmask_en;
+ 	unsigned char bytemask_only;

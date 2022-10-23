@@ -1,0 +1,5 @@
+config BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_AARCH64
+    bool "gcc-linaro-aarch64"
+    default n
+    help
+	gcc toolchain for amlogic 64bit soc browser

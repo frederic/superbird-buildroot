@@ -1,0 +1,385 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/libavcodec/amldec.c
+===================================================================
+--- ffmpeg-3.4.5-ori/libavcodec/amldec.c	1970-01-01 08:00:00.000000000 +0800
++++ ffmpeg-3.4.5/libavcodec/amldec.c	2019-08-21 09:48:59.135817297 +0800
+============================================
+@@ -0,0 +1,376 @@
++/***************************************************************************
++ * copyright (c) 2019 amlogic, inc. all rights reserved.
++ *
++ * @file amldec.c
++ * @brief amlogic hifi DSP port layer
++ *
++ * @detail
++ *   It's the API wrapper between ffmpeg and our hifi DSP
++ *
++ * @author Yeping.Miao
++ * @date 2019-08-01
++ ***************************************************************************/
++#include <string.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <assert.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <time.h>
++
++#include "libavutil/attributes.h"
++#include "libavutil/audio_fifo.h"
++#include "libavutil/channel_layout.h"
++#include "libavutil/opt.h"
++
++#include "libswresample/swresample.h"
++
++#include "mpegaudio.h"
++
++#include "avcodec.h"
++#include "get_bits.h"
++#include "internal.h"
++#include "mathops.h"
++
++#include "aml_dsp/rpc_client_aipc.h"
++#include "aml_dsp/rpc_client_mp3.h"
++#include "aml_dsp/rpc_client_aac.h"
++#include "aml_dsp/rpc_client_shm.h"
++#include "aml_dsp/aipc_type.h"
++
++#include "amldec.h"
++#define DMX_ANC_BUFFSIZE       128
++#define DECODER_MAX_CHANNELS     8
++#define DECODER_BUFFSIZE      2048 * sizeof(INT_PCM)
++
++typedef union _codec_config {
++  tAmlACodecConfig_Mp3DecExternal mp3_config;
++  tAmlAacInitCtx aac_config;
++} AML_CODEC_CONFIG;
++
++typedef struct _tag_DecoderHandle {
++  enum AVCodecID  codec_id;
++  AML_CODEC_CONFIG config;
++  void *dsp_codec;
++  uint8_t *output_buf;
++} AmlACodec_t;
++static void *aml_dsp_codec = NULL;
++
++#define MAX_SHARE_INPUT_MEMORY_SIZE kInputBufferSize
++#define MAX_SHARE_OUTPUT_MEMORY_SIZE kOutputBufferSize
++
++static int aml_mp3_decode_frame(AVCodecContext *avctx, void *data,
++    const uint8_t *buf, int buf_size);
++static int aml_aac_decode_frame(AVCodecContext *avctx, void *data,
++    const uint8_t *buf, int buf_size);
++
++static int in_allocate_output_buf(AmlACodec_t *amlcodc) {
++  if (NULL == amlcodc) return -1;
++  amlcodc->output_buf = malloc(MAX_SHARE_OUTPUT_MEMORY_SIZE);
++
++  if (NULL == amlcodc->output_buf) {
++    printf("Cannot malloc AAC output buffer %d\n",
++            MAX_SHARE_OUTPUT_MEMORY_SIZE);
++    return -1;
++  }
++
++  return 0;
++}
++static void*  in_aac_dec_init(AVCodecContext *avctx,AmlACodec_t *pCodec)
++{
++  AAC_DECODER_ERROR err;
++  tAmlAacInitCtx *pConfig = &(pCodec->config.aac_config);
++  // allocate AAC output buffer
++  if (0 != in_allocate_output_buf(pCodec))
++  {
++    return AVERROR_UNKNOWN;
++  }
++  pConfig->transportFmt = avctx->extradata_size ? TT_MP4_RAW : TT_MP4_ADTS;
++  pConfig->nrOfLayers = 1;
++  pCodec->dsp_codec = AmlACodecInit_AacDec(pConfig);
++  if (pConfig->transportFmt == TT_MP4_ADTS)
++  {
++    return pCodec->dsp_codec;
++  }
++
++  if (NULL == pCodec->dsp_codec) 
++  {
++    av_log(avctx, AV_LOG_ERROR, "hifidsp init %d decode failed\n", avctx->codec_id);
++    return AVERROR_UNKNOWN;
++  }
++  if (avctx->extradata_size) 
++  {
++    if((AmlACodecConfigRaw((tAmlAacDecHdl)pCodec->dsp_codec, &avctx->extradata, &avctx->extradata_size)) != AAC_DEC_OK)
++    {
++      av_log(avctx, AV_LOG_ERROR, "Unable to set extradata\n");
++      return AVERROR_INVALIDDATA;
++    }
++  }
++  if ((err = AmlACodecSetParam((tAmlAacDecHdl)pCodec->dsp_codec, AAC_CONCEAL_METHOD,
++          1)) != AAC_DEC_OK)
++  {
++    av_log(avctx, AV_LOG_ERROR, "Unable to set error concealment method\n");
++    return AVERROR_UNKNOWN;
++  }
++
++  if (avctx->request_channel_layout > 0 &&
++      avctx->request_channel_layout != AV_CH_LAYOUT_NATIVE)
++  {
++    int downmix_channels = -1;
++    switch (avctx->request_channel_layout)
++    {
++      case AV_CH_LAYOUT_STEREO:
++      case AV_CH_LAYOUT_STEREO_DOWNMIX:
++        downmix_channels = 2;
++        break;
++      case AV_CH_LAYOUT_MONO:
++        downmix_channels = 1;
++        break;
++      default:
++        av_log(avctx, AV_LOG_WARNING, "Invalid request_channel_layout\n");
++        break;
++    }
++
++      if (downmix_channels != -1)
++      {
++        if (AmlACodecSetParam((tAmlAacDecHdl)pCodec->dsp_codec, AAC_PCM_MAX_OUTPUT_CHANNELS,
++              downmix_channels) != AAC_DEC_OK)
++        {
++          av_log(avctx, AV_LOG_WARNING, "Unable to set output channels in the decoder\n");
++        }
++        else
++        {
++          pCodec->output_buf = av_malloc(DMX_ANC_BUFFSIZE);
++          if (!pCodec->output_buf)
++          {
++            av_log(avctx, AV_LOG_ERROR, "Unable to allocate ancillary buffer for the decoder\n");
++            return AVERROR(ENOMEM);
++          }
++          if (AmlACodecAncInit((tAmlAacDecHdl)pCodec->dsp_codec, pCodec->output_buf, DMX_ANC_BUFFSIZE)) {
++            av_log(avctx, AV_LOG_ERROR, "Unable to register downmix ancillary buffer in the decoder\n");
++            return AVERROR_UNKNOWN;
++          }
++        }
++      }
++    }
++    if (AmlACodecSetParam((tAmlAacDecHdl)pCodec->dsp_codec, AAC_DRC_BOOST_FACTOR, 0) != AAC_DEC_OK)
++    {
++      av_log(avctx, AV_LOG_ERROR, "Unable to set DRC boost factor in the decoder\n");
++      return AVERROR_UNKNOWN;
++    }
++    if (AmlACodecSetParam((tAmlAacDecHdl)pCodec->dsp_codec, AAC_DRC_ATTENUATION_FACTOR, 0) != AAC_DEC_OK)
++    {
++      av_log(avctx, AV_LOG_ERROR, "Unable to set DRC attenuation factor in the decoder\n");
++      return AVERROR_UNKNOWN;
++    }
++    avctx->sample_fmt = AV_SAMPLE_FMT_S16;
++    int buf;
++    buf = DECODER_BUFFSIZE * DECODER_MAX_CHANNELS;
++    pCodec->output_buf = av_malloc(buf);
++    if (!pCodec->output_buf){
++      return AVERROR(ENOMEM);
++    }
++    return pCodec->dsp_codec;
++}
++static void* AmlACodecInit(AVCodecContext *avctx) {
++  AmlACodec_t *pCodec = NULL;
++
++  // mallock AmlACodec_t
++  pCodec = (AmlACodec_t*)calloc(1, sizeof(AmlACodec_t));
++  if (NULL == pCodec) {
++    av_log(avctx, AV_LOG_ERROR, "Cannot malloc memory size = %d\n", sizeof(AmlACodec_t));
++    return NULL;
++  }
++  switch (avctx->codec_id){
++  case AV_CODEC_ID_MP3:
++    {
++      tAmlACodecConfig_Mp3DecExternal *pConfig = &(pCodec->config.mp3_config);
++      pConfig->equalizerType = flat;
++      pConfig->crcEnabled = false;
++      pCodec->dsp_codec = AmlACodecInit_Mp3Dec(pConfig);
++    }
++    break;
++  case AV_CODEC_ID_AAC:
++    {
++      pCodec->dsp_codec = in_aac_dec_init(avctx,pCodec);
++    }
++    break;
++  default:
++    av_log(avctx, AV_LOG_ERROR, "Cannot support id %d\n", avctx->codec_id);
++    break;
++  }
++  if (NULL == pCodec->dsp_codec) {
++    av_log(avctx, AV_LOG_ERROR, "hifidsp init %d decode failed\n", avctx->codec_id);
++    if(pCodec->output_buf)
++      free(pCodec->output_buf);
++    free(pCodec);
++    pCodec = NULL;
++  } else {
++    pCodec->codec_id = avctx->codec_id;
++    av_log(avctx, AV_LOG_INFO, "hifidsp init successful\n");
++  }
++  return (void*)pCodec;
++}
++
++static av_cold void AmlACodecDeInit(AVCodecContext *avctx) {
++  AmlACodec_t *pCodec = (AmlACodec_t*)aml_dsp_codec;
++  if (NULL == pCodec) return;
++  switch (pCodec->codec_id){
++  case AV_CODEC_ID_MP3:
++    AmlACodecDeInit_Mp3Dec(pCodec->dsp_codec);
++    break;
++  case AV_CODEC_ID_AAC:
++    AmlACodecDeInit_AacDec(pCodec->dsp_codec);
++    if (pCodec->output_buf)
++      free(pCodec->output_buf);
++    break;
++  default:
++    av_log(avctx, AV_LOG_ERROR,
++        "It should not come to here id %d\n", pCodec->codec_id);
++    break;
++  }
++
++  free(pCodec);
++  return;
++}
++
++void aml_decode_flush(AVCodecContext *avctx) {
++}
++
++void aml_decode_close(AVCodecContext *avctx)
++{
++    AmlACodecDeInit(avctx);
++    aml_dsp_codec = NULL;
++}
++
++
++int aml_decode_open(AVCodecContext *avctx)
++{
++    if (aml_dsp_codec) {
++      av_log(avctx, AV_LOG_ERROR, " Error aml decode has not been initialized\n");
++      return 0;
++    }
++    aml_dsp_codec = AmlACodecInit(avctx);
++    if (NULL == aml_dsp_codec) return -1;
++    return 0;
++}
++
++static int aml_mp3_decode_frame(AVCodecContext *avctx, void *data,
++    const uint8_t *buf, int buf_size)
++{
++  AmlACodec_t *pCodec = (AmlACodec_t*)aml_dsp_codec;
++  tAmlACodecConfig_Mp3DecExternal *pConfig = &(pCodec->config.mp3_config);
++  int  ret;
++  AVFrame *frame = data;
++  frame->nb_samples = MAX_SHARE_OUTPUT_MEMORY_SIZE;
++  if ((ret = ff_get_buffer(avctx, frame, 0)) < 0)
++    return ret;
++  // Set the input config.
++  pConfig->inputBufferCurrentLength = buf_size;
++  pConfig->inputBufferMaxLength = 0;
++  pConfig->inputBufferUsedLength = 0;
++  pConfig->pInputBuffer = (uint8_t*)buf;
++  pConfig->pOutputBuffer = (int16_t*)frame->data[0];
++  pConfig->outputFrameSize = MPA_FRAME_SIZE*10;
++  ret = AmlACodecExec_Mp3Dec(pCodec->dsp_codec, pConfig);
++  if (ret != NO_DECODING_ERROR) {
++    av_frame_unref(frame);
++    return -1;
++  }
++
++  // Fill the frame parameter
++  frame->nb_samples =
++    pConfig->outputFrameSize/pConfig->num_channels;
++  frame->format = AV_SAMPLE_FMT_S16;
++  frame->sample_rate = pConfig->samplingRate;
++  frame->channels = pConfig->num_channels;
++
++  // Fill the AVCodecContext parameters
++  avctx->frame_size = frame->nb_samples;
++  avctx->sample_rate = pConfig->samplingRate;
++  avctx->sample_fmt = AV_SAMPLE_FMT_S16;
++  avctx->channels = pConfig->num_channels;
++  avctx->bit_rate = pConfig->bitRate;
++
++  return 0;
++}
++
++static int aml_aac_decode_frame(AVCodecContext *avctx, void *data,
++    const uint8_t *buf, int buf_size)
++{
++  // aml_dsp_codec has been checked in aml_decode_frame
++  AmlACodec_t *pCodec = (AmlACodec_t*)aml_dsp_codec;
++  // tAmlAacInitCtx *pConfig = &(pCodec->config.aac_config);
++  uint32_t pcm_out_size, aac_input_left;
++	tAmlAacOutputCtx out_ctx;
++  int  ret;
++
++  AVFrame *frame = data;
++
++  pcm_out_size = MAX_SHARE_OUTPUT_MEMORY_SIZE;
++
++	ret = AmlACodecExec_AacDec(pCodec->dsp_codec, (uint8_t*)buf, buf_size,
++					pCodec->output_buf, &pcm_out_size, &aac_input_left, &out_ctx);
++  if (ret != AAC_DEC_OK) {
++    av_log(avctx, AV_LOG_ERROR, " AmlACodecExec_AacDec ret = %d\n", ret);
++    return -1;
++  }
++
++  /*
++  av_log(avctx, AV_LOG_INFO,
++    "hifi decode ret:%x, input_left:%d, channels:%d, nb_samples%d, samplerate:%d\n",
++    ret, aac_input_left, out_ctx.channelNum, out_ctx.frameSize, out_ctx.sampleRate);
++  */
++  // Fill the frame parameter
++  av_frame_unref(frame);
++  frame->nb_samples = out_ctx.frameSize;
++  frame->format = AV_SAMPLE_FMT_S16;
++  frame->sample_rate = out_ctx.sampleRate;
++  frame->channels = out_ctx.channelNum;
++
++  // Fill the AVCodecContext parameters
++  avctx->frame_size = frame->nb_samples;
++  avctx->sample_rate = frame->sample_rate;
++  avctx->sample_fmt = AV_SAMPLE_FMT_S16;
++  avctx->channels = frame->channels;
++
++    // allocate frame
++  if ((ret = ff_get_buffer(avctx, frame, 0)) < 0)
++    return ret;
++
++  // copy data to frame
++  pcm_out_size = av_samples_get_buffer_size(NULL,
++      frame->channels, frame->nb_samples, frame->format, 1);
++  memcpy(frame->data[0], pCodec->output_buf, pcm_out_size);
++
++  // av_log(avctx, AV_LOG_INFO, "output size = %d\n", pcm_out_size);
++
++  return aac_input_left;
++}
++
++
++int aml_decode_frame(AVCodecContext *avctx, void *data,
++    const uint8_t *buf, int buf_size)
++{
++  int ret = -1;
++  AmlACodec_t *pCodec;
++  if (NULL == aml_dsp_codec) {
++    av_log(avctx, AV_LOG_ERROR, " Error aml decode has not been initialized\n");
++    return ret;
++  }
++  pCodec = (AmlACodec_t*)aml_dsp_codec;
++
++  switch (pCodec->codec_id){
++  case AV_CODEC_ID_MP3:
++    ret = aml_mp3_decode_frame(avctx, data, buf, buf_size);
++    break;
++  case AV_CODEC_ID_AAC:
++    ret = aml_aac_decode_frame(avctx, data, buf, buf_size);
++    break;
++  default:
++    av_log(avctx, AV_LOG_ERROR, "hifidsp does not support this codec\n");
++    break;
++  }
++
++  return ret;
++}

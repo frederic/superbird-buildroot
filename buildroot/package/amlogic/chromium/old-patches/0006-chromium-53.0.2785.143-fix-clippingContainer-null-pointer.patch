@@ -1,0 +1,30 @@
+diff --git a/src/third_party/WebKit/Source/core/layout/compositing/CompositedLayerMapping.cpp b/src/third_party/WebKit/Source/core/layout/compositing/CompositedLayerMapping.cpp
+old mode 100644
+new mode 100755
+index 80735fb..09e04c1
+--- a/src/third_party/WebKit/Source/core/layout/compositing/CompositedLayerMapping.cpp
++++ b/src/third_party/WebKit/Source/core/layout/compositing/CompositedLayerMapping.cpp
+@@ -2185,7 +2185,7 @@ const GraphicsLayerPaintInfo* CompositedLayerMapping::containingSquashedLayer(co
+ IntRect CompositedLayerMapping::localClipRectForSquashedLayer(const PaintLayer& referenceLayer, const GraphicsLayerPaintInfo& paintInfo, const Vector<GraphicsLayerPaintInfo>& layers)
+ {
+     const LayoutObject* clippingContainer = paintInfo.paintLayer->clippingContainer();
+-    if (clippingContainer == referenceLayer.clippingContainer())
++    if (clippingContainer == NULL || clippingContainer == referenceLayer.clippingContainer())
+         return LayoutRect::infiniteIntRect();
+ 
+     ASSERT(clippingContainer);
+diff --git a/src/third_party/WebKit/Source/core/layout/compositing/CompositingLayerAssigner.cpp b/src/third_party/WebKit/Source/core/layout/compositing/CompositingLayerAssigner.cpp
+old mode 100644
+new mode 100755
+index 5dd80bb..6a3fcbd
+--- a/src/third_party/WebKit/Source/core/layout/compositing/CompositingLayerAssigner.cpp
++++ b/src/third_party/WebKit/Source/core/layout/compositing/CompositingLayerAssigner.cpp
+@@ -146,7 +146,7 @@ SquashingDisallowedReasons CompositingLayerAssigner::getReasonsPreventingSquashi
+         return SquashingDisallowedReasonSquashingBlendingIsDisallowed;
+ 
+     // FIXME: this is not efficient, since it walks up the tree. We should store these values on the CompositingInputsCache.
+-    if (layer->clippingContainer() != squashingLayer.clippingContainer() && !squashingLayer.compositedLayerMapping()->containingSquashedLayer(layer->clippingContainer(), squashingState.nextSquashedLayerIndex))
++    if (layer->clippingContainer() != NULL && layer->clippingContainer() != squashingLayer.clippingContainer() && !squashingLayer.compositedLayerMapping()->containingSquashedLayer(layer->clippingContainer(), squashingState.nextSquashedLayerIndex))
+         return SquashingDisallowedReasonClippingContainerMismatch;
+ 
+     // Composited descendants need to be clipped by a child containment graphics layer, which would not be available if the layer is

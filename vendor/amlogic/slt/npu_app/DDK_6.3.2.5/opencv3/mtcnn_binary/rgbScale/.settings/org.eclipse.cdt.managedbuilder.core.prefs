@@ -1,0 +1,17 @@
+#Wed Jun 20 15:33:40 CST 2018
+eclipse.preferences.version=1
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPATH/delimiter=;
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPATH/operation=remove
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/delimiter=;
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/operation=replace
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/value=/home/ubuser/VeriSilicon/VivanteIDE3.2.0/vcmdtools\\include
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/delimiter=;
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/operation=replace
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/value=/home/ubuser/VeriSilicon/VivanteIDE3.2.0/vcmdtools/include\:/home/ubuser/VeriSilicon/VivanteIDE3.2.0/vcmdtools/include/CL
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/append=true
+environment/buildEnvironmentInclude/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/appendContributed=true
+environment/buildEnvironmentLibrary/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/delimiter=;
+environment/buildEnvironmentLibrary/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/operation=replace
+environment/buildEnvironmentLibrary/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/value=/home/ubuser/VeriSilicon/VivanteIDE3.2.0/vcmdtools/lib
+environment/buildEnvironmentLibrary/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/append=true
+environment/buildEnvironmentLibrary/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/appendContributed=true

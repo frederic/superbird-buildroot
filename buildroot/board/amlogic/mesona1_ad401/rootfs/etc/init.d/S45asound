@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+
+curvol_file=/etc/current_volume
+
+#hw:0,4 need to use TDMIN_B as loopback input, but default is PDM in dts, so we need manually switch
+amixer_ctr=`amixer controls | grep "Loopback datain source"` > /dev/null
+datainsrc_id=${amixer_ctr%%,*}
+amixer cset $datainsrc_id 1
+
+function resume_volume()
+{
+    amixer_vol_ctrl=`amixer controls | grep "DAC Digital Playback Volume"` > /dev/null
+    vol_ctrl_id=${amixer_vol_ctrl%%,*}
+    echo "Resume volume: `cat $curvol_file`"
+    amixer cset "$vol_ctrl_id" `cat $curvol_file`
+}
+
+function init_asound(){
+	sleep 2
+	cat /proc/device-tree/amlogic-dt-id | grep v03
+	if [ $? -eq 0 ]
+	then
+		#sed -i "s/device 1/device 2/g" /etc/asound.conf
+		sed -i "s/hw:0,1/hw:0,2/g" /etc/asound.conf
+		sync
+	else
+		sed -i "s/hw:0,2/hw:0,1/g" /etc/asound.conf
+		sync
+	fi
+
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+}
+
+case "$1" in
+  start)
+	  init_asound &
+      resume_volume
+	;;
+  *)
+	echo "Usage: $0 {start}"
+	exit 1
+esac
+
+exit $?
+

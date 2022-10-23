@@ -317,12 +317,14 @@ static void switch_to_el1(void)
 #endif
 
 /* Subcommand: GO */
+extern void jump_to_a32_kernel(unsigned long, unsigned long, unsigned long);
 static void boot_jump_linux(bootm_headers_t *images, int flag)
 {
 #ifdef CONFIG_ARM64
 	void (*kernel_entry)(void *fdt_addr, void *res0, void *res1,
 			void *res2);
 	int fake = (flag & BOOTM_STATE_OS_FAKE_GO);
+	unsigned long machid = 0xf81;
 
 	kernel_entry = (void (*)(void *fdt_addr, void *res0, void *res1,
 				void *res2))images->ep;
@@ -341,21 +343,37 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 
 		update_os_arch_secondary_cores(images->os.arch);
 
+/* disable EL switch */
+#if 0
+		printf("switch el\n");
 #ifdef CONFIG_ARMV8_SWITCH_TO_EL1
 		armv8_switch_to_el2((u64)images->ft_addr, 0, 0, 0,
 				    (u64)switch_to_el1, ES_TO_AARCH64);
 #else
 		if ((IH_ARCH_DEFAULT == IH_ARCH_ARM64) &&
-		    (images->os.arch == IH_ARCH_ARM))
+		    (images->os.arch == IH_ARCH_ARM)) {
+			printf("switch el2-1\n");
 			armv8_switch_to_el2(0, (u64)gd->bd->bi_arch_number,
 					    (u64)images->ft_addr, 0,
 					    (u64)images->ep,
 					    ES_TO_AARCH32);
-		else
+		}
+		else {
+			printf("switch el2-2\n");
 			armv8_switch_to_el2((u64)images->ft_addr, 0, 0, 0,
 					    images->ep,
 					    ES_TO_AARCH64);
+		}
 #endif
+#endif
+		if (images->os.arch == IH_ARCH_ARM) {
+			printf("boot 32bit kernel\n");
+			jump_to_a32_kernel(images->ep, machid, (unsigned long)images->ft_addr);
+		}
+		else {
+			printf("boot 64bit kernel\n");
+			kernel_entry(images->ft_addr, NULL, NULL, NULL);
+		}
 	}
 #else
 	unsigned long machid = gd->bd->bi_arch_number;

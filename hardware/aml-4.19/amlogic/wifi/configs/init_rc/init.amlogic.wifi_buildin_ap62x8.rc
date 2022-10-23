@@ -1,0 +1,5 @@
+on boot
+    start bcmdl
+    insmod /vendor/lib/modules/bcmdhd.ko firmware_path=/vendor/etc/wifi/buildin/ nvram_path=/vendor/etc/wifi/buildin/
+    chown root wifi /sys/module/bcmdhd/parameters/firmware_path
+    chmod 664 /sys/module/bcmdhd/parameters/firmware_path

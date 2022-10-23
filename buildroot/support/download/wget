@@ -33,7 +33,7 @@ shift $((OPTIND-1)) # Get rid of our options
 # Caller needs to single-quote its arguments to prevent them from
 # being expanded a second time (in case there are spaces in them)
 _wget() {
-    eval ${WGET} "${@}"
+    eval ${WGET} --no-check-certificate "${@}"
 }
 
 # Replace every '?' with '%3F' in the filename; only for the PRIMARY and BACKUP

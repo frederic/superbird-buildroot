@@ -1,0 +1,2 @@
+source "package/amlogic/mediatek/mtk7601/Config.in"
+source "package/amlogic/mediatek/mtk7603/Config.in"

@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Starts mDNSResponderPosix and mdnsd
+#
+
+# umask 077
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DESC="mdnsd protocol daemon"
+NAME=mdnsd
+DAEMON=/usr/sbin/$NAME
+
+start() {
+	echo -n "Starting mdnsd: "
+	start-stop-daemon -S -b -x $NAME
+	if [ "$?" != "0" ] ; then
+		echo "mdnsd start FAIL"
+		return 1
+	fi
+	echo "mdnsd start Succese"
+}
+stop() {
+	echo -n "Stopping mdnsd: "
+	start-stop-daemon -K -q -n $NAME
+	if [ "$?" != "0" ] ; then
+		echo "mdnsd stop FAIL"
+		return 1
+	fi
+	echo "mdnsd stop Succese"
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

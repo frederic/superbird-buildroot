@@ -1,0 +1,33 @@
+#!/bin/sh
+
+PROCESS=MediaRendererTest
+
+case "$1" in
+    start)
+    ;;
+    stop)
+    ;;
+    restart)
+    ;;
+    netready)
+    echo "dlna start:dlna first start..."
+    $PROCESS &
+    ;;
+    netup)
+    echo "dlna start:network connected..."
+    $PROCESS &
+    ;;
+    netdown)
+    echo "dlna stop:network disconnected..."
+    killall $PROCESS
+    ;;
+    netchange)
+    echo "dlna restart:network ip change..."
+    killall $PROCESS
+    $PROCESS &
+    ;;
+    *)
+    echo "Usage: $0 {start|stop|restart|netready|netup|netdown|netchange}"
+    exit 1
+    ;;
+esac

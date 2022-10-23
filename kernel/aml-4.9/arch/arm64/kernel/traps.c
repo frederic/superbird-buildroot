@@ -33,11 +33,13 @@
 #include <linux/syscalls.h>
 
 #include <asm/atomic.h>
+#include <asm/barrier.h>
 #include <asm/bug.h>
 #include <asm/debug-monitors.h>
 #include <asm/esr.h>
 #include <asm/insn.h>
 #include <asm/traps.h>
+#include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 #include <asm/exception.h>
 #include <asm/system_misc.h>
@@ -95,6 +97,31 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 	set_fs(fs);
 }
 
+#ifdef CONFIG_AMLOGIC_VMAP
+static void dump_backtrace_entry(unsigned long ip, unsigned long fp,
+				 unsigned long low)
+{
+	unsigned long fp_size = 0;
+	unsigned long high;
+
+	high = low + THREAD_SIZE;
+
+	/*
+	 * Since the target process may be rescheduled again,
+	 * we have to add necessary validation checking for fp.
+	 * The checking condition is borrowed from unwind_frame
+	 */
+	if (on_irq_stack(fp, raw_smp_processor_id()) ||
+	    (fp >= low && fp <= high)) {
+		fp_size = *((unsigned long *)fp) - fp;
+		/* fp cross IRQ or vmap stack */
+		if (fp_size >= THREAD_SIZE)
+			fp_size = 0;
+	}
+	pr_info("[%016lx+%4ld][<%016lx>] %pS\n",
+		fp, fp_size, (unsigned long)ip, (void *)ip);
+}
+#else
 static void dump_backtrace_entry(unsigned long where)
 {
 	/*
@@ -102,6 +129,7 @@ static void dump_backtrace_entry(unsigned long where)
 	 */
 	print_ip_sym(where);
 }
+#endif
 
 static void __dump_instr(const char *lvl, struct pt_regs *regs)
 {
@@ -147,6 +175,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	if (!tsk)
 		tsk = current;
 
+	if (!try_get_task_stack(tsk))
+		return;
+
 	/*
 	 * Switching between stacks is valid when tracing current and in
 	 * non-preemptible context.
@@ -181,7 +212,12 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 		/* skip until specified stack frame */
 		if (!skip) {
+		#ifdef CONFIG_AMLOGIC_VMAP
+			dump_backtrace_entry(where, frame.fp,
+					     (unsigned long)tsk->stack);
+		#else
 			dump_backtrace_entry(where);
+		#endif
 		} else if (frame.fp == regs->regs[29]) {
 			skip = 0;
 			/*
@@ -191,7 +227,12 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 			 * at which an exception has taken place, use regs->pc
 			 * instead.
 			 */
+		#ifdef CONFIG_AMLOGIC_VMAP
+			dump_backtrace_entry(regs->pc, frame.fp,
+					     (unsigned long)tsk->stack);
+		#else
 			dump_backtrace_entry(regs->pc);
+		#endif
 		}
 		ret = unwind_frame(tsk, &frame);
 		if (ret < 0)
@@ -212,6 +253,8 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 				 stack + sizeof(struct pt_regs));
 		}
 	}
+
+	put_task_stack(tsk);
 }
 
 void show_stack(struct task_struct *tsk, unsigned long *sp)
@@ -227,10 +270,9 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 #endif
 #define S_SMP " SMP"
 
-static int __die(const char *str, int err, struct thread_info *thread,
-		 struct pt_regs *regs)
+static int __die(const char *str, int err, struct pt_regs *regs)
 {
-	struct task_struct *tsk = thread->task;
+	struct task_struct *tsk = current;
 	static int die_counter;
 	int ret;
 
@@ -245,7 +287,8 @@ static int __die(const char *str, int err, struct thread_info *thread,
 	print_modules();
 	__show_regs(regs);
 	pr_emerg("Process %.*s (pid: %d, stack limit = 0x%p)\n",
-		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
+		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk),
+		 end_of_stack(tsk));
 
 	if (!user_mode(regs)) {
 		dump_mem(KERN_EMERG, "Stack: ", regs->sp,
@@ -264,7 +307,6 @@ static DEFINE_RAW_SPINLOCK(die_lock);
  */
 void die(const char *str, struct pt_regs *regs, int err)
 {
-	struct thread_info *thread = current_thread_info();
 	int ret;
 
 	oops_enter();
@@ -272,9 +314,9 @@ void die(const char *str, struct pt_regs *regs, int err)
 	raw_spin_lock_irq(&die_lock);
 	console_verbose();
 	bust_spinlocks(1);
-	ret = __die(str, err, thread, regs);
+	ret = __die(str, err, regs);
 
-	if (regs && kexec_should_crash(thread->task))
+	if (regs && kexec_should_crash(current))
 		crash_kexec(regs);
 
 	bust_spinlocks(0);
@@ -388,6 +430,10 @@ static void force_signal_inject(int signal, int code, struct pt_regs *regs,
 	    show_unhandled_signals_ratelimited()) {
 		pr_info("%s[%d]: %s: pc=%p\n",
 			current->comm, task_pid_nr(current), desc, pc);
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+		show_all_pfn(current, regs);
+		show_regs(regs);
+#endif
 		dump_instr(KERN_INFO, regs);
 	}
 
@@ -435,9 +481,10 @@ int cpu_enable_cache_maint_trap(void *__unused)
 }
 
 #define __user_cache_maint(insn, address, res)			\
-	if (address >= user_addr_max())				\
+	if (address >= user_addr_max()) {			\
 		res = -EFAULT;					\
-	else							\
+	} else {						\
+		uaccess_ttbr0_enable();				\
 		asm volatile (					\
 			"1:	" insn ", %1\n"			\
 			"	mov	%w0, #0\n"		\
@@ -449,7 +496,9 @@ int cpu_enable_cache_maint_trap(void *__unused)
 			"	.popsection\n"			\
 			_ASM_EXTABLE(1b, 3b)			\
 			: "=r" (res)				\
-			: "r" (address), "i" (-EFAULT) )
+			: "r" (address), "i" (-EFAULT));	\
+		uaccess_ttbr0_disable();			\
+	}
 
 static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
 {
@@ -492,6 +541,25 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
 	regs->pc += 4;
 }
 
+static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+{
+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+
+	isb();
+	if (rt != 31)
+		regs->regs[rt] = arch_counter_get_cntvct();
+	regs->pc += 4;
+}
+
+static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+{
+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+
+	if (rt != 31)
+		regs->regs[rt] = read_sysreg(cntfrq_el0);
+	regs->pc += 4;
+}
+
 struct sys64_hook {
 	unsigned int esr_mask;
 	unsigned int esr_val;
@@ -509,6 +577,18 @@ static struct sys64_hook sys64_hooks[] = {
 		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
 		.handler = ctr_read_handler,
+	},
+	{
+		/* Trap read access to CNTVCT_EL0 */
+		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
+		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
+		.handler = cntvct_read_handler,
+	},
+	{
+		/* Trap read access to CNTFRQ_EL0 */
+		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
+		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
+		.handler = cntfrq_read_handler,
 	},
 	{},
 };
@@ -599,7 +679,12 @@ const char *esr_get_class_string(u32 esr)
  * bad_mode handles the impossible case in the exception vector. This is always
  * fatal.
  */
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr,
+			 unsigned long far)
+#else
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+#endif
 {
 	console_verbose();
 
@@ -607,6 +692,11 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 		handler[reason], smp_processor_id(), esr,
 		esr_get_class_string(esr));
 
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+	regs->unused = far;
+	pr_crit("FAR:%lx\n", far);
+	show_all_pfn(current, regs);
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
 	die("Oops - bad mode", regs, 0);
 	local_irq_disable();
 	panic("bad mode");
@@ -622,6 +712,9 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
 	void __user *pc = (void __user *)instruction_pointer(regs);
 	console_verbose();
 
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+	show_all_pfn(current, regs);
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
 	pr_crit("Bad EL0 synchronous exception detected on CPU%d, code 0x%08x -- %s\n",
 		smp_processor_id(), esr, esr_get_class_string(esr));
 	__show_regs(regs);

@@ -1,0 +1,20 @@
+This BSA Server contains the Bluetooth Deamon server with some profiles.
+
+To compile all executables(libbsa & bsa_server & my_app), you have to type:
+> cd 3rdparty/embedded/bsa_project_example/my_project/bsa_server/build
+> make -f Makefile.all clean   
+> make -f Makefile.all all    <= build libbsa, bsa_server, my_app
+
+
+To compile the Bluetooth Deamon server(bsa_server) only, you have to type:
+> cd 3rdparty/embedded/bsa_project_example/my_project/bsa_server/build
+> make            <= For PC Linux target (default target)
+> make CPU=arm    <= CPU=mips is also supported
+
+For PC/Linux target, the server application executable is located in build/x86 or build/x86_64 folder.
+To execute it, you have to type:
+> ./x86/bsa_server
+
+For MIPS or ARM targets, the server application executables are located in build/mips or build/arm folders.
+To execute it, you have to copy and to execute it on the MIPS/ARM platform
+

@@ -1,0 +1,14 @@
+config BR2_PACKAGE_MESON_DISPLAY
+	bool "meson-display"
+	select BR2_PACKAGE_JSON_C
+	help
+	  A help function for weston.
+
+if BR2_PACKAGE_MESON_DISPLAY
+
+config BR2_PACKAGE_MESON_WESTON_DRM_HELPER
+	bool "meson-weston-drm-helper"
+	depends on BR2_PACKAGE_MESON_DISPLAY
+	help
+	  A help function for weston.
+endif

@@ -1,0 +1,105 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_common/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_manager/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hh/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hd/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_av/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_avk/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_tm/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_dg/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hl/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_ble/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_headless/include \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_3d/include
+
+
+ifeq ($(strip $(APP_BTHID_INCLUDED)),TRUE)
+    appincdir := $(appincdir) ../../../../brcm/linux/bthid
+endif
+
+ifeq ($(strip $(ENABLE_BLE_AUDIO)),TRUE)
+    appincdir := $(appincdir) $(embdrvdir)/sbc/decoder/include
+endif
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source\
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_common/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_manager/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hh/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hd/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_av/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_avk/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_tm/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_dg/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_hl/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_ble/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_headless/source \
+    $(BLUETOOTH_3RD_DIR)/embedded/bsa_examples/linux/app_3d/source
+
+# list of sources for the current application
+appsrcs := \
+    my_app_menu.c \
+    my_app.c \
+    app_manager.c \
+    app_disc.c \
+    app_gpio.c \
+    app_utils.c \
+    app_link.c \
+    app_xml_param.c \
+    app_xml_utils.c \
+    app_services.c \
+    nanoxml.c\
+    app_hh.c \
+    app_hh_db.c \
+    app_hh_xml.c \
+    app_hd.c \
+    app_hl.c \
+    app_hl_db.c \
+    app_hl_xml.c \
+    app_av.c \
+    app_avk.c \
+    app_wav.c \
+    app_playlist.c \
+    app_mutex.c \
+    app_thread.c \
+    app_tm.c \
+    app_tm_vse.c \
+    app_tm_vsc.c \
+    app_headless.c \
+    app_sec.c \
+    app_mgt.c \
+    app_dm.c \
+    app_ble.c \
+    app_ble_client.c \
+    app_ble_server.c \
+    app_ble_client_xml.c \
+    app_ble_client_db.c
+
+ifeq ($(strip $(APP_BTHID_INCLUDED)),TRUE)
+    appsrcs := $(appsrcs) app_bthid.c
+endif
+
+ifeq ($(strip $(ENABLE_ALSA)),TRUE)
+appsrcs := $(appsrcs) app_alsa.c
+endif
+
+ifeq ($(strip $(ENABLE_OTAFWDL)),TRUE)
+appsrcs := $(appsrcs) app_hh_otafwdl.c
+endif
+
+ifeq ($(strip $(ENABLE_BLE_AUDIO)),TRUE)
+appsrcs := $(appsrcs) app_hh_ble_audio_sink.c
+endif
+
+ifeq ($(strip $(ENABLE_BLE2_BRCM)),TRUE)
+appsrcs := $(appsrcs) app_ble2_brcm.c
+endif
+
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)

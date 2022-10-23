@@ -1,0 +1,15 @@
+config BR2_PACKAGE_LIBTOTEM
+	bool "libtotem"
+	select BR2_PACKAGE_LIBGLIB2
+	select BR2_PACKAGE_GLIB_NETWORKING
+	select BR2_PACKAGE_LIBSOUP
+	select BR2_PACKAGE_LIBXML2
+	select BR2_PACKAGE_LIBARCHIVE
+	select BR2_PACKAGE_LIBGCRYPT
+	select BR2_PACKAGE_LIBTOOL
+	depends on BR2_USE_WCHAR
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_USE_MMU
+	help
+		totem-pl-parser is a simple GObject-based library to parse a host of
+		playlist formats, as well as save those

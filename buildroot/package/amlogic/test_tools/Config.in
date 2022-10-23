@@ -1,0 +1,4 @@
+config BR2_PACKAGE_TEST_TOOLS
+	bool  "test tools"
+	help
+		function test for cpu & ddr & nand & emmc & usb & gpio & IR & wifi...

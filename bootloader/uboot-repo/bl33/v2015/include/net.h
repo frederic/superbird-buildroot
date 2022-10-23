@@ -223,6 +223,7 @@ struct vlan_ethernet_hdr {
 
 #define PROT_IP		0x0800		/* IP protocol			*/
 #define PROT_ARP	0x0806		/* IP ARP protocol		*/
+#define PROT_TEST	0x0808		/* Ethernet loopback test */
 #define PROT_RARP	0x8035		/* IP ARP protocol		*/
 #define PROT_VLAN	0x8100		/* IEEE 802.1q protocol		*/
 
@@ -420,7 +421,7 @@ extern int		NetRestartWrap;		/* Tried all network devices */
 
 enum proto_t {
 	BOOTP, RARP, ARP, TFTPGET, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP,
-	TFTPSRV, TFTPPUT, LINKLOCAL
+	TFTPSRV, TFTPPUT, LINKLOCAL, ETHLOOP
 };
 
 /* from net/net.c */
@@ -580,9 +581,9 @@ static inline IPaddr_t NetReadIP(void *from)
 }
 
 /* return ulong *in network byteorder* */
-static inline ulong NetReadLong(ulong *from)
+static inline ulong NetReadLong(uint *from)
 {
-	ulong l;
+	uint l;
 
 	memcpy((void *)&l, (void *)from, sizeof(l));
 	return l;
@@ -601,9 +602,9 @@ static inline void NetCopyIP(void *to, void *from)
 }
 
 /* copy ulong */
-static inline void NetCopyLong(ulong *to, ulong *from)
+static inline void NetCopyLong(uint *to, uint *from)
 {
-	memcpy((void *)to, (void *)from, sizeof(ulong));
+	memcpy((void *)to, (void *)from, sizeof(uint));
 }
 
 /**

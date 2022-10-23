@@ -1,0 +1,16 @@
+#Wed Jun 20 15:33:37 CST 2018
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/delimiter=;
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/operation=replace
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/CPLUS_INCLUDE_PATH/value=${VIVANTE_VIP_HOME}vcmdtools\\include;
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/delimiter=;
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/operation=replace
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/C_INCLUDE_PATH/value=${VIVANTE_VIP_HOME}vcmdtools/include\:${VIVANTE_VIP_HOME}vcmdtools/include/CL
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/delimiter=;
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/operation=replace
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/LIBRARY_PATH/value=${VIVANTE_VIP_HOME}vcmdtools/lib
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/VIVANTE_SDK_DIR/delimiter=;
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/VIVANTE_SDK_DIR/operation=replace
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/VIVANTE_SDK_DIR/value=${VIVANTE_VIP_HOME}vcmdtools
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/append=true
+environment/project/cdt.managedbuild.config.gnu.mingw.so.debug.1404917839/appendContributed=true

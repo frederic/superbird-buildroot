@@ -1,0 +1,13 @@
+Index: weston-6.0.0/clients/simple-dmabuf-egl.c
+===================================================================
+--- weston-6.0.0.orig/clients/simple-dmabuf-egl.c	2019-03-28 09:15:13.000000000 +0800
++++ weston-6.0.0/clients/simple-dmabuf-egl.c	2019-06-04 13:57:12.852377642 +0800
+@@ -293,7 +293,7 @@
+ 						      EGL_NO_CONTEXT,
+ 						      EGL_LINUX_DMA_BUF_EXT,
+ 						      NULL, attribs);
+-	if (buffer->egl_image == EGL_NO_IMAGE) {
++	if (buffer->egl_image == EGL_NO_IMAGE_KHR) {
+ 		fprintf(stderr, "EGLImageKHR creation failed\n");
+ 		return false;
+ 	}

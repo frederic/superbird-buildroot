@@ -1,0 +1,59 @@
+config BR2_PACKAGE_AML_RTOS
+	bool "AML RTOS"
+    select BR2_PACKAGE_AML_DSP_UTIL
+	help
+	  Amlogic RTOS
+
+config BR2_PACKAGE_AML_RTOS_LOCAL_PATH
+	string "amlogic RTOS local path"
+	depends on BR2_PACKAGE_AML_RTOS
+	help
+	aml rtos local path
+
+config BR2_PACKAGE_AML_RTOS_PREBUILT_PATH
+	string "amlogic RTOS prebuilt path"
+	depends on BR2_PACKAGE_AML_RTOS
+	help
+	aml rtos prebuilt path
+
+config BR2_PACKAGE_AML_RTOS_ARM_BUILD_OPTION
+    string "AML RTOS ARM build option"
+    depends on BR2_PACKAGE_AML_RTOS
+    help
+      AML RTOS ARM build option
+
+config BR2_PACKAGE_AML_RTOS_DSPA_BUILD_OPTION
+    string "AML RTOS DSPA build option"
+    depends on BR2_PACKAGE_AML_RTOS
+    help
+      AML RTOS DSPA build option
+
+config BR2_PACKAGE_AML_RTOS_DSPA_INSTALL
+    bool "AML RTOS DSPA INSTALL to /usr/dsp"
+    depends on BR2_PACKAGE_AML_RTOS
+    help
+      Whether we install dspA bin to /usr/dsp folder
+
+config BR2_PACKAGE_AML_RTOS_DSPA_AUTOLOAD
+    bool "Auto load DSP_A RTOS image"
+    depends on BR2_PACKAGE_AML_RTOS_DSPA_INSTALL
+    help
+      Auto load DSP_A RTOS image
+
+config BR2_PACKAGE_AML_RTOS_DSPB_BUILD_OPTION
+    string "AML RTOS DSPB build option"
+    depends on BR2_PACKAGE_AML_RTOS
+    help
+      AML RTOS DSPB build option
+
+config BR2_PACKAGE_AML_RTOS_DSPB_INSTALL
+    bool "AML RTOS DSPB INSTALL to /usr/dsp"
+    depends on BR2_PACKAGE_AML_RTOS
+    help
+      Whether we install dspB bin to /usr/dsp folder
+
+config BR2_PACKAGE_AML_RTOS_DSPB_AUTOLOAD
+    bool "Auto load DSP_B RTOS image"
+    depends on BR2_PACKAGE_AML_RTOS_DSPB_INSTALL
+    help
+      Auto load DSP_B RTOS image

@@ -1,0 +1,54 @@
+From cc68361329632c491478749aba22a71b24e3fb73 Mon Sep 17 00:00:00 2001
+From: Pengcheng Chen <pengcheng.chen@amlogic.com>
+Date: Wed, 12 Jul 2017 11:12:25 +0800
+Subject: [PATCH 2/2] fix osd pan display wait vsync too long issue
+
+Signed-off-by: Pengcheng Chen <pengcheng.chen@amlogic.com>
+---
+ systems/fbdev/fbdev.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/systems/fbdev/fbdev.c b/systems/fbdev/fbdev.c
+index 5297358..cb2a030 100644
+--- a/systems/fbdev/fbdev.c
++++ b/systems/fbdev/fbdev.c
+@@ -1505,21 +1505,21 @@ primaryFlipRegion( CoreLayer             *layer,
+      CoreLayerRegionConfig *config = &dfb_fbdev->shared->config;
+ 
+      D_DEBUG_AT( FBDev_Primary, "%s()\n", __FUNCTION__ );
+-
++     #if 0
+      if (((flags & DSFLIP_WAITFORSYNC) == DSFLIP_WAITFORSYNC) &&
+          !dfb_config->pollvsync_after)
+           dfb_screen_wait_vsync( dfb_screens_at(DSCID_PRIMARY) );
+-
++     #endif
+      ret = dfb_fbdev_pan( config->source.x,
+                           left_lock->offset / left_lock->pitch + config->source.y,
+                           (flags & DSFLIP_WAITFORSYNC) == DSFLIP_ONSYNC );
+      if (ret)
+           return ret;
+-
++     #if 0
+      if ((flags & DSFLIP_WAIT) &&
+          (dfb_config->pollvsync_after || !(flags & DSFLIP_ONSYNC)))
+           dfb_screen_wait_vsync( dfb_screens_at(DSCID_PRIMARY) );
+-
++     #endif
+      dfb_surface_flip( surface, false );
+ 
+      return DFB_OK;
+@@ -1598,8 +1598,8 @@ dfb_fbdev_pan( int xoffset, int yoffset, bool onsync )
+           var->yoffset = 0;
+      }
+ 
+-     var->activate = onsync ? FB_ACTIVATE_VBL : FB_ACTIVATE_NOW;
+-
++     //var->activate = onsync ? FB_ACTIVATE_VBL : FB_ACTIVATE_NOW;
++     var->activate = FB_ACTIVATE_NOW;
+ #if 0
+      ret = fusion_call_execute( &shared->fbdev_ioctl, FCEF_NONE, FBIOPAN_DISPLAY, var, &result );
+      if (ret)
+-- 
+1.7.9.5
+

@@ -1,0 +1,40 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+             $(appdir)/../app_common/include
+
+ifeq ($(strip $(ENABLE_BTHID)),TRUE)
+appincdir := $(appincdir) ../../../../brcm/linux/bthid
+endif
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source \
+            $(appdir)/../app_common/source
+
+# list of sources for the current application
+appsrcs := \
+    simple_app.c \
+    discovery.c \
+    hh.c \
+    security.c \
+    dm.c \
+    stress.c \
+    nanoxml.c \
+    app_mgt.c \
+    app_xml_param.c \
+    app_xml_utils.c \
+    app_utils.c \
+    av.c \
+    vsc.c \
+    hci_cmd.c
+
+ifeq ($(strip $(ENABLE_BTHID)),TRUE)
+appsrcs := $(appsrcs) hh_bthid.c
+endif
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)
+

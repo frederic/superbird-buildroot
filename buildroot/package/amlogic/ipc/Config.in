@@ -1,0 +1,23 @@
+menu "ip camera"
+source "package/amlogic/ipc/onvif_prebuilt/Config.in"
+source "package/amlogic/ipc/onvif_srvd/Config.in"
+source "package/amlogic/ipc/onvif_wsdd/Config.in"
+source "package/amlogic/ipc/onvif_rtsp/Config.in"
+source "package/amlogic/ipc/ipc-property/Config.in"
+source "package/amlogic/ipc/ipc-webui/Config.in"
+source "package/amlogic/ipc/ipc_autocap/Config.in"
+source "package/amlogic/ipc/gst-amlion-allocator/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlimgcap/Config.in"
+source "package/amlogic/ipc/gst-plugin-amloverlay/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlvconv/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlgdc/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlvenc/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlnn/Config.in"
+source "package/amlogic/ipc/ptz_control/Config.in"
+source "package/amlogic/ipc/gst-plugin-amlwebstreamserversink/Config.in"
+config BR2_LINUX_KERNEL_IRCUT
+	bool "amlogic ircut"
+	default n
+	help
+	  amlogic ircut control
+endmenu

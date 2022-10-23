@@ -51,7 +51,20 @@ static const char *handler[]= {
 void *vectors_page;
 
 #ifdef CONFIG_DEBUG_USER
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+#define USER_DEBUG_UNDEFINED_INSTRUCTION (1 << 0)
+#define USER_DEBUG_SYSTEM_CALL           (1 << 1)
+#define USER_DEBUG_INVALID_DATA_ABORT    (1 << 2)
+#define USER_DEBUG_SIGSEGV_FAULT         (1 << 3)
+#define USER_DEBUG_SIGBUS_FAULT          (1 << 4)
+unsigned int user_debug = USER_DEBUG_UNDEFINED_INSTRUCTION |
+			  USER_DEBUG_SYSTEM_CALL |
+			  USER_DEBUG_INVALID_DATA_ABORT |
+			  USER_DEBUG_SIGSEGV_FAULT |
+			  USER_DEBUG_SIGBUS_FAULT;
+#else
 unsigned int user_debug;
+#endif
 
 static int __init user_debug_setup(char *str)
 {
@@ -478,6 +491,10 @@ die_sig:
 	if (user_debug & UDBG_UNDEFINED) {
 		pr_info("%s (%d): undefined instruction: pc=%p\n",
 			current->comm, task_pid_nr(current), pc);
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+		if (user_fault_debug_ratelimited())
+			show_all_pfn(current, regs);
+#endif
 		__show_regs(regs);
 		dump_instr(KERN_INFO, regs);
 	}
@@ -527,6 +544,10 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason)
 {
 	console_verbose();
 
+#ifdef CONFIG_AMLOGIC_USER_FAULT
+	if (user_fault_debug_ratelimited())
+		show_all_pfn(current, regs);
+#endif /* CONFIG_AMLOGIC_USER_FAULT */
 	pr_crit("Bad mode in %s handler detected\n", handler[reason]);
 
 	die("Oops - bad mode", regs, 0);

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Dolby security firmware decryption
+
+DSD=/sbin/dolby_fw_datmos
+case "$1" in
+    start)
+    if [ ! -d "/tmp/ds/" ]; then
+        mkdir -p /tmp/ds/
+    fi
+    $DSD /usr/lib/libdolby_atmos.so   /tmp/ds/0xc7_0xfba4_0x5e.so
+    ;;
+    *)
+    echo "Usage: S83dsd {start}" >&2
+    exit 1
+    ;;
+esac

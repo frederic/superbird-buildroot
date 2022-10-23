@@ -88,8 +88,9 @@ static void print_mmcinfo(struct mmc *mmc)
 
 	printf("High Capacity: %s\n", mmc->high_capacity ? "Yes" : "No");
 	puts("Capacity: ");
+	printf("(0x%llx Bytes) ", mmc->capacity);
 	print_size(mmc->capacity, "\n");
-
+	printf("mmc clock: %u\n", mmc->clock);
 	printf("Bus Width: %d-bit%s\n", mmc->bus_width,
 			mmc->ddr_mode ? " DDR" : "");
 }
@@ -299,13 +300,13 @@ static int do_mmc_read(cmd_tbl_t *cmdtp, int flag,
 	if (!mmc)
 		return CMD_RET_FAILURE;
 
-	printf("\nMMC read: dev # %d, block # %d, count %d ... ",
-	       curr_device, blk, cnt);
+	/*printf("\nMMC read: dev # %d, block # %d, count %d ... ",*/
+		   /*curr_device, blk, cnt);*/
 
 	n = mmc->block_dev.block_read(curr_device, blk, cnt, addr);
 	/* flush cache after read */
 	flush_cache((ulong)addr, cnt * 512); /* FIXME */
-	printf("%d blocks read: %s\n", n, (n == cnt) ? "OK" : "ERROR");
+	/*printf("%d blocks read: %s\n", n, (n == cnt) ? "OK" : "ERROR");*/
 
 	return (n == cnt) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
 }
@@ -327,15 +328,15 @@ static int do_mmc_write(cmd_tbl_t *cmdtp, int flag,
 	if (!mmc)
 		return CMD_RET_FAILURE;
 
-	printf("\nMMC write: dev # %d, block # %d, count %d ... ",
-	       curr_device, blk, cnt);
+	/*printf("\nMMC write: dev # %d, block # %d, count %d ... ",*/
+		   /*curr_device, blk, cnt);*/
 
 	if (mmc_getwp(mmc) == 1) {
 		printf("Error: card is write protected!\n");
 		return CMD_RET_FAILURE;
 	}
 	n = mmc->block_dev.block_write(curr_device, blk, cnt, addr);
-	printf("%d blocks written: %s\n", n, (n == cnt) ? "OK" : "ERROR");
+	/*printf("%d blocks written: %s\n", n, (n == cnt) ? "OK" : "ERROR");*/
 
 	return (n == cnt) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
 }
@@ -363,9 +364,9 @@ static int do_mmc_erase(cmd_tbl_t *cmdtp, int flag,
 		return CMD_RET_FAILURE;
 	}
 	n = mmc->block_dev.block_erase(curr_device, blk, cnt);
-	printf("%d blocks erased: %s\n", n, (n == cnt) ? "OK" : "ERROR");
+	printf("%d blocks erased: %s\n", cnt, (n == 0) ? "OK" : "ERROR");
 
-	return (n == cnt) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+	return (n == 0) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
 }
 static int do_mmc_rescan(cmd_tbl_t *cmdtp, int flag,
 			 int argc, char * const argv[])
@@ -444,6 +445,75 @@ static int do_mmc_list(cmd_tbl_t *cmdtp, int flag,
 	print_mmc_devices('\n');
 	return CMD_RET_SUCCESS;
 }
+
+static int do_mmc_lifetime(cmd_tbl_t *cmdtp, int flag,
+		       int argc, char * const argv[])
+{
+	int dev;
+	struct mmc *mmc;
+
+	if (curr_device < 0)
+		dev = 1;
+	else
+		dev = curr_device;
+	mmc = init_mmc_device(dev, false);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+	printf("dev_lifetime_est_type: a = %x, b = %x\n",
+			mmc->dev_lifetime_est_typ_a, mmc->dev_lifetime_est_typ_b);
+	return CMD_RET_SUCCESS;
+}
+
+static int do_mmc_ext_csd(cmd_tbl_t *cmdtp, int flag,
+		       int argc, char * const argv[])
+{
+	int bit = 0, value = 0, ret = 0;
+	struct mmc *mmc;
+	char str[128] = {0};
+
+	if ((argc != 2) && (argc != 3))
+		return CMD_RET_USAGE;
+
+	bit = simple_strtoul(argv[1], NULL, 10);
+	if (argc == 3)
+		value = simple_strtoul(argv[2], NULL, 16);
+
+	mmc = init_mmc_device(curr_device, false);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+
+	if (argc == 2)
+		sprintf(str, "amlmmc ext_csd 1 %d", bit);
+	else
+		sprintf(str, "amlmmc ext_csd 1 %d %x", bit, value);
+
+	ret = run_command(str, 0);
+	return (ret == 0) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
+static int do_mmc_ffu(cmd_tbl_t *cmdtp, int flag,
+			int argc, char * const argv[])
+{
+	struct mmc *mmc;
+	u64 ver, cnt;
+	int ret;
+	void *addr;
+
+	if (argc != 4)
+		return CMD_RET_USAGE;
+
+	ver = simple_strtoul(argv[1], NULL, 16);
+	addr = (void *)simple_strtoul(argv[2], NULL, 16);
+	cnt = simple_strtoul(argv[3], NULL, 16);
+
+	mmc = init_mmc_device(curr_device, false);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+
+	ret = mmc_ffu_op(curr_device, ver, addr, cnt);
+	return (ret == 0) ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
 #ifdef CONFIG_SUPPORT_EMMC_BOOT
 static int do_mmc_bootbus(cmd_tbl_t *cmdtp, int flag,
 			  int argc, char * const argv[])
@@ -573,7 +643,7 @@ static int do_mmc_setdsr(cmd_tbl_t *cmdtp, int flag,
 
 	if (argc != 2)
 		return CMD_RET_USAGE;
-	val = simple_strtoul(argv[2], NULL, 16);
+	val = simple_strtoul(argv[1], NULL, 16);
 
 	mmc = find_mmc_device(curr_device);
 	if (!mmc) {
@@ -592,25 +662,304 @@ static int do_mmc_setdsr(cmd_tbl_t *cmdtp, int flag,
 	return ret;
 }
 
+static int do_mmc_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	int rc = 0;
+	void *addr = NULL;
+	u32 *p = (u32 *)addr;
+	u64 blk, size_blk, blocks, cnt, n, i, j;
+	u32 crc1 = 0,crc2 = 0,count = 1,num = 1;
+	int blk_shift;
+	struct mmc *mmc;
+	if (argc != 4) {
+		printf("test command Input is invalid, nothing happen.\n");
+		return 1;
+	}
+	printf("enter test().................................\n");
+	mmc = find_mmc_device(curr_device);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+
+	blk = simple_strtoul(argv[1], NULL, 16);
+	size_blk= simple_strtoul(argv[2],NULL,16);
+	num = simple_strtoul(argv[3],NULL,16);
+	blk_shift = mmc->read_bl_len > 0 ? ffs(mmc->read_bl_len) -1 : 0;
+	while (count <= num) {
+		printf("TEST TIMES: %d........................\n",count);
+		n = mmc->block_dev.block_erase(curr_device, blk, size_blk); // erase the whole card
+		if (n != 0) {
+			printf("erase fail\n");
+			return 1;
+		}
+		else
+			printf("erase succeed\n");
+		addr = (u32 *)0x1080000;
+		p = (u32 *)addr;
+		cnt = (1<<17)>>blk_shift; //128k block number
+		printf("start write data...\n");
+		for (i = blk;i <= size_blk - cnt;) {
+			for (j = 0;j < ((1<<17)/4)-1;j++)
+			{
+				*p = i*512 + j*4;
+				crc1 += *p;
+				p++;
+				//printf("*p=%x,crc1=%x\n",*p,crc1);
+			}
+			*p = crc1;
+			p = (u32 *)addr;
+			n = mmc->block_dev.block_write(curr_device, i, cnt , addr);
+			if (n != cnt) {
+				printf("write fail\n");
+				return 1;
+			}
+			crc1 = 0;
+			i += cnt;
+			if (i % 1000 == 0)
+				printf("...");
+		}
+		blocks = size_blk - i;
+		if ((blocks > 0) && (blocks < cnt)) {
+			//printf("\n%llu========\n", blocks);
+			for (j = 0;j < ((blocks << blk_shift)/4)-1;j++)
+			{
+				*p = i*512 + j*4;
+				crc1 += *p;
+				p++;
+				//printf("*p=%x,crc1=%x\n",*p,crc1);
+			}
+			*p = crc1;
+			p = (u32 *)addr;
+			n = mmc->block_dev.block_write(curr_device, i, blocks , addr);
+			if (n != blocks) {
+				printf("write fail\n");
+				return 1;
+			}
+		}
+		printf("\n--------------write succeed----------------\n\n");
+		printf("start read and checksum :...\n");
+		for (i = blk;i <= size_blk - cnt;) {
+			n = mmc->block_dev.block_read(curr_device, i, cnt, addr);
+			if (n != cnt) {
+				printf("read fail\n");
+				return 1;
+			}
+			p = (u32 *)addr;
+			for (j = 0;j < (1<<17)/sizeof(*p)-1;j++) {
+				crc2+=*p;
+				p++;
+			}
+		//	printf("i=%llx,crc1=%x,crc2=%x.....................\n",i,*p,crc2);
+			if (crc2 != *p) {
+				printf("crc1 is not same as crc2\n");
+				return 1;
+			}
+			crc2 = 0;
+			i += cnt;
+			if (i % 1000 == 0)
+				printf("...");
+		}
+		blocks = size_blk - i;
+		if ((blocks > 0) && (blocks < cnt)) {
+			//printf("\n%llu========\n", blocks);
+			n = mmc->block_dev.block_read(curr_device, i, blocks, addr);
+			if (n != blocks) {
+				printf("read fail\n");
+				return 1;
+			}
+			p = (u32 *)addr;
+			for (j = 0;j < ((blocks << blk_shift)/4)-1;j++) {
+				crc2+=*p;
+				p++;
+			}
+		//	printf("i=%llx,crc1=%x,crc2=%x.....................\n",i,*p,crc2);
+			if (crc2 != *p) {
+				printf("crc1 is not same as crc2\n");
+				return 1;
+			}
+		}
+		//printf("i=%llx.....................\n",i);
+		printf("\n----------------read succeed-------------------\n");
+		printf("TEST TIMES: %d...........check sum ok!...............\n\n",count);
+		count++;
+	}
+	return rc;
+}
+
+
+static int parse_hwpart_user(struct mmc_hwpart_conf *pconf,
+			     int argc, char * const argv[])
+{
+	int i = 0;
+
+	memset(&pconf->user, 0, sizeof(pconf->user));
+
+	while (i < argc) {
+		if (!strcmp(argv[i], "enh")) {
+			if (i + 2 >= argc)
+				return -1;
+			pconf->user.enh_start =
+				simple_strtoul(argv[i+1], NULL, 10);
+			pconf->user.enh_size =
+				simple_strtoul(argv[i+2], NULL, 10);
+			i += 3;
+		} else if (!strcmp(argv[i], "wrrel")) {
+			if (i + 1 >= argc)
+				return -1;
+			pconf->user.wr_rel_change = 1;
+			if (!strcmp(argv[i+1], "on"))
+				pconf->user.wr_rel_set = 1;
+			else if (!strcmp(argv[i+1], "off"))
+				pconf->user.wr_rel_set = 0;
+			else
+				return -1;
+			i += 2;
+		} else {
+			break;
+		}
+	}
+	return i;
+}
+
+static int parse_hwpart_gp(struct mmc_hwpart_conf *pconf, int pidx,
+			   int argc, char * const argv[])
+{
+	int i;
+
+	memset(&pconf->gp_part[pidx], 0, sizeof(pconf->gp_part[pidx]));
+
+	if (1 >= argc)
+		return -1;
+	pconf->gp_part[pidx].size = simple_strtoul(argv[0], NULL, 10);
+
+	i = 1;
+	while (i < argc) {
+		if (!strcmp(argv[i], "enh")) {
+			pconf->gp_part[pidx].enhanced = 1;
+			i += 1;
+		} else if (!strcmp(argv[i], "wrrel")) {
+			if (i + 1 >= argc)
+				return -1;
+			pconf->gp_part[pidx].wr_rel_change = 1;
+			if (!strcmp(argv[i+1], "on"))
+				pconf->gp_part[pidx].wr_rel_set = 1;
+			else if (!strcmp(argv[i+1], "off"))
+				pconf->gp_part[pidx].wr_rel_set = 0;
+			else
+				return -1;
+			i += 2;
+		} else {
+			break;
+		}
+	}
+	return i;
+}
+
+static int do_mmc_hwpartition(cmd_tbl_t *cmdtp, int flag,
+			      int argc, char * const argv[])
+{
+	struct mmc *mmc;
+	struct mmc_hwpart_conf pconf = { };
+	enum mmc_hwpart_conf_mode mode = MMC_HWPART_CONF_CHECK;
+	int i, r, pidx;
+	mmc = init_mmc_device(curr_device, false);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+
+	if (argc < 1)
+		return CMD_RET_USAGE;
+	i = 1;
+	while (i < argc) {
+		if (!strcmp(argv[i], "user")) {
+			i++;
+			r = parse_hwpart_user(&pconf, argc-i, &argv[i]);
+			if (r < 0)
+				return CMD_RET_USAGE;
+			i += r;
+		} else if (!strncmp(argv[i], "gp", 2) &&
+			   strlen(argv[i]) == 3 &&
+			   argv[i][2] >= '1' && argv[i][2] <= '4') {
+			pidx = argv[i][2] - '1';
+			i++;
+			r = parse_hwpart_gp(&pconf, pidx, argc-i, &argv[i]);
+			if (r < 0)
+				return CMD_RET_USAGE;
+			i += r;
+		} else if (!strcmp(argv[i], "check")) {
+			mode = MMC_HWPART_CONF_CHECK;
+			i++;
+		} else if (!strcmp(argv[i], "set")) {
+			mode = MMC_HWPART_CONF_SET;
+			i++;
+		} else if (!strcmp(argv[i], "complete")) {
+			mode = MMC_HWPART_CONF_COMPLETE;
+			i++;
+		} else {
+			return CMD_RET_USAGE;
+		}
+	}
+
+	puts("Partition configuration:\n");
+	if (pconf.user.enh_size) {
+		puts("\tUser Enhanced Start: ");
+		print_size(((u64)pconf.user.enh_start) << 9, "\n");
+		puts("\tUser Enhanced Size: ");
+		print_size(((u64)pconf.user.enh_size) << 9, "\n");
+	} else {
+		puts("\tNo enhanced user data area\n");
+	}
+	if (pconf.user.wr_rel_change)
+		printf("\tUser partition write reliability: %s\n",
+		       pconf.user.wr_rel_set ? "on" : "off");
+	for (pidx = 0; pidx < 4; pidx++) {
+		if (pconf.gp_part[pidx].size) {
+			printf("\tGP%i Capacity: ", pidx+1);
+			print_size(((u64)pconf.gp_part[pidx].size) << 9,
+				   pconf.gp_part[pidx].enhanced ?
+				   " ENH\n" : "\n");
+		} else {
+			printf("\tNo GP%i partition\n", pidx+1);
+		}
+		if (pconf.gp_part[pidx].wr_rel_change)
+			printf("\tGP%i write reliability: %s\n", pidx+1,
+			       pconf.gp_part[pidx].wr_rel_set ? "on" : "off");
+	}
+
+	if (!mmc_hwpart_config(mmc, &pconf, mode)) {
+		if (mode == MMC_HWPART_CONF_COMPLETE)
+			puts("Partitioning successful, "
+			     "power-cycle to make effective\n");
+		return CMD_RET_SUCCESS;
+	} else {
+		puts("Failed!\n");
+		return CMD_RET_FAILURE;
+	}
+}
+
+
 static cmd_tbl_t cmd_mmc[] = {
-	U_BOOT_CMD_MKENT(info, 1, 0, do_mmcinfo, "", ""),
-	U_BOOT_CMD_MKENT(read, 4, 1, do_mmc_read, "", ""),
-	U_BOOT_CMD_MKENT(write, 4, 0, do_mmc_write, "", ""),
-	U_BOOT_CMD_MKENT(erase, 3, 0, do_mmc_erase, "", ""),
-	U_BOOT_CMD_MKENT(rescan, 1, 1, do_mmc_rescan, "", ""),
-	U_BOOT_CMD_MKENT(part, 1, 1, do_mmc_part, "", ""),
-	U_BOOT_CMD_MKENT(dev, 3, 0, do_mmc_dev, "", ""),
-	U_BOOT_CMD_MKENT(list, 1, 1, do_mmc_list, "", ""),
+	U_BOOT_CMD_MKENT(info,     1, 0, do_mmcinfo,      "", ""),
+	U_BOOT_CMD_MKENT(read,     4, 1, do_mmc_read,     "", ""),
+	U_BOOT_CMD_MKENT(write,    4, 0, do_mmc_write,    "", ""),
+	U_BOOT_CMD_MKENT(erase,    3, 0, do_mmc_erase,    "", ""),
+	U_BOOT_CMD_MKENT(rescan,   1, 1, do_mmc_rescan,   "", ""),
+	U_BOOT_CMD_MKENT(part,     1, 1, do_mmc_part,     "", ""),
+	U_BOOT_CMD_MKENT(dev,      3, 0, do_mmc_dev,      "", ""),
+	U_BOOT_CMD_MKENT(list,     1, 1, do_mmc_list,     "", ""),
+	U_BOOT_CMD_MKENT(lifetime, 1, 1, do_mmc_lifetime, "", ""),
+	U_BOOT_CMD_MKENT(ext_csd,  3, 0, do_mmc_ext_csd,  "", ""),
+	U_BOOT_CMD_MKENT(ffu,      4, 0, do_mmc_ffu,      "", ""),
+	U_BOOT_CMD_MKENT(hwpartition, 28, 0, do_mmc_hwpartition, "", ""),
 #ifdef CONFIG_SUPPORT_EMMC_BOOT
-	U_BOOT_CMD_MKENT(bootbus, 5, 0, do_mmc_bootbus, "", ""),
+	U_BOOT_CMD_MKENT(bootbus,         5, 0, do_mmc_bootbus,     "", ""),
 	U_BOOT_CMD_MKENT(bootpart-resize, 4, 0, do_mmc_boot_resize, "", ""),
-	U_BOOT_CMD_MKENT(partconf, 5, 0, do_mmc_partconf, "", ""),
-	U_BOOT_CMD_MKENT(rst-function, 3, 0, do_mmc_rst_func, "", ""),
+	U_BOOT_CMD_MKENT(partconf,        5, 0, do_mmc_partconf,    "", ""),
+	U_BOOT_CMD_MKENT(rst-function,    3, 0, do_mmc_rst_func,    "", ""),
 #endif
 #ifdef CONFIG_SUPPORT_EMMC_RPMB
 	U_BOOT_CMD_MKENT(rpmb, CONFIG_SYS_MAXARGS, 1, do_mmcrpmb, "", ""),
 #endif
 	U_BOOT_CMD_MKENT(setdsr, 2, 0, do_mmc_setdsr, "", ""),
+	U_BOOT_CMD_MKENT(test,   5, 0, do_mmc_test,   "", ""),
 };
 
 static int do_mmcops(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -650,6 +999,16 @@ U_BOOT_CMD(
 	"mmc part - lists available partition on current mmc device\n"
 	"mmc dev [dev] [part] - show or set current mmc device [partition]\n"
 	"mmc list - lists available devices\n"
+	"mmc lifetime - show dev life time estimate type A/B\n"
+	"mmc ext_csd [byte] <val> - read/write ext_csd [byte] value\n"
+	"mmc ffu ver addr cnt - update ffu fw\n"
+	"mmc hwpartition [args...] - does hardware partitioning\n"
+	"  arguments (sizes in 512-byte blocks):\n"
+	"    [user [enh start cnt] [wrrel {on|off}]] - sets user data area attributes\n"
+	"    [gp1|gp2|gp3|gp4 cnt [enh] [wrrel {on|off}]] - general purpose partition\n"
+	"    [check|set|complete] - mode, complete set partitioning completed\n"
+	"  WARNING: Partitioning is a write-once setting once it is set to complete.\n"
+	"  Power cycling is required to initialize partitions after set to complete.\n"
 #ifdef CONFIG_SUPPORT_EMMC_BOOT
 	"mmc bootbus dev boot_bus_width reset_boot_bus_width boot_mode\n"
 	" - Set the BOOT_BUS_WIDTH field of the specified device\n"
@@ -668,6 +1027,8 @@ U_BOOT_CMD(
 	"mmc rpmb counter - read the value of the write counter\n"
 #endif
 	"mmc setdsr <value> - set DSR register value\n"
+	"mmc test <blk_start> <blk_size> <times> - erase, read and write appointed\n"
+	" - Position and size multiple times\n"
 	);
 
 /* Old command kept for compatibility. Same as 'mmc info' */

@@ -1,0 +1,41 @@
+config BR2_PACKAGE_AML_LAUNCHER
+	bool "amlogic launcher"
+    help
+        Configure AML Browser launcher
+
+choice
+        bool "choose a launcher"
+        default BR2_PACKAGE_LAUNCHER_USE_CHROME if BR2_PACKAGE_CHROMIUM
+        default BR2_PACKAGE_LAUNCHER_USE_COBALT if !BR2_PACKAGE_CHROMIUM && BR2_PACKAGE_COBALT
+        default BR2_PACKAGE_LAUNCHER_USE_WPE if !BR2_PACKAGE_CHROMIUM && !BR2_PACKAGE_COBALT && BR2_PACKAGE_WPE_LAUNCHER
+        default BR2_PACKAGE_LAUNCHER_USE_DIRECTFB if !BR2_PACKAGE_CHROMIUM && !BR2_PACKAGE_COBALT && !BR2_PACKAGE_WPE_LAUNCHER && BR2_PACKAGE_DIRECTFB
+        default BR2_PACKAGE_LAUNCHER_NONE if !BR2_PACKAGE_CHROMIUM && !BR2_PACKAGE_COBALT && !BR2_PACKAGE_WPE_LAUNCHER && !BR2_PACKAGE_DIRECTFB
+        help
+                choose chrome or WPE launcher, or none
+
+config BR2_PACKAGE_LAUNCHER_USE_CHROME
+        bool "chrome"
+        help
+                use chrome as launcher
+
+config BR2_PACKAGE_LAUNCHER_USE_COBALT
+        bool "cobalt"
+        help
+                use cobalt as launcher
+
+config BR2_PACKAGE_LAUNCHER_USE_WPE
+        bool "wpe"
+        help
+                use wpe as launcher
+
+config BR2_PACKAGE_LAUNCHER_USE_DIRECTFB
+	bool "directfb"
+	help
+		use directfb as launcher
+
+config BR2_PACKAGE_LAUNCHER_NONE
+        bool "none"
+        help
+                Do not use launcher
+
+endchoice

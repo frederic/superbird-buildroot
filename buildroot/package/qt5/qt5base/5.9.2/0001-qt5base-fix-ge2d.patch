@@ -1,0 +1,2203 @@
+commit c38e91bf6f03ab0ea62aca662748206bd1180fbd
+Author: Renjun Xu <renjun.xu@amlogic.com>
+Date:   Thu Aug 10 17:08:34 2017 +0800
+
+    fix qt direct use ge2d and skip directFB
+
+diff --git a/src/gui/kernel/qplatformintegration.cpp b/src/gui/kernel/qplatformintegration.cpp
+index 5bf0df6..7910076 100644
+--- a/src/gui/kernel/qplatformintegration.cpp
++++ b/src/gui/kernel/qplatformintegration.cpp
+@@ -615,4 +615,8 @@ void QPlatformIntegration::setApplicationIcon(const QIcon &icon) const
+     Q_UNUSED(icon);
+ }
+
++unsigned long QPlatformIntegration::get_phy_info(unsigned long mem)
++{
++}
++
+ QT_END_NAMESPACE
+diff --git a/src/gui/kernel/qplatformintegration.h b/src/gui/kernel/qplatformintegration.h
+index 22a834f..9a0254f 100644
+--- a/src/gui/kernel/qplatformintegration.h
++++ b/src/gui/kernel/qplatformintegration.h
+@@ -182,6 +182,8 @@ public:
+ #endif
+     virtual void setApplicationIcon(const QIcon &icon) const;
+
++    virtual unsigned long get_phy_info(unsigned long mem);
++
+     void removeScreen(QScreen *screen);
+
+     virtual void beep() const;
+diff --git a/src/gui/painting/ge2d.h b/src/gui/painting/ge2d.h
+new file mode 100755
+index 0000000..1051851
+--- /dev/null
++++ b/src/gui/painting/ge2d.h
+@@ -0,0 +1,297 @@
++/****************************************************************************
++**
++** Copyright (C) 2010 AMLOGIC, INC.
++** All rights reserved.
++****************************************************************************/
++
++#ifndef GE2D_H
++#define GE2D_H
++
++
++#define OPERATION_ADD           0    /* Cd = Cs*Fs+Cd*Fd */
++#define OPERATION_SUB           1    /* Cd = Cs*Fs-Cd*Fd */
++#define OPERATION_REVERSE_SUB   2    /* Cd = Cd*Fd-Cs*Fs */
++#define OPERATION_MIN           3    /* Cd = Min(Cd*Fd,Cs*Fs) */
++#define OPERATION_MAX           4    /* Cd = Max(Cd*Fd,Cs*Fs) */
++#define OPERATION_LOGIC         5
++
++#define COLOR_FACTOR_ZERO                     0
++#define COLOR_FACTOR_ONE                      1
++#define COLOR_FACTOR_SRC_COLOR                2
++#define COLOR_FACTOR_ONE_MINUS_SRC_COLOR      3
++#define COLOR_FACTOR_DST_COLOR                4
++#define COLOR_FACTOR_ONE_MINUS_DST_COLOR      5
++#define COLOR_FACTOR_SRC_ALPHA                6
++#define COLOR_FACTOR_ONE_MINUS_SRC_ALPHA      7
++#define COLOR_FACTOR_DST_ALPHA                8
++#define COLOR_FACTOR_ONE_MINUS_DST_ALPHA      9
++#define COLOR_FACTOR_CONST_COLOR              10
++#define COLOR_FACTOR_ONE_MINUS_CONST_COLOR    11
++#define COLOR_FACTOR_CONST_ALPHA              12
++#define COLOR_FACTOR_ONE_MINUS_CONST_ALPHA    13
++#define COLOR_FACTOR_SRC_ALPHA_SATURATE       14
++
++#define ALPHA_FACTOR_ZERO                     0
++#define ALPHA_FACTOR_ONE                      1
++#define ALPHA_FACTOR_SRC_ALPHA                2
++#define ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA      3
++#define ALPHA_FACTOR_DST_ALPHA                4
++#define ALPHA_FACTOR_ONE_MINUS_DST_ALPHA      5
++#define ALPHA_FACTOR_CONST_ALPHA              6
++#define ALPHA_FACTOR_ONE_MINUS_CONST_ALPHA    7
++
++
++#define  GE2D_BLEND_NOALPHA_NOBLOCK 0x470a
++#define  GE2D_BLEND_NOALPHA         0x4709
++#define  GE2D_STRETCHBLIT_NOALPHA   0x4702
++#define  GE2D_BLIT_NOALPHA          0x4701
++#define  GE2D_BLEND                 0x4700
++#define  GE2D_BLIT                  0x46ff
++#define  GE2D_STRETCHBLIT           0x46fe
++#define  GE2D_FILLRECTANGLE         0x46fd
++#define  GE2D_SET_COEF              0x46fb
++#define  GE2D_ANTIFLICKER_ENABLE    0x46f8
++
++typedef enum {
++    OSD0_OSD0 = 0,
++    OSD0_OSD1,
++    OSD1_OSD1,
++    OSD1_OSD0,
++    ALLOC_OSD0,
++    ALLOC_OSD1,
++    ALLOC_ALLOC,
++    TYPE_INVALID,
++} ge2d_src_dst_t;
++
++enum ge2d_src_canvas_type_e {
++    CANVAS_OSD0 = 0,
++    CANVAS_OSD1,
++    CANVAS_ALLOC,
++    CANVAS_TYPE_INVALID,
++};
++
++struct config_planes_s {
++    unsigned long   addr;
++    unsigned int    w;
++    unsigned int    h;
++};
++
++struct src_key_ctrl_s {
++    int key_enable;
++    int key_color;
++    int key_mask;
++    int key_mode;
++};
++
++struct config_para_s {
++    int  src_dst_type;
++    int  alu_const_color;
++    unsigned int src_format;
++    unsigned int dst_format ; //add for src&dst all in user space.
++    struct config_planes_s src_planes[4];
++    struct config_planes_s dst_planes[4];
++    struct src_key_ctrl_s  src_key;
++};
++
++
++
++struct rectangle_s {
++    int x;   /* X coordinate of its top-left point */
++    int y;   /* Y coordinate of its top-left point */
++    int w;   /* width of it */
++    int h;   /* height of it */
++};
++
++struct ge2d_para_s {
++    unsigned int color ;
++    struct rectangle_s src1_rect;
++    struct rectangle_s src2_rect;
++    struct rectangle_s dst_rect;
++    int op;
++};
++
++struct src_dst_para_ex_s {
++    int  canvas_index;
++    int  top;
++    int  left;
++    int  width;
++    int  height;
++    int  format;
++    int  mem_type;
++    int  color;
++    unsigned char x_rev;
++    unsigned char y_rev;
++    unsigned char fill_color_en;
++    unsigned char fill_mode;
++};
++
++struct config_para_ex_s {
++    struct src_dst_para_ex_s src_para;
++    struct src_dst_para_ex_s src2_para;
++    struct src_dst_para_ex_s dst_para;
++
++    /* key mask */
++    struct src_key_ctrl_s  src_key;
++    struct src_key_ctrl_s  src2_key;
++
++    int alu_const_color;
++    unsigned src1_gb_alpha;
++    unsigned op_mode;
++    unsigned char bitmask_en;
++    unsigned char bytemask_only;
++    unsigned int  bitmask;
++    unsigned char dst_xy_swap;
++
++    /* scaler and phase releated */
++    unsigned hf_init_phase;
++    int hf_rpt_num;
++    unsigned hsc_start_phase_step;
++    int hsc_phase_slope;
++    unsigned vf_init_phase;
++    int vf_rpt_num;
++    unsigned vsc_start_phase_step;
++    int vsc_phase_slope;
++    unsigned char src1_vsc_phase0_always_en;
++    unsigned char src1_hsc_phase0_always_en;
++    /* 1bit, 0: using minus, 1: using repeat data */
++    unsigned char src1_hsc_rpt_ctrl;
++    /* 1bit, 0: using minus  1: using repeat data */
++    unsigned char src1_vsc_rpt_ctrl;
++
++    /* canvas info */
++    struct config_planes_s src_planes[4];
++    struct config_planes_s src2_planes[4];
++    struct config_planes_s dst_planes[4];
++};
++
++struct config_planes_ion_s {
++	unsigned long addr;
++	unsigned int w;
++	unsigned int h;
++	int shared_fd;
++};
++
++
++#define GE2D_ENDIAN_SHIFT       24
++#define GE2D_ENDIAN_MASK        (0x1 << GE2D_ENDIAN_SHIFT)
++#define GE2D_BIG_ENDIAN	        (0 << GE2D_ENDIAN_SHIFT)
++#define GE2D_LITTLE_ENDIAN      (1 << GE2D_ENDIAN_SHIFT)
++
++#define GE2D_COLOR_MAP_SHIFT    20
++#define GE2D_COLOR_MAP_MASK     (0xf << GE2D_COLOR_MAP_SHIFT)
++/* 16 bit */
++#define GE2D_COLOR_MAP_YUV422   (0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB655   (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV655   (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB844   (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV844   (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA6442 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA6442 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA4444 (4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA4444 (4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB565   (5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV565   (5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB4444 (6 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV4444 (6 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB1555 (7 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV1555 (7 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA4642 (8 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA4642 (8 << GE2D_COLOR_MAP_SHIFT)
++/* 24 bit */
++#define GE2D_COLOR_MAP_RGB888   (0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV444   (0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA5658 (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA5658 (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB8565 (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV8565 (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA6666 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA6666 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB6666 (4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV6666 (4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_BGR888   (5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_VUY888   (5 << GE2D_COLOR_MAP_SHIFT)
++/* 32 bit */
++#define GE2D_COLOR_MAP_RGBA8888 (0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA8888 (0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB8888 (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV8888 (1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ABGR8888 (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AVUY8888 (2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_BGRA8888 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_VUYA8888 (3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_NV21     (14 << GE2D_COLOR_MAP_SHIFT)
++
++#define GE2D_FMT_S8_Y           0x00000 /* 00_00_0_00_0_00 */
++#define GE2D_FMT_S8_CB          0x00040 /* 00_01_0_00_0_00 */
++#define GE2D_FMT_S8_CR          0x00080 /* 00_10_0_00_0_00 */
++#define GE2D_FMT_S8_R           0x00000 /* 00_00_0_00_0_00 */
++#define GE2D_FMT_S8_G           0x00040 /* 00_01_0_00_0_00 */
++#define GE2D_FMT_S8_B           0x00080 /* 00_10_0_00_0_00 */
++#define GE2D_FMT_S8_A           0x000c0 /* 00_11_0_00_0_00 */
++#define GE2D_FMT_S8_LUT         0x00020 /* 00_00_1_00_0_00 */
++#define GE2D_FMT_S16_YUV422     0x20100 /* 01_00_0_00_0_00 */
++#define GE2D_FMT_S16_RGB        (GE2D_LITTLE_ENDIAN|0x00100) /* 01_00_0_00_0_00 */
++#define GE2D_FMT_S24_YUV444     0x20200 /* 10_00_0_00_0_00 */
++#define GE2D_FMT_S24_RGB        (GE2D_LITTLE_ENDIAN|0x00200) /* 10_00_0_00_0_00 */
++#define GE2D_FMT_S32_YUVA444    0x20300 /* 11_00_0_00_0_00 */
++#define GE2D_FMT_S32_RGBA       (GE2D_LITTLE_ENDIAN|0x00300) /* 11_00_0_00_0_00 */
++#define GE2D_FMT_M24_YUV420     0x20007 /* 00_00_0_00_1_11 */
++#define GE2D_FMT_M24_YUV422     0x20006 /* 00_00_0_00_1_10 */
++#define GE2D_FMT_M24_YUV444     0x20004 /* 00_00_0_00_1_00 */
++#define GE2D_FMT_M24_RGB        0x00004 /* 00_00_0_00_1_00 */
++#define GE2D_FMT_M24_YUV420T    0x20017 /* 00_00_0_10_1_11 */
++#define GE2D_FMT_M24_YUV420B    0x2001f /* 00_00_0_11_1_11 */
++#define GE2D_FMT_S16_YUV422T    0x20110 /* 01_00_0_10_0_00 */
++#define GE2D_FMT_S16_YUV422B    0x20138 /* 01_00_0_11_0_00 */
++#define GE2D_FMT_S24_YUV444T    0x20210 /* 10_00_0_10_0_00 */
++#define GE2D_FMT_S24_YUV444B    0x20218 /* 10_00_0_11_0_00 */
++#define GE2D_FMT_M24_YUV420SP   0x20207
++
++#define GE2D_FORMAT_S8_Y            (GE2D_FMT_S8_Y)
++#define GE2D_FORMAT_S8_CB           (GE2D_FMT_S8_CB)
++#define GE2D_FORMAT_S8_CR           (GE2D_FMT_S8_CR)
++#define GE2D_FORMAT_S8_R            (GE2D_FMT_S8_R)
++#define GE2D_FORMAT_S8_G            (GE2D_FMT_S8_G)
++#define GE2D_FORMAT_S8_B            (GE2D_FMT_S8_B)
++#define GE2D_FORMAT_S8_A            (GE2D_FMT_S8_A)
++#define GE2D_FORMAT_S8_LUT          (GE2D_FMT_S8_LUT)
++#define GE2D_FORMAT_S16_YUV422      (GE2D_FMT_S16_YUV422    | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S16_RGB_655     (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGB655)
++#define GE2D_FORMAT_S16_RGB_565     (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGB565)
++#define GE2D_FORMAT_S16_RGB_844     (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGB844)
++#define GE2D_FORMAT_S16_RGBA_6442   (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGBA6442)
++#define GE2D_FORMAT_S16_RGBA_4444   (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGBA4444)
++#define GE2D_FORMAT_S16_ARGB_4444   (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_ARGB4444)
++#define GE2D_FORMAT_S16_ARGB_1555   (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_ARGB1555)
++#define GE2D_FORMAT_S16_RGBA_4642   (GE2D_FMT_S16_RGB       | GE2D_COLOR_MAP_RGBA4642)
++#define GE2D_FORMAT_S24_YUV444      (GE2D_FMT_S24_YUV444    | GE2D_COLOR_MAP_YUV444)
++#define GE2D_FORMAT_S24_RGB	        (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_RGB888)
++#define GE2D_FORMAT_S32_YUVA444     (GE2D_FMT_S32_YUVA444   | GE2D_COLOR_MAP_YUVA4444)
++#define GE2D_FORMAT_S32_RGBA        (GE2D_FMT_S32_RGBA      | GE2D_COLOR_MAP_RGBA8888)
++#define GE2D_FORMAT_S32_ARGB        (GE2D_FMT_S32_RGBA      | GE2D_COLOR_MAP_ARGB8888)
++#define GE2D_FORMAT_S32_ABGR        (GE2D_FMT_S32_RGBA      | GE2D_COLOR_MAP_ABGR8888)
++#define GE2D_FORMAT_S32_BGRA        (GE2D_FMT_S32_RGBA      | GE2D_COLOR_MAP_BGRA8888)
++#define GE2D_FORMAT_S24_RGBA_5658   (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_RGBA5658)
++#define GE2D_FORMAT_S24_ARGB_8565   (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_ARGB8565)
++#define GE2D_FORMAT_S24_RGBA_6666   (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_RGBA6666)
++#define GE2D_FORMAT_S24_ARGB_6666   (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_ARGB6666)
++#define GE2D_FORMAT_S24_BGR         (GE2D_FMT_S24_RGB       | GE2D_COLOR_MAP_BGR888)
++#define GE2D_FORMAT_M24_YUV420      (GE2D_FMT_M24_YUV420)
++#define GE2D_FORMAT_M24_YUV422      (GE2D_FMT_M24_YUV422)
++#define GE2D_FORMAT_M24_YUV444      (GE2D_FMT_M24_YUV444)
++#define GE2D_FORMAT_M24_RGB         (GE2D_FMT_M24_RGB)
++#define GE2D_FORMAT_M24_YUV420T     (GE2D_FMT_M24_YUV420T)
++#define GE2D_FORMAT_M24_YUV420B     (GE2D_FMT_M24_YUV420B)
++#define GE2D_FORMAT_S16_YUV422T     (GE2D_FMT_S16_YUV422T | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S16_YUV422B     (GE2D_FMT_S16_YUV422B | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S24_YUV444T     (GE2D_FMT_S24_YUV444T | GE2D_COLOR_MAP_YUV444)
++#define GE2D_FORMAT_S24_YUV444B     (GE2D_FMT_S24_YUV444B | GE2D_COLOR_MAP_YUV444)
++#define GE2D_FORMAT_M24_NV21        (GE2D_FMT_M24_YUV420SP | GE2D_COLOR_MAP_NV21)
++
++#define GE2D_IOC_MAGIC  'G'
++
++#define GE2D_CONFIG     _IOW(GE2D_IOC_MAGIC, 0x00, struct config_para_s)
++#define GE2D_CONFIG_EX  _IOW(GE2D_IOC_MAGIC, 0x01, struct config_para_ex_s)
++#define GE2D_SRCCOLORKEY    _IOW(GE2D_IOC_MAGIC, 0x02, struct config_para_s)
++
++#endif /* GE2D_H */
+diff --git a/src/gui/painting/ge2d_com.h b/src/gui/painting/ge2d_com.h
+new file mode 100755
+index 0000000..eb1687e
+--- /dev/null
++++ b/src/gui/painting/ge2d_com.h
+@@ -0,0 +1,39 @@
++#ifndef GE2D_COM_H_
++#define GE2D_COM_H_
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <malloc.h>
++#include <string.h>
++
++
++//#define __DEBUG
++
++#ifdef __DEBUG
++#define D_GE2D(fmt, args...) printf(fmt, ## args)
++#else
++#define D_GE2D(fmt, args...)
++#endif
++#define E_GE2D(fmt, args...) printf(fmt, ## args)
++
++typedef struct{
++    unsigned int color;
++    rectangle_t src1_rect;
++    rectangle_t src2_rect;
++    rectangle_t dst_rect;
++    int op;
++}ge2d_op_para_t;
++
++
++
++typedef struct{
++    unsigned int color_blending_mode;
++    unsigned int color_blending_src_factor;
++    unsigned int color_blending_dst_factor;
++    unsigned int alpha_blending_mode;
++    unsigned int alpha_blending_src_factor;
++    unsigned int alpha_blending_dst_factor;
++}ge2d_blend_op;
++
++
++#endif
+diff --git a/src/gui/painting/ge2d_port.h b/src/gui/painting/ge2d_port.h
+new file mode 100755
+index 0000000..ab53ceb
+--- /dev/null
++++ b/src/gui/painting/ge2d_port.h
+@@ -0,0 +1,115 @@
++#ifndef GE2D_PORT_H_
++#define GE2D_PORT_H_
++
++#define ge2d_fail      -1
++#define ge2d_success        0
++
++#define OSD0        0
++#define OSD1        1
++
++
++#if defined (__cplusplus)
++extern "C" {
++#endif
++
++typedef enum {
++    GE2D_CANVAS_OSD0 = 0,
++    GE2D_CANVAS_OSD1,
++    GE2D_CANVAS_ALLOC,
++    GE2D_CANVAS_TYPE_INVALID,
++}ge2d_canvas_t;
++
++
++/* Blend modes, settable per layer */
++typedef enum {
++    BLEND_MODE_INVALID = 0,
++
++    /* colorOut = colorSrc */
++    BLEND_MODE_NONE = 1,
++
++    /* colorOut = colorSrc + colorDst * (1 - alphaSrc) */
++    BLEND_MODE_PREMULTIPLIED = 2,
++
++    /* colorOut = colorSrc * alphaSrc + colorDst * (1 - alphaSrc) */
++    BLEND_MODE_COVERAGE = 3,
++} blend_mode_t;
++
++
++
++
++/**
++ * pixel format definitions
++ */
++
++typedef enum  {
++    PIXEL_FORMAT_RGBA_8888          = 1,
++    PIXEL_FORMAT_RGBX_8888          = 2,
++    PIXEL_FORMAT_RGB_888            = 3,
++    PIXEL_FORMAT_RGB_565            = 4,
++    PIXEL_FORMAT_BGRA_8888          = 5,
++    PIXEL_FORMAT_YV12               = 0x32315659, // YCrCb 4:2:0 Planar  YYYY......  U......V......
++    PIXEL_FORMAT_Y8                 = 0x20203859, // YYYY
++    PIXEL_FORMAT_YCbCr_422_SP       = 0x10, // NV16   YYYY.....UVUV....
++    PIXEL_FORMAT_YCrCb_420_SP       = 0x11, // NV21   YYYY.....UV....
++    PIXEL_FORMAT_YCbCr_422_I        = 0x14, // YUY2   Y0 U0 Y1 V0
++}pixel_format_t;
++
++typedef enum {
++    GE2D_ROTATION_0,
++    GE2D_ROTATION_90,
++    GE2D_ROTATION_180,
++    GE2D_ROTATION_270,
++} GE2D_ROTATION;
++
++
++typedef enum {
++    AML_GE2D_FILLRECTANGLE,
++    AML_GE2D_BLEND,
++    AML_GE2D_STRETCHBLIT,
++    AML_GE2D_BLIT,
++    AML_GE2D_NONE,
++} GE2DOP;
++
++
++typedef struct{
++    int x;
++    int y;
++    int w;
++    int h;
++}rectangle_t;
++
++
++typedef struct buffer_info {
++    unsigned int memtype;
++    unsigned long vaddr;
++    unsigned long offset;
++    unsigned int canvas_w;
++    unsigned int canvas_h;
++    rectangle_t rect;
++    int format;
++    unsigned int rotation;
++    int shared_fd;
++} buffer_info_t;
++
++
++
++typedef struct aml_ge2d_info {
++    unsigned int offset;
++    unsigned int blend_mode;
++    GE2DOP ge2d_op;
++    buffer_info_t src_info[2];
++    buffer_info_t dst_info;
++    unsigned int color;
++    unsigned int gl_alpha;
++} aml_ge2d_info_t;
++
++
++int ge2d_open(void);
++int ge2d_close(int fd);
++int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo);
++
++#if defined (__cplusplus)
++}
++#endif
++
++#endif
+diff --git a/src/gui/painting/painting.pri b/src/gui/painting/painting.pri
+index 86e35c3..97bde6f 100644
+--- a/src/gui/painting/painting.pri
++++ b/src/gui/painting/painting.pri
+@@ -53,7 +53,8 @@ HEADERS += \
+         painting/qtriangulatingstroker_p.h \
+         painting/qtriangulator_p.h \
+         painting/qplatformbackingstore.h \
+-        painting/qpathsimplifier_p.h
++        painting/qpathsimplifier_p.h \
++        painting/qdrawhelper_ge2d_p.h
+
+
+ SOURCES += \
+@@ -96,7 +97,8 @@ SOURCES += \
+         painting/qtriangulatingstroker.cpp \
+         painting/qtriangulator.cpp \
+         painting/qplatformbackingstore.cpp \
+-        painting/qpathsimplifier.cpp
++        painting/qpathsimplifier.cpp \
++        painting/qdrawhelper_ge2d.cpp
+
+ darwin {
+     HEADERS += painting/qcoregraphics_p.h
+diff --git a/src/gui/painting/qdrawhelper.cpp b/src/gui/painting/qdrawhelper.cpp
+index e1875d8..2697955 100644
+--- a/src/gui/painting/qdrawhelper.cpp
++++ b/src/gui/painting/qdrawhelper.cpp
+@@ -55,6 +55,9 @@
+ #include <private/qguiapplication_p.h>
+ #include <private/qrgba64_p.h>
+ #include <qmath.h>
++#include "ge2d_port.h"
++#include "qdrawhelper_ge2d_p.h"
++#include <qpa/qplatformintegration.h>
+
+ QT_BEGIN_NAMESPACE
+
+@@ -5166,9 +5169,127 @@ static const ProcessSpans processTextureSpansGeneric64[NBlendTypes] = {
+     blend_src_generic_rgb64             // TransformedBilinearTiled
+ };
+
++static bool is_continous_phys_addr(unsigned long addr, unsigned long *phy_addr)
++{
++    *phy_addr = QGuiApplicationPrivate::platformIntegration()->get_phy_info(addr);
++    if (*phy_addr > 0)
++        return true;
++    else
++        return false;
++}
++
++static bool is_format_support_ge2d(int format, int *pxiel_format)
++{
++enum  {
++    PIXEL_FORMAT_RGBA_8888          = 1,
++    PIXEL_FORMAT_RGBX_8888          = 2,
++    PIXEL_FORMAT_RGB_888            = 3,
++    PIXEL_FORMAT_RGB_565            = 4,
++    PIXEL_FORMAT_BGRA_8888          = 5,
++    PIXEL_FORMAT_ARGB_8888          = 6,
++}pixel_format_t;
++
++enum Format {
++    Format_Invalid,
++    Format_Mono,
++    Format_MonoLSB,
++    Format_Indexed8,
++    Format_RGB32,
++    Format_ARGB32,
++    Format_ARGB32_Premultiplied,
++    Format_RGB16,
++    Format_ARGB8565_Premultiplied,
++    Format_RGB666,
++    Format_ARGB6666_Premultiplied,
++    Format_RGB555,
++    Format_ARGB8555_Premultiplied,
++    Format_RGB888,
++    Format_RGB444,
++    Format_ARGB4444_Premultiplied,
++    Format_RGBX8888,
++    Format_RGBA8888,
++    Format_RGBA8888_Premultiplied,
++    Format_BGR30,
++    Format_A2BGR30_Premultiplied,
++    Format_RGB30,
++    Format_A2RGB30_Premultiplied,
++    Format_Alpha8,
++    Format_Grayscale8,
++};
++    int ret = true;
++    switch(format)
++    {
++        case Format_RGB32:
++            *pxiel_format = PIXEL_FORMAT_RGB_888;
++            break;
++        case Format_ARGB32:
++            *pxiel_format = PIXEL_FORMAT_ARGB_8888;
++            break;
++        case Format_RGBA8888:
++            *pxiel_format = PIXEL_FORMAT_RGBA_8888;
++            break;
++        case Format_RGBX8888:
++            *pxiel_format = PIXEL_FORMAT_RGBX_8888;
++            break;
++        default:
++            printf("ge2d format is not support,format=%d\n",format);
++            ret = false;
++            break;
++    }
++    return ret;
++}
++
++
++
+ void qBlendTexture(int count, const QSpan *spans, void *userData)
+ {
+     QSpanData *data = reinterpret_cast<QSpanData *>(userData);
++
++    unsigned long src_addr = (unsigned long)(data->texture.imageData);
++    unsigned long dst_addr = (unsigned long)(data->rasterBuffer->buffer());
++    unsigned long src_addr_phys, dst_addr_phys;
++    int src_format = data->texture.format;
++    int dst_format = data->rasterBuffer->format;
++    int src_width = data->texture.width;
++    int src_height = data->texture.height;
++    int dst_width = data->rasterBuffer->width();
++    int dst_height = data->rasterBuffer->height();
++    int ge2d_src_format, ge2d_dst_format;
++    if (is_continous_phys_addr(src_addr, &src_addr_phys) && is_continous_phys_addr(dst_addr, &dst_addr_phys) &&
++        is_format_support_ge2d(src_format, &ge2d_src_format) && is_format_support_ge2d(dst_format,&ge2d_dst_format)) {
++        aml_ge2d_info_t ge2dinfo;
++        ge2dinfo.src_info[0].canvas_w = src_width;
++        ge2dinfo.src_info[0].canvas_h = src_height;
++        ge2dinfo.src_info[0].format = src_format;
++        ge2dinfo.src_info[0].rect.x = 0;
++        ge2dinfo.src_info[0].rect.y = 0;
++        ge2dinfo.src_info[0].rect.w = src_width;
++        ge2dinfo.src_info[0].rect.h = src_height;
++        ge2dinfo.src_info[0].vaddr = src_addr_phys;
++        ge2dinfo.src_info[0].rotation = GE2D_ROTATION_0;
++
++        ge2dinfo.src_info[1].canvas_w = dst_width;
++        ge2dinfo.src_info[1].canvas_h = dst_height;
++        ge2dinfo.src_info[1].format = dst_format;
++        ge2dinfo.src_info[1].rect.x = 0;
++        ge2dinfo.src_info[1].rect.y = 0;
++        ge2dinfo.src_info[1].rect.w = dst_width;
++        ge2dinfo.src_info[1].rect.h = dst_height;
++        ge2dinfo.src_info[1].vaddr = dst_addr_phys;
++        ge2dinfo.src_info[1].rotation = GE2D_ROTATION_0;
++
++
++        ge2dinfo.dst_info.canvas_w = dst_width;
++        ge2dinfo.dst_info.canvas_h = dst_height;
++        ge2dinfo.dst_info.format = dst_format;
++        ge2dinfo.dst_info.rect.x = 0;
++        ge2dinfo.dst_info.rect.y = 0;
++        ge2dinfo.dst_info.rect.w = dst_width;
++        ge2dinfo.dst_info.rect.h = dst_height;
++        ge2dinfo.dst_info.vaddr = dst_addr_phys;
++        ge2dinfo.dst_info.rotation = GE2D_ROTATION_0;
++        ge2d_blend_Texture(&ge2dinfo);
++    }else{
+     TextureBlendType blendType = getBlendType(data);
+     ProcessSpans proc;
+     switch (data->rasterBuffer->format) {
+@@ -5192,6 +5313,7 @@ void qBlendTexture(int count, const QSpan *spans, void *userData)
+         break;
+     }
+     proc(count, spans, userData);
++    }
+ }
+
+ template <class DST> Q_STATIC_TEMPLATE_FUNCTION
+diff --git a/src/gui/painting/qdrawhelper_ge2d.cpp b/src/gui/painting/qdrawhelper_ge2d.cpp
+new file mode 100755
+index 0000000..008e34e
+--- /dev/null
++++ b/src/gui/painting/qdrawhelper_ge2d.cpp
+@@ -0,0 +1,1318 @@
++/****************************************************************************
++**
++** Copyright (C) 2015 The Qt Company Ltd.
++** Contact: http://www.qt.io/licensing/
++**
++** This file is part of the plugins of the Qt Toolkit.
++**
++** $QT_BEGIN_LICENSE:LGPL21$
++** Commercial License Usage
++** Licensees holding valid commercial Qt licenses may use this file in
++** accordance with the commercial license agreement provided with the
++** Software or, alternatively, in accordance with the terms contained in
++** a written agreement between you and The Qt Company. For licensing terms
++** and conditions see http://www.qt.io/terms-conditions. For further
++** information use the contact form at http://www.qt.io/contact-us.
++**
++** GNU Lesser General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU Lesser
++** General Public License version 2.1 or version 3 as published by the Free
++** Software Foundation and appearing in the file LICENSE.LGPLv21 and
++** LICENSE.LGPLv3 included in the packaging of this file. Please review the
++** following information to ensure the GNU Lesser General Public License
++** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
++** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
++**
++** As a special exception, The Qt Company gives you certain additional
++** rights. These rights are described in The Qt Company LGPL Exception
++** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
++**
++** $QT_END_LICENSE$
++**
++****************************************************************************/
++
++//#include <qimage.h>
++//#include <qdebug.h>
++#include <qglobal.h>
++#include <qguiapplication.h>
++
++#include <unistd.h>
++#include <stdlib.h>
++#include <sys/ioctl.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/mman.h>
++#include <linux/kd.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <stdio.h>
++#include <limits.h>
++#include <signal.h>
++
++#include <linux/fb.h>
++#include "ge2d.h"
++#include "ge2d_port.h"
++#include "ge2d_com.h"
++
++#include "qdrawhelper_ge2d_p.h"
++
++
++QT_BEGIN_NAMESPACE
++
++#define FILE_NAME_GE2D        "/dev/ge2d"
++
++#define CANVAS_ALIGNED(x)        (((x) + 31) & ~31)
++
++
++#define GE2D_BPP_32  32
++#define GE2D_BPP_24  24
++#define GE2D_BPP_16  16
++#define GE2D_BPP_12  12
++#define GE2D_BPP_8   8
++
++static int b_src_swap = 0;
++
++static int  pixel_to_ge2d_format(int img_format, int *pge2d_format,int *p_bpp)
++{
++    int is_rgb = -1;
++
++    switch (img_format) {
++        case PIXEL_FORMAT_RGBA_8888:
++        case PIXEL_FORMAT_RGBX_8888:
++        *pge2d_format = GE2D_FORMAT_S32_ABGR;
++        *p_bpp = GE2D_BPP_32;
++        is_rgb = 1;
++        break;
++        case PIXEL_FORMAT_BGRA_8888:
++        *pge2d_format = GE2D_FORMAT_S32_ARGB;
++        *p_bpp = GE2D_BPP_32;
++        is_rgb = 1;
++        break;
++        case PIXEL_FORMAT_RGB_888:
++        *pge2d_format = GE2D_FORMAT_S24_RGB;
++        *p_bpp = GE2D_BPP_24;
++        is_rgb = 1;
++        break;
++        case PIXEL_FORMAT_RGB_565:
++        *pge2d_format = GE2D_FORMAT_S16_RGB_565;
++        *p_bpp = GE2D_BPP_16;
++        is_rgb = 1;
++        break;
++        case PIXEL_FORMAT_YCrCb_420_SP:
++        *pge2d_format = GE2D_FORMAT_M24_NV21;
++        *p_bpp = GE2D_BPP_8;
++        is_rgb = 0;
++        break;
++        case  PIXEL_FORMAT_YV12:
++        *pge2d_format = GE2D_FORMAT_M24_YUV420;
++        *p_bpp = GE2D_BPP_8;
++        is_rgb = 0;
++        break;
++        case  PIXEL_FORMAT_Y8:
++        *pge2d_format = GE2D_FORMAT_S8_Y;
++        *p_bpp = GE2D_BPP_8;
++        is_rgb = 0;
++        break;
++        case PIXEL_FORMAT_YCbCr_422_I:
++        *pge2d_format = GE2D_FORMAT_S16_YUV422;
++        *p_bpp = GE2D_BPP_8;
++        is_rgb = 0;
++        break;
++        default:
++        E_GE2D("Image format %d not supported!", img_format);
++        *pge2d_format = 0xffffffff;
++        *p_bpp = GE2D_BPP_32;
++        break;
++    }
++    return is_rgb;
++}
++
++
++
++
++static void ge2d_set_canvas(int bpp, int w,int h, int *canvas_w, int *canvas_h)
++{
++   *canvas_w = (CANVAS_ALIGNED(w * bpp >> 3))/(bpp >> 3);
++   *canvas_h = h;
++}
++
++
++static inline unsigned blendop(unsigned color_blending_mode,
++        unsigned color_blending_src_factor,
++        unsigned color_blending_dst_factor,
++        unsigned alpha_blending_mode,
++        unsigned alpha_blending_src_factor,
++        unsigned alpha_blending_dst_factor)
++{
++    return (color_blending_mode << 24) |
++        (color_blending_src_factor << 20) |
++        (color_blending_dst_factor << 16) |
++        (alpha_blending_mode << 8) |
++        (alpha_blending_src_factor << 4) | (alpha_blending_dst_factor << 0);
++}
++
++
++static int is_no_alpha(int format)
++{
++    if ((format == PIXEL_FORMAT_RGBX_8888) ||
++        (format == PIXEL_FORMAT_RGB_565) ||
++        (format == PIXEL_FORMAT_RGB_888) ||
++        (format == PIXEL_FORMAT_YCrCb_420_SP)||
++        (format == PIXEL_FORMAT_Y8)||
++        (format == PIXEL_FORMAT_YV12) ||
++        (format == PIXEL_FORMAT_YCbCr_422_I)||
++        (format == PIXEL_FORMAT_YCbCr_422_SP))
++        return 1;
++    else
++        return 0;
++}
++
++static int is_need_swap_src2(int format)
++{
++    /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
++    if ((format == PIXEL_FORMAT_YCrCb_420_SP) ||
++        (format == PIXEL_FORMAT_YV12))
++        return 1;
++    else
++        return 0;
++}
++
++
++static int is_rect_valid(buffer_info_t *pbuffer_info)
++{
++    int ret = 1;
++    if (CANVAS_ALLOC == pbuffer_info->memtype)
++        if (((unsigned int)pbuffer_info->rect.w > pbuffer_info->canvas_w) ||
++            ((unsigned int)pbuffer_info->rect.h > pbuffer_info->canvas_h)) {
++            E_GE2D("rect.w,h:[%d,%d],canvas w,h:[%d,%d] out of range!\n",pbuffer_info->rect.w,
++                pbuffer_info->rect.h,pbuffer_info->canvas_w,pbuffer_info->canvas_h);
++            ret = 0;
++        }
++    return 1;//ret;
++}
++
++static int ge2d_fillrectangle_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
++{
++    int ret = -1;
++    struct config_para_ex_s ge2d_config_ex;
++    int src_format = 0xffffffff,dst_format = 0xffffffff;
++    int s_canvas_w = 0;
++    int s_canvas_h = 0;
++    int d_canvas_w = 0;
++    int d_canvas_h = 0;
++    int bpp = 0;
++    int is_rgb = -1;
++    buffer_info_t* input_buffer_info = &(pge2dinfo->src_info[0]);
++    buffer_info_t* output_buffer_info = &(pge2dinfo->dst_info);
++
++    memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_s ));
++
++    if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
++        is_rgb = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
++        dst_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == dst_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
++
++        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
++        src_format |= GE2D_LITTLE_ENDIAN;
++        ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
++    }else {
++        is_rgb = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
++        dst_format |= GE2D_LITTLE_ENDIAN;
++        ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
++
++        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
++        src_format |= GE2D_LITTLE_ENDIAN;
++        ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
++    }
++    D_GE2D("ge2d_fillrectangle_config_ex,memtype=%x,src_format=%x,s_canvas_w=%d,s_canvas_h=%d,rotation=%d\n",
++        input_buffer_info->memtype,src_format,s_canvas_w,s_canvas_h,input_buffer_info->rotation);
++
++    D_GE2D("ge2d_fillrectangle_config_ex,memtype=%x,dst_format=%x,d_canvas_w=%d,d_canvas_h=%d,rotation=%d\n",
++        output_buffer_info->memtype,dst_format,d_canvas_w,d_canvas_h,output_buffer_info->rotation);
++
++    ge2d_config_ex.src_para.mem_type = CANVAS_OSD0;
++    ge2d_config_ex.src_para.format = src_format;
++    ge2d_config_ex.src_para.left = 0;
++    ge2d_config_ex.src_para.top = 0;
++    ge2d_config_ex.src_para.width = s_canvas_w;
++    ge2d_config_ex.src_para.height = s_canvas_h;
++
++    ge2d_config_ex.dst_para.mem_type = output_buffer_info->memtype;
++    ge2d_config_ex.dst_para.format = dst_format;
++    ge2d_config_ex.dst_para.left = 0;
++    ge2d_config_ex.dst_para.top = 0;
++    ge2d_config_ex.dst_para.width = d_canvas_w;
++    ge2d_config_ex.dst_para.height = d_canvas_h;
++
++    ge2d_config_ex.src2_para.mem_type = CANVAS_TYPE_INVALID;
++
++    switch (pge2dinfo->dst_info.rotation) {
++        case GE2D_ROTATION_0:
++            break;
++        case GE2D_ROTATION_90:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.dst_para.x_rev = 1;
++            break;
++        case GE2D_ROTATION_180:
++            ge2d_config_ex.dst_para.x_rev = 1;
++            ge2d_config_ex.dst_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_270:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.dst_para.y_rev = 1;
++            break;
++        default:
++            break;
++    }
++
++
++    if (CANVAS_ALLOC == output_buffer_info->memtype) {
++        if (is_rgb == 1) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++        }  else if (output_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h)*5/4;
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++            ge2d_config_ex.dst_planes[2].addr = ge2d_config_ex.dst_planes[1].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w*2;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config dst_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++    ge2d_config_ex.alu_const_color = 0x00000000;
++    ge2d_config_ex.src1_gb_alpha = 0x00;
++
++    ret = ioctl(fd, GE2D_CONFIG_EX, &ge2d_config_ex);
++    if (ret < 0) {
++        E_GE2D("ge2d config ex ion failed. \n");
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
++{
++    int ret = -1;
++    struct config_para_ex_s ge2d_config_ex;
++    int src_format = 0xffffffff,dst_format = 0xffffffff;
++    int s_canvas_w = 0;
++    int s_canvas_h = 0;
++    int d_canvas_w = 0;
++    int d_canvas_h = 0;
++    int bpp = 0;
++    int is_rgb_input = -1;
++    int is_rgb_output = -1;
++    buffer_info_t* input_buffer_info = &(pge2dinfo->src_info[0]);
++    buffer_info_t* output_buffer_info = &(pge2dinfo->dst_info);
++
++    memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_s ));
++
++    if ((CANVAS_ALLOC == input_buffer_info->memtype)) {
++        is_rgb_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
++        src_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == src_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
++    }
++
++    if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
++        is_rgb_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
++        dst_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == dst_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
++    }
++    D_GE2D("ge2d_blit_config_ex,memtype=%x,src_format=%x,s_canvas_w=%d,s_canvas_h=%d,rotation=%d\n",
++        input_buffer_info->memtype,src_format,s_canvas_w,s_canvas_h,input_buffer_info->rotation);
++
++    D_GE2D("ge2d_blit_config_ex,memtype=%x,dst_format=%x,d_canvas_w=%d,d_canvas_h=%d,rotation=%d\n",
++        output_buffer_info->memtype,dst_format,d_canvas_w,d_canvas_h,output_buffer_info->rotation);
++
++    ge2d_config_ex.src_para.mem_type = input_buffer_info->memtype;
++    ge2d_config_ex.src_para.format = src_format;
++    ge2d_config_ex.src_para.left = input_buffer_info->rect.x;
++    ge2d_config_ex.src_para.top = input_buffer_info->rect.y;
++    ge2d_config_ex.src_para.width = input_buffer_info->rect.w;
++    ge2d_config_ex.src_para.height = input_buffer_info->rect.h;
++
++    ge2d_config_ex.src2_para.mem_type = CANVAS_TYPE_INVALID;
++
++    ge2d_config_ex.dst_para.mem_type = output_buffer_info->memtype;
++    ge2d_config_ex.dst_para.format = dst_format;
++    ge2d_config_ex.dst_para.left = 0;
++    ge2d_config_ex.dst_para.top = 0;
++    ge2d_config_ex.dst_para.width = d_canvas_w;
++    ge2d_config_ex.dst_para.height = d_canvas_h;
++
++    switch (pge2dinfo->src_info[0].rotation) {
++        case GE2D_ROTATION_0:
++            break;
++        case GE2D_ROTATION_90:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_180:
++            ge2d_config_ex.src_para.x_rev = 1;
++            ge2d_config_ex.src_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_270:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src_para.x_rev = 1;
++            break;
++        default:
++            break;
++    }
++
++    switch (pge2dinfo->dst_info.rotation) {
++        case GE2D_ROTATION_0:
++            break;
++        case GE2D_ROTATION_90:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.dst_para.x_rev = 1;
++            break;
++        case GE2D_ROTATION_180:
++            ge2d_config_ex.dst_para.x_rev = 1;
++            ge2d_config_ex.dst_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_270:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.dst_para.y_rev = 1;
++            break;
++        default:
++            break;
++    }
++
++    if (CANVAS_ALLOC == input_buffer_info->memtype) {
++        if (is_rgb_input) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            ge2d_config_ex.src_planes[1].addr = ge2d_config_ex.src_planes[0].addr + (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[1].w = s_canvas_w;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.src_planes[1].addr = ge2d_config_ex.src_planes[0].addr + (s_canvas_w * s_canvas_h)*5/4;
++            ge2d_config_ex.src_planes[1].w = s_canvas_w/2;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
++            ge2d_config_ex.src_planes[2].addr = ge2d_config_ex.src_planes[1].addr + (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[2].w = s_canvas_w/2;
++            ge2d_config_ex.src_planes[2].h = s_canvas_h/2;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            ge2d_config_ex.src_planes[1].addr = ge2d_config_ex.src_planes[0].addr + (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[1].w = s_canvas_w;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w*2;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config src_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++
++    if (CANVAS_ALLOC == output_buffer_info->memtype) {
++        if (is_rgb_output) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h)*5/4;
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++            ge2d_config_ex.dst_planes[2].addr = ge2d_config_ex.dst_planes[1].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w*2;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config dst_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++
++    ge2d_config_ex.alu_const_color = 0x00000000;
++    ge2d_config_ex.src1_gb_alpha = 0x00;
++    ret = ioctl(fd, GE2D_CONFIG_EX, &ge2d_config_ex);
++    if (ret < 0) {
++        E_GE2D("ge2d config ex ion failed. \n");
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
++{
++    int ret = -1;
++    struct config_para_ex_s ge2d_config_ex;
++    int src_format = 0xffffffff,src2_format = 0xffffffff,dst_format = 0xffffffff;
++    int s_canvas_w = 0;
++    int s_canvas_h = 0;
++    int s2_canvas_w = 0;
++    int s2_canvas_h = 0;
++    int d_canvas_w = 0;
++    int d_canvas_h = 0;
++    int is_rgb_input = -1;
++    int is_rgb_input2 = -1;
++    int is_rgb_output = -1;
++    int bpp = 0;
++    buffer_info_t* input_buffer_info = &pge2dinfo->src_info[0];
++    buffer_info_t* input2_buffer_info = &pge2dinfo->src_info[1];
++    buffer_info_t* output_buffer_info = &pge2dinfo->dst_info;
++    /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
++    if (is_need_swap_src2(input2_buffer_info->format)) {
++        input_buffer_info = &pge2dinfo->src_info[1];
++        input2_buffer_info = &pge2dinfo->src_info[0];
++        b_src_swap = 1;
++        D_GE2D("NOTE:src2 not support nv21/nv12, swap src1 and src2!\n");
++    }
++    else
++        b_src_swap = 0;
++
++    memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_s ));
++
++    if (CANVAS_ALLOC == input_buffer_info->memtype) {
++        is_rgb_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
++        src_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == src_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
++    }
++    if ((CANVAS_ALLOC == input2_buffer_info->memtype)) {
++        is_rgb_input2 = pixel_to_ge2d_format(input2_buffer_info->format,&src2_format,&bpp);
++        src2_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == src2_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,input2_buffer_info->canvas_w,input2_buffer_info->canvas_h,&s2_canvas_w,&s2_canvas_h);
++    }
++
++    if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
++        is_rgb_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
++        dst_format |= GE2D_LITTLE_ENDIAN;
++        if ((int)0xffffffff == dst_format) {
++            E_GE2D("can't get proper ge2d format\n" );
++            return ge2d_fail;
++        }
++        ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
++
++    }
++    D_GE2D("ge2d_blit_config_ex,memtype=%x,src_format=%x,s_canvas_w=%d,s_canvas_h=%d,rotation=%d\n",
++        input_buffer_info->memtype,src_format,s_canvas_w,s_canvas_h,input_buffer_info->rotation);
++
++    D_GE2D("ge2d_blit_config_ex,memtype=%x,src2_format=%x,s2_canvas_w=%d,s2_canvas_h=%d,rotation=%d\n",
++        input2_buffer_info->memtype,src2_format,s2_canvas_w,s2_canvas_h,input2_buffer_info->rotation);
++
++    D_GE2D("ge2d_blit_config_ex,memtype=%x,dst_format=%x,d_canvas_w=%d,d_canvas_h=%d,rotation=%d\n",
++        output_buffer_info->memtype,dst_format,d_canvas_w,d_canvas_h,output_buffer_info->rotation);
++
++    ge2d_config_ex.src_para.mem_type = input_buffer_info->memtype;
++    ge2d_config_ex.src_para.format = src_format;
++    ge2d_config_ex.src_para.left = input_buffer_info->rect.x;
++    ge2d_config_ex.src_para.top = input_buffer_info->rect.y;
++    ge2d_config_ex.src_para.width = input_buffer_info->rect.w;
++    ge2d_config_ex.src_para.height = input_buffer_info->rect.h;
++
++    ge2d_config_ex.src2_para.mem_type = input2_buffer_info->memtype;
++    ge2d_config_ex.src2_para.format = src2_format;
++    ge2d_config_ex.src2_para.left = input2_buffer_info->rect.x;
++    ge2d_config_ex.src2_para.top = input2_buffer_info->rect.y;
++    ge2d_config_ex.src2_para.width = input2_buffer_info->rect.w;
++    ge2d_config_ex.src2_para.height = input2_buffer_info->rect.h;
++
++    ge2d_config_ex.dst_para.mem_type = output_buffer_info->memtype;
++    ge2d_config_ex.dst_para.format = dst_format;
++    ge2d_config_ex.dst_para.left = 0;
++    ge2d_config_ex.dst_para.top = 0;
++    ge2d_config_ex.dst_para.width = d_canvas_w;
++    ge2d_config_ex.dst_para.height = d_canvas_h;
++    switch (pge2dinfo->src_info[0].rotation) {
++        case GE2D_ROTATION_0:
++            break;
++        case GE2D_ROTATION_90:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_180:
++            ge2d_config_ex.src_para.x_rev = 1;
++            ge2d_config_ex.src_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_270:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src_para.x_rev = 1;
++            break;
++        default:
++            break;
++    }
++
++    switch (pge2dinfo->src_info[1].rotation) {
++        case GE2D_ROTATION_0:
++            break;
++        case GE2D_ROTATION_90:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src2_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_180:
++            ge2d_config_ex.src2_para.x_rev = 1;
++            ge2d_config_ex.src2_para.y_rev = 1;
++            break;
++        case GE2D_ROTATION_270:
++            ge2d_config_ex.dst_xy_swap = 1;
++            ge2d_config_ex.src2_para.x_rev = 1;
++            break;
++        default:
++            break;
++    }
++
++    switch (pge2dinfo->dst_info.rotation) {
++         case GE2D_ROTATION_0:
++             break;
++         case GE2D_ROTATION_90:
++             ge2d_config_ex.dst_xy_swap = 1;
++             ge2d_config_ex.dst_para.x_rev = 1;
++             break;
++         case GE2D_ROTATION_180:
++             ge2d_config_ex.dst_para.x_rev = 1;
++             ge2d_config_ex.dst_para.y_rev = 1;
++             break;
++         case GE2D_ROTATION_270:
++             ge2d_config_ex.dst_xy_swap = 1;
++             ge2d_config_ex.dst_para.y_rev = 1;
++             break;
++         default:
++             break;
++    }
++
++    if (CANVAS_ALLOC == input_buffer_info->memtype) {
++        if (is_rgb_input) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            ge2d_config_ex.src_planes[1].addr = ge2d_config_ex.src_planes[0].addr + (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[1].w = s_canvas_w;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.src_planes[1].addr = ge2d_config_ex.src_planes[0].addr + (s_canvas_w * s_canvas_h)*5/4;
++            ge2d_config_ex.src_planes[1].w = s_canvas_w/2;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
++            ge2d_config_ex.src_planes[2].addr = ge2d_config_ex.src_planes[1].addr + (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[2].w = s_canvas_w/2;
++            ge2d_config_ex.src_planes[2].h = s_canvas_h/2;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++            ge2d_config_ex.src_planes[1].addr = (s_canvas_w * s_canvas_h);
++            ge2d_config_ex.src_planes[1].w = s_canvas_w;
++            ge2d_config_ex.src_planes[1].h = s_canvas_h;
++        } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.src_planes[0].addr = input_buffer_info->vaddr;
++            ge2d_config_ex.src_planes[0].w = s_canvas_w*2;
++            ge2d_config_ex.src_planes[0].h = s_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config src_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++
++
++    if (CANVAS_ALLOC == input2_buffer_info->memtype) {
++        if (is_rgb_input2) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++        } else if (input2_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++            ge2d_config_ex.src2_planes[1].addr = ge2d_config_ex.src2_planes[0].addr + (s2_canvas_w * s2_canvas_h);
++            ge2d_config_ex.src2_planes[1].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[1].h = s2_canvas_h/2;
++        } else if (input2_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++        } else if (input2_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.src2_planes[1].addr = ge2d_config_ex.src2_planes[0].addr + (s2_canvas_w * s2_canvas_h)*5/4;
++            ge2d_config_ex.src2_planes[1].w = s2_canvas_w/2;
++            ge2d_config_ex.src2_planes[1].h = s2_canvas_h/2;
++            ge2d_config_ex.src2_planes[2].addr = ge2d_config_ex.src2_planes[1].addr + (s2_canvas_w * s2_canvas_h);
++            ge2d_config_ex.src2_planes[2].w = s2_canvas_w/2;
++            ge2d_config_ex.src2_planes[2].h = s2_canvas_h/2;
++        } else if (input2_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++            ge2d_config_ex.src2_planes[1].addr = ge2d_config_ex.src2_planes[0].addr + (s2_canvas_w * s2_canvas_h);
++            ge2d_config_ex.src2_planes[1].w = s2_canvas_w;
++            ge2d_config_ex.src2_planes[1].h = s2_canvas_h;
++        } else if (input2_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->vaddr;
++            ge2d_config_ex.src2_planes[0].w = s2_canvas_w*2;
++            ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config src2_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++
++    if (CANVAS_ALLOC == output_buffer_info->memtype) {
++        if (is_rgb_output) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCrCb_420_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++        }  else if (output_buffer_info->format == PIXEL_FORMAT_Y8) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YV12) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            /* android is ycrcb,kernel is ycbcr,swap the addr */
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h)*5/4;
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
++            ge2d_config_ex.dst_planes[2].addr = ge2d_config_ex.dst_planes[1].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
++            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++            ge2d_config_ex.dst_planes[1].addr = ge2d_config_ex.dst_planes[0].addr + (d_canvas_w * d_canvas_h);
++            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
++            ge2d_config_ex.dst_planes[1].h = d_canvas_h;
++        } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_I) {
++            ge2d_config_ex.dst_planes[0].addr = output_buffer_info->vaddr;
++            ge2d_config_ex.dst_planes[0].w = d_canvas_w*2;
++            ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++        }
++        else {
++            E_GE2D("format is not match, should config dst_planes correct.\n");
++            return ge2d_fail;
++        }
++    }
++    ge2d_config_ex.alu_const_color = 0x00000000;
++    ge2d_config_ex.src1_gb_alpha = 0x00;
++    ret = ioctl(fd, GE2D_CONFIG_EX, &ge2d_config_ex);
++    if (ret < 0) {
++        E_GE2D("ge2d config ex ion failed. \n");
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++static int ge2d_fillrectangle(int fd,rectangle_t *rect,unsigned int color)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    memset(&op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++    D_GE2D("ge2d_fillrectangle:rect x is %d, y is %d, w is %d, h is %d\n",
++        rect->x, rect->y, rect->w, rect->h);
++    D_GE2D("color is %d\n", color);
++
++    op_ge2d_info.src1_rect.x = rect->x;
++    op_ge2d_info.src1_rect.y = rect->y;
++    op_ge2d_info.src1_rect.w = rect->w;
++    op_ge2d_info.src1_rect.h = rect->h;
++
++    op_ge2d_info.dst_rect.x = rect->x;
++    op_ge2d_info.dst_rect.y = rect->y;
++    op_ge2d_info.dst_rect.w = rect->w;
++    op_ge2d_info.dst_rect.h = rect->h;
++    op_ge2d_info.color = color;
++
++    ret = ioctl(fd, GE2D_FILLRECTANGLE, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++
++static int ge2d_blit(int fd,rectangle_t *rect,unsigned int dx,unsigned int dy)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    memset(&op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++    D_GE2D("ge2d_blit:rect x is %d, y is %d, w is %d, h is %d\n",
++        rect->x, rect->y, rect->w, rect->h);
++    D_GE2D("dx is %d, dy is %d\n", dx, dy);
++
++    op_ge2d_info.src1_rect.x = rect->x;
++    op_ge2d_info.src1_rect.y = rect->y;
++    op_ge2d_info.src1_rect.w = rect->w;
++    op_ge2d_info.src1_rect.h = rect->h;
++
++    op_ge2d_info.dst_rect.x = dx;
++    op_ge2d_info.dst_rect.y = dy;
++    op_ge2d_info.dst_rect.w = rect->w;
++    op_ge2d_info.dst_rect.h = rect->h;
++
++    ret = ioctl(fd, GE2D_BLIT, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++static int ge2d_blit_noalpha(int fd,rectangle_t *rect,unsigned int dx,unsigned int dy)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    memset(&op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++    D_GE2D("ge2d_blit_noalpha:rect x is %d, y is %d, w is %d, h is %d\n",
++        rect->x, rect->y, rect->w, rect->h);
++
++    D_GE2D("dx is %d, dy is %d\n", dx, dy);
++
++    op_ge2d_info.src1_rect.x = rect->x;
++    op_ge2d_info.src1_rect.y = rect->y;
++    op_ge2d_info.src1_rect.w = rect->w;
++    op_ge2d_info.src1_rect.h = rect->h;
++
++    op_ge2d_info.dst_rect.x = dx;
++    op_ge2d_info.dst_rect.y = dy;
++    op_ge2d_info.dst_rect.w = rect->w;
++    op_ge2d_info.dst_rect.h = rect->h;
++
++    ret = ioctl(fd, GE2D_BLIT_NOALPHA, &op_ge2d_info);
++    if ( ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++static int ge2d_strechblit(int fd,rectangle_t *srect,rectangle_t *drect)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    memset(&op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++    D_GE2D("stretchblit srect[%d %d %d %d] drect[%d %d %d %d]\n",
++        srect->x,srect->y,srect->w,srect->h,drect->x,drect->y,drect->w,drect->h);
++
++    op_ge2d_info.src1_rect.x = srect->x;
++    op_ge2d_info.src1_rect.y = srect->y;
++    op_ge2d_info.src1_rect.w = srect->w;
++    op_ge2d_info.src1_rect.h = srect->h;
++
++    op_ge2d_info.dst_rect.x = drect->x;
++    op_ge2d_info.dst_rect.y = drect->y;
++    op_ge2d_info.dst_rect.w = drect->w;
++    op_ge2d_info.dst_rect.h = drect->h;
++
++    ret = ioctl(fd, GE2D_STRETCHBLIT, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++static int ge2d_strechblit_noalpha(int fd,rectangle_t *srect,rectangle_t *drect)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    memset(&op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++    D_GE2D("stretchblit srect[%d %d %d %d] drect[%d %d %d %d]\n",
++        srect->x,srect->y,srect->w,srect->h,drect->x,drect->y,drect->w,drect->h);
++
++    op_ge2d_info.src1_rect.x = srect->x;
++    op_ge2d_info.src1_rect.y = srect->y;
++    op_ge2d_info.src1_rect.w = srect->w;
++    op_ge2d_info.src1_rect.h = srect->h;
++
++    op_ge2d_info.dst_rect.x = drect->x;
++    op_ge2d_info.dst_rect.y = drect->y;
++    op_ge2d_info.dst_rect.w = drect->w;
++    op_ge2d_info.dst_rect.h = drect->h;
++
++    ret = ioctl(fd, GE2D_STRETCHBLIT_NOALPHA, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t *drect, unsigned int op)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    ge2d_blend_op blend_op;
++    int max_d_w, max_d_h;
++    D_GE2D("ge2d_blend srect[%d %d %d %d], s2rect[%d %d %d %d],drect[%d %d %d %d]\n",
++        srect->x,srect->y,srect->w,srect->h,
++        srect2->x,srect2->y,srect2->w,srect2->h,
++        drect->x,drect->y,drect->w,drect->h);
++    memset(&blend_op,0,sizeof(ge2d_blend_op));
++    max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
++    max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
++    if ((drect->w > max_d_w) || (drect->h > max_d_h)) {
++        /* dst rect must be min(srect,srect2),otherwise ge2d will timeout */
++        E_GE2D("dst rect w=%d,h=%d out of range\n",drect->w,drect->h);
++        return ge2d_fail;
++    }
++
++    op_ge2d_info.src1_rect.x = srect->x;
++    op_ge2d_info.src1_rect.y = srect->y;
++    op_ge2d_info.src1_rect.w = srect->w;
++    op_ge2d_info.src1_rect.h = srect->h;
++
++    op_ge2d_info.src2_rect.x = srect2->x;
++    op_ge2d_info.src2_rect.y = srect2->y;
++    op_ge2d_info.src2_rect.w = srect2->w;
++    op_ge2d_info.src2_rect.h = srect2->h;
++
++    op_ge2d_info.dst_rect.x = drect->x;
++    op_ge2d_info.dst_rect.y = drect->y;
++    op_ge2d_info.dst_rect.w = drect->w;
++    op_ge2d_info.dst_rect.h = drect->h;
++
++    blend_op.color_blending_mode = OPERATION_ADD;
++    blend_op.alpha_blending_mode = OPERATION_ADD;
++    /* b_src_swap = 1:src1 & src2 swap, so blend factor used dst instead src */
++    switch (op) {
++        case BLEND_MODE_NONE:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ZERO;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ZERO;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ZERO;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ZERO;
++            }
++            break;
++        case BLEND_MODE_PREMULTIPLIED:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++            }
++            break;
++        case BLEND_MODE_COVERAGE:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.color_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
++                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_SRC_ALPHA;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_SRC_ALPHA;
++                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
++            }
++            break;
++        case BLEND_MODE_INVALID:
++            return ge2d_fail;
++    }
++
++    op_ge2d_info.op = blendop(
++            blend_op.color_blending_mode,
++            blend_op.color_blending_src_factor,
++            blend_op.color_blending_dst_factor,
++            blend_op.alpha_blending_mode,
++            blend_op.alpha_blending_src_factor,
++            blend_op.alpha_blending_dst_factor);
++
++    D_GE2D("ge2d_blend op_ge2d_info.op=%x\n",op_ge2d_info.op);
++    ret = ioctl(fd, GE2D_BLEND, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++static int ge2d_blend_noalpha(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t *drect, unsigned int op)
++{
++    int ret;
++    ge2d_op_para_t op_ge2d_info;
++    ge2d_blend_op blend_op;
++    int max_d_w, max_d_h;
++
++    D_GE2D("ge2d_blend srect[%d %d %d %d], s2rect[%d %d %d %d],drect[%d %d %d %d]\n",
++        srect->x,srect->y,srect->w,srect->h,
++        srect2->x,srect2->y,srect2->w,srect2->h,
++        drect->x,drect->y,drect->w,drect->h);
++    memset(&blend_op,0,sizeof(ge2d_blend_op));
++    max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
++    max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
++    if ((drect->w > max_d_w) || (drect->h > max_d_h)) {
++        /* dst rect must be min(srect,srect2),otherwise ge2d will timeout */
++        E_GE2D("dst rect w=%d,h=%d out of range\n",drect->w,drect->h);
++        return ge2d_fail;
++    }
++
++    op_ge2d_info.src1_rect.x = srect->x;
++    op_ge2d_info.src1_rect.y = srect->y;
++    op_ge2d_info.src1_rect.w = srect->w;
++    op_ge2d_info.src1_rect.h = srect->h;
++
++    op_ge2d_info.src2_rect.x = srect2->x;
++    op_ge2d_info.src2_rect.y = srect2->y;
++    op_ge2d_info.src2_rect.w = srect2->w;
++    op_ge2d_info.src2_rect.h = srect2->h;
++
++    op_ge2d_info.dst_rect.x = drect->x;
++    op_ge2d_info.dst_rect.y = drect->y;
++    op_ge2d_info.dst_rect.w = drect->w;
++    op_ge2d_info.dst_rect.h = drect->h;
++
++    blend_op.color_blending_mode = OPERATION_ADD;
++    blend_op.alpha_blending_mode = OPERATION_ADD;
++    /* b_src_swap = 1:src1 & src2 swap, so blend factor used dst instead src */
++    switch (op) {
++        case BLEND_MODE_NONE:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ZERO;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ZERO;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ZERO;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ZERO;
++            }
++            break;
++        case BLEND_MODE_PREMULTIPLIED:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
++                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++            }
++            break;
++        case BLEND_MODE_COVERAGE:
++            if (b_src_swap) {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
++                blend_op.color_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
++                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
++            }
++            else {
++                blend_op.color_blending_src_factor = COLOR_FACTOR_SRC_ALPHA;
++                blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
++                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_SRC_ALPHA;
++                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
++            }
++            break;
++        case BLEND_MODE_INVALID:
++            return ge2d_fail;
++    }
++
++
++    op_ge2d_info.op = blendop(
++            blend_op.color_blending_mode,
++            blend_op.color_blending_src_factor,
++            blend_op.color_blending_dst_factor,
++            blend_op.alpha_blending_mode,
++            blend_op.alpha_blending_src_factor,
++            blend_op.alpha_blending_dst_factor);
++
++    D_GE2D("ge2d_blend op_ge2d_info.op=%x\n",op_ge2d_info.op);
++    ret = ioctl(fd, GE2D_BLEND_NOALPHA, &op_ge2d_info);
++    if (ret != 0) {
++        E_GE2D("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++        return ge2d_fail;
++    }
++    return ge2d_success;
++}
++
++
++
++int ge2d_open(void)
++{
++    int fd = -1;
++    fd = open(FILE_NAME_GE2D, O_RDWR);
++    if (fd < 0) {
++        E_GE2D("open %s failed!error no %d\n",FILE_NAME_GE2D,errno);
++    }
++    return fd;
++}
++
++
++
++int ge2d_close(int fd)
++{
++    int ret = -1;
++    ret = close(fd);
++    if (ret < 0)
++        return -errno;
++    return ret;
++}
++
++int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
++{
++    rectangle_t src_rect[2];
++    rectangle_t dst_rect;
++    int dx = 0, dy = 0;
++    int ret = -1;
++
++    if (!pge2dinfo) {
++        E_GE2D("pge2dinfo is NULL!\n");
++        return ge2d_fail;
++    }
++
++    switch (pge2dinfo->ge2d_op) {
++        case AML_GE2D_FILLRECTANGLE:
++            dst_rect.w = pge2dinfo->dst_info.rect.w;
++            dst_rect.h = pge2dinfo->dst_info.rect.h;
++            dst_rect.x =  pge2dinfo->dst_info.rect.x;
++            dst_rect.y = pge2dinfo->offset + pge2dinfo->dst_info.rect.y;
++            ret = ge2d_fillrectangle_config_ex(fd,pge2dinfo);
++            if (ret == ge2d_success)
++                ge2d_fillrectangle(fd,&dst_rect,pge2dinfo->color);
++            break;
++        case AML_GE2D_BLIT:
++            if (!is_rect_valid(&pge2dinfo->src_info[0]))
++                return ge2d_fail;
++            if (!is_rect_valid(&pge2dinfo->dst_info))
++                return ge2d_fail;
++
++            dx = pge2dinfo->dst_info.rect.x;
++            dy = pge2dinfo->offset + pge2dinfo->dst_info.rect.y;
++            ret = ge2d_blit_config_ex(fd,pge2dinfo);
++            if (ret == ge2d_success) {
++                if (is_no_alpha(pge2dinfo->src_info[0].format))
++                    ge2d_blit_noalpha(fd,&pge2dinfo->src_info[0].rect,dx,dy);
++                else
++                    ge2d_blit(fd,&pge2dinfo->src_info[0].rect,dx,dy);
++            }
++            break;
++        case AML_GE2D_STRETCHBLIT:
++            if (!is_rect_valid(&pge2dinfo->src_info[0]))
++                return ge2d_fail;
++            if (!is_rect_valid(&pge2dinfo->dst_info))
++                return ge2d_fail;
++
++            dst_rect.w = pge2dinfo->dst_info.rect.w;
++            dst_rect.h = pge2dinfo->dst_info.rect.h;
++            dst_rect.x =  pge2dinfo->dst_info.rect.x;
++            dst_rect.y = pge2dinfo->offset + pge2dinfo->dst_info.rect.y;
++            ret = ge2d_blit_config_ex(fd,pge2dinfo);
++            if (ret == ge2d_success) {
++                if (is_no_alpha(pge2dinfo->src_info[0].format))
++                    ge2d_strechblit_noalpha(fd,&pge2dinfo->src_info[0].rect,&dst_rect);
++                else
++                    ge2d_strechblit(fd,&pge2dinfo->src_info[0].rect,&dst_rect);
++            }
++            break;
++        case AML_GE2D_BLEND:
++            if ((pge2dinfo->dst_info.memtype == CANVAS_OSD0) && (pge2dinfo->src_info[1].memtype == CANVAS_OSD0)) {
++                memcpy(&pge2dinfo->src_info[1],&pge2dinfo->dst_info,sizeof(buffer_info_t));
++                pge2dinfo->src_info[1].rect.y = pge2dinfo->offset + pge2dinfo->src_info[1].rect.y;
++            }
++            if (!is_rect_valid(&pge2dinfo->src_info[0]))
++                return ge2d_fail;
++            if (!is_rect_valid(&pge2dinfo->src_info[1]))
++                return ge2d_fail;
++            if (!is_rect_valid(&pge2dinfo->dst_info))
++                return ge2d_fail;
++
++            dst_rect.w = pge2dinfo->dst_info.rect.w;
++            dst_rect.h = pge2dinfo->dst_info.rect.h;
++            dst_rect.x =  pge2dinfo->dst_info.rect.x;
++            dst_rect.y = pge2dinfo->offset + pge2dinfo->dst_info.rect.y;
++            ret = ge2d_blend_config_ex(fd,pge2dinfo);
++            if (ret == ge2d_success) {
++                if ((is_no_alpha(pge2dinfo->src_info[0].format)) || (is_no_alpha(pge2dinfo->src_info[1].format))) {
++                    if (b_src_swap)
++                        ge2d_blend_noalpha(fd,&(pge2dinfo->src_info[1].rect),
++                            &(pge2dinfo->src_info[0].rect),
++                            &dst_rect,pge2dinfo->blend_mode);
++                    else
++                        ge2d_blend_noalpha(fd,&(pge2dinfo->src_info[0].rect),
++                            &(pge2dinfo->src_info[1].rect),
++                            &dst_rect,pge2dinfo->blend_mode);
++                }
++                else {
++                    if (b_src_swap)
++                        ge2d_blend(fd,&(pge2dinfo->src_info[1].rect),
++                            &(pge2dinfo->src_info[0].rect),
++                            &dst_rect,pge2dinfo->blend_mode);
++                    else
++                        ge2d_blend(fd,&(pge2dinfo->src_info[0].rect),
++                            &(pge2dinfo->src_info[1].rect),
++                            &dst_rect,pge2dinfo->blend_mode);
++                }
++            }
++            break;
++        default:
++            E_GE2D("ge2d(%d) opration not support!\n",pge2dinfo->ge2d_op);
++            return ge2d_fail;
++    }
++
++    return ge2d_success;
++}
++
++#if 0
++void set_Ge2dinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel)
++{
++    int fb_size = 0;
++    fb_size = xres * yres * bits_per_pixel;
++    gfx_fb.mem = mem;
++    gfx_fb.size = size;
++    gfx_fb.phys = phys;
++    gfx_fb.xres = xres;
++    gfx_fb.yres= yres;
++    gfx_fb.bits_per_pixel = bits_per_pixel;
++    printf("gfx_fb.mem=%x,size=%x,gfx_fb.phys=%x,xres=%d,yres=%d,bits_per_pixel=%d\n",
++        gfx_fb.mem,gfx_fb.size,gfx_fb.phys,gfx_fb.xres,gfx_fb.yres,gfx_fb.bits_per_pixel);
++}
++#endif
++
++static int ge2d_fd = -1;
++int ge2d_blend_Texture(aml_ge2d_info_t *pge2dinfo)
++{
++    if (ge2d_fd < 0)
++        ge2d_fd = ge2d_open();
++    pge2dinfo->offset = 0;
++    pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
++    pge2dinfo->ge2d_op = AML_GE2D_BLEND;
++    pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
++    pge2dinfo->src_info[1].memtype = GE2D_CANVAS_ALLOC;
++    pge2dinfo->dst_info.memtype = GE2D_CANVAS_ALLOC;
++    ge2d_process(ge2d_fd,pge2dinfo);
++}
++
++
++QT_END_NAMESPACE
++
+diff --git a/src/gui/painting/qdrawhelper_ge2d_p.h b/src/gui/painting/qdrawhelper_ge2d_p.h
+new file mode 100755
+index 0000000..e1c9fba
+--- /dev/null
++++ b/src/gui/painting/qdrawhelper_ge2d_p.h
+@@ -0,0 +1,59 @@
++/****************************************************************************
++**
++** Copyright (C) 2015 The Qt Company Ltd.
++** Contact: http://www.qt.io/licensing/
++**
++** This file is part of the QtGui module of the Qt Toolkit.
++**
++** $QT_BEGIN_LICENSE:LGPL21$
++** Commercial License Usage
++** Licensees holding valid commercial Qt licenses may use this file in
++** accordance with the commercial license agreement provided with the
++** Software or, alternatively, in accordance with the terms contained in
++** a written agreement between you and The Qt Company. For licensing terms
++** and conditions see http://www.qt.io/terms-conditions. For further
++** information use the contact form at http://www.qt.io/contact-us.
++**
++** GNU Lesser General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU Lesser
++** General Public License version 2.1 or version 3 as published by the Free
++** Software Foundation and appearing in the file LICENSE.LGPLv21 and
++** LICENSE.LGPLv3 included in the packaging of this file. Please review the
++** following information to ensure the GNU Lesser General Public License
++** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
++** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
++**
++** As a special exception, The Qt Company gives you certain additional
++** rights. These rights are described in The Qt Company LGPL Exception
++** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
++**
++** $QT_END_LICENSE$
++**
++****************************************************************************/
++
++#ifndef QDRAWHELPER_GE2D_P_H
++#define QDRAWHELPER_GE2D_P_H
++
++//
++//  W A R N I N G
++//  -------------
++//
++// This file is not part of the Qt API.  It exists purely as an
++// implementation detail.  This header file may change from version to
++// version without notice, or even be removed.
++//
++// We mean it.
++//
++
++//#include <private/qdrawhelper_p.h>
++
++QT_BEGIN_NAMESPACE
++
++
++int ge2d_blend_Texture(aml_ge2d_info_t *pge2dinfo);
++
++
++
++QT_END_NAMESPACE
++
++#endif // QDRAWHELPER_NEON_P_H
+diff --git a/src/platformsupport/fbconvenience/qfbscreen.cpp b/src/platformsupport/fbconvenience/qfbscreen.cpp
+index 216f272..77d1fd6 100644
+--- a/src/platformsupport/fbconvenience/qfbscreen.cpp
++++ b/src/platformsupport/fbconvenience/qfbscreen.cpp
+@@ -45,6 +45,7 @@
+ #include <QtGui/QPainter>
+ #include <QtCore/QCoreApplication>
+ #include <qpa/qwindowsysteminterface.h>
++#include <qimage.h>
+
+ #include <QtCore/QDebug>
+ #include <QtCore/QElapsedTimer>
+@@ -67,6 +68,12 @@ void QFbScreen::initializeCompositor()
+     scheduleUpdate();
+ }
+
++void QFbScreen::initializeCompositor(uchar *mem, int mBytesPerLine)
++{
++    mScreenImage = new QImage((uchar*)(mem + mGeometry.height()* mBytesPerLine), mGeometry.width(), mGeometry.height(), mBytesPerLine, mFormat);
++    scheduleUpdate();
++}
++
+ bool QFbScreen::event(QEvent *event)
+ {
+     if (event->type() == QEvent::UpdateRequest) {
+diff --git a/src/platformsupport/fbconvenience/qfbscreen_p.h b/src/platformsupport/fbconvenience/qfbscreen_p.h
+index e9b570a..bb4ed6e 100644
+--- a/src/platformsupport/fbconvenience/qfbscreen_p.h
++++ b/src/platformsupport/fbconvenience/qfbscreen_p.h
+@@ -99,6 +99,7 @@ protected:
+     virtual QRegion doRedraw();
+
+     void initializeCompositor();
++    void initializeCompositor(uchar *mem, int mBytesPerLine);
+     bool event(QEvent *event) Q_DECL_OVERRIDE;
+
+     QFbWindow *windowForId(WId wid) const;
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbintegration.cpp b/src/plugins/platforms/linuxfb/qlinuxfbintegration.cpp
+index c1c2355..7c1a394 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbintegration.cpp
++++ b/src/plugins/platforms/linuxfb/qlinuxfbintegration.cpp
+@@ -167,4 +167,9 @@ QPlatformNativeInterface *QLinuxFbIntegration::nativeInterface() const
+     return m_nativeInterface.data();
+ }
+
++unsigned long QLinuxFbIntegration::get_phy_info(unsigned long mem)
++{
++    return m_primaryScreen->getfbinfo(mem);
++}
++
+ QT_END_NAMESPACE
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbintegration.h b/src/plugins/platforms/linuxfb/qlinuxfbintegration.h
+index e48a1ba..7fcfeda 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbintegration.h
++++ b/src/plugins/platforms/linuxfb/qlinuxfbintegration.h
+@@ -70,6 +70,7 @@ public:
+     QPlatformNativeInterface *nativeInterface() const Q_DECL_OVERRIDE;
+
+     QList<QPlatformScreen *> screens() const;
++    unsigned long get_phy_info(unsigned long mem);
+
+ private:
+     void createInputHandlers();
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp b/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
+index 246c959..dd7f3a3 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
++++ b/src/plugins/platforms/linuxfb/qlinuxfbscreen.cpp
+@@ -387,7 +387,10 @@ bool QLinuxFbScreen::initialize()
+     mMmap.offset = geometry.y() * mBytesPerLine + geometry.x() * mDepth / 8;
+     mMmap.data = data + mMmap.offset;
+
+-    QFbScreen::initializeCompositor();
++    QFbScreen::initializeCompositor(mMmap.data,mBytesPerLine);
++    setfbinfo(mMmap.data,mMmap.size, finfo.smem_start + mMmap.offset,
++        vinfo.xres, vinfo.yres,vinfo.bits_per_pixel);
++
+     mFbScreenImage = QImage(mMmap.data, geometry.width(), geometry.height(), mBytesPerLine, mFormat);
+
+     mCursor = new QFbCursor(this);
+@@ -402,6 +405,25 @@ bool QLinuxFbScreen::initialize()
+     return true;
+ }
+
++void QLinuxFbScreen::setfbinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel)
++{
++    gfx_fb.mem = mem;
++    gfx_fb.size = size;
++    gfx_fb.phys = phys;
++    gfx_fb.xres = xres;
++    gfx_fb.yres= yres;
++    gfx_fb.bits_per_pixel = bits_per_pixel;
++}
++
++unsigned long QLinuxFbScreen::getfbinfo(unsigned long mem)
++{
++    unsigned long phys = 0;
++    unsigned long vir_mem_base = (unsigned long)gfx_fb.mem;
++    if ((mem >= vir_mem_base) && (mem - vir_mem_base) <= gfx_fb.size)
++        phys = gfx_fb.phys + (mem - vir_mem_base);
++    return phys;
++}
++
+ QRegion QLinuxFbScreen::doRedraw()
+ {
+     QRegion touched = QFbScreen::doRedraw();
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbscreen.h b/src/plugins/platforms/linuxfb/qlinuxfbscreen.h
+index c7ce455..d94f558 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbscreen.h
++++ b/src/plugins/platforms/linuxfb/qlinuxfbscreen.h
+@@ -56,11 +56,14 @@ public:
+ 
+     bool initialize() override;
+ 
++    unsigned long getfbinfo(unsigned long mem);
++
+     QPixmap grabWindow(WId wid, int x, int y, int width, int height) const override;
+ 
+     QRegion doRedraw() override;
+ 
+ private:
++    void setfbinfo(void *mem, int size, unsigned long phys, unsigned int xres, unsigned int yres, unsigned int bits_per_pixel);
+     QStringList mArgs;
+     int mFbFd;
+     int mTtyFd;
+@@ -74,6 +77,15 @@ private:
+         int offset, size;
+     } mMmap;
+ 
++    struct {
++        void            *mem;
++        int             size;
++        unsigned int    xres;
++        unsigned int    yres;
++        unsigned int    bits_per_pixel;
++        unsigned long   phys;
++    } gfx_fb;
++
+     QPainter *mBlitter;
+ };

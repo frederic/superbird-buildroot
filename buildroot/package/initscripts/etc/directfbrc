@@ -1,0 +1,14 @@
+#
+system        = fbdev
+fbdev         = /dev/fb0
+mode = 1920x1080
+depth = 32
+pixelformat = ARGB
+#no-hardware
+hardware
+#accelerator=49
+# Disable Cursor
+#no-cursor
+#debug
+#desktop-buffer-mode=backsystem
+

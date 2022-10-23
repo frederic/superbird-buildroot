@@ -1,0 +1,58 @@
+From 45421eaeaee4b0f6ffb7c355df381de8d6e94dfd Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Tue, 20 Aug 2019 14:38:49 -0700
+Subject: [PATCH] build break fix
+
+---
+ 0001-build-break-fix.patch             | 25 +++++++++++++++++++++++++
+ v4l2/westeros-sink/westeros-sink-soc.h |  2 +-
+ 2 files changed, 26 insertions(+), 1 deletion(-)
+ create mode 100644 0001-build-break-fix.patch
+
+diff --git a/0001-build-break-fix.patch b/0001-build-break-fix.patch
+new file mode 100644
+index 0000000..7f18e48
+--- /dev/null
++++ b/0001-build-break-fix.patch
+@@ -0,0 +1,25 @@
++From 9b8328b3a3323ce2233b58ca3785f5f20454cb3e Mon Sep 17 00:00:00 2001
++From: Pradeep Sriram <pradeep.sriram@amlogic.com>
++Date: Tue, 20 Aug 2019 14:38:49 -0700
++Subject: [PATCH] build break fix
++
++---
++ v4l2/westeros-sink/westeros-sink-soc.h | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/v4l2/westeros-sink/westeros-sink-soc.h b/v4l2/westeros-sink/westeros-sink-soc.h
++index 20afc55..7eaaf8a 100644
++--- a/v4l2/westeros-sink/westeros-sink-soc.h
+++++ b/v4l2/westeros-sink/westeros-sink-soc.h
++@@ -24,7 +24,7 @@
++ #include <sys/socket.h>
++ #include <sys/un.h>
++ #include <linux/videodev2.h>
++-#include <drm/drm_fourcc.h>
+++#include <drm_fourcc.h>
++ 
++ #include "simplebuffer-client-protocol.h"
++ 
++-- 
++2.7.4
++
+diff --git a/v4l2/westeros-sink/westeros-sink-soc.h b/v4l2/westeros-sink/westeros-sink-soc.h
+index 20afc55..c42f7d5 100644
+--- a/v4l2/westeros-sink/westeros-sink-soc.h
++++ b/v4l2/westeros-sink/westeros-sink-soc.h
+@@ -24,7 +24,7 @@
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <linux/videodev2.h>
+-#include <drm/drm_fourcc.h>
++#include <libdrm/drm_fourcc.h>
+ 
+ #include "simplebuffer-client-protocol.h"
+ 
+-- 
+2.7.4
+

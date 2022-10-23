@@ -13,6 +13,7 @@ case "$1" in
 		start-stop-daemon -K -q -x /usr/sbin/dnsmasq
 		[ $? = 0 ] && echo "OK" || echo "FAIL"
 		;;
+        netready|netup|netdown|netchange) ;;
 	restart|reload)
 		$0 stop
 		$0 start

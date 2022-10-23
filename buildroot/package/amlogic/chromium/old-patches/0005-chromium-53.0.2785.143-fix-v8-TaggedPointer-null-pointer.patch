@@ -1,0 +1,26 @@
+diff --git a/src/v8/src/compiler/access-info.cc b/src/v8/src/compiler/access-info.cc
+old mode 100644
+new mode 100755
+index 768b985..7f3f858
+--- a/src/v8/src/compiler/access-info.cc
++++ b/src/v8/src/compiler/access-info.cc
+@@ -274,6 +274,9 @@ bool AccessInfoFactory::ComputePropertyAccessInfo(
+         } else if (field_representation.IsHeapObject()) {
+           // Extract the field type from the property details (make sure its
+           // representation is TaggedPointer to reflect the heap object case).
++          if (descriptors->GetFieldType(number) == NULL)
++            return false;
++
+           field_type = Type::Intersect(
+               descriptors->GetFieldType(number)->Convert(zone()),
+               Type::TaggedPointer(), zone());
+@@ -429,6 +432,9 @@ bool AccessInfoFactory::LookupTransition(Handle<Map> map, Handle<Name> name,
+     } else if (field_representation.IsHeapObject()) {
+       // Extract the field type from the property details (make sure its
+       // representation is TaggedPointer to reflect the heap object case).
++      if (transition_map->instance_descriptors()->GetFieldType(number) == NULL)
++        return false;
++
+       field_type = Type::Intersect(
+           transition_map->instance_descriptors()->GetFieldType(number)->Convert(
+               zone()),

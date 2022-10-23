@@ -1,0 +1,73 @@
+Index: efl-1.17.2/src/lib/ector/gl/Ector_GL.h
+===================================================================
+--- efl-1.17.2.orig/src/lib/ector/gl/Ector_GL.h	2016-03-25 08:23:31.000000000 +0800
++++ efl-1.17.2/src/lib/ector/gl/Ector_GL.h	2016-09-22 17:31:26.353793805 +0800
+@@ -12,8 +12,10 @@
+ 
+ #endif
+ 
+-typedef unsigned int GLuint;
+-typedef short        GLshort;
++#define GLuint unsigned int
++#define GLshort short
++//typedef unsigned int GLuint;
++//typedef short        GLshort;
+ 
+ #include "gl/ector_gl_buffer_base.eo.h"
+ #include "gl/ector_gl_buffer.eo.h"
+Index: efl-1.17.2/src/lib/ector/ector_gl_internal.h
+===================================================================
+--- efl-1.17.2.orig/src/lib/ector/ector_gl_internal.h	2016-03-25 08:23:31.000000000 +0800
++++ efl-1.17.2/src/lib/ector/ector_gl_internal.h	2016-09-22 17:31:05.617793416 +0800
+@@ -769,21 +769,36 @@
+ typedef ptrdiff_t GLintptr;     // Changed khronos_intptr_t
+ typedef ptrdiff_t GLsizeiptr;   // Changed khronos_ssize_t
+ 
+-typedef void             GLvoid;
+-typedef char             GLchar;
+-typedef unsigned int     GLenum;
+-typedef unsigned char    GLboolean;
+-typedef unsigned int     GLbitfield;
+-typedef signed char      GLbyte;       // Changed khronos_int8_t
+-typedef short            GLshort;
+-typedef int              GLint;
+-typedef int              GLsizei;
+-typedef unsigned char    GLubyte;      // Changed khronos_uint8_t
+-typedef unsigned short   GLushort;
+-typedef unsigned int     GLuint;
+-typedef float            GLfloat;      // Changed khronos_float_t
+-typedef float            GLclampf;     // Changed khronos_float_t
+-typedef signed int       GLfixed;      // Changed khronos_int32_t
++//typedef void             GLvoid;
++//typedef char             GLchar;
++//typedef unsigned int     GLenum;
++//typedef unsigned char    GLboolean;
++//typedef unsigned int     GLbitfield;
++//typedef signed char      GLbyte;       // Changed khronos_int8_t
++//typedef short            GLshort;
++//typedef int              GLint;
++//typedef int              GLsizei;
++//typedef unsigned char    GLubyte;      // Changed khronos_uint8_t
++//typedef unsigned short   GLushort;
++//typedef unsigned int     GLuint;
++//typedef float            GLfloat;      // Changed khronos_float_t
++//typedef float            GLclampf;     // Changed khronos_float_t
++//typedef signed int       GLfixed;      // Changed khronos_int32_t
++#define GLvoid void
++#define GLchar char
++#define GLenum unsigned int
++#define GLboolean unsigned char
++#define GLbitfield unsigned int
++#define GLbyte signed char
++#define GLshort short
++#define GLint int
++#define GLsizei int
++#define GLubyte unsigned char
++#define GLushort unsigned short
++#define GLuint unsigned int
++#define GLfloat float
++#define GLclampf float
++#define GLfixed signed int
+ 
+ struct _Ector_GL_API {
+    // Struct is same as Evas_GL_API version 1 without extensions

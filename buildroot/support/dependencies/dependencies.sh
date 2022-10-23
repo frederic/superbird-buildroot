@@ -17,6 +17,7 @@ case ":${LD_LIBRARY_PATH:-unset}:" in
 	echo
 	echo "You seem to have the current working directory in your"
 	echo "LD_LIBRARY_PATH environment variable. This doesn't work."
+	echo "Your current LD_LIBRARY_PATH is: ==${LD_LIBRARY_PATH}=="
 	exit 1
 	;;
 esac
@@ -33,6 +34,7 @@ case ":${PATH:-unset}:" in
 	echo
 	echo "You seem to have the current working directory in your"
 	echo "PATH environment variable. This doesn't work."
+	echo "Your current PATH is: ==${PATH}=="
 	exit 1
 	;;
 (*"
@@ -40,6 +42,7 @@ case ":${PATH:-unset}:" in
 	# Break the '\n' sequence, or a \n is printed (which is not what we want).
 	printf "Your PATH contains a newline (%sn) character.\n" "\\"
 	printf "This doesn't work. Fix you PATH.\n"
+	echo "Your current PATH is: ==${PATH}=="
 	exit 1
 	;;
 esac

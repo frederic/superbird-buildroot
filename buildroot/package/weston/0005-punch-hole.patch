@@ -1,0 +1,26 @@
+Index: weston-6.0.0/libweston/gl-renderer.c
+===================================================================
+--- weston-6.0.0.orig/libweston/gl-renderer.c	2019-03-28 09:15:13.000000000 +0800
++++ weston-6.0.0/libweston/gl-renderer.c	2019-07-11 11:10:23.750342419 +0800
+@@ -970,7 +970,7 @@
+ 	if (ensure_surface_buffer_is_ready(gr, gs) < 0)
+ 		goto out;
+ 
+-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
++	glBlendFunc(GL_SRC_ALPHA, GL_SRC_ALPHA);
+ 
+ 	if (gr->fan_debug) {
+ 		use_shader(gr, &gr->solid_shader);
+Index: weston-6.0.0/libweston/pixel-formats.c
+===================================================================
+--- weston-6.0.0.orig/libweston/pixel-formats.c	2019-03-28 09:15:13.000000000 +0800
++++ weston-6.0.0/libweston/pixel-formats.c	2019-07-11 11:09:41.073290543 +0800
+@@ -165,7 +165,7 @@
+ 	},
+ 	{
+ 		DRM_FORMAT(ARGB8888),
+-		.opaque_substitute = DRM_FORMAT_XRGB8888,
++		//.opaque_substitute = DRM_FORMAT_XRGB8888,
+ 		.depth = 32,
+ 		.bpp = 32,
+ 		GL_FORMAT(GL_BGRA_EXT),

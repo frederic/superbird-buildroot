@@ -13,7 +13,9 @@
  * License or (at your optional) any later version of the license.
  */
 
+#ifndef CONFIG_AMLOGIC_MODIFY /* save print time */
 #define pr_fmt(fmt)	"OF: reserved mem: " fmt
+#endif
 
 #include <linux/err.h>
 #include <linux/of.h>
@@ -24,6 +26,11 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/sort.h>
 #include <linux/slab.h>
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <linux/kmemleak.h>
+#endif
+
 
 #define MAX_RESERVED_REGIONS	16
 static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
@@ -155,6 +162,25 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 			end = start + dt_mem_next_cell(dt_root_size_cells,
 						       &prop);
 
+		#ifdef CONFIG_AMLOGIC_MODIFY
+		#ifdef CONFIG_AMLOGIC_KASAN32
+			{
+				unsigned long lowmem_size;
+
+				/* fix for cma overlap 2 zone */
+				lowmem_size = KMEM_END - PAGE_OFFSET;
+				lowmem_size += CONFIG_PHYS_OFFSET;
+				if (start < lowmem_size && end > lowmem_size) {
+					end = lowmem_size - SZ_4M;
+				}
+			}
+		#endif
+		#ifdef CONFIG_PHYS_ADDR_T_64BIT
+			pr_info("%s, start:%pa, end:%pa, len:%ld MiB\n",
+				__func__, &start, &end,
+				(unsigned long)((end - start)/SZ_1M));
+		#endif
+		#endif /* CONFIG_AMLOGIC_MODIFY */
 			ret = early_init_dt_alloc_reserved_memory_arch(size,
 					align, start, end, nomap, &base);
 			if (ret == 0) {
@@ -175,7 +201,12 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 	}
 
 	if (base == 0) {
+	#ifdef CONFIG_AMLOGIC_MODIFY
+		pr_info("failed to allocate memory for node %s, size:%ld MB\n",
+			uname, (unsigned long)size / SZ_1M);
+	#else
 		pr_info("failed to allocate memory for node '%s'\n", uname);
+	#endif /* CONFIG_AMLOGIC_MODIFY */
 		return -ENOMEM;
 	}
 
@@ -204,8 +235,16 @@ static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
 			continue;
 
 		if (initfn(rmem) == 0) {
+		#ifdef CONFIG_AMLOGIC_MODIFY
+			pr_emerg("\t%08lx - %08lx, %8ld KB, %s\n",
+				 (unsigned long)rmem->base,
+				 (unsigned long)(rmem->base + rmem->size),
+				 (unsigned long)(rmem->size >> 10),
+				 rmem->name);
+		#else
 			pr_info("initialized node %s, compatible id %s\n",
 				rmem->name, compat);
+		#endif
 			return 0;
 		}
 	}
@@ -279,6 +318,11 @@ void __init fdt_init_reserved_mem(void)
 		if (rmem->size == 0)
 			err = __reserved_mem_alloc_size(node, rmem->name,
 						 &rmem->base, &rmem->size);
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+		kmemleak_no_scan(phys_to_virt(rmem->base));
+#endif
+
 		if (err == 0)
 			__reserved_mem_init_node(rmem);
 	}

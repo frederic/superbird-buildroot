@@ -1,0 +1,45 @@
+#
+# Please modify KERNELPATH, KERNELARCH and TOOLPREFIX to meet your environment
+#
+#export KERNELPATH=/lib/modules/${shell uname -r}/build
+
+#export KERNELARCH=i386
+#export TOOLPREFIX=
+
+#export ANDROID_X86_PROJ_PATH=/mnt/nfsroot/weiguang.ruan/iptv44/
+#export KERNELPATH=${ANDROID_X86_PROJ_PATH}/out/target/product/p201_iptv/obj/KERNEL_OBJ
+
+
+#export TOOLCHAIN=/opt/gcc-linaro-aarch64-linux-gnu-4.9-2014.09_linux/bin/
+export KERNELARCH=$(ARCH)
+#export CROSS_COMPILE=aarch64-linux-gnu-
+export TOOLPREFIX=${CROSS_COMPILE}
+export CONFIG_NO_USE_BACKPORTS=y
+export CONFIG_CFG80211_DEPEND_ON_KERNEL=y
+# for backports
+export KLIB=${KERNELPATH}
+export KLIB_BUILD=${KERNELPATH}
+
+
+# Use local libnl library or not
+export BUILD_LIBNL=y
+export INCLUDE_LIBNL32_HEADER=${ATH_TOPDIR}/apps/libnl-3.2.25/include
+export INCLUDE_LIBNL32_LIB=-lm ${ATH_TOPDIR}/apps/libnl-3.2.25/lib/.libs/libnl-3.a
+export INCLUDE_LIBNL32_GENL_LIB =-lm ${ATH_TOPDIR}/apps/libnl-3.2.25/lib/.libs/libnl-genl-3.a
+
+# Put one copy of firmware to local PC or not. Need root privilege.
+export BUILD_DRIVERFW_TOLOCAL=y
+
+# Build regdb into cfg80211.ko
+export CONFIG_CFG80211_INTERNAL_REGDB=y
+
+# PMF (11W)
+export CONFIG_PMF_SUPPORT=y
+
+# Rome IF
+export CONFIG_CLD_HL_SDIO_CORE=y
+export CONFIG_LINUX_QCMBR=y
+export SAP_AUTH_OFFLOAD=1
+export CONFIG_PER_VDEV_RX_DESC_POOL=1
+export CONFIG_QCA_LL_TX_FLOW_CT=1
+

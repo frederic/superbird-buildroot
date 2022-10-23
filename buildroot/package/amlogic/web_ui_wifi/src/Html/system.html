@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Amlogic wifi setting</title>
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body background="./images/bg.PNG">
+
+<div class="panel panel-default">
+<nav class="navbar">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="./index.html">
+	<span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+      </a>
+    </div>
+	<ul class="nav navbar-nav navbar-right">
+        	<ul class="nav navbar-nav navbar-right" id="swupdate">
+	</ul>
+	<ul class="nav navbar-nav navbar-right">
+          <li><a class="list-group-item" role="button" onclick="stop_swupdate()">Stop update</a></li>
+      </ul>
+    </ul>
+  </div>
+</nav>
+
+	<div id="dev_info" class="panel-heading" align="center">Systen Info
+	</div>
+	<div align="center">
+  	<ul class="list-group" id="dev_info_show"></ul>
+</div>
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ajax.js"></script>
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+	window.onload = function(){
+		system();
+	}
+  </script>
+</div>
+</body>
+</html>

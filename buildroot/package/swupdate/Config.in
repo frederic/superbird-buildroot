@@ -1,5 +1,6 @@
 config BR2_PACKAGE_SWUPDATE
 	bool "swupdate"
+	depends on BR2_PACKAGE_AML_UBOOTENV
 	depends on BR2_TOOLCHAIN_HAS_THREADS
 	depends on BR2_USE_MMU # fork()
 	# swupdate requires a parser and uses libconfig as default
@@ -48,6 +49,12 @@ config BR2_PACKAGE_SWUPDATE_CONFIG
 	  I you wish to use your own modified swupdate configuration
 	  file specify the config file location with this option.
 
+config BR2_PACKAGE_SWUPDATE_DOWNLOAD
+	bool "swupdate download OTA image"
+	default n
+	help
+	  Download the OTA image during swupdate process.
+
 config BR2_PACKAGE_SWUPDATE_INSTALL_WEBSITE
 	bool "install default website"
 	default y
@@ -62,3 +69,6 @@ endif
 comment "swupdate needs a toolchain w/ threads"
 	depends on BR2_USE_MMU
 	depends on !BR2_TOOLCHAIN_HAS_THREADS
+
+config BR2_PACKAGE_SWUPDATE_AB_SUPPORT
+    string "use a/b system"

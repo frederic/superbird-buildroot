@@ -1,0 +1,4 @@
+config BR2_PACKAGE_NAGRA_APP
+    bool "nagra app"
+    help
+        nagra app

@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Setup DuerOS environment
+#
+
+case "$1" in
+    start)
+        echo -n "Starting Dueros Pre setup environment: "
+		rm /etc/init.d/S48avs
+		cp /DuerOS_pre/asound.conf /etc/asound.conf
+		cp /DuerOS_pre/bluez_tool_dueros.sh /usr/bin/bluez_tool.sh
+		cp /DuerOS_pre/S42wifi-dueros /etc/init.d/S42wifi
+		cp /DuerOS_pre/S44bluetooth-dueros /etc/init.d/S44bluetooth
+		cp /DuerOS_pre/wpa_supplicant.conf /etc/wpa_supplicant.conf
+		cp /DuerOS_pre/adckey_function.sh /etc/adckey/adckey_function.sh
+        ;;
+    stop)
+        ;;
+    netready|netup|netdown|netchange) ;;
+    restart|reload)
+        $0 stop
+        $0 start
+        ;;
+    *)
+    echo $"Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit $?

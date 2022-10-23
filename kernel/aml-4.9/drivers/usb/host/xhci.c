@@ -125,7 +125,7 @@ int xhci_halt(struct xhci_hcd *xhci)
 /*
  * Set the run bit and wait for the host to be running.
  */
-static int xhci_start(struct xhci_hcd *xhci)
+int xhci_start(struct xhci_hcd *xhci)
 {
 	u32 temp;
 	int ret;
@@ -1339,7 +1339,9 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	unsigned int slot_id, ep_index;
 	struct urb_priv	*urb_priv;
 	int size, i;
-
+#ifdef CONFIG_AMLOGIC_USB
+	struct usb_ctrlrequest *setup;
+#endif
 	if (!urb || xhci_check_args(hcd, urb->dev, urb->ep,
 					true, true, __func__) <= 0)
 		return -EINVAL;
@@ -1404,6 +1406,29 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 		spin_lock_irqsave(&xhci->lock, flags);
 		if (xhci->xhc_state & XHCI_STATE_DYING)
 			goto dying;
+
+#ifdef CONFIG_AMLOGIC_USB
+		setup = (struct usb_ctrlrequest *) urb->setup_packet;
+		if ((setup->bRequestType == 0x80) && (setup->bRequest == 0x06)
+			&& (setup->wValue == 0x0100)
+			&& (setup->wIndex != 0x0)) {
+			if ((((setup->wIndex)>>8) & 0xff) == 7) {
+				setup->wIndex = 0;
+				spin_unlock_irqrestore(&xhci->lock, flags);
+				ret = xhci_test_single_step(xhci,
+					GFP_ATOMIC, urb,
+					slot_id, ep_index, 1);
+				spin_lock_irqsave(&xhci->lock, flags);
+			} else if ((((setup->wIndex)>>8)&0xff) == 8) {
+				setup->wIndex = 0;
+				spin_unlock_irqrestore(&xhci->lock, flags);
+				ret = xhci_test_single_step(xhci,
+					GFP_ATOMIC, urb,
+					slot_id, ep_index, 2);
+				spin_lock_irqsave(&xhci->lock, flags);
+			}
+		} else
+#endif
 		ret = xhci_queue_ctrl_tx(xhci, GFP_ATOMIC, urb,
 				slot_id, ep_index);
 		if (ret)
@@ -1564,14 +1589,22 @@ int xhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	/* Queue a stop endpoint command, but only if this is
 	 * the first cancellation to be handled.
 	 */
+#ifdef CONFIG_AMLOGIC_USB
+	if (!(ep->ep_state & EP_STOP_CMD_PENDING)) {
+#else
 	if (!(ep->ep_state & EP_HALT_PENDING)) {
+#endif
 		command = xhci_alloc_command(xhci, false, false, GFP_ATOMIC);
 		if (!command) {
 			ret = -ENOMEM;
 			goto done;
 		}
+#ifdef CONFIG_AMLOGIC_USB
+		ep->ep_state |= EP_STOP_CMD_PENDING;
+#else
 		ep->ep_state |= EP_HALT_PENDING;
 		ep->stop_cmds_pending++;
+#endif
 		ep->stop_cmd_timer.expires = jiffies +
 			XHCI_STOP_EP_CMD_TIMEOUT * HZ;
 		add_timer(&ep->stop_cmd_timer);
@@ -1749,7 +1782,12 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	 * process context, not interrupt context (or so documenation
 	 * for usb_set_interface() and usb_set_configuration() claim).
 	 */
+#ifdef CONFIG_AMLOGIC_CMA
+	if (xhci_endpoint_init(xhci, virt_dev, udev, ep,
+		 GFP_NOIO | __GFP_BDEV) < 0) {
+#else
 	if (xhci_endpoint_init(xhci, virt_dev, udev, ep, GFP_NOIO) < 0) {
+#endif
 		dev_dbg(&udev->dev, "%s - could not initialize ep %#x\n",
 				__func__, ep->desc.bEndpointAddress);
 		return -ENOMEM;
@@ -3612,9 +3650,17 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 
 	/* Stop any wayward timer functions (which may grab the lock) */
 	for (i = 0; i < 31; ++i) {
+#ifdef CONFIG_AMLOGIC_USB
+		virt_dev->eps[i].ep_state &= ~EP_STOP_CMD_PENDING;
+#else
 		virt_dev->eps[i].ep_state &= ~EP_HALT_PENDING;
+#endif
 		del_timer_sync(&virt_dev->eps[i].stop_cmd_timer);
 	}
+
+#ifdef CONFIG_AMLOGIC_USB
+	virt_dev->udev = NULL;
+#endif
 
 	spin_lock_irqsave(&xhci->lock, flags);
 	/* Don't disable the slot if the host controller is dead. */

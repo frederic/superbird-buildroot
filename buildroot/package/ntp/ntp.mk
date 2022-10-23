@@ -89,8 +89,10 @@ NTP_INSTALL_FILES_$(BR2_PACKAGE_NTP_TICKADJ) += util/tickadj
 
 define NTP_INSTALL_TARGET_CMDS
 	$(if $(BR2_PACKAGE_NTP_NTPD), install -m 755 $(@D)/ntpd/ntpd $(TARGET_DIR)/usr/sbin/ntpd)
+	$(if $(BR2_PACKAGE_NTP_NTPD), install -m 755 package/ntp/ntpdate.sh $(TARGET_DIR)/etc/init.d/ntpdate.sh)
 	test -z "$(NTP_INSTALL_FILES_y)" || install -m 755 $(addprefix $(@D)/,$(NTP_INSTALL_FILES_y)) $(TARGET_DIR)/usr/bin/
-	$(INSTALL) -m 644 package/ntp/ntpd.etc.conf $(TARGET_DIR)/etc/ntp.conf
+	install -m 755 -d $(TARGET_DIR)/etc/default
+	install -m 644 package/ntp/ntpd.etc.default $(TARGET_DIR)/etc/default/ntpd
 endef
 
 # This script will step the time if there is a large difference

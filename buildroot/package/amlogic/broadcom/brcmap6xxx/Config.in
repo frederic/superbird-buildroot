@@ -1,0 +1,52 @@
+config BR2_PACKAGE_BRCMAP6XXX
+	bool "brcmap6xxx"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  brcmap6xxx driver
+
+config BR2_PACKAGE_BRCMAP6XXX_GIT_VERSION
+	string "brcmap6xxx branch"
+	depends on BR2_PACKAGE_BRCMAP6XXX
+	help
+		Branch for brcmap6xxx	
+
+config BR2_PACKAGE_BRCMAP6XXX_GIT_REPO_URL
+	string "brcmap6xxx git"
+	depends on BR2_PACKAGE_BRCMAP6XXX
+	help
+		brcmap6xxx git
+
+config BR2_PACKAGE_BRCMAP6XXX_LOCAL
+	bool "brcmap6xxx local"
+	help
+		brcmap6xxx local
+
+config BR2_PACKAGE_BRCMAP6XXX_LOCAL_PATH
+	string "brcmap6xxx local path"
+	depends on BR2_PACKAGE_BRCMAP6XXX_LOCAL
+	help
+		brcmap6xxx local path
+
+config BR2_PACKAGE_BRCMAP6XXX_SDIO_VERSION
+	string "brcmap6xxx sdio build version"
+	depends on BR2_PACKAGE_BRCMAP6XXX_LOCAL
+	help
+		brcmap6xxx sdio build version
+
+config BR2_PACKAGE_BRCMAP6XXX_PCI_VERSION
+	string "brcmap6xxx pci build version"
+	depends on BR2_PACKAGE_BRCMAP6XXX_LOCAL
+	help
+		brcmap6xxx pci build version
+
+config BR2_PACKAGE_BRCMAP6XXX_USB_VERSION
+	string "brcmap6xxx usb build version"
+	depends on BR2_PACKAGE_BRCMAP6XXX_LOCAL
+	help
+		brcmap6xxx usb build version
+
+config BR2_PACKAGE_BRCMAP6XXX_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_BRCMAP6XXX
+	help
+	  compile ko directly

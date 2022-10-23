@@ -1,0 +1,10 @@
+#
+#bluetopia a9 build
+#
+bluetopia: 
+	@echo Build bluetopia
+	cd ${BLUETOPIA_TOPDIR} && \
+	export CC=$(TOOLPREFIX)gcc && \
+	export AR=$(TOOLPREFIX)ar && \
+	export LD=$(TOOLPREFIX)ld && \
+	./m.sh && ./cp_samp.sh

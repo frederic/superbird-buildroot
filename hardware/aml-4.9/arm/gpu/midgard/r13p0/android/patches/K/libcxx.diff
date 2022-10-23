@@ -1,0 +1,13 @@
+diff --git a/include/cstdlib b/include/cstdlib
+index 152b891..e45a8fd 100644
+--- a/include/cstdlib
++++ b/include/cstdlib
+@@ -126,7 +126,7 @@ using ::realloc;
+ using ::abort;
+ using ::atexit;
+ using ::exit;
+-using ::_Exit;
++
+ using ::getenv;
+ using ::system;
+ using ::bsearch;

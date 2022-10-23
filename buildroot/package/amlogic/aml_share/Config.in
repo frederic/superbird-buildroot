@@ -1,0 +1,77 @@
+config BR2_PACKAGE_AML_CUSTOMIZE_KERNEL
+	bool  "Strip kernel size by disable addon options"
+	default n
+	help
+	  Allow project to disable additional kernel options to decrease size
+
+if BR2_PACKAGE_AML_CUSTOMIZE_KERNEL
+
+config BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_DISABLE_OPT_LIST
+	string  "Add-on disabled kernel options, separate by whitespace"
+	default ""
+	help
+	  Please add project specified disabled kernel options which is not covered by buildroot by default
+
+config BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_ENABLE_OPT_LIST
+	string  "Add-on enable kernel options, separate by whitespace"
+	default ""
+	help
+	  Please add project specified enable kernel options which is not covered by buildroot by default
+
+config BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_SET_OPT_LIST
+	string  "Add-on kernel options new value, separate by whitespace"
+	default ""
+	help
+	  Please add project specified new kernel options value which is not covered by buildroot by default
+endif
+
+config BR2_PACKAGE_AML_SOC_FAMILY_NAME
+	string "Amlogic SoC Family Name"
+	default "TBD"
+    help
+	  Amlogic SoC Family Name, such as AXG, GXL, G12A, G12B, SM1, TM2, A1, C1
+
+config BR2_PACKAGE_AML_SOC_CHIP_NAME
+	string "Amlogic SoC CHIP Name"
+	default "TBD"
+    help
+	  Amlogic SoC Chip Name, such as A113D, A113X, A113L, S905D, S905X
+
+config BR2_PACKAGE_AML_SOC_CHIP_REV
+	string "Amlogic SoC Chip Rev"
+	default "TBD"
+    help
+	  Amlogic SoC Chip Rev RevA, RevB
+
+config BR2_PACKAGE_AML_SOC_BOARD_NAME
+	string "Amlogic SoC BOARD Name"
+	default "TBD"
+    help
+	  Amlogic SoC Board Name, such as P212, W400, W411, AD401, AE400
+
+config BR2_PACKAGE_AML_SOC_USE_MULTIENC
+    bool "use multi-encoder library"
+    default n
+    help
+      check if use multi-encoder library
+
+config BR2_PACKAGE_AML_VENDOR_PARTITION
+    bool "Support with vendor partition"
+    default n
+    help
+      check if use vendor partition
+
+if BR2_PACKAGE_AML_VENDOR_PARTITION
+config BR2_PACKAGE_AML_VENDOR_PARTITION_SIZE
+	string  "Vendor paritition size"
+	default "256M"
+	help
+	  Please provide vendor partition size defined in DTS file
+
+config BR2_PACKAGE_AML_VENDOR_PARTITION_PATH
+	string  "Vendor partition content path"
+	default ""
+	help
+	  Please provide vendor partition content path
+endif
+

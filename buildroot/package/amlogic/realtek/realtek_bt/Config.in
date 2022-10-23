@@ -1,0 +1,23 @@
+config BR2_PACKAGE_REALTEK_BT
+	bool "realtek bt for bluez"
+	depends on BR2_LINUX_KERNEL
+	help
+	realtek bt
+
+config BR2_PACKAGE_REALTEK_BT_LOCAL_PATH
+	string "realtek bt codes local path"
+	depends on BR2_PACKAGE_REALTEK_BT
+	help
+		realtek bt codes local path
+
+config BR2_PACKAGE_REALTEK_UART_BT
+	bool "realtek uart bt driver"
+	depends on BR2_PACKAGE_REALTEK_BT
+	help
+	realtek uart bt driver
+
+config BR2_PACKAGE_REALTEK_USB_BT
+	bool "realtek usb bt driver"
+	depends on BR2_PACKAGE_REALTEK_BT
+	help
+	realtek usb bt driver

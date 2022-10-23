@@ -1,0 +1,37 @@
+From ff39f8153805239bb38aae88a537f65329e4777c Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Wed, 20 Feb 2019 17:58:16 +0800
+Subject: [PATCH] configure:This fixes a compile failure in case wayland
+ whichcan't find the wayland-scanner of the build host.
+
+because the pkg-config use the target's pkg-config configure, get the wrong path
+The error message show like below:
+GEN      xdg-shell-unstable-v5-protocol.c
+/bin/sh: /usr/bin/wayland-scanner: No such file or directory
+Makefile:2426: recipe for target 'xdg-shell-unstable-v5-protocol.c' failed
+make[3]: *** [xdg-shell-unstable-v5-protocol.c] Error 127
+make[3]: *** Waiting for unfinished jobs....
+GEN      xdg-shell-unstable-v5-client-protocol.h
+/bin/sh: /usr/bin/wayland-scanner: No such file or directory
+Makefile:2428: recipe for target 'xdg-shell-unstable-v5-client-protocol.h' failed
+make[3]: *** [xdg-shell-unstable-v5-client-protocol.h] Error 127
+---
+ configure | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure b/configure
+index 4f6cff5..a69a460 100755
+--- a/configure
++++ b/configure
+@@ -20047,7 +20047,7 @@ $as_echo "no" >&6; }
+ fi
+ 
+ 
+-    wayland_scanner=`$PKG_CONFIG --variable=wayland_scanner wayland-scanner`
++    #wayland_scanner=`$PKG_CONFIG --variable=wayland_scanner wayland-scanner`
+     ac_wayland_protocols_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir wayland-protocols`
+     WAYLAND_PROTOCOLS_DATADIR=$ac_wayland_protocols_pkgdatadir
+ 
+-- 
+2.7.4
+

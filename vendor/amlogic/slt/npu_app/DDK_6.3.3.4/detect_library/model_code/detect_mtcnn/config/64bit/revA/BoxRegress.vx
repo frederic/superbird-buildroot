@@ -1,0 +1,125 @@
+/*
+ ============================================================================
+ Name        : BoxRegress.vx
+ Author      : Kaihong.Xia
+ Version     :
+ Copyright   : Your copyright notice
+ Description : 
+ ============================================================================
+ */
+#include "cl_viv_vx_ext.h"
+
+#define THREAD_NUM 256
+
+typedef   struct
+{
+    float f32X1;
+    float f32Y1;
+    float f32X2;
+    float f32Y2;
+    float f32Score;
+    float f32Reserved;
+}TFaceRect;
+
+typedef struct
+{
+    float f32X[5];
+    float f32Y[5];
+}TFacePts;
+
+typedef struct
+{
+    TFaceRect tBox;
+    float reg[4];
+    TFacePts tPts;
+} TFaceInfo;
+
+__kernel void BoxRegressVXC
+    (
+    vx_array_float ptFaceInfo,
+    //vx_array_float outFaceInfo,
+    __global int* l32BoxNum,
+    __global int* linkGraph,
+    __global char* useForLinkGraph
+    )
+{
+    __global TFaceInfo* faceInfoPtr = (__global TFaceInfo*)ptFaceInfo.item;
+    __global TFaceInfo* outFaceInfoPtr = (__global TFaceInfo*)ptFaceInfo.item;
+    int boxNum = *l32BoxNum;
+    int iter = boxNum >> 8;
+    int res = boxNum % THREAD_NUM;
+    int gid = get_global_id(0);
+    int offset = 0;
+    //TFaceInfo tmpData;
+    float tmpData0, tmpData1;
+    float vX1, vX2, vY1, vY2;
+    float reg0, reg1, reg2, reg3;
+
+    for(int i = 0; i < iter; i++)
+    {
+        offset = i * THREAD_NUM + gid;
+        vX1 = faceInfoPtr[offset].tBox.f32X1;
+        vX2 = faceInfoPtr[offset].tBox.f32X2;
+        vY1 = faceInfoPtr[offset].tBox.f32Y1;
+        vY2 = faceInfoPtr[offset].tBox.f32Y2;
+
+        reg0 = faceInfoPtr[offset].reg[0];
+        reg1 = faceInfoPtr[offset].reg[1];
+        reg2 = faceInfoPtr[offset].reg[2];
+        reg3 = faceInfoPtr[offset].reg[3];
+
+        float f32RegHeight = vX2 - vX1;
+        float f32RegWidth = vY2 - vY1;
+
+        float x1 = vX1 + f32RegWidth * reg1;
+        float y1 = vY1 + f32RegHeight * reg0;
+        float x2 = vX2 + f32RegWidth * reg3;
+        float y2 = vY2 + f32RegHeight * reg2;
+
+        float f32Width    = x2 - x1;
+        float f32Height   = y2 - y1;
+        float f32Side     = f32Width > f32Height ? f32Width : f32Height;
+
+        tmpData0 = x1 + (f32Width - f32Side) * 0.5;
+        tmpData1 = y1 + (f32Height - f32Side) * 0.5;
+        outFaceInfoPtr[offset].tBox.f32X1 = tmpData0;
+        outFaceInfoPtr[offset].tBox.f32Y1 = tmpData1;
+        outFaceInfoPtr[offset].tBox.f32X2 = tmpData0 + f32Side;
+        outFaceInfoPtr[offset].tBox.f32Y2 = tmpData1 + f32Side;
+    }
+
+    faceInfoPtr += (iter << 8);
+    outFaceInfoPtr += (iter << 8);
+
+    if(gid < res)
+    {
+        vX1 = faceInfoPtr[gid].tBox.f32X1;
+        vX2 = faceInfoPtr[gid].tBox.f32X2;
+        vY1 = faceInfoPtr[gid].tBox.f32Y1;
+        vY2 = faceInfoPtr[gid].tBox.f32Y2;
+
+        reg0 = faceInfoPtr[gid].reg[0];
+        reg1 = faceInfoPtr[gid].reg[1];
+        reg2 = faceInfoPtr[gid].reg[2];
+        reg3 = faceInfoPtr[gid].reg[3];
+
+        float f32RegHeight = vX2 - vX1;
+        float f32RegWidth = vY2 - vY1;
+
+        float x1 = vX1 + f32RegWidth * reg1;
+        float y1 = vY1 + f32RegHeight * reg0;
+        float x2 = vX2 + f32RegWidth * reg3;
+        float y2 = vY2 + f32RegHeight * reg2;
+
+        float f32Width    = x2 - x1;
+        float f32Height   = y2 - y1;
+        float f32Side     = f32Width > f32Height ? f32Width : f32Height;
+
+        tmpData0 = x1 + (f32Width - f32Side) * 0.5;
+        tmpData1 = y1 + (f32Height - f32Side) * 0.5;
+        outFaceInfoPtr[gid].tBox.f32X1 = tmpData0;
+        outFaceInfoPtr[gid].tBox.f32Y1 = tmpData1;
+        outFaceInfoPtr[gid].tBox.f32X2 = tmpData0 + f32Side;
+        outFaceInfoPtr[gid].tBox.f32Y2 = tmpData1 + f32Side;
+    }
+}

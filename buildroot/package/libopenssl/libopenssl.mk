@@ -176,5 +176,20 @@ endef
 LIBOPENSSL_POST_INSTALL_TARGET_HOOKS += LIBOPENSSL_REMOVE_LIBOPENSSL_ENGINES
 endif
 
+define LIBOPENSSL_PATCH_OLDVERSION
+if [ ! -f $(TARGET_DIR)/usr/lib/libssl.so.1.0.0 ]; then \
+	pushd $(TARGET_DIR)/usr/lib; \
+	ln -sv libssl.so libssl.so.1.0.0; \
+	popd; \
+fi
+if [ ! -f $(TARGET_DIR)/usr/lib/libcrypto.so.1.0.0 ]; then \
+	pushd $(TARGET_DIR)/usr/lib; \
+	ln -sv libcrypto.so libcrypto.so.1.0.0; \
+	popd; \
+fi
+endef
+
+LIBOPENSSL_POST_INSTALL_TARGET_HOOKS += LIBOPENSSL_PATCH_OLDVERSION
+
 $(eval $(generic-package))
 $(eval $(host-generic-package))

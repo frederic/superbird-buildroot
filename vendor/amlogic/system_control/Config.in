@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SYSTEM_CONTROL
+    bool "aml system control"
+    depends on BR2_LINUX_KERNEL
+    help
+        system control

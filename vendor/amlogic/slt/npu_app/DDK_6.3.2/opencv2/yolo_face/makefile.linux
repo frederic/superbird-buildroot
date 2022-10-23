@@ -1,0 +1,29 @@
+include $(AQROOT)/makefile.linux.def
+
+
+INCLUDE += -I$(AQROOT)/sdk/inc -I$(OPENCV_ROOT)/modules/highgui/include -I$(OPENCV_ROOT)/modules/core/include  -I$(OPENCV_ROOT)/modules/imgproc/include -I$(OPENCV_ROOT)/modules/objdetect/include 
+CFLAGS += $(INCLUDE)
+################################################################################
+# Supply necessary libraries.
+LIBS += -L$(VIVANTE_SDK_LIB) -l OpenVX -l OpenVXU -l CLC -l VSC -l m -lGAL 
+LIBS += -lm -lpthread -ldl
+LIBS +=-L$(OVXLIB_DIR)/lib64  -lz -lopencv_imgproc -lopencv_core -lopencv_highgui -l ovxlib -l jpeg
+LIBS +=-L$(LIB_DIR) -lstdc++ 
+
+
+#############################################################################
+# Macros.
+PROGRAM = 1
+TARGET_NAME = yolofaceint8
+CUR_SOURCE = ${wildcard *.c}
+#############################################################################
+# Objects.
+OBJECTS =  ${patsubst %.c, $(OBJ_DIR)/%.o, $(CUR_SOURCE)}
+OBJECTS += $(OBJ_DIR)/main.o
+# installation directory
+INSTALL_DIR := ./
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

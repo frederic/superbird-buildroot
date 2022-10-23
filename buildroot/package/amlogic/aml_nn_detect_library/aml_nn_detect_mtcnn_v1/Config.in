@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_NN_DETECT_MTCNN_V1
+    bool "aml nn_detect mtcnn library"
+    help
+        Support mtcnn_v1 detection

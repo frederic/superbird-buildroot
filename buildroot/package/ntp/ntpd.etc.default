@@ -1,0 +1,9 @@
+# NTP Servers to use for ntpdate
+NTPSERVERS="0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org time.android.com"
+
+# Get initial time via ntpdate?
+NTPDATE=yes
+NTPDATE_OPTS="-t 5"
+
+# Start the ntp daemon?
+NTPD=yes

@@ -1,0 +1,236 @@
+diff -rNu swupdate-2018.11-Orig/bootloader/none.c swupdate-2018.11/bootloader/none.c
+--- swupdate-2018.11-Orig/bootloader/none.c	2018-12-05 22:03:06.000000000 +0800
++++ swupdate-2018.11/bootloader/none.c	2019-03-21 17:00:27.125247590 +0800
+@@ -5,6 +5,8 @@
+  * SPDX-License-Identifier:     GPL-2.0-or-later
+  */
+ 
++#if 0
++
+ #include <unistd.h>
+ #include <string.h>
+ #include "bootloader.h"
+@@ -43,3 +45,78 @@
+ {
+ 	return dict_parse_script(&environment, filename);
+ }
++
++#else
++
++#include <unistd.h>
++#include <stdio.h>
++#include <string.h>
++#include "bootloader.h"
++
++int bootloader_env_init()
++{
++	bootenv_init();
++	return 0;
++}
++
++int bootloader_env_set(const char __attribute__ ((__unused__)) *name,
++			const char __attribute__ ((__unused__)) *value)
++{
++	bootenv_update(name, value);
++	return 0;
++}
++
++int bootloader_env_unset(const char __attribute__ ((__unused__)) *name)
++{
++	bootenv_update(name, "");
++	return 0;
++}
++
++char *bootloader_env_get(const char __attribute__ ((__unused__)) *name)
++{
++    return bootenv_get(name);
++}
++
++int bootloader_apply_list(const char __attribute__ ((__unused__)) *filename)
++{
++	FILE *fp = NULL;
++	int ret = 0;
++	char *line = NULL, *key = NULL, *value = NULL;
++	size_t len = 0;
++	/* open script generated during sw-description parsing */
++	fp = fopen(filename, "rb");
++	if (!fp) {
++		printf("Failed to open filename: %s\n", filename);
++		ret = -1;
++		goto cleanup;
++	}
++
++	/* load  varname-value pairs from script into grubenv dictlist */
++	/* Note that variables with no value assigned are skipped now.
++	 * We should consider whether we want to replicate U-Boot behavior
++	 * (unset if no value given). GRUB env tool distinguishes unsetting
++	 * (removing) variable from environment and setting variable to an
++	 * empty string (NULL) as two actions. We should think about if if it
++	 * turns oout to be desired
++	 */
++	while ((getline(&line, &len, fp)) != -1) {
++		key = strtok(line, " \t\n");
++		value = strtok(NULL, " \t\n");
++		if (value != NULL && key != NULL) {
++			ret = bootloader_env_set( key, value);
++			if (ret) {
++				printf("Adding pair [%s] = %s into dictionary"
++					"list failed\n", key, value);
++				goto cleanup;
++			}
++		}
++	}
++
++cleanup:
++	if (fp) fclose(fp);
++	/* free(null) should not harm anything */
++	free(line);
++
++	return ret;
++}
++#endif
+diff -rNu swupdate-2018.11-Orig/core/swupdate.c swupdate-2018.11/core/swupdate.c
+--- swupdate-2018.11-Orig/core/swupdate.c	2018-12-05 22:03:06.000000000 +0800
++++ swupdate-2018.11/core/swupdate.c	2019-03-21 17:28:45.905297675 +0800
+@@ -104,6 +104,7 @@
+ 	{"webserver", required_argument, NULL, 'w'},
+ #endif
+ 	{"check", no_argument, NULL, 'c'},
++	{"recovery", no_argument, NULL, 'r'},
+ 	{"postupdate", required_argument, NULL, 'p'},
+ 	{NULL, 0, NULL, 0}
+ };
+@@ -596,6 +597,7 @@
+ 	memset(main_options, 0, sizeof(main_options));
+ 	memset(image_url, 0, sizeof(image_url));
+ 	strcpy(main_options, "vhni:e:l:Lcf:p:o:N:");
++    strcat(main_options, "r:");
+ #ifdef CONFIG_MTD
+ 	strcat(main_options, "b:");
+ #endif
+@@ -780,6 +782,9 @@
+ 		case 'c':
+ 			opt_c = 1;
+ 			break;
++		case 'r':
++			swcfg.recovery_flag = 1;
++			break;
+ 		case 'p':
+ 			strncpy(swcfg.globals.postupdatecmd, optarg,
+ 				sizeof(swcfg.globals.postupdatecmd));
+@@ -921,6 +926,8 @@
+ 	if(!get_hw_revision(&swcfg.hw))
+ 		printf("Running on %s Revision %s\n", swcfg.hw.boardname, swcfg.hw.revision);
+ 
++	bootloader_env_init();
++
+ 	print_registered_handlers();
+ 	if (swcfg.globals.syslog_enabled) {
+ 		if (syslog_init()) {
+diff -rNu swupdate-2018.11-Orig/corelib/stream_interface.c swupdate-2018.11/corelib/stream_interface.c
+--- swupdate-2018.11-Orig/corelib/stream_interface.c	2018-12-05 22:03:06.000000000 +0800
++++ swupdate-2018.11/corelib/stream_interface.c	2019-03-21 16:38:31.369208798 +0800
+@@ -71,6 +71,50 @@
+ 
+ static struct installer inst;
+ 
++
++static int extract_file_to_data(int fd, const char *fname, unsigned long *poffs)
++{
++	char output_file[MAX_IMAGE_FNAME];
++	struct filehdr fdh;
++	int fdout;
++	uint32_t checksum;
++
++	if (extract_cpio_header(fd, &fdh, poffs)) {
++		return -1;
++	}
++	if (strcmp(fdh.filename, fname)) {
++		TRACE("description file name not the first of the list: %s instead of %s",
++			fdh.filename,
++			fname);
++		return -1;
++	}
++	if (snprintf(output_file, sizeof(output_file), "%s%s", "/data/",
++		     fdh.filename) >= (int)sizeof(output_file)) {
++		ERROR("Path too long: %s%s", "/data/", fdh.filename);
++		return -1;
++	}
++	TRACE("Found file:\n\tfilename %s\n\tsize %u", fdh.filename, (unsigned int)fdh.size);
++
++	fdout = openfileoutput(output_file);
++	if (fdout < 0)
++		return -1;
++
++	if (copyfile(fd, &fdout, fdh.size, poffs, 0, 0, 0, &checksum, NULL, 0, NULL) < 0) {
++		close(fdout);
++		return -1;
++	}
++	if (checksum != (uint32_t)fdh.chksum) {
++		close(fdout);
++		ERROR("Checksum WRONG ! Computed 0x%ux, it should be 0x%ux\n",
++			(unsigned int)checksum, (unsigned int)fdh.chksum);
++			return -1;
++	}
++	close(fdout);
++
++	return 0;
++}
++
++
+ static int extract_file_to_tmp(int fd, const char *fname, unsigned long *poffs)
+ {
+ 	char output_file[MAX_IMAGE_FNAME];
+@@ -363,6 +407,23 @@
+ 		mtd_cleanup();
+ 		scan_mtd_devices();
+ #endif
++		if (software->recovery_flag == 1) {
++			unsigned long offset = 0;
++			ret = extract_file_to_data(inst.fd, "software.swu", &offset);
++			if (ret == 0) {
++				close(inst.fd);
++				inst.last_install = SUCCESS;
++				bootloader_env_set("upgrade_step", "3");
++				notify(SUCCESS, RECOVERY_NO_ERROR, INFOLEVEL, "SWUPDATE download successful !, reboot...");
++				umount("/data");
++				system("reboot");
++				sleep(5);
++			} else {
++				close(inst.fd);
++				inst.last_install = FAILURE;
++				notify(FAILURE, RECOVERY_ERROR, ERRORLEVEL, "Image download error. Not installing ...");
++			}
++		} else {
+ 		/*
+ 		 * extract the meta data and relevant parts
+ 		 * (flash images) from the install image
+@@ -400,6 +461,7 @@
+ 		} else {
+ 			inst.last_install = FAILURE;
+ 			notify(FAILURE, RECOVERY_ERROR, ERRORLEVEL, "Image invalid or corrupted. Not installing ...");
++			}
+ 		}
+ 
+ 		swupdate_progress_end(inst.last_install);
+diff -rNu swupdate-2018.11-Orig/include/bootloader.h swupdate-2018.11/include/bootloader.h
+--- swupdate-2018.11-Orig/include/bootloader.h	2018-12-05 22:03:06.000000000 +0800
++++ swupdate-2018.11/include/bootloader.h	2019-03-21 16:38:31.369208798 +0800
+@@ -53,4 +53,6 @@
+  */
+ int bootloader_apply_list(const char *script);
+ 
++int bootloader_env_init(void) ;
++
+ #endif
+diff -rNu swupdate-2018.11-Orig/include/swupdate.h swupdate-2018.11/include/swupdate.h
+--- swupdate-2018.11-Orig/include/swupdate.h	2018-12-05 22:03:06.000000000 +0800
++++ swupdate-2018.11/include/swupdate.h	2019-03-21 16:38:31.369208798 +0800
+@@ -134,6 +134,7 @@
+ 	struct proclist extprocs;
+ 	void *dgst;	/* Structure for signed images */
+ 	struct swupdate_global_cfg globals;
++	int recovery_flag;
+ 	const char *embscript;
+ };
+ 

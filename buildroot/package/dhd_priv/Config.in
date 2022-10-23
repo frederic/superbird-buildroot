@@ -1,0 +1,4 @@
+config BR2_PACKAGE_DHD_PRIV
+	bool  "dhd private tool"
+	help
+        a broadcom wifi tool

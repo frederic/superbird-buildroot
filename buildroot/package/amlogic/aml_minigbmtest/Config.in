@@ -1,0 +1,8 @@
+config BR2_PACKAGE_AML_MINIGBMTEST
+	bool "Amlogic Minigbm Test"
+	default y
+	depends on BR2_PACKAGE_AML_MINIGBM
+	depends on BR2_PACKAGE_LIBDRM
+	help
+	    amlogic minigbmtest programs
+

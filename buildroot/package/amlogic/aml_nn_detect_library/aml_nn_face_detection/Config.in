@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_NN_FACE_DETECTION
+    bool "aml nn face detection library"
+    depends on BR2_PACKAGE_NPU
+    help
+        Support nn face detection library

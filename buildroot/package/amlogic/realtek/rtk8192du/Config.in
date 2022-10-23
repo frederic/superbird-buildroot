@@ -1,0 +1,29 @@
+config BR2_PACKAGE_RTK8192DU
+	bool "rtk8192du"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  rtk8192du driver
+
+config BR2_PACKAGE_RTK8192DU_GIT_VERSION
+	string "rtk8192du branch"
+	depends on BR2_PACKAGE_RTK8192DU
+	help
+		Branch for rtk8192du	
+
+config BR2_PACKAGE_RTK8192DU_GIT_REPO_URL
+	string "rtk8192du git"
+	depends on BR2_PACKAGE_RTK8192DU
+	help
+		rtk8192du git
+
+config BR2_PACKAGE_RTK8192DU_LOCAL
+	bool "rtk8192du local"
+	help
+		rtk8192du local
+
+config BR2_PACKAGE_RTK8192DU_LOCAL_PATH
+	string "rtk8192du local path"
+	depends on BR2_PACKAGE_RTK8192DU_LOCAL
+	help
+		rtk8192du local path
+

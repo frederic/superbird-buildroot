@@ -1,0 +1,1 @@
+#define DRIVERVERSION	"v5.3.9.1_31959.20190109_beta"

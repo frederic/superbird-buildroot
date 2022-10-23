@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBSECMEM_BIN
+        bool "libsecmem"
+        select BR2_PACKAGE_TDK
+        help
+          libsecmem files.
+
+          http://openlinux.amlogic.com

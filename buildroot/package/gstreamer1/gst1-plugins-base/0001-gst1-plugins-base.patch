@@ -1,0 +1,81 @@
+diff --git a/ext/alsa/gstalsasink.c b/ext/alsa/gstalsasink.c
+index 86606f7..1db05f2 100644
+--- a/ext/alsa/gstalsasink.c
++++ b/ext/alsa/gstalsasink.c
+@@ -52,6 +52,8 @@
+ #include <gst/audio/gstaudioiec61937.h>
+ #include <gst/gst-i18n-plugin.h>
+ 
++#include <libconfig.h>
++
+ #ifndef ESTRPIPE
+ #define ESTRPIPE EPIPE
+ #endif
+@@ -62,6 +64,8 @@
+ #define SPDIF_PERIOD_SIZE 1536
+ #define SPDIF_BUFFER_SIZE 15360
+ 
++#define CONFIG_FILE "/etc/gst-soundcard.conf"
++
+ enum
+ {
+   PROP_0,
+@@ -102,6 +106,8 @@ static gint output_ref;         /* 0    */
+ static snd_output_t *output;    /* NULL */
+ static GMutex output_mutex;
+ 
++static char* gst_soundcard_device = DEFAULT_DEVICE;
++
+ static GstStaticPadTemplate alsasink_sink_factory =
+     GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+@@ -144,6 +150,8 @@ gst_alsasink_init_interfaces (GType type)
+ static void
+ gst_alsasink_class_init (GstAlsaSinkClass * klass)
+ {
++  char* config_file_real_path;
++  config_t cfg;
+   GObjectClass *gobject_class;
+   GstElementClass *gstelement_class;
+   GstBaseSinkClass *gstbasesink_class;
+@@ -182,10 +190,21 @@ gst_alsasink_class_init (GstAlsaSinkClass * klass)
+   gstaudiosink_class->delay = GST_DEBUG_FUNCPTR (gst_alsasink_delay);
+   gstaudiosink_class->reset = GST_DEBUG_FUNCPTR (gst_alsasink_reset);
+ 
++  //GST_DEBUG_OBJECT (alsasink, "gst_alsasink_class_init...");
++
++  config_init(&cfg);
++  config_file_real_path = realpath(CONFIG_FILE, NULL);
++  if(config_file_real_path != NULL) {
++     if (config_read_file(&cfg, config_file_real_path)) {
++		if (!config_lookup_string(&cfg, "gst-sound-card.hw", (const char**)&gst_soundcard_device))
++			gst_soundcard_device=DEFAULT_DEVICE;
++	 }
++  }
++
+   g_object_class_install_property (gobject_class, PROP_DEVICE,
+       g_param_spec_string ("device", "Device",
+           "ALSA device, as defined in an asound configuration file",
+-          DEFAULT_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++          gst_soundcard_device, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
+   g_object_class_install_property (gobject_class, PROP_DEVICE_NAME,
+       g_param_spec_string ("device-name", "Device name",
+@@ -212,7 +231,7 @@ gst_alsasink_set_property (GObject * object, guint prop_id,
+       sink->device = g_value_dup_string (value);
+       /* setting NULL restores the default device */
+       if (sink->device == NULL) {
+-        sink->device = g_strdup (DEFAULT_DEVICE);
++        sink->device = g_strdup (gst_soundcard_device);
+       }
+       break;
+     default:
+@@ -254,7 +273,7 @@ gst_alsasink_init (GstAlsaSink * alsasink)
+ {
+   GST_DEBUG_OBJECT (alsasink, "initializing alsasink");
+ 
+-  alsasink->device = g_strdup (DEFAULT_DEVICE);
++  alsasink->device = g_strdup (gst_soundcard_device);
+   alsasink->handle = NULL;
+   alsasink->cached_caps = NULL;
+   g_mutex_init (&alsasink->alsa_lock);

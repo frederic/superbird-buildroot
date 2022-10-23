@@ -1,0 +1,12 @@
+config BR2_PACKAGE_LIBMULTIENC
+	bool "amlogic h264/h265 multi video encoder"
+	select BR2_PACKAGE_AML_LIBGE2D
+	help
+	  h264/h265 multi video encoder library
+
+config BR2_PACKAGE_LIBMULTIENC_LOCAL_PATH
+    string "amlogic h264/h265 multi video encoder local path"
+    depends on BR2_PACKAGE_LIBMULTIENC
+	help
+    aml h264/h265 video encoder local path
+

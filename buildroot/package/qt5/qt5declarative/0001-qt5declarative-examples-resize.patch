@@ -1,0 +1,127 @@
+diff --git a/examples/quick/demos/calqlatr/calqlatr.qml b/examples/quick/demos/calqlatr/calqlatr.qml
+index 017d819..a6269be 100644
+--- a/examples/quick/demos/calqlatr/calqlatr.qml
++++ b/examples/quick/demos/calqlatr/calqlatr.qml
+@@ -45,8 +45,8 @@ import "content/calculator.js" as CalcEngine
+
+ Rectangle {
+     id: window
+-    width: 320
+-    height: 480
++    width: 768
++    height: 1024
+     focus: true
+     color: "#272822"
+
+diff --git a/examples/quick/demos/clocks/clocks.qml b/examples/quick/demos/clocks/clocks.qml
+index d9694d1..54e6008 100644
+--- a/examples/quick/demos/clocks/clocks.qml
++++ b/examples/quick/demos/clocks/clocks.qml
+@@ -43,7 +43,7 @@ import "content" as Content
+
+ Rectangle {
+     id: root
+-    width: 640; height: 320
++    width: 768; height: 1024
+     color: "#646464"
+
+     ListView {
+diff --git a/examples/quick/demos/maroon/maroon.qml b/examples/quick/demos/maroon/maroon.qml
+index 2582fd7..b922643 100644
+--- a/examples/quick/demos/maroon/maroon.qml
++++ b/examples/quick/demos/maroon/maroon.qml
+@@ -45,8 +45,8 @@ import "content/logic.js" as Logic
+
+ Item {
+     id: root
+-    width: 320
+-    height: 480
++    width: 768
++    height: 1024
+     property var gameState
+     property bool passedSplash: false
+
+diff --git a/examples/quick/demos/photosurface/photosurface.qml b/examples/quick/demos/photosurface/photosurface.qml
+index d8a424e..d4dfdb8 100644
+--- a/examples/quick/demos/photosurface/photosurface.qml
++++ b/examples/quick/demos/photosurface/photosurface.qml
+@@ -45,7 +45,7 @@ import Qt.labs.folderlistmodel 1.0
+ Window {
+     id: root
+     visible: true
+-    width: 1024; height: 600
++    width: 768; height: 1024
+     color: "black"
+     property int highestZ: 0
+     property real defaultSize: 200
+diff --git a/examples/quick/demos/photoviewer/main.qml b/examples/quick/demos/photoviewer/main.qml
+index 2e2b8e4..bb53acb 100644
+--- a/examples/quick/demos/photoviewer/main.qml
++++ b/examples/quick/demos/photoviewer/main.qml
+@@ -71,7 +71,7 @@ ApplicationWindow {
+     property bool imageLoading: false
+     property bool editMode: false
+
+-    width: 800; height: 480; color: "#d5d6d8"
++    width: 768; height: 1024; color: "#d5d6d8"
+
+     ListModel {
+         id: photosModel
+diff --git a/examples/quick/demos/rssnews/rssnews.qml b/examples/quick/demos/rssnews/rssnews.qml
+index bd1ed48..9e974cc 100644
+--- a/examples/quick/demos/rssnews/rssnews.qml
++++ b/examples/quick/demos/rssnews/rssnews.qml
+@@ -46,8 +46,8 @@ import "./content"
+ Rectangle {
+     id: window
+
+-    width: 800
+-    height: 480
++    width: 768
++    height: 1024
+
+     property string currentFeed: rssFeeds.get(0).feed
+     property bool loading: feedModel.status === XmlListModel.Loading
+diff --git a/examples/quick/demos/samegame/samegame.qml b/examples/quick/demos/samegame/samegame.qml
+index 63e4083..1efd4cd 100644
+--- a/examples/quick/demos/samegame/samegame.qml
++++ b/examples/quick/demos/samegame/samegame.qml
+@@ -45,7 +45,7 @@ import "content"
+
+ Rectangle {
+     id: root
+-    width: Settings.screenWidth; height: Settings.screenHeight
++    width: 768; height: 1024
+     property int acc: 0
+
+
+diff --git a/examples/quick/demos/stocqt/stocqt.qml b/examples/quick/demos/stocqt/stocqt.qml
+index 6b1da17..758c080 100644
+--- a/examples/quick/demos/stocqt/stocqt.qml
++++ b/examples/quick/demos/stocqt/stocqt.qml
+@@ -44,8 +44,8 @@ import "./content"
+
+ Rectangle {
+     id: mainRect
+-    width: 1000
+-    height: 700
++    width: 768
++    height: 1024
+
+     property alias currentIndex: root.currentIndex
+
+diff --git a/examples/quick/demos/tweetsearch/tweetsearch.qml b/examples/quick/demos/tweetsearch/tweetsearch.qml
+index b1323a6..5b262d4 100644
+--- a/examples/quick/demos/tweetsearch/tweetsearch.qml
++++ b/examples/quick/demos/tweetsearch/tweetsearch.qml
+@@ -44,8 +44,8 @@ import "content/tweetsearch.js" as Helper
+
+ Rectangle {
+     id: main
+-    width: 320
+-    height: 480
++    width: 768
++    height: 1024
+     color: "#d6d6d6"
+
+     property int inAnimDur: 250

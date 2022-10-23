@@ -1,0 +1,37 @@
+--- swupdate-2018.11/core/swupdate.c	2019-07-19 13:33:33.926607700 +0800
++++ swupdate-2018.11/core/swupdate.c	2019-07-19 16:19:17.407359700 +0800
+@@ -98,6 +98,7 @@
+ #endif
+ #ifdef CONFIG_DOWNLOAD
+ 	{"download", required_argument, NULL, 'd'},
++	{"Download", required_argument, NULL, 'D'},
+ #endif
+ #ifdef CONFIG_SURICATTA
+ 	{"suricatta", required_argument, NULL, 'u'},
+@@ -605,7 +606,7 @@
+ #endif
+ #ifdef CONFIG_DOWNLOAD
+ 	strcat(main_options, "d:");
+-	strcat(main_options, "D");
++	strcat(main_options, "D:");
+ #endif
+ #ifdef CONFIG_SURICATTA
+ 	strcat(main_options, "u:");
+@@ -691,7 +692,7 @@
+ 	/* Process options with getopt */
+ 	while ((c = getopt_long(argc, argv, main_options,
+ 				long_options, NULL)) != EOF) {
+-		if (optarg && *optarg == '-' && (c != 'd' && c != 'u' && c != 'w')) {
++		if (optarg && *optarg == '-' && (c != 'd' && c != 'D' && c != 'u' && c != 'w')) {
+ 			/* An option's value starting with '-' is not allowed except
+ 			 * for downloader, webserver, and suricatta doing their own
+ 			 * argv parsing.
+@@ -769,7 +770,7 @@
+                 exit(EXIT_FAILURE);
+                 break;
+             }
+-            (void)snprintf(dwloptions, sizeof(dwloptions), "%s -u %s", argv[0], image_url);
++            (void)snprintf(dwloptions, sizeof(dwloptions), "%s -u %s %s", argv[0], image_url, optarg);
+             dwlav = splitargs(dwloptions, &dwlac);
+             opt_d = 1;
+             break;

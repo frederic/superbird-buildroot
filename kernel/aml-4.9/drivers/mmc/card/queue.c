@@ -19,11 +19,16 @@
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
+#include <linux/sched/rt.h>
 
 #include "queue.h"
 #include "block.h"
 
 #define MMC_QUEUE_BOUNCESZ	65536
+
+#ifdef CONFIG_AMLOGIC_CMA
+#include <linux/sched.h>
+#endif /* CONFIG_AMLOGIC_CMA */
 
 /*
  * Prepare a MMC request. This just filters out odd stuff.
@@ -53,8 +58,17 @@ static int mmc_queue_thread(void *d)
 {
 	struct mmc_queue *mq = d;
 	struct request_queue *q = mq->queue;
+	struct sched_param scheduler_params = {0};
+
+	scheduler_params.sched_priority = 1;
+
+	sched_setscheduler(current, SCHED_FIFO, &scheduler_params);
 
 	current->flags |= PF_MEMALLOC;
+
+#ifdef CONFIG_AMLOGIC_CMA
+	set_user_nice(current, -15);
+#endif /* CONFIG_AMLOGIC_CMA */
 
 	down(&mq->thread_sem);
 	do {

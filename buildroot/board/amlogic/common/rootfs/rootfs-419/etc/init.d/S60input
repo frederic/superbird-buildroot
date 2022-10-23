@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Starts the input_eventd daemon.
+#
+
+NAME=input_eventd
+DAEMON=/usr/bin/$NAME
+PIDFILE=/var/run/$NAME.pid
+
+case "$1" in
+    start)
+        echo -n "Starting $NAME: "
+        #start-stop-daemon -S -q -m -p $PIDFILE -b -x $DAEMON -- -f && echo "OK" || echo "Failed"
+        $NAME &
+        if [ ! -d "/etc/adckey" ];then
+            mkdir -p /etc/adckey
+            chmod 755 /etc/adckey
+        fi
+        if [ ! -f "/etc/adckey/adckey_function.sh" ];then
+            touch /etc/adckey/adckey_function.sh
+            chmod 777 /etc/adckey/adckey_function.sh
+            echo "#!/bin/sh" > /etc/adckey/adckey_function.sh
+            echo "echo getevent:\$1" >> /etc/adckey/adckey_function.sh
+        fi
+        ;;
+    stop)
+        echo -n "Stopping $NAME: "
+        #start-stop-daemon -K -q -p $PIDFILE && echo "OK" || echo "Failed"
+        #rm -f $PIDFILE
+	killall $NAME
+        ;;
+    netready|netup|netdown|netchange) ;;
+    restart|reload)
+        $0 stop
+        $0 start
+        ;;
+    *)
+    echo $"Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit $?
+

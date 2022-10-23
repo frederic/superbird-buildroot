@@ -1,0 +1,4 @@
+config BR2_PACKAGE_WESTON_DAEMON
+        bool "weston daemon"
+	default y if BR2_PACKAGE_WESTON
+

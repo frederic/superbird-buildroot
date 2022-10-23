@@ -8,5 +8,11 @@ config BR2_PACKAGE_LIBSOUNDTOUCH
 
 	  http://www.surina.net/soundtouch
 
+config BR2_PACKAGE_LIBSOUNDTOUCHCWRAP
+	bool "libsoundtouchcwrap"
+	depends on BR2_PACKAGE_LIBSOUNDTOUCH
+	help
+       Provide a C wrapper for C++ SoundTouch library, so it can be dlopened in C code
+
 comment "libsoundtouch needs a toolchain w/ C++"
 	depends on !BR2_INSTALL_LIBSTDCPP

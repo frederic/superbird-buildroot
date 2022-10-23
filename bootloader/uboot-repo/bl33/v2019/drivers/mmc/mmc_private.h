@@ -9,7 +9,64 @@
 #ifndef _MMC_PRIVATE_H_
 #define _MMC_PRIVATE_H_
 
+#include <clk.h>
 #include <mmc.h>
+
+#define SAMSUNG_MID			0x15
+#define KINGSTON_MID		0x70
+#define SAMSUNG_FFU_ADDR	0xc7810000
+#define KINGSTON_FFU_ADDR	0x0000ffff
+#define MAX_TUNING_RETRY	(4)
+#define CALI_BLK_CNT		(1024)
+#define REFIX_BLK_CNT		(100)
+#define CALI_PATTERN_ADDR   (0x13800)
+#define TUNING_NUM_PER_POINT 10
+#define MMC_MAX_DESC_NUM	512
+#define MAX_RESPONSE_BYTES	4
+
+/* unknown */
+#define CARD_TYPE_UNKNOWN       0
+/* MMC card */
+#define CARD_TYPE_MMC           1
+/* SD card */
+#define CARD_TYPE_SD            2
+/* SDIO card */
+#define CARD_TYPE_SDIO          3
+/* SD combo (IO+mem) card */
+#define CARD_TYPE_SD_COMBO      4
+/* NON sdio device (means SD/MMC card) */
+#define CARD_TYPE_NON_SDIO      5
+
+#define aml_card_type_unknown(c)    ((c)->card_type == CARD_TYPE_UNKNOWN)
+#define aml_card_type_mmc(c)        ((c)->card_type == CARD_TYPE_MMC)
+#define aml_card_type_sd(c)      ((c)->card_type == CARD_TYPE_SD)
+#define aml_card_type_sdio(c)      ((c)->card_type == CARD_TYPE_SDIO)
+#define aml_card_type_non_sdio(c)   ((c)->card_type == CARD_TYPE_NON_SDIO)
+
+struct meson_host {
+	struct mmc *mmc;
+	uint is_in;
+	uint is_sduart;
+	uint is_tuning;
+	uint card_type;
+	struct clk core;
+	struct clk xtal;
+	struct clk div2;
+	struct clk mux;
+	struct clk div;
+	struct clk gate;
+	struct gpio_desc gpio_cd;
+	struct gpio_desc gpio_reset;
+	char *blk_test;
+	char* desc_buf;
+};
+
+struct meson_mmc_platdata {
+	struct mmc_config cfg;
+	struct mmc mmc;
+	void *regbase;
+	void *w_buf;
+};
 
 extern int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			struct mmc_data *data);
@@ -134,4 +191,5 @@ int mmc_switch_part(struct mmc *mmc, unsigned int part_num);
  */
 int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value);
 
+int emmc_boot_chk(struct mmc *mmc);
 #endif /* _MMC_PRIVATE_H_ */

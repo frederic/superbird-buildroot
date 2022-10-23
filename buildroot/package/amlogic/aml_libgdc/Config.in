@@ -1,0 +1,12 @@
+config BR2_PACKAGE_AML_LIBGDC
+    bool "GDC library"
+    select BR2_PACKAGE_AML_LIBION
+    help
+        Support AML GDC library
+
+config BR2_PACKAGE_AML_LIBGDC_LOCAL_PATH
+    string "amlogic libgdc local path"
+    depends on BR2_PACKAGE_AML_LIBGDC
+    help
+        aml gdc local path
+

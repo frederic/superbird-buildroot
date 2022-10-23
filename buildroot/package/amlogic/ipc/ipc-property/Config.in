@@ -1,0 +1,8 @@
+config BR2_PACKAGE_IPC_PROPERTY
+  bool "ipc property service and library"
+  select BR2_PACKAGE_IPC_PROPERTY_JSON
+
+  help
+     include ipc property service and library
+
+source "package/amlogic/ipc/ipc-property/ipc-property-json/Config.in"

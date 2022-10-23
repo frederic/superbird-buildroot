@@ -1,0 +1,4 @@
+config BR2_PACKAGE_WEB_UI_WIFI
+	bool "web_ui_wifi"
+	help
+		All  files for web ui config wifi

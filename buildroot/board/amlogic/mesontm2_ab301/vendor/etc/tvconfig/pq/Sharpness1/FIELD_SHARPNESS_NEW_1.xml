@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="FIELD_SHARPNESS_NEW_1" platform="txlx" commands="">
+<Group num="0" val="">
+<Page tab_title="FIELD" layout="50x3">
+<Control type="field" tablename="Sharpness_1_HDMI_HD" tableid="0" port="5,6,7,8," sig="0,1027,1028,1034,1036,1037,1043,1044,1045,1046,1049,1050,1051,1054,1055,1062,1063,1064,1065,1066,1067,1068,1069,1070,1071,1072,1073,1074,1078,1079,1080,1081,1082,1083,1084,1085,1086,1087,1088,1089,1090,1091,1092,1102," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_HDMI_SD" tableid="0" port="5,6,7,8," sig="1025,1026,1029,1030,1031,1032,1033,1035,1038,1039,1040,1041,1042,1047,1048,1052,1053,1056,1057,1058,1059,1060,1061,1075,1076,1077,1078,1100,1101," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_AV_PAL" tableid="0" port="1,2," sig="1539,1540,1541,1542,1543," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_AV_NTSC" tableid="0" port="1,2," sig="1537,1538," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_ATV_PAL" tableid="0" port="0," sig="1539,1540,1541,1542,1543," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_ATV_NTSC" tableid="0" port="0," sig="1537,1538," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_DTV_HD" tableid="0" port="11," sig="0,1027,1028,1034,1036,1037,1043,1044,1045,1046,1049,1050,1051,1054,1055,1062,1063,1064,1065,1066,1067,1068,1069,1070,1071,1072,1073,1074,1078,1079,1080,1081,1082,1083,1084,1085,1086,1087,1088,1089,1090,1091,1092,1102," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_DTV_SD" tableid="0" port="11," sig="1025,1026,1029,1030,1031,1032,1033,1035,1038,1039,1040,1041,1042,1047,1048,1052,1053,1056,1057,1058,1059,1060,1061,1075,1076,1077,1078,1100,1101," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_MPEG_HD" tableid="0" port="10," sig="0,1027,1028,1034,1036,1037,1043,1044,1045,1046,1049,1050,1051,1054,1055,1062,1063,1064,1065,1066,1067,1068,1069,1070,1071,1072,1073,1074,1078,1079,1080,1081,1082,1083,1084,1085,1086,1087,1088,1089,1090,1091,1092,1102," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_MPEG_SD" tableid="0" port="10," sig="1025,1026,1029,1030,1031,1032,1033,1035,1038,1039,1040,1041,1042,1047,1048,1052,1053,1056,1057,1058,1059,1060,1061,1075,1076,1077,1078,1100,1101," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_HDMI_4K" tableid="0" port="5,6,7,8," sig="1093,1094," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_MPEG_4K" tableid="0" port="10," sig="1093,1094," trans="0,1,"/>
+<Control type="field" tablename="Sharpness_1_HDR" tableid="0" port="5,6,7,8,10," sig="1095," trans="0,1,"/>
+<Control type="port" name="TVIN_PORT_TV" value="0"/>
+<Control type="port" name="TVIN_PORT_AV1" value="1"/>
+<Control type="port" name="TVIN_PORT_AV2" value="2"/>
+<Control type="port" name="TVIN_PORT_HDMI1" value="5"/>
+<Control type="port" name="TVIN_PORT_HDMI2" value="6"/>
+<Control type="port" name="TVIN_PORT_HDMI3" value="7"/>
+<Control type="port" name="TVIN_PORT_HDMI4" value="8"/>
+<Control type="port" name="TVIN_PORT_MPEG" value="10"/>
+<Control type="port" name="TVIN_PORT_DTV" value="11"/>
+<Control type="sig" name="TVIN_SIG_FMT_NULL" value="0"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_640x480P_60Hz" value="1025"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x480P_60Hz" value="1026"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_60Hz" value="1027"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_60Hz" value="1028"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x480I_60Hz" value="1029"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x240P_60Hz" value="1030"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x480I_60Hz" value="1031"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x240P_60Hz" value="1032"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x480P_60Hz" value="1033"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_60Hz" value="1034"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x576P_50Hz" value="1035"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_50Hz" value="1036"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_50Hz_A" value="1037"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x576I_50Hz" value="1038"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x288P_50Hz" value="1039"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x576I_50Hz" value="1040"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x288P_50Hz" value="1041"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x576P_50Hz" value="1042"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_50Hz" value="1043"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_24Hz" value="1044"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_25Hz" value="1045"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_30Hz" value="1046"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x480P_60Hz" value="1047"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_2880x576P_60Hz" value="1048"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_50Hz_B" value="1049"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_100Hz" value="1050"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_100Hz" value="1051"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x576P_100Hz" value="1052"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x576I_100Hz" value="1053"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_120Hz" value="1054"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_120Hz" value="1055"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x480P_120Hz" value="1056"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x480I_120Hz" value="1057"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x576P_200Hz" value="1058"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x576I_200Hz" value="1059"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x480P_240Hz" value="1060"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440x480I_240Hz" value="1061"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_24Hz" value="1062"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_25Hz" value="1063"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_30Hz" value="1064"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_120Hz" value="1065"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_100Hz" value="1066"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_60Hz_FRAME_PACKING" value="1067"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_50Hz_FRAME_PACKING" value="1068"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_24Hz_FRAME_PACKING" value="1069"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280x720P_30Hz_FRAME_PACKING" value="1070"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_60Hz_FRAME_PACKING" value="1071"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080I_50Hz_FRAME_PACKING" value="1072"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_24Hz_FRAME_PACKING" value="1073"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920x1080P_30Hz_FRAME_PACKING" value="1074"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_800x600" value="1075"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1024X768" value="1076"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720_400" value="1077"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280_768" value="1078"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280_800" value="1079"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280_960" value="1080"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1280X1024" value="1081"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1360_768" value="1082"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1366_768" value="1083"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1600_1200" value="1084"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920_1200" value="1085"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1440_900" value="1086"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1400_1050" value="1087"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1680_1050" value="1088"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920X1080I_60HZ_ALTERNATIVE" value="1089"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_ALTERNATIVE" value="1090"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920X1080P_24HZ_ALTERNATIVE" value="1091"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_1920X1080P_30HZ_ALTERNATIVE" value="1092"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_3840_2160_00HZ" value="1093"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_4096_2160_00HZ" value="1094"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_HDR" value="1095"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_RESERVE11" value="1096"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_RESERVE12" value="1097"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_RESERVE13" value="1098"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_RESERVE14" value="1099"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x480P_60Hz_FRAME_PACKING" value="1100"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_720x576P_50Hz_FRAME_PACKING" value="1101"/>
+<Control type="sig" name="TVIN_SIG_FMT_HDMI_MAX" value="1102"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_NTSC_M" value="1537"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_NTSC_443" value="1538"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_PAL_I" value="1539"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_PAL_M" value="1540"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_PAL_60" value="1541"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_PAL_CN" value="1542"/>
+<Control type="sig" name="TVIN_SIG_FMT_CVBS_SECAM" value="1543"/>
+<Control type="sig" name="TVIN_SIG_FMT_BT656IN_576I" value="2049"/>
+<Control type="sig" name="TVIN_SIG_FMT_BT656IN_480I" value="2050"/>
+<Control type="sig" name="TVIN_SIG_FMT_BT601IN_576I" value="2051"/>
+<Control type="sig" name="TVIN_SIG_FMT_BT601IN_480I" value="2052"/>
+<Control type="sig" name="TVIN_SIG_FMT_CAMERA_640X480P_30Hz" value="2053"/>
+<Control type="sig" name="TVIN_SIG_FMT_CAMERA_800X600P_30Hz" value="2054"/>
+<Control type="sig" name="TVIN_SIG_FMT_CAMERA_1024X768P_30HZ" value="2055"/>
+<Control type="sig" name="TVIN_SIG_FMT_CAMERA_1920X1080P_30Hz" value="2056"/>
+<Control type="sig" name="TVIN_SIG_FMT_CAMERA_1280X720P_30Hz" value="2057"/>
+<Control type="sig" name="TVIN_SIG_FMT_MAX" value="2058"/>
+<Control type="sig" name="TVIN_SIG_FMT_NULL0" value="3"/>
+<Control type="sig" name="TVIN_SIG_FMT_NULL1" value="4"/>
+<Control type="sig" name="TVIN_SIG_FMT_NULL2" value="5"/>
+<Control type="trans" name="TVIN_TFMT0_2D" value="0"/>
+<Control type="trans" name="TVIN_TFMT0_3D" value="1"/>
+</Page>
+</Group>
+</Form>
+

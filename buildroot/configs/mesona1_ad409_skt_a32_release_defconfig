@@ -1,0 +1,262 @@
+# Mirrors and Download locations
+BR2_BACKUP_SITE="http://sources.buildroot.net"
+# Architecture
+BR2_cortex_a35=y
+BR2_arm=y
+BR2_ARM_KERNEL_32=y
+
+BR2_ARM_CPU_HAS_VFPV4
+BR2_ARM_CPU_HAS_NEON
+BR2_ARM_CPU_HAS_FP_ARMV8=y
+BR2_ARM_FPU_NEON_FP_ARMV8=y
+
+#BR2_ARM_ENABLE_VFP=y
+#BR2_ARM_ENABLE_NEON=y
+#BR2_ARM_FPU_NEON=y
+
+BR2_DEPRECATED=y
+BR2_TOOLCHAIN_EXTERNAL_LINARO_ARMV8_7DOT3_201805_PREINSTALLED=y
+BR2_TOOLCHAIN_EXTERNAL=y
+BR2_TOOLCHAIN_EXTERNAL_PREINSTALLED=y
+BR2_TOOLCHAIN_EXTERNAL_PATH="$(TOPDIR)/../toolchain/gcc/linux-x86/arm/gcc-linaro-7.3.1-2018.05-x86_64_armv8l-linux-gnueabihf"
+BR2_KERNEL_TOOLCHAIN_PATH="$(TOPDIR)/../toolchain/gcc/linux-x86/arm/gcc-linaro-7.3.1-2018.05-x86_64_armv8l-linux-gnueabihf"
+BR2_KERNEL_TOOLCHAIN_LINARO_ARMV8_201805=y
+#BR2_ENABLE_DEBUG=y
+
+BR2_TARGET_ROOTFS_CPIO=y
+BR2_TARGET_ROOTFS_CPIO_GZIP=y
+BR2_TARGET_ROOTFS_CPIO_UIMAGE=y
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/common/initramfs/initramfs-419/ramfslist-32-ubi-release"
+BR2_TARGET_ROOTFS_UBIFS=y
+BR2_TARGET_ROOTFS_UBIFS_LEBSIZE=0x1f000
+BR2_TARGET_ROOTFS_UBIFS_MAXLEBCNT=2212
+BR2_TARGET_ROOTFS_UBIFS_OPTS="-v"
+BR2_TARGET_ROOTFS_UBI=y
+BR2_TARGET_ROOTFS_UBI_SUBSIZE=2048
+#BR2_TARGET_ROOTFS_EXT2=y
+#BR2_TARGET_ROOTFS_EXT2_4=y
+BR2_TARGET_ROOTFS_TAR_GZIP=y
+BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_MDEV=y
+BR2_ROOTFS_COMMON_OVERLAY="board/amlogic/common/rootfs/rootfs-419-audio/"
+BR2_ROOTFS_OVERLAY="board/amlogic/mesona1_ad409/rootfs/"
+BR2_ROOTFS_UPGRADE_DIR="board/amlogic/common/upgrade/upgrade-a1/"
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(TOPDIR)/board/amlogic/mesona1_ad409/post_build.sh"
+BR2_RECOVERY_OTA_DIR="board/amlogic/common/ota/ota-a1/"
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_LOCAL_VERSION_VALUE="amlogic-4.19-dev"
+BR2_LINUX_KERNEL_CUSTOM_LOCAL=y
+BR2_LINUX_KERNEL_CUSTOM_LOCAL_PATH="$(TOPDIR)/../kernel/aml-4.19"
+BR2_LINUX_KERNEL_DEFCONFIG="meson64_a32_smarthome"
+BR2_TARGET_BOARD_PLATFORM="mesonaxg"
+BR2_LINUX_KERNEL_IMAGE_LOADADDR="0x20000"
+BR2_LINUX_KERNEL_BOOTIMAGE_OFFSET="0x20000"
+BR2_LINUX_KERNEL_PATCH="amlogic-4.19"
+BR2_LINUX_KERNEL_DTS_SUPPORT=y
+BR2_LINUX_KERNEL_USE_INTREE_DTS=y
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="meson-a1-a113l-ad409"
+BR2_LINUX_KERNEL_AMLOGIC_DTD=y
+BR2_LINUX_KERNEL_ANDROID_FORMAT=y
+#32Bit kernel must use uImage
+BR2_LINUX_KERNEL_UIMAGE=y
+
+BR2_TARGET_UBOOT=y
+BR2_TARGET_UBOOT_CUSTOM_LOCAL=y
+BR2_TARGET_UBOOT_CUSTOM_LOCAL_VERSION_VALUE="2019"
+BR2_TARGET_UBOOT_CUSTOM_LOCAL_LOCATION="$(TOPDIR)/../bootloader/uboot-repo"
+BR2_TARGET_UBOOT_PATCH=""
+BR2_TARGET_UBOOT_BOARDNAME="a1_ad409_nand_linux"
+BR2_TARGET_UBOOT_AMLOGIC_REPO=y
+BR2_TARGET_UBOOT_PLATFORM="a1"
+BR2_TARGET_USBTOOL_AMLOGIC=y
+BR2_TARGET_USBTOOL_UBI_AMLOGIC=y
+BR2_TARGET_UBOOT_AMLOGIC_BOOTARGS="root=/dev/ubi0_0 rootfstype=ubifs init=/sbin/init"
+
+# Audio/Sound
+BR2_PACKAGE_LIBSAMPLERATE=y
+BR2_PACKAGE_ALSA_PLUGINS=y
+
+#For ALSALIB
+BR2_PACKAGE_ALSA_LIB=y
+BR2_PACKAGE_ALSA_LIB_DEVDIR="/dev/snd"
+BR2_PACKAGE_ALSA_LIB_PCM_PLUGINS="all"
+BR2_PACKAGE_ALSA_LIB_CTL_PLUGINS="all"
+BR2_PACKAGE_ALSA_LIB_ALOAD=y
+BR2_PACKAGE_ALSA_LIB_MIXER=y
+BR2_PACKAGE_ALSA_LIB_PCM=y
+BR2_PACKAGE_ALSA_LIB_RAWMIDI=y
+BR2_PACKAGE_ALSA_LIB_HWDEP=y
+BR2_PACKAGE_ALSA_LIB_SEQ=y
+BR2_PACKAGE_ALSA_LIB_ALISP=y
+BR2_PACKAGE_ALSA_LIB_OLD_SYMBOLS=y
+
+#For ALSAUTILS
+BR2_PACKAGE_ALSA_UTILS=y
+BR2_PACKAGE_ALSA_UTILS_ALSACTL=y
+BR2_PACKAGE_ALSA_UTILS_ALSACONF=y
+BR2_PACKAGE_ALSA_UTILS_AMIXER=y
+BR2_PACKAGE_ALSA_UTILS_ALSAMIXER=y
+BR2_PACKAGE_ALSA_UTILS_APLAY=y
+BR2_PACKAGE_ALSA_UTILS_ALSALOOP=y
+BR2_PACKAGE_ALSA_UTILS_ALSATPLG=y
+BR2_PACKAGE_ALSA_UTILS_BAT=y
+BR2_PACKAGE_ALSA_UTILS_IECSET=y
+BR2_PACKAGE_ALSA_UTILS_SPEAKER_TEST=y
+
+
+#For rsyslog, needed by audio service
+BR2_PACKAGE_RSYSLOG=y
+BR2_PACKAGE_LIBESTR=y
+BR2_PACKAGE_LIBFASTJSON=y
+BR2_PACKAGE_LIBLOGGING=y
+
+#For MTD
+BR2_PACKAGE_MTD=y
+BR2_PACKAGE_MTD_FLASHCP=y
+BR2_PACKAGE_MTD_FLASH_ERASE=y
+BR2_PACKAGE_MTD_FLASH_LOCK=y
+BR2_PACKAGE_MTD_FLASH_UNLOCK=y
+BR2_PACKAGE_MTD_MKFSUBIFS=y
+BR2_PACKAGE_MTD_MTDINFO=y
+BR2_PACKAGE_MTD_MTD_DEBUG=y
+BR2_PACKAGE_MTD_NANDDUMP=y
+BR2_PACKAGE_MTD_NANDTEST=y
+BR2_PACKAGE_MTD_NANDWRITE=y
+BR2_PACKAGE_MTD_UBIATTACH=y
+BR2_PACKAGE_MTD_UBIDETACH=y
+BR2_PACKAGE_MTD_UBIFORMAT=y
+BR2_PACKAGE_MTD_UBIMKVOL=y
+BR2_PACKAGE_MTD_UBINFO=y
+BR2_PACKAGE_MTD_UBINIZE=y
+
+#For RTOS
+BR2_PACKAGE_AML_RTOS=y
+BR2_PACKAGE_AML_RTOS_LOCAL_PATH="$(TOPDIR)/../vendor/amlogic/rtos/freertos"
+BR2_PACKAGE_AML_RTOS_DSPA_BUILD_OPTION="a1_a113l_ad409_hifi4a"
+BR2_PACKAGE_AML_RTOS_DSPA_INSTALL=y
+
+BR2_PACKAGE_AML_SOC_FAMILY_NAME="A1"
+BR2_PACKAGE_AML_SOC_CHIP_NAME="A113L"
+BR2_PACKAGE_AML_SOC_BOARD_NAME="AD409"
+
+#---------
+BR2_PACKAGE_LIBGLIB2=y
+BR2_PACKAGE_LIBCURL=y
+BR2_PACKAGE_CURL=y
+BR2_PACKAGE_LIBCURL_TLS_SUPPORT=y
+BR2_PACKAGE_LIBCURL_MBEDTLS=y
+BR2_PACKAGE_NGHTTP2=y
+BR2_PACKAGE_MBEDTLS=y
+
+#-----------------------For WiFi & BT----------------------------------#
+BR2_PACKAGE_HOSTAPD=y
+BR2_PACKAGE_HOSTAPD_ACS=y
+BR2_PACKAGE_HOSTAPD_EAP=y
+BR2_PACKAGE_HOSTAPD_WPS=y
+BR2_PACKAGE_WPA_SUPPLICANT=y
+BR2_PACKAGE_WPA_SUPPLICANT_CLI=y
+BR2_PACKAGE_IW=y
+BR2_PACKAGE_DHCPCD=y
+BR2_PACKAGE_DNSMASQ=y
+BR2_PACKAGE_DNSMASQ_TFTP=y
+BR2_PACKAGE_DNSMASQ_DHCP=y
+BR2_PACKAGE_DNSMASQ_DNSSEC=y
+BR2_PACKAGE_DNSMASQ_IDN=y
+BR2_PACKAGE_DNSMASQ_CONNTRACK=y
+#BR2_PACKAGE_READLINE=y
+
+#For BT Firmware
+BR2_PACKAGE_WIFI_FW=y
+BR2_PACKAGE_WIFI_FW_LOCAL=y
+BR2_PACKAGE_WIFI_FW_CUSTOM_GIT_REPO_URL="a"
+BR2_PACKAGE_WIFI_CUSTOM_GIT_VERSION="p-amlogic"
+BR2_PACKAGE_WIFI_FW_CUSTOM_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.19/amlogic/wifi"
+BR2_PACKAGE_WIFI_FW_WIFI_MODULE="AP6236"
+BR2_PACKAGE_FAAD2=y
+
+#----------------------Only For BRCM WiFi/BT----------------------------------------------Begin#
+BR2_PACKAGE_AML_BRCM_BSA=y
+BR2_PACKAGE_DHD_PRIV=y
+BR2_PACKAGE_BRCMAP6XXX=y
+BR2_PACKAGE_BRCMAP6XXX_LOCAL=y
+BR2_PACKAGE_BRCMAP6XXX_STANDALONE=y
+BR2_PACKAGE_BRCMAP6XXX_GIT_VERSION="q-amlogic"
+BR2_PACKAGE_BRCMAP6XXX_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.19/wifi/broadcom/drivers/ap6xxx"
+BR2_PACKAGE_BRCMAP6XXX_SDIO_VERSION="bcmdhd.100.10.315.x"
+#BR2_PACKAGE_BRCMAP6XXX_USB_VERSION="bcmdhd-usb.1.363.110.17.x"
+BR2_PACKAGE_BRCM_SMARTCONFIG=y
+BR2_PACKAGE_BRCM_SMARTCONFIG_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.9/amlogic/wifi/bcm_ampak/tools/easySetupTarget"
+#----------------------Only For BRCM WiFi/BT----------------------------------------------End#
+
+
+#----------------------Only For RealTeck WiFi/BT----------------------------------------------Begin#
+#for rtk
+#BR2_PACKAGE_RTK8723DS=y
+#BR2_PACKAGE_RTK8723DS_LOCAL=y
+#BR2_PACKAGE_RTK8723DS_STANDALONE=y
+#BR2_PACKAGE_RTK8723DS_GIT_VERSION="n-amlogic"
+#BR2_PACKAGE_RTK8723DS_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.9/wifi/realtek/drivers/8723ds"
+#
+#BR2_PACKAGE_REALTEK_BT=y
+#BR2_PACKAGE_REALTEK_BT_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.9/realtek/bluetooth"
+#BR2_PACKAGE_REALTEK_UART_BT=y
+#BR2_PACKAGE_REALTEK_USB_BT=y
+
+#BR2_PACKAGE_SBC=y
+#BR2_PACKAGE_BLUEZ5_UTILS=y
+#BR2_PACKAGE_BLUEZ5_UTILS_OBEX=y
+#BR2_PACKAGE_BLUEZ5_UTILS_CLIENT=y
+#BR2_PACKAGE_BLUEZ_ALSA=y
+#----------------------Only For RealTeck WiFi/BT----------------------------------------------End#
+
+#-----------For Debug Purpose--------------------------------------------------#
+BR2_PACKAGE_PROCRANK_LINUX=y
+BR2_PACKAGE_LSOF=y
+BR2_PACKAGE_DROPBEAR=y
+BR2_PACKAGE_DROPBEAR_CLIENT=y
+BR2_PACKAGE_DROPBEAR_SMALL=y
+BR2_PACKAGE_STRACE=y
+
+#-----------For ADB Feature----------------------------------------------------#
+BR2_PACKAGE_ANDROID_TOOLS=y
+BR2_PACKAGE_ANDROID_TOOLS_FASTBOOT_GOOD_KERNEL_HEADERS=y
+BR2_PACKAGE_ANDROID_TOOLS_ADBD=y
+BR2_PACKAGE_AML_USB_CONFIG=y
+BR2_PACKAGE_ADB_RNDIS=y
+BR2_PACKAGE_AML_UTIL=y
+BR2_PACKAGE_UTIL_LINUX_BINARIES=y
+BR2_PACKAGE_OPENSSL=y
+
+#For SWUpdate, without swupdate, recovery.img not will be generate
+BR2_PACKAGE_AML_UBOOTENV=y
+BR2_PACKAGE_AML_BOOTLOADER_MESSAGE=y
+
+#-----------For SWUpdate Feature------------------------------------------------#
+BR2_PACKAGE_SWUPDATE=y
+BR2_PACKAGE_SWUPDATE_CONFIG="package/swupdate/swupdate.config"
+
+#-----------------------For AML Audio Player--------------------------------#
+BR2_PACKAGE_AML_AUDIO_PLAYER=y
+# FFMPEG for USBPlayer, audio only
+#
+BR2_PACKAGE_FFMPEG_ARCH_SUPPORTS=y
+BR2_PACKAGE_FFMPEG=y
+# BR2_PACKAGE_FFMPEG_GPL is not set
+# # BR2_PACKAGE_FFMPEG_NONFREE is not set
+BR2_PACKAGE_FFMPEG_FFMPEG=y
+BR2_PACKAGE_FFMPEG_FFPLAY=y
+# # BR2_PACKAGE_FFMPEG_FFSERVER is not set
+# # BR2_PACKAGE_FFMPEG_FFPROBE is not set
+# # BR2_PACKAGE_FFMPEG_AVRESAMPLE is not set
+BR2_PACKAGE_FFMPEG_SWSCALE=y
+BR2_PACKAGE_FFMPEG_ENCODERS=""
+BR2_PACKAGE_FFMPEG_DECODERS="8svx_exp, 8svx_fib, aac, aac_fixed, aac_latm, ac3, ac3_fixed, adpcm_4xm, adpcm_adx, adpcm_afc, adpcm_aica, adpcm_ct, adpcm_dtk, adpcm_ea, adpcm_ea_maxis_xa, adpcm_ea_r1, adpcm_ea_r2, adpcm_ea_r3, adpcm_ea_xas, g722, g726, g726le, adpcm_ima_amv, adpcm_ima_apc, adpcm_ima_dat4, adpcm_ima_dk3, adpcm_ima_dk4, adpcm_ima_ea_eacs, adpcm_ima_ea_sead, adpcm_ima_iss, adpcm_ima_oki, adpcm_ima_qt, adpcm_ima_rad, adpcm_ima_smjpeg, adpcm_ima_wav, adpcm_ima_ws, adpcm_ms, adpcm_mtaf, adpcm_psx, adpcm_sbpro_2, adpcm_sbpro_3, adpcm_sbpro_4, adpcm_swf, adpcm_thp, adpcm_thp_le, adpcm_vima, adpcm_xa, adpcm_yamaha, alac, amrnb, libopencore_amrnb, amrwb, libopencore_amrwb, ape, aptx, aptx_hd, atrac1, atrac3, atrac3al, atrac3plus, atrac3plusal, on2avc, binkaudio_dct, binkaudio_rdft, bmv_audio, comfortnoise, cook, dolby_e, dsd_lsbf, dsd_lsbf_planar, dsd_msbf, dsd_msbf_planar, dsicinaudio, dss_sp, dst, dca, dvaudio, eac3, evrc, flac, g723_1, g729, gremlin_dpcm, gsm, gsm_ms, iac, imc, interplay_dpcm, interplayacm, mace3, mace6, metasound, mlp, mp1, mp1float, mp2, mp2float, mp3float, mp3, mp3adufloat, mp3adu, mp3on4float, mp3on4, als, mpc7, mpc8, nellymoser, opus, libopus, paf_audio, pcm_alaw, pcm_bluray, pcm_dvd, pcm_f16le, pcm_f24le, pcm_f32be, pcm_f32le, pcm_f64be, pcm_f64le, pcm_lxf, pcm_mulaw, pcm_s16be, pcm_s16be_planar, pcm_s16le, pcm_s16le_planar, pcm_s24be, pcm_s24daud, pcm_s24le, pcm_s24le_planar, pcm_s32be, pcm_s32le, pcm_s32le_planar, pcm_s64be, pcm_s64le, pcm_s8, pcm_s8_planar, pcm_u16be, pcm_u16le, pcm_u24be, pcm_u24le, pcm_u32be, pcm_u32le, pcm_u8, pcm_zork, qcelp, qdm2, qdmc, real_144, real_288, ralf, roq_dpcm, s302m, sbc, sdx2_dpcm, shorten, sipr, smackaud, sol_dpcm, sonic, libspeex, tak, truehd, truespeech, tta, twinvq, vmdaudio, vorbis, libvorbis, wavesynth, wavpack, ws_snd1, wmalossless, wmapro, wmav1, wmav2, wmavoice, xan_dpcm, xma1, xma2"
+BR2_PACKAGE_FFMPEG_MUXERS=""
+BR2_PACKAGE_FFMPEG_DEMUXERS="all"
+BR2_PACKAGE_FFMPEG_PARSERS="all"
+BR2_PACKAGE_FFMPEG_BSFS="all"
+BR2_PACKAGE_FFMPEG_PROTOCOLS="all"
+BR2_PACKAGE_FFMPEG_FILTERS="amix,aresample"
+BR2_PACKAGE_FFMPEG_INDEVS=y
+BR2_PACKAGE_FFMPEG_OUTDEVS=y
+BR2_PACKAGE_FFMPEG_EXTRACONF=""
+

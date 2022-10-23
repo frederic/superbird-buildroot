@@ -1,0 +1,53 @@
+config BR2_PACKAGE_MESON_MALI
+	bool "amlogic mali opengl provider"
+	select BR2_PACKAGE_HAS_LIBGLES
+	select BR2_PACKAGE_HAS_LIBEGL
+	help
+		amlogic mali400 opengl driver.
+
+		http://openlinux.amlogic.com
+
+config BR2_PACKAGE_MESON_MALI_MODEL
+	string "mali hw model"
+
+config BR2_PACKAGE_MESON_MALI_VERSION
+	string "mali opengl version"
+
+choice
+        bool "choose a mali egl"
+        default BR2_PACKAGE_MESON_MALI_WAYLAND_DRM_EGL if BR2_PACKAGE_WESTON_DRM
+        default BR2_PACKAGE_MESON_MALI_WAYLAND_FBDEV_EGL if BR2_PACKAGE_WESTON_FBDEV && !BR2_PACKAGE_WESTON_DRM
+        default BR2_PACKAGE_MESON_MALI_DUMMY_EGL if !BR2_PACKAGE_WESTON && BR2_PACKAGE_AML_MINIGBM
+        default BR2_PACKAGE_MESON_MALI_FBDEV_EGL if !BR2_PACKAGE_WESTON && !BR2_PACKAGE_AML_MINIGBM
+        help
+                choose wayland_fbdev, wayland_drm, dummy or fbdev
+
+config BR2_PACKAGE_MESON_MALI_WAYLAND_FBDEV_EGL
+        bool "wayland with fbdev backend"
+        select BR2_PACKAGE_HAS_LIBEGL_WAYLAND
+        help
+                support wayland api for app, backend is fbdev
+
+config BR2_PACKAGE_MESON_MALI_WAYLAND_DRM_EGL
+        bool "wayland with drm backend"
+        select BR2_PACKAGE_HAS_LIBEGL_WAYLAND
+        help
+                support wayland api for app, backend is drm
+
+config BR2_PACKAGE_MESON_MALI_DUMMY_EGL
+        bool "dummy"
+        help
+                support dummy for chromeos to use
+
+config BR2_PACKAGE_MESON_MALI_FBDEV_EGL
+        bool "fbdev"
+        help
+                support fbdev for app to control
+
+endchoice
+
+config BR2_PACKAGE_PROVIDES_LIBEGL
+	default "meson-mali" if BR2_PACKAGE_MESON_MALI
+
+config BR2_PACKAGE_PROVIDES_LIBGLES
+	default "meson-mali" if BR2_PACKAGE_MESON_MALI

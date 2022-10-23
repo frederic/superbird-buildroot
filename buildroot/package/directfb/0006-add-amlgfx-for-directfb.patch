@@ -1,0 +1,3501 @@
+From 0feaf732f86479d789f71952cc0d6dfcc7108602 Mon Sep 17 00:00:00 2001
+From: Pengcheng Chen <pengcheng.chen@amlogic.com>
+Date: Tue, 7 Mar 2017 16:40:27 +0800
+Subject: [PATCH] add amlgfx for directfb
+
+---
+ configure                     |   30 +-
+ configure.in                  |   13 +-
+ gfxdrivers/Makefile.am        |    7 +
+ gfxdrivers/amlgfx/Makefile.am |   42 +
+ gfxdrivers/amlgfx/Makefile.in |  669 ++++++++++++++++
+ gfxdrivers/amlgfx/aml.c       |  185 +++++
+ gfxdrivers/amlgfx/aml.h       |  411 ++++++++++
+ gfxdrivers/amlgfx/aml_accel.c | 1081 ++++++++++++++++++++++++++
+ gfxdrivers/amlgfx/aml_accel.h |   98 +++
+ gfxdrivers/amlgfx/aml_state.c |  596 ++++++++++++++
+ gfxdrivers/amlgfx/aml_state.h |   69 ++
+ gfxdrivers/amlgfx/amlfb.h     |   47 ++
+ systems/fbdev/fb.h            |    1 +
+ 14 files changed, 3250 insertions(+), 12 deletions(-)
+ mode change 100755 => 100755 configure
+ create mode 100644 gfxdrivers/amlgfx/Makefile.am
+ create mode 100644 gfxdrivers/amlgfx/Makefile.in
+ create mode 100644 gfxdrivers/amlgfx/aml.c
+ create mode 100644 gfxdrivers/amlgfx/aml.h
+ create mode 100644 gfxdrivers/amlgfx/aml_accel.c
+ create mode 100644 gfxdrivers/amlgfx/aml_accel.h
+ create mode 100644 gfxdrivers/amlgfx/aml_state.c
+ create mode 100644 gfxdrivers/amlgfx/aml_state.h
+ create mode 100644 gfxdrivers/amlgfx/amlfb.h
+
+diff --git a/configure b/configure
+old mode 100755
+new mode 100755
+index a36e948..6fa6c6f
+--- a/configure
++++ b/configure
+@@ -758,6 +758,8 @@ GFX_CYBER5K_FALSE
+ GFX_CYBER5K_TRUE
+ GFX_CLE266_FALSE
+ GFX_CLE266_TRUE
++GFX_AMLGFX_FALSE
++GFX_AMLGFX_TRUE
+ GFX_ATI128_FALSE
+ GFX_ATI128_TRUE
+ DIRECTFB_CSOURCE
+@@ -6225,8 +6227,8 @@ esac
+ 
+ 
+ 
+-macro_version='2.4.2'
+-macro_revision='1.3337'
++macro_version='2.4.6'
++macro_revision='2.4.6'
+ 
+ 
+ 
+@@ -22982,7 +22984,7 @@ fi
+ 
+ 
+ 
+-
++almgfx=yes
+ ati128=no
+ cle266=no
+ cyber5k=no
+@@ -23025,6 +23027,7 @@ else
+ fi
+ 
+ if test "$gfxdrivers" = "all"; then
++  checkfor_amlgfx=yes
+   checkfor_ati128=yes
+   checkfor_cle266=no
+   checkfor_cyber5k=no
+@@ -23060,6 +23063,9 @@ else
+     for gfxdriver in $gfxdrivers
+     do
+       case "$gfxdriver" in
++          amlgfx)
++                  checkfor_amlgfx=yes
++                  ;;
+           ati128)
+                   checkfor_ati128=yes
+                   ;;
+@@ -23149,6 +23155,9 @@ $as_echo "$gfxdrivers" >&6; }
+   fi
+ fi
+ 
++if test "$checkfor_amlgfx" = "yes"; then
++  amlgfx=yes
++fi
+ if test "$checkfor_ati128" = "yes"; then
+   ati128=yes
+ fi
+@@ -24167,7 +24176,13 @@ fi
+   fi
+ fi
+ 
+-
++ if test "$amlgfx" = "yes"; then
++  GFX_AMLGFX_TRUE=
++  GFX_AMLGFX_FALSE='#'
++else
++  GFX_AMLGFX_TRUE='#'
++  GFX_AMLGFX_FALSE=
++fi
+ 
+  if test "$ati128" = "yes"; then
+   GFX_ATI128_TRUE=
+@@ -24716,7 +24731,7 @@ else
+ fi
+ 
+ 
+-ac_config_files="$ac_config_files build-android/Makefile directfb-config directfb.pc directfb-internal.pc directfb.spec Makefile include/Makefile include/directfb_build.h include/directfb_version.h include/++dfb/Makefile lib/Makefile lib/direct/Makefile lib/direct/build.h lib/direct/direct.pc lib/direct/os/Makefile lib/direct/os/linux/glibc/Makefile lib/fusion/Makefile lib/fusion/build.h lib/fusion/fusion.pc lib/fusion/shm/Makefile lib/One/Makefile lib/One/one.pc lib/voodoo/Makefile lib/voodoo/build.h lib/voodoo/unix/Makefile lib/voodoo/voodoo.pc lib/sawman/Makefile lib/sawman/sawman.pc lib/fusiondale/Makefile lib/fusiondale/coma/Makefile lib/fusiondale/core/Makefile lib/fusiondale/messenger/Makefile lib/fusiondale/misc/Makefile lib/fusiondale/one/Makefile lib/fusiondale/fusiondale.pc lib/fusiondale/fusiondale_version.h lib/fusionsound/Makefile lib/fusionsound/core/Makefile lib/fusionsound/drivers/Makefile lib/fusionsound/media/Makefile lib/fusionsound/misc/Makefile lib/fusionsound/fusionsound.pc lib/fusionsound/fusionsound-internal.pc lib/fusionsound/fusionsound_limits.h lib/fusionsound/fusionsound_version.h lib/divine/Makefile lib/divine/divine.pc lib/dvc/Makefile lib/++dfb/Makefile lib/++dfb/++dfb.pc patches/Makefile proxy/Makefile proxy/compressor/Makefile proxy/dispatcher/Makefile proxy/requestor/Makefile rules/Makefile src/Makefile src/core/Makefile src/display/Makefile src/gfx/Makefile src/gfx/generic/Makefile src/input/Makefile src/media/Makefile src/misc/Makefile src/windows/Makefile systems/Makefile systems/android/Makefile systems/devmem/Makefile systems/dummy/Makefile systems/fbdev/Makefile systems/mesa/Makefile systems/drmkms/Makefile systems/pvr2d/Makefile systems/egl/Makefile systems/x11/Makefile systems/x11vdpau/Makefile systems/osx/Makefile systems/sdl/Makefile systems/vnc/Makefile wm/Makefile wm/default/Makefile wm/unique/Makefile wm/unique/classes/Makefile wm/unique/data/Makefile wm/unique/devices/Makefile wm/sawman/Makefile gfxdrivers/Makefile gfxdrivers/ati128/Makefile gfxdrivers/cle266/Makefile gfxdrivers/cyber5k/Makefile gfxdrivers/davinci/Makefile gfxdrivers/ep9x/Makefile gfxdrivers/gp2d/Makefile gfxdrivers/gl/Makefile gfxdrivers/gles2/Makefile gfxdrivers/i810/Makefile gfxdrivers/i830/Makefile gfxdrivers/mach64/Makefile gfxdrivers/matrox/Makefile gfxdrivers/neomagic/Makefile gfxdrivers/nsc/Makefile gfxdrivers/nsc/include/Makefile gfxdrivers/nvidia/Makefile gfxdrivers/omap/Makefile gfxdrivers/pvr2d/Makefile gfxdrivers/pxa3xx/Makefile gfxdrivers/radeon/Makefile gfxdrivers/savage/Makefile gfxdrivers/sh772x/Makefile gfxdrivers/sis315/Makefile gfxdrivers/tdfx/Makefile gfxdrivers/unichrome/Makefile gfxdrivers/vdpau/Makefile gfxdrivers/vmware/Makefile inputdrivers/Makefile inputdrivers/dbox2remote/Makefile inputdrivers/divine/Makefile inputdrivers/dreamboxremote/Makefile inputdrivers/dynapro/Makefile inputdrivers/elo/Makefile inputdrivers/gunze/Makefile inputdrivers/h3600_ts/Makefile inputdrivers/input_hub/Makefile inputdrivers/joystick/Makefile inputdrivers/keyboard/Makefile inputdrivers/linux_input/Makefile inputdrivers/lirc/Makefile inputdrivers/mutouch/Makefile inputdrivers/zytronic/Makefile inputdrivers/penmount/Makefile inputdrivers/ps2mouse/Makefile inputdrivers/serialmouse/Makefile inputdrivers/sonypi/Makefile inputdrivers/tslib/Makefile inputdrivers/ucb1x00_ts/Makefile inputdrivers/wm97xx_ts/Makefile interfaces/Makefile interfaces/ICoreResourceManager/Makefile interfaces/IDirectFBFont/Makefile interfaces/IDirectFBGL/Makefile interfaces/IDirectFBGL/EGL/Makefile interfaces/IDirectFBImageProvider/Makefile interfaces/IDirectFBImageProvider/mpeg2/Makefile interfaces/IDirectFBVideoProvider/Makefile interfaces/IDirectFBVideoProvider/video_out_dfb/Makefile interfaces/IDirectFBWindows/Makefile interfaces/IFusionSound/Makefile interfaces/IFusionSoundMusicProvider/Makefile interfaces/IWater/Makefile data/Makefile tests/Makefile tests/voodoo/Makefile tools/Makefile examples/fusiondale/Makefile examples/fusionsound/Makefile examples/++dfb/Makefile examples/++dfb/tests/Makefile examples/++dfb/tests/data/Makefile docs/Makefile docs/dfbg.1 docs/directfb-csource.1 docs/directfbrc.5 docs/html/Makefile"
++ac_config_files="$ac_config_files build-android/Makefile directfb-config directfb.pc directfb-internal.pc directfb.spec Makefile include/Makefile include/directfb_build.h include/directfb_version.h include/++dfb/Makefile lib/Makefile lib/direct/Makefile lib/direct/build.h lib/direct/direct.pc lib/direct/os/Makefile lib/direct/os/linux/glibc/Makefile lib/fusion/Makefile lib/fusion/build.h lib/fusion/fusion.pc lib/fusion/shm/Makefile lib/One/Makefile lib/One/one.pc lib/voodoo/Makefile lib/voodoo/build.h lib/voodoo/unix/Makefile lib/voodoo/voodoo.pc lib/sawman/Makefile lib/sawman/sawman.pc lib/fusiondale/Makefile lib/fusiondale/coma/Makefile lib/fusiondale/core/Makefile lib/fusiondale/messenger/Makefile lib/fusiondale/misc/Makefile lib/fusiondale/one/Makefile lib/fusiondale/fusiondale.pc lib/fusiondale/fusiondale_version.h lib/fusionsound/Makefile lib/fusionsound/core/Makefile lib/fusionsound/drivers/Makefile lib/fusionsound/media/Makefile lib/fusionsound/misc/Makefile lib/fusionsound/fusionsound.pc lib/fusionsound/fusionsound-internal.pc lib/fusionsound/fusionsound_limits.h lib/fusionsound/fusionsound_version.h lib/divine/Makefile lib/divine/divine.pc lib/dvc/Makefile lib/++dfb/Makefile lib/++dfb/++dfb.pc patches/Makefile proxy/Makefile proxy/compressor/Makefile proxy/dispatcher/Makefile proxy/requestor/Makefile rules/Makefile src/Makefile src/core/Makefile src/display/Makefile src/gfx/Makefile src/gfx/generic/Makefile src/input/Makefile src/media/Makefile src/misc/Makefile src/windows/Makefile systems/Makefile systems/android/Makefile systems/devmem/Makefile systems/dummy/Makefile systems/fbdev/Makefile systems/mesa/Makefile systems/drmkms/Makefile systems/pvr2d/Makefile systems/egl/Makefile systems/x11/Makefile systems/x11vdpau/Makefile systems/osx/Makefile systems/sdl/Makefile systems/vnc/Makefile wm/Makefile wm/default/Makefile wm/unique/Makefile wm/unique/classes/Makefile wm/unique/data/Makefile wm/unique/devices/Makefile wm/sawman/Makefile gfxdrivers/Makefile gfxdrivers/amlgfx/Makefile gfxdrivers/ati128/Makefile gfxdrivers/cle266/Makefile gfxdrivers/cyber5k/Makefile gfxdrivers/davinci/Makefile gfxdrivers/ep9x/Makefile gfxdrivers/gp2d/Makefile gfxdrivers/gl/Makefile gfxdrivers/gles2/Makefile gfxdrivers/i810/Makefile gfxdrivers/i830/Makefile gfxdrivers/mach64/Makefile gfxdrivers/matrox/Makefile gfxdrivers/neomagic/Makefile gfxdrivers/nsc/Makefile gfxdrivers/nsc/include/Makefile gfxdrivers/nvidia/Makefile gfxdrivers/omap/Makefile gfxdrivers/pvr2d/Makefile gfxdrivers/pxa3xx/Makefile gfxdrivers/radeon/Makefile gfxdrivers/savage/Makefile gfxdrivers/sh772x/Makefile gfxdrivers/sis315/Makefile gfxdrivers/tdfx/Makefile gfxdrivers/unichrome/Makefile gfxdrivers/vdpau/Makefile gfxdrivers/vmware/Makefile inputdrivers/Makefile inputdrivers/dbox2remote/Makefile inputdrivers/divine/Makefile inputdrivers/dreamboxremote/Makefile inputdrivers/dynapro/Makefile inputdrivers/elo/Makefile inputdrivers/gunze/Makefile inputdrivers/h3600_ts/Makefile inputdrivers/input_hub/Makefile inputdrivers/joystick/Makefile inputdrivers/keyboard/Makefile inputdrivers/linux_input/Makefile inputdrivers/lirc/Makefile inputdrivers/mutouch/Makefile inputdrivers/zytronic/Makefile inputdrivers/penmount/Makefile inputdrivers/ps2mouse/Makefile inputdrivers/serialmouse/Makefile inputdrivers/sonypi/Makefile inputdrivers/tslib/Makefile inputdrivers/ucb1x00_ts/Makefile inputdrivers/wm97xx_ts/Makefile interfaces/Makefile interfaces/ICoreResourceManager/Makefile interfaces/IDirectFBFont/Makefile interfaces/IDirectFBGL/Makefile interfaces/IDirectFBGL/EGL/Makefile interfaces/IDirectFBImageProvider/Makefile interfaces/IDirectFBImageProvider/mpeg2/Makefile interfaces/IDirectFBVideoProvider/Makefile interfaces/IDirectFBVideoProvider/video_out_dfb/Makefile interfaces/IDirectFBWindows/Makefile interfaces/IFusionSound/Makefile interfaces/IFusionSoundMusicProvider/Makefile interfaces/IWater/Makefile data/Makefile tests/Makefile tests/voodoo/Makefile tools/Makefile examples/fusiondale/Makefile examples/fusionsound/Makefile examples/++dfb/Makefile examples/++dfb/tests/Makefile examples/++dfb/tests/data/Makefile docs/Makefile docs/dfbg.1 docs/directfb-csource.1 docs/directfbrc.5 docs/html/Makefile"
+ 
+ ac_config_commands="$ac_config_commands default"
+ 
+@@ -25154,6 +25169,10 @@ if test -z "${SOFTWARE_RENDERING_TRUE}" && test -z "${SOFTWARE_RENDERING_FALSE}"
+   as_fn_error $? "conditional \"SOFTWARE_RENDERING\" was never defined.
+ Usually this means the macro was only invoked conditionally." "$LINENO" 5
+ fi
++if test -z "${GFX_AMLGFX_TRUE}" && test -z "${GFX_AMLGFX_FALSE}"; then
++  as_fn_error $? "conditional \"GFX_AMLGFX\" was never defined.
++Usually this means the macro was only invoked conditionally." "$LINENO" 5
++fi
+ if test -z "${GFX_ATI128_TRUE}" && test -z "${GFX_ATI128_FALSE}"; then
+   as_fn_error $? "conditional \"GFX_ATI128\" was never defined.
+ Usually this means the macro was only invoked conditionally." "$LINENO" 5
+@@ -26427,6 +26446,7 @@ do
+     "wm/unique/devices/Makefile") CONFIG_FILES="$CONFIG_FILES wm/unique/devices/Makefile" ;;
+     "wm/sawman/Makefile") CONFIG_FILES="$CONFIG_FILES wm/sawman/Makefile" ;;
+     "gfxdrivers/Makefile") CONFIG_FILES="$CONFIG_FILES gfxdrivers/Makefile" ;;
++	"gfxdrivers/amlgfx/Makefile") CONFIG_FILES="$CONFIG_FILES gfxdrivers/amlgfx/Makefile" ;;
+     "gfxdrivers/ati128/Makefile") CONFIG_FILES="$CONFIG_FILES gfxdrivers/ati128/Makefile" ;;
+     "gfxdrivers/cle266/Makefile") CONFIG_FILES="$CONFIG_FILES gfxdrivers/cle266/Makefile" ;;
+     "gfxdrivers/cyber5k/Makefile") CONFIG_FILES="$CONFIG_FILES gfxdrivers/cyber5k/Makefile" ;;
+diff --git a/configure.in b/configure.in
+index dc78d59..03f1401 100644
+--- a/configure.in
++++ b/configure.in
+@@ -1898,6 +1898,7 @@ AM_CONDITIONAL(WEBP_PROVIDER, test "$webp" = "yes")
+ 
+ 
+ dnl check which gfxdrivers to build
++amlgfx=yes
+ ati128=no
+ cle266=no
+ cyber5k=no
+@@ -1934,13 +1935,14 @@ AC_ARG_WITH(gfxdrivers,
+             AC_HELP_STRING([--with-gfxdrivers=LIST],
+                            [LIST is a comma separated selection of gfxdrivers]
+                            [to build. Possible gfxdrivers are: all (builds most]
+-                           [drivers), none (builds none), ati128, cle266,]
++                           [drivers), none (builds none), amlgfx, ati128, cle266,]
+                            [cyber5k, davinci, ep9x, gp2d, gl, gles2, i810, i830, mach64,]
+                            [matrox, neomagic, nsc, nvidia, omap, pvr2d, pxa3xx,]
+                            [radeon, savage, sh772x, sis315, tdfx, unichrome,]
+                            [vdpau, vmware. @<:@default=all@:>@]),
+             [gfxdrivers="$withval"], [gfxdrivers=all])
+ if test "$gfxdrivers" = "all"; then
++  checkfor_amlgfx=yes
+   checkfor_ati128=yes
+   checkfor_cle266=no
+   checkfor_cyber5k=no
+@@ -1975,6 +1977,9 @@ else
+     for gfxdriver in $gfxdrivers
+     do
+       case "$gfxdriver" in
++          amlgfx)
++                  checkfor_amlgfx=yes
++                  ;;
+           ati128)
+                   checkfor_ati128=yes
+                   ;;
+@@ -2063,6 +2068,9 @@ else
+   fi
+ fi
+ 
++if test "$checkfor_amlgfx" = "yes"; then
++  amlgfx=yes
++fi
+ if test "$checkfor_ati128" = "yes"; then
+   ati128=yes
+ fi
+@@ -2646,7 +2654,7 @@ if test "$enable_unique" = "yes"; then
+ fi
+ 
+ 
+-
++AM_CONDITIONAL(GFX_AMLGFX, test "$amlgfx" = "yes")
+ AM_CONDITIONAL(GFX_ATI128, test "$ati128" = "yes")
+ AM_CONDITIONAL(GFX_CLE266, test "$cle266" = "yes")
+ AM_CONDITIONAL(GFX_CYBER5K, test "$cyber5k" = "yes")
+@@ -2897,6 +2905,7 @@ wm/unique/devices/Makefile
+ wm/sawman/Makefile
+ 
+ gfxdrivers/Makefile
++gfxdrivers/amlgfx/Makefile
+ gfxdrivers/ati128/Makefile
+ gfxdrivers/cle266/Makefile
+ gfxdrivers/cyber5k/Makefile
+@@ -3117,6 +3126,7 @@ AC_MSG_RESULT([
+ Building Graphics Drivers:
+   3Dfx Voodoo               $tdfx
+   ATI Mach64                $mach64
++  AMLGFX                    $amlgfx
+   ATI Rage 128              $ati128
+   ATI Radeon                $radeon
+   Cirrus EP9X               $ep9x
+diff --git a/gfxdrivers/Makefile.am b/gfxdrivers/Makefile.am
+index 6e5a7e8..444f0fc 100644
+--- a/gfxdrivers/Makefile.am
++++ b/gfxdrivers/Makefile.am
+@@ -1,5 +1,11 @@
+ ## Makefile.am for DirectFB/gfxdrivers
+ 
++if GFX_AMLGFX
++AMLGFX_DIR = amlgfx
++else
++AMLGFX_DIR =
++endif
++
+ if GFX_ATI128
+ ATI128_DIR = ati128
+ else
+@@ -158,6 +164,7 @@ endif
+ 
+ 
+ SUBDIRS = \
++	$(AMLGFX_DIR)	\
+ 	$(ATI128_DIR)	\
+ 	$(CLE266_DIR)	\
+ 	$(CYBER5K_DIR)	\
+diff --git a/gfxdrivers/amlgfx/Makefile.am b/gfxdrivers/amlgfx/Makefile.am
+new file mode 100644
+index 0000000..6129f5b
+--- /dev/null
++++ b/gfxdrivers/amlgfx/Makefile.am
+@@ -0,0 +1,42 @@
++## Makefile.am for DirectFB/src/core/gfxcards/amlgfx
++
++INCLUDES = \
++	-I$(top_builddir)/include	\
++	-I$(top_srcdir)/include	\
++	-I$(top_builddir)/lib	\
++	-I$(top_srcdir)/lib	\
++	-I$(top_srcdir)/systems	\
++	-I$(top_srcdir)/src
++
++
++amlgfxdir = $(MODULEDIR)/gfxdrivers
++
++amlgfx_LTLIBRARIES = libdirectfb_amlgfx.la
++
++if BUILD_STATIC
++amlgfx_DATA = $(amlgfx_LTLIBRARIES:.la=.o)
++endif
++
++
++libdirectfb_amlgfx_la_SOURCES =	\
++	aml.c		\
++	aml.h		\
++	aml_accel.c	\
++	aml_accel.h	\
++	aml_state.c		\
++	aml_state.h		\
++	amlfb.h
++		
++
++libdirectfb_amlgfx_la_LDFLAGS = \
++	-module			\
++	-avoid-version		\
++	$(DFB_LDFLAGS)
++
++libdirectfb_amlgfx_la_LIBADD = \
++	$(top_builddir)/lib/direct/libdirect.la \
++	$(top_builddir)/src/libdirectfb.la
++
++
++include $(top_srcdir)/rules/libobject.make
++
+diff --git a/gfxdrivers/amlgfx/Makefile.in b/gfxdrivers/amlgfx/Makefile.in
+new file mode 100644
+index 0000000..d7a2ffa
+--- /dev/null
++++ b/gfxdrivers/amlgfx/Makefile.in
+@@ -0,0 +1,669 @@
++# Makefile.in generated by automake 1.11.3 from Makefile.am.
++# @configure_input@
++
++# Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
++# 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software
++# Foundation, Inc.
++# This Makefile.in is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
++# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
++# PARTICULAR PURPOSE.
++
++@SET_MAKE@
++
++
++VPATH = @srcdir@
++pkgdatadir = $(datadir)/@PACKAGE@
++pkgincludedir = $(includedir)/@PACKAGE@
++pkglibdir = $(libdir)/@PACKAGE@
++pkglibexecdir = $(libexecdir)/@PACKAGE@
++am__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
++install_sh_DATA = $(install_sh) -c -m 644
++install_sh_PROGRAM = $(install_sh) -c
++install_sh_SCRIPT = $(install_sh) -c
++INSTALL_HEADER = $(INSTALL_DATA)
++transform = $(program_transform_name)
++NORMAL_INSTALL = :
++PRE_INSTALL = :
++POST_INSTALL = :
++NORMAL_UNINSTALL = :
++PRE_UNINSTALL = :
++POST_UNINSTALL = :
++build_triplet = @build@
++host_triplet = @host@
++target_triplet = @target@
++DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
++	$(top_srcdir)/rules/libobject.make
++subdir = gfxdrivers/amlgfx
++ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
++am__aclocal_m4_deps = $(top_srcdir)/m4/as-ac-expand.m4 \
++	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
++	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
++	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.in
++am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
++	$(ACLOCAL_M4)
++mkinstalldirs = $(install_sh) -d
++CONFIG_HEADER = $(top_builddir)/config.h
++CONFIG_CLEAN_FILES =
++CONFIG_CLEAN_VPATH_FILES =
++am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
++am__vpath_adj = case $$p in \
++    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
++    *) f=$$p;; \
++  esac;
++am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
++am__install_max = 40
++am__nobase_strip_setup = \
++  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
++am__nobase_strip = \
++  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
++am__nobase_list = $(am__nobase_strip_setup); \
++  for p in $$list; do echo "$$p $$p"; done | \
++  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
++  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
++    if (++n[$$2] == $(am__install_max)) \
++      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
++    END { for (dir in files) print dir, files[dir] }'
++am__base_list = \
++  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
++  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
++am__uninstall_files_from_dir = { \
++  test -z "$$files" \
++    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
++    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
++         $(am__cd) "$$dir" && rm -f $$files; }; \
++  }
++am__installdirs = "$(DESTDIR)$(amlgfxdir)" "$(DESTDIR)$(amlgfxdir)"
++LTLIBRARIES = $(amlgfx_LTLIBRARIES)
++libdirectfb_amlgfx_la_DEPENDENCIES =  \
++	$(top_builddir)/lib/direct/libdirect.la \
++	$(top_builddir)/src/libdirectfb.la
++am_libdirectfb_amlgfx_la_OBJECTS = aml.lo aml_accel.lo aml_state.lo
++libdirectfb_amlgfx_la_OBJECTS = $(am_libdirectfb_amlgfx_la_OBJECTS)
++libdirectfb_amlgfx_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
++	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
++	$(libdirectfb_amlgfx_la_LDFLAGS) $(LDFLAGS) -o $@
++DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
++depcomp = $(SHELL) $(top_srcdir)/depcomp
++am__depfiles_maybe = depfiles
++am__mv = mv -f
++COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
++	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
++LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
++	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
++	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
++CCLD = $(CC)
++LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
++	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
++	$(LDFLAGS) -o $@
++SOURCES = $(libdirectfb_amlgfx_la_SOURCES)
++DIST_SOURCES = $(libdirectfb_amlgfx_la_SOURCES)
++DATA = $(amlgfx_DATA)
++ETAGS = etags
++CTAGS = ctags
++DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
++ACLOCAL = @ACLOCAL@
++AMTAR = @AMTAR@
++AR = @AR@
++AS = @AS@
++ASFLAGS = @ASFLAGS@
++AUTOCONF = @AUTOCONF@
++AUTOHEADER = @AUTOHEADER@
++AUTOMAKE = @AUTOMAKE@
++AWK = @AWK@
++CC = @CC@
++CCAS = @CCAS@
++CCASDEPMODE = @CCASDEPMODE@
++CCASFLAGS = @CCASFLAGS@
++CCDEPMODE = @CCDEPMODE@
++CFLAGS = @CFLAGS@
++CPP = @CPP@
++CPPFLAGS = @CPPFLAGS@
++CYGPATH_W = @CYGPATH_W@
++DATADIR = @DATADIR@
++DEFS = @DEFS@
++DEPDIR = @DEPDIR@
++DFB_CFLAGS_OMIT_FRAME_POINTER = @DFB_CFLAGS_OMIT_FRAME_POINTER@
++DFB_INTERNAL_CFLAGS = @DFB_INTERNAL_CFLAGS@
++DFB_LDFLAGS = @DFB_LDFLAGS@
++DFB_SMOOTH_SCALING = @DFB_SMOOTH_SCALING@
++DIRECTFB_BINARY_AGE = @DIRECTFB_BINARY_AGE@
++DIRECTFB_CSOURCE = @DIRECTFB_CSOURCE@
++DIRECTFB_INTERFACE_AGE = @DIRECTFB_INTERFACE_AGE@
++DIRECTFB_MAJOR_VERSION = @DIRECTFB_MAJOR_VERSION@
++DIRECTFB_MICRO_VERSION = @DIRECTFB_MICRO_VERSION@
++DIRECTFB_MINOR_VERSION = @DIRECTFB_MINOR_VERSION@
++DIRECTFB_VERSION = @DIRECTFB_VERSION@
++DIRECT_BUILD_DEBUG = @DIRECT_BUILD_DEBUG@
++DIRECT_BUILD_DEBUGS = @DIRECT_BUILD_DEBUGS@
++DIRECT_BUILD_GETTID = @DIRECT_BUILD_GETTID@
++DIRECT_BUILD_NETWORK = @DIRECT_BUILD_NETWORK@
++DIRECT_BUILD_STDBOOL = @DIRECT_BUILD_STDBOOL@
++DIRECT_BUILD_TEXT = @DIRECT_BUILD_TEXT@
++DIRECT_BUILD_TRACE = @DIRECT_BUILD_TRACE@
++DLLTOOL = @DLLTOOL@
++DSYMUTIL = @DSYMUTIL@
++DUMPBIN = @DUMPBIN@
++DYNLIB = @DYNLIB@
++ECHO_C = @ECHO_C@
++ECHO_N = @ECHO_N@
++ECHO_T = @ECHO_T@
++EGREP = @EGREP@
++EXEEXT = @EXEEXT@
++FGREP = @FGREP@
++FREETYPE_CFLAGS = @FREETYPE_CFLAGS@
++FREETYPE_LIBS = @FREETYPE_LIBS@
++FREETYPE_PROVIDER = @FREETYPE_PROVIDER@
++FUSION_BUILD_KERNEL = @FUSION_BUILD_KERNEL@
++FUSION_BUILD_MULTI = @FUSION_BUILD_MULTI@
++FUSION_MESSAGE_SIZE = @FUSION_MESSAGE_SIZE@
++GIF_PROVIDER = @GIF_PROVIDER@
++GREP = @GREP@
++HAVE_LINUX = @HAVE_LINUX@
++INCLUDEDIR = @INCLUDEDIR@
++INSTALL = @INSTALL@
++INSTALL_DATA = @INSTALL_DATA@
++INSTALL_PROGRAM = @INSTALL_PROGRAM@
++INSTALL_SCRIPT = @INSTALL_SCRIPT@
++INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
++INTERNALINCLUDEDIR = @INTERNALINCLUDEDIR@
++JPEG_PROVIDER = @JPEG_PROVIDER@
++LD = @LD@
++LDFLAGS = @LDFLAGS@
++LIBJPEG = @LIBJPEG@
++LIBOBJS = @LIBOBJS@
++LIBPNG_CFLAGS = @LIBPNG_CFLAGS@
++LIBPNG_CONFIG = @LIBPNG_CONFIG@
++LIBPNG_LIBS = @LIBPNG_LIBS@
++LIBS = @LIBS@
++LIBTOOL = @LIBTOOL@
++LIPO = @LIPO@
++LN_S = @LN_S@
++LTLIBOBJS = @LTLIBOBJS@
++LT_AGE = @LT_AGE@
++LT_BINARY = @LT_BINARY@
++LT_CURRENT = @LT_CURRENT@
++LT_RELEASE = @LT_RELEASE@
++LT_REVISION = @LT_REVISION@
++MAINT = @MAINT@
++MAKEINFO = @MAKEINFO@
++MAN2HTML = @MAN2HTML@
++MANIFEST_TOOL = @MANIFEST_TOOL@
++MKDIR_P = @MKDIR_P@
++MODULEDIR = @MODULEDIR@
++MODULEDIRNAME = @MODULEDIRNAME@
++NM = @NM@
++NMEDIT = @NMEDIT@
++OBJDUMP = @OBJDUMP@
++OBJEXT = @OBJEXT@
++OSX_LIBS = @OSX_LIBS@
++OTOOL = @OTOOL@
++OTOOL64 = @OTOOL64@
++PACKAGE = @PACKAGE@
++PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
++PACKAGE_NAME = @PACKAGE_NAME@
++PACKAGE_STRING = @PACKAGE_STRING@
++PACKAGE_TARNAME = @PACKAGE_TARNAME@
++PACKAGE_URL = @PACKAGE_URL@
++PACKAGE_VERSION = @PACKAGE_VERSION@
++PATH_SEPARATOR = @PATH_SEPARATOR@
++PERL = @PERL@
++PKG_CONFIG = @PKG_CONFIG@
++PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
++PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
++PNG_PROVIDER = @PNG_PROVIDER@
++RANLIB = @RANLIB@
++RUNTIME_SYSROOT = @RUNTIME_SYSROOT@
++SDL_CFLAGS = @SDL_CFLAGS@
++SDL_LIBS = @SDL_LIBS@
++SED = @SED@
++SET_MAKE = @SET_MAKE@
++SHELL = @SHELL@
++SOPATH = @SOPATH@
++STRIP = @STRIP@
++SYSCONFDIR = @SYSCONFDIR@
++SYSFS_LIBS = @SYSFS_LIBS@
++THREADFLAGS = @THREADFLAGS@
++THREADLIB = @THREADLIB@
++TSLIB_CFLAGS = @TSLIB_CFLAGS@
++TSLIB_LIBS = @TSLIB_LIBS@
++VERSION = @VERSION@
++VNC_CFLAGS = @VNC_CFLAGS@
++VNC_CONFIG = @VNC_CONFIG@
++VNC_LIBS = @VNC_LIBS@
++X11_CFLAGS = @X11_CFLAGS@
++X11_LIBS = @X11_LIBS@
++ZLIB_LIBS = @ZLIB_LIBS@
++abs_builddir = @abs_builddir@
++abs_srcdir = @abs_srcdir@
++abs_top_builddir = @abs_top_builddir@
++abs_top_srcdir = @abs_top_srcdir@
++ac_ct_AR = @ac_ct_AR@
++ac_ct_CC = @ac_ct_CC@
++ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
++am__include = @am__include@
++am__leading_dot = @am__leading_dot@
++am__quote = @am__quote@
++am__tar = @am__tar@
++am__untar = @am__untar@
++bindir = @bindir@
++build = @build@
++build_alias = @build_alias@
++build_cpu = @build_cpu@
++build_os = @build_os@
++build_vendor = @build_vendor@
++builddir = @builddir@
++datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
++exec_prefix = @exec_prefix@
++host = @host@
++host_alias = @host_alias@
++host_cpu = @host_cpu@
++host_os = @host_os@
++host_vendor = @host_vendor@
++htmldir = @htmldir@
++includedir = @includedir@
++infodir = @infodir@
++install_sh = @install_sh@
++libdir = @libdir@
++libexecdir = @libexecdir@
++localedir = @localedir@
++localstatedir = @localstatedir@
++mandir = @mandir@
++mkdir_p = @mkdir_p@
++oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
++prefix = @prefix@
++program_transform_name = @program_transform_name@
++psdir = @psdir@
++sbindir = @sbindir@
++sharedstatedir = @sharedstatedir@
++srcdir = @srcdir@
++sysconfdir = @sysconfdir@
++target = @target@
++target_alias = @target_alias@
++target_cpu = @target_cpu@
++target_os = @target_os@
++target_vendor = @target_vendor@
++top_build_prefix = @top_build_prefix@
++top_builddir = @top_builddir@
++top_srcdir = @top_srcdir@
++INCLUDES = \
++	-I$(top_builddir)/include	\
++	-I$(top_srcdir)/include	\
++	-I$(top_builddir)/lib	\
++	-I$(top_srcdir)/lib	\
++	-I$(top_srcdir)/systems	\
++	-I$(top_srcdir)/src
++
++amlgfxdir = $(MODULEDIR)/gfxdrivers
++amlgfx_LTLIBRARIES = libdirectfb_amlgfx.la
++@BUILD_STATIC_TRUE@amlgfx_DATA = $(amlgfx_LTLIBRARIES:.la=.o)
++libdirectfb_amlgfx_la_SOURCES = \
++	aml.c		\
++	aml.h		\
++	aml_accel.c	\
++	aml_accel.h	\
++	aml_state.c		\
++	aml_state.h		\
++	amlfb.h
++
++libdirectfb_amlgfx_la_LDFLAGS = \
++	-module			\
++	-avoid-version		\
++	$(DFB_LDFLAGS)
++
++libdirectfb_amlgfx_la_LIBADD = \
++	$(top_builddir)/lib/direct/libdirect.la \
++	$(top_builddir)/src/libdirectfb.la
++
++all: all-am
++
++.SUFFIXES:
++.SUFFIXES: .c .lo .o .obj
++$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/rules/libobject.make $(am__configure_deps)
++	@for dep in $?; do \
++	  case '$(am__configure_deps)' in \
++	    *$$dep*) \
++	      ( cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh ) \
++	        && { if test -f $@; then exit 0; else break; fi; }; \
++	      exit 1;; \
++	  esac; \
++	done; \
++	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu gfxdrivers/amlgfx/Makefile'; \
++	$(am__cd) $(top_srcdir) && \
++	  $(AUTOMAKE) --gnu gfxdrivers/amlgfx/Makefile
++.PRECIOUS: Makefile
++Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
++	@case '$?' in \
++	  *config.status*) \
++	    cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh;; \
++	  *) \
++	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
++	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
++	esac;
++$(top_srcdir)/rules/libobject.make:
++
++$(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
++	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
++
++$(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
++	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
++$(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
++	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
++$(am__aclocal_m4_deps):
++install-amlgfxLTLIBRARIES: $(amlgfx_LTLIBRARIES)
++	@$(NORMAL_INSTALL)
++	test -z "$(amlgfxdir)" || $(MKDIR_P) "$(DESTDIR)$(amlgfxdir)"
++	@list='$(amlgfx_LTLIBRARIES)'; test -n "$(amlgfxdir)" || list=; \
++	list2=; for p in $$list; do \
++	  if test -f $$p; then \
++	    list2="$$list2 $$p"; \
++	  else :; fi; \
++	done; \
++	test -z "$$list2" || { \
++	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 '$(DESTDIR)$(amlgfxdir)'"; \
++	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 "$(DESTDIR)$(amlgfxdir)"; \
++	}
++
++uninstall-amlgfxLTLIBRARIES:
++	@$(NORMAL_UNINSTALL)
++	@list='$(amlgfx_LTLIBRARIES)'; test -n "$(amlgfxdir)" || list=; \
++	for p in $$list; do \
++	  $(am__strip_dir) \
++	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f '$(DESTDIR)$(amlgfxdir)/$$f'"; \
++	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f "$(DESTDIR)$(amlgfxdir)/$$f"; \
++	done
++
++clean-amlgfxLTLIBRARIES:
++	-test -z "$(amlgfx_LTLIBRARIES)" || rm -f $(amlgfx_LTLIBRARIES)
++	@list='$(amlgfx_LTLIBRARIES)'; for p in $$list; do \
++	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
++	  test "$$dir" != "$$p" || dir=.; \
++	  echo "rm -f \"$${dir}/so_locations\""; \
++	  rm -f "$${dir}/so_locations"; \
++	done
++libdirectfb_amlgfx.la: $(libdirectfb_amlgfx_la_OBJECTS) $(libdirectfb_amlgfx_la_DEPENDENCIES) $(EXTRA_libdirectfb_amlgfx_la_DEPENDENCIES) 
++	$(libdirectfb_amlgfx_la_LINK) -rpath $(amlgfxdir) $(libdirectfb_amlgfx_la_OBJECTS) $(libdirectfb_amlgfx_la_LIBADD) $(LIBS)
++
++mostlyclean-compile:
++	-rm -f *.$(OBJEXT)
++
++distclean-compile:
++	-rm -f *.tab.c
++
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aml.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aml_accel.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aml_state.Plo@am__quote@
++
++.c.o:
++@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
++@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(COMPILE) -c $<
++
++.c.obj:
++@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
++@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
++
++.c.lo:
++@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
++@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
++
++mostlyclean-libtool:
++	-rm -f *.lo
++
++clean-libtool:
++	-rm -rf .libs _libs
++install-amlgfxDATA: $(amlgfx_DATA)
++	@$(NORMAL_INSTALL)
++	test -z "$(amlgfxdir)" || $(MKDIR_P) "$(DESTDIR)$(amlgfxdir)"
++	@list='$(amlgfx_DATA)'; test -n "$(amlgfxdir)" || list=; \
++	for p in $$list; do \
++	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
++	  echo "$$d$$p"; \
++	done | $(am__base_list) | \
++	while read files; do \
++	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(amlgfxdir)'"; \
++	  $(INSTALL_DATA) $$files "$(DESTDIR)$(amlgfxdir)" || exit $$?; \
++	done
++
++uninstall-amlgfxDATA:
++	@$(NORMAL_UNINSTALL)
++	@list='$(amlgfx_DATA)'; test -n "$(amlgfxdir)" || list=; \
++	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
++	dir='$(DESTDIR)$(amlgfxdir)'; $(am__uninstall_files_from_dir)
++
++ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
++	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
++	unique=`for i in $$list; do \
++	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
++	  done | \
++	  $(AWK) '{ files[$$0] = 1; nonempty = 1; } \
++	      END { if (nonempty) { for (i in files) print i; }; }'`; \
++	mkid -fID $$unique
++tags: TAGS
++
++TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
++		$(TAGS_FILES) $(LISP)
++	set x; \
++	here=`pwd`; \
++	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
++	unique=`for i in $$list; do \
++	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
++	  done | \
++	  $(AWK) '{ files[$$0] = 1; nonempty = 1; } \
++	      END { if (nonempty) { for (i in files) print i; }; }'`; \
++	shift; \
++	if test -z "$(ETAGS_ARGS)$$*$$unique"; then :; else \
++	  test -n "$$unique" || unique=$$empty_fix; \
++	  if test $$# -gt 0; then \
++	    $(ETAGS) $(ETAGSFLAGS) $(AM_ETAGSFLAGS) $(ETAGS_ARGS) \
++	      "$$@" $$unique; \
++	  else \
++	    $(ETAGS) $(ETAGSFLAGS) $(AM_ETAGSFLAGS) $(ETAGS_ARGS) \
++	      $$unique; \
++	  fi; \
++	fi
++ctags: CTAGS
++CTAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
++		$(TAGS_FILES) $(LISP)
++	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
++	unique=`for i in $$list; do \
++	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
++	  done | \
++	  $(AWK) '{ files[$$0] = 1; nonempty = 1; } \
++	      END { if (nonempty) { for (i in files) print i; }; }'`; \
++	test -z "$(CTAGS_ARGS)$$unique" \
++	  || $(CTAGS) $(CTAGSFLAGS) $(AM_CTAGSFLAGS) $(CTAGS_ARGS) \
++	     $$unique
++
++GTAGS:
++	here=`$(am__cd) $(top_builddir) && pwd` \
++	  && $(am__cd) $(top_srcdir) \
++	  && gtags -i $(GTAGS_ARGS) "$$here"
++
++distclean-tags:
++	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
++
++distdir: $(DISTFILES)
++	@srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*]/\\\\&/g'`; \
++	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's/[].[^$$\\*]/\\\\&/g'`; \
++	list='$(DISTFILES)'; \
++	  dist_files=`for file in $$list; do echo $$file; done | \
++	  sed -e "s|^$$srcdirstrip/||;t" \
++	      -e "s|^$$topsrcdirstrip/|$(top_builddir)/|;t"`; \
++	case $$dist_files in \
++	  */*) $(MKDIR_P) `echo "$$dist_files" | \
++			   sed '/\//!d;s|^|$(distdir)/|;s,/[^/]*$$,,' | \
++			   sort -u` ;; \
++	esac; \
++	for file in $$dist_files; do \
++	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi; \
++	  if test -d $$d/$$file; then \
++	    dir=`echo "/$$file" | sed -e 's,/[^/]*$$,,'`; \
++	    if test -d "$(distdir)/$$file"; then \
++	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx {} \;; \
++	    fi; \
++	    if test -d $(srcdir)/$$file && test $$d != $(srcdir); then \
++	      cp -fpR $(srcdir)/$$file "$(distdir)$$dir" || exit 1; \
++	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx {} \;; \
++	    fi; \
++	    cp -fpR $$d/$$file "$(distdir)$$dir" || exit 1; \
++	  else \
++	    test -f "$(distdir)/$$file" \
++	    || cp -p $$d/$$file "$(distdir)/$$file" \
++	    || exit 1; \
++	  fi; \
++	done
++check-am: all-am
++check: check-am
++all-am: Makefile $(LTLIBRARIES) $(DATA)
++installdirs:
++	for dir in "$(DESTDIR)$(amlgfxdir)" "$(DESTDIR)$(amlgfxdir)"; do \
++	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
++	done
++install: install-am
++install-exec: install-exec-am
++install-data: install-data-am
++uninstall: uninstall-am
++
++install-am: all-am
++	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
++
++installcheck: installcheck-am
++install-strip:
++	if test -z '$(STRIP)'; then \
++	  $(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
++	    install_sh_PROGRAM="$(INSTALL_STRIP_PROGRAM)" INSTALL_STRIP_FLAG=-s \
++	      install; \
++	else \
++	  $(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
++	    install_sh_PROGRAM="$(INSTALL_STRIP_PROGRAM)" INSTALL_STRIP_FLAG=-s \
++	    "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'" install; \
++	fi
++mostlyclean-generic:
++
++clean-generic:
++
++distclean-generic:
++	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
++	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
++
++maintainer-clean-generic:
++	@echo "This command is intended for maintainers to use"
++	@echo "it deletes files that may require special tools to rebuild."
++clean: clean-am
++
++clean-am: clean-amlgfxLTLIBRARIES clean-generic clean-libtool \
++	mostlyclean-am
++
++distclean: distclean-am
++	-rm -rf ./$(DEPDIR)
++	-rm -f Makefile
++distclean-am: clean-am distclean-compile distclean-generic \
++	distclean-tags
++
++dvi: dvi-am
++
++dvi-am:
++
++html: html-am
++
++html-am:
++
++info: info-am
++
++info-am:
++
++install-data-am: install-amlgfxDATA install-amlgfxLTLIBRARIES
++
++install-dvi: install-dvi-am
++
++install-dvi-am:
++
++install-exec-am:
++
++install-html: install-html-am
++
++install-html-am:
++
++install-info: install-info-am
++
++install-info-am:
++
++install-man:
++
++install-pdf: install-pdf-am
++
++install-pdf-am:
++
++install-ps: install-ps-am
++
++install-ps-am:
++
++installcheck-am:
++
++maintainer-clean: maintainer-clean-am
++	-rm -rf ./$(DEPDIR)
++	-rm -f Makefile
++maintainer-clean-am: distclean-am maintainer-clean-generic
++
++mostlyclean: mostlyclean-am
++
++mostlyclean-am: mostlyclean-compile mostlyclean-generic \
++	mostlyclean-libtool
++
++pdf: pdf-am
++
++pdf-am:
++
++ps: ps-am
++
++ps-am:
++
++uninstall-am: uninstall-amlgfxDATA uninstall-amlgfxLTLIBRARIES
++
++.MAKE: install-am install-strip
++
++.PHONY: CTAGS GTAGS all all-am check check-am clean \
++	clean-amlgfxLTLIBRARIES clean-generic clean-libtool ctags \
++	distclean distclean-compile distclean-generic \
++	distclean-libtool distclean-tags distdir dvi dvi-am html \
++	html-am info info-am install install-am install-amlgfxDATA \
++	install-amlgfxLTLIBRARIES install-data install-data-am \
++	install-dvi install-dvi-am install-exec install-exec-am \
++	install-html install-html-am install-info install-info-am \
++	install-man install-pdf install-pdf-am install-ps \
++	install-ps-am install-strip installcheck installcheck-am \
++	installdirs maintainer-clean maintainer-clean-generic \
++	mostlyclean mostlyclean-compile mostlyclean-generic \
++	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
++	uninstall-am uninstall-amlgfxDATA uninstall-amlgfxLTLIBRARIES
++
++%.o: .libs/%.a %.la
++	rm -f $<.tmp/*.o
++	if test -d $<.tmp; then rmdir $<.tmp; fi
++	mkdir $<.tmp
++	(cd $<.tmp && $(AR) x ../../$<)
++	$(LD) -o $@ -r $<.tmp/*.o
++	rm -f $<.tmp/*.o && rmdir $<.tmp
++
++.PHONY: $(LTLIBRARIES:%.la=.libs/%.a)
++
++# Tell versions [3.59,3.63) of GNU make to not export all variables.
++# Otherwise a system limit (for SysV at least) may be exceeded.
++.NOEXPORT:
+diff --git a/gfxdrivers/amlgfx/aml.c b/gfxdrivers/amlgfx/aml.c
+new file mode 100644
+index 0000000..92c7b7f
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml.c
+@@ -0,0 +1,185 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#include <config.h>
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <sys/mman.h>
++#include <fcntl.h>
++#include <sys/ioctl.h>
++#include <malloc.h>
++
++#include <directfb.h>
++
++#include <core/system.h>
++#include <core/coredefs.h>
++#include <core/screens.h>
++#include <core/core.h>
++#include <core/state.h>
++#include <core/gfxcard.h>
++#include <core/surface_buffer.h>
++
++#include <gfx/convert.h>
++#include <gfx/util.h>
++#include <misc/conf.h>
++#include <misc/util.h>
++
++#include <core/graphics_driver.h>
++
++#include "aml.h"
++#include "amlfb.h"
++#include "aml_state.h"
++#include "aml_accel.h"
++
++DFB_GRAPHICS_DRIVER( amlgfx )
++
++D_DEBUG_DOMAIN( AML, "AML", "AML GFXDRIVERS" );
++/**********************************************************************************************************************/
++
++static int
++driver_probe( CoreGraphicsDevice *device )
++{
++	switch (dfb_gfxcard_get_accelerator( device )) {
++		case FB_ACCEL_AML_GE2D:          /* cirrus aml ge2d serials */
++			printf("driver_probe find FB_ACCEL_AML_GE2D\n");
++			return 1;
++	}
++	return 0;
++}
++
++static void
++driver_get_info( CoreGraphicsDevice *device,
++		GraphicsDriverInfo *info )
++{
++	/* fill driver info structure */
++	snprintf( info->name,
++			DFB_GRAPHICS_DRIVER_INFO_NAME_LENGTH,
++			"AML GE2D Driver" );
++
++	snprintf( info->vendor,
++			DFB_GRAPHICS_DRIVER_INFO_VENDOR_LENGTH,
++			"aml beijing" );
++
++	snprintf( info->url,
++			DFB_GRAPHICS_DRIVER_INFO_URL_LENGTH,
++			"http://www.amlogic.com" );
++
++	snprintf( info->license,
++			DFB_GRAPHICS_DRIVER_INFO_LICENSE_LENGTH,
++			"LGPL" );
++
++	info->version.major = 0;
++	info->version.minor = 1;
++
++	info->driver_data_size = sizeof (AMLGFX_DriverData);
++	info->device_data_size = sizeof (AMLGFX_DeviceData);
++}
++
++static DFBResult
++driver_init_driver( CoreGraphicsDevice  *device,
++		GraphicsDeviceFuncs *funcs, void *driver_data,
++		void *device_data, CoreDFB *core )
++{
++	DFBResult      ret;
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData*) driver_data;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData*) device_data;
++
++	amldrv->dfb_fbdev = dfb_system_data();
++	amldrv->amldev = amldev;
++	amldrv->core = core;
++
++	amldrv->fb.mem = dfb_gfxcard_memory_virtual(device, 0);
++	amldrv->fb.size = dfb_system_videoram_length();
++	amldrv->fb.phys = dfb_gfxcard_memory_physical(device, 0);
++	amldrv->fb.xres = amldrv->dfb_fbdev->shared->current_var.xres;
++	amldrv->fb.yres= amldrv->dfb_fbdev->shared->current_var.yres;
++	amldrv->fb.bits_per_pixel = amldrv->dfb_fbdev->shared->current_var.bits_per_pixel;
++
++	amldev->poter_duff_rule = DSPD_UNSUPPORTED;
++
++	debug("amldrv->fb.phys is 0x%x, size is %d\n", amldrv->fb.phys, amldrv->fb.size);
++	printf("amldrv->fb.phys is 0x%x, size is %d\n", amldrv->fb.phys, amldrv->fb.size);
++
++	amldrv->ge2d_fd = open("/dev/ge2d", O_RDWR);
++	if (!amldrv->ge2d_fd)
++		return DFB_IO;
++
++	funcs->CheckState    = amlCheckState;
++	funcs->SetState      = amlSetState;
++	funcs->EngineSync    = amlEngineSync;
++	funcs->EngineReset   = amlEngineReset;
++	funcs->FlushTextureCache  = amlFlushTextureCache;
++
++	funcs->FillRectangle = amlFillRectangle;
++	funcs->Blit          = amlBlit;
++	funcs->StretchBlit = amlStretchBlit;
++
++	return DFB_OK;
++}
++
++static DFBResult
++driver_init_device( CoreGraphicsDevice *device,
++		GraphicsDeviceInfo *device_info, void *driver_data,
++		void *device_data )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData*) driver_data;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData*) device_data;
++
++	/* fill device info */
++	snprintf( device_info->name,
++			DFB_GRAPHICS_DEVICE_INFO_NAME_LENGTH, "aml" );
++
++	snprintf( device_info->vendor,
++			DFB_GRAPHICS_DEVICE_INFO_VENDOR_LENGTH, "aml vendor" );
++
++	device_info->caps.flags    = 0;
++	device_info->caps.accel    = AML_SUPPORTED_DRAWINGFUNCTIONS |
++		AML_SUPPORTED_BLITTINGFUNCTIONS;
++
++	device_info->caps.drawing  = AML_SUPPORTED_DRAWINGFLAGS;
++	device_info->caps.blitting = AML_SUPPORTED_BLITTINGFLAGS;
++
++	device_info->limits.surface_byteoffset_alignment = 8;
++	device_info->limits.surface_pixelpitch_alignment = 8;
++
++	return DFB_OK;
++
++}
++
++static void
++driver_close_device( CoreGraphicsDevice *device,
++		void *driver_data, void *device_data )
++{
++
++}
++
++static void
++driver_close_driver( CoreGraphicsDevice *device,
++		void *driver_data )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData*) driver_data;
++	amldrv->dfb_fbdev = NULL;
++}
++
+diff --git a/gfxdrivers/amlgfx/aml.h b/gfxdrivers/amlgfx/aml.h
+new file mode 100644
+index 0000000..8ddfba6
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml.h
+@@ -0,0 +1,411 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#ifndef __AML_H__
++#define __AML_H__
++
++#include <dfb_types.h>
++#include <core/coretypes.h>
++#include <core/layers.h>
++#include <fbdev/fbdev.h>
++/*
++ * The following are the IOCTLs that can be sent to the EP93xx frame buffer
++ * device.
++ */
++/**blend op relative macro**/
++#define OPERATION_ADD           0    //Cd = Cs*Fs+Cd*Fd
++#define OPERATION_SUB             1   //Cd = Cs*Fs-Cd*Fd
++#define OPERATION_REVERSE_SUB   2    //Cd = Cd*Fd-Cs*Fs
++#define OPERATION_MIN             3    //Cd = Min(Cd*Fd,Cs*Fs)
++#define OPERATION_MAX            4    //Cd = Max(Cd*Fd,Cs*Fs)
++#define OPERATION_LOGIC        5
++
++#define COLOR_FACTOR_ZERO                     0
++#define COLOR_FACTOR_ONE                        1
++#define COLOR_FACTOR_SRC_COLOR                2
++#define COLOR_FACTOR_ONE_MINUS_SRC_COLOR      3
++#define COLOR_FACTOR_DST_COLOR                4
++#define COLOR_FACTOR_ONE_MINUS_DST_COLOR      5
++
++#define COLOR_FACTOR_SRC_ALPHA                6
++#define COLOR_FACTOR_ONE_MINUS_SRC_ALPHA      7
++#define COLOR_FACTOR_DST_ALPHA                8
++#define COLOR_FACTOR_ONE_MINUS_DST_ALPHA      9
++#define COLOR_FACTOR_CONST_COLOR              10
++#define COLOR_FACTOR_ONE_MINUS_CONST_COLOR    11
++#define COLOR_FACTOR_CONST_ALPHA              12
++#define COLOR_FACTOR_ONE_MINUS_CONST_ALPHA    13
++#define COLOR_FACTOR_SRC_ALPHA_SATURATE       14
++
++#define ALPHA_FACTOR_ZERO                     0
++#define ALPHA_FACTOR_ONE                      1
++#define ALPHA_FACTOR_SRC_ALPHA                2
++#define ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA      3
++#define ALPHA_FACTOR_DST_ALPHA                4
++#define ALPHA_FACTOR_ONE_MINUS_DST_ALPHA      5
++#define ALPHA_FACTOR_CONST_ALPHA              6
++#define ALPHA_FACTOR_ONE_MINUS_CONST_ALPHA    7
++
++#define GE2D_STRETCHBLIT_NOALPHA   			0x4702
++#define GE2D_BLIT_NOALPHA	 				0x4701
++#define GE2D_BLEND			 				0x4700
++#define GE2D_BLIT    			 			0x46ff
++#define GE2D_STRETCHBLIT   					0x46fe
++#define GE2D_FILLRECTANGLE   				0x46fd
++//#define GE2D_SRCCOLORKEY   					0x46fc
++#define GE2D_SET_COEF						0x46fb
++//#define GE2D_CONFIG_EX  			       	0x46fa
++//#define GE2D_CONFIG							0x46f9
++#define GE2D_ANTIFLICKER_ENABLE				0x46f8
++#define GE2D_BLIT_WITHOUTKEY				0x46f7
++#define GE2D_SRC2COLORKEY                   0x46f6 
++#define GE2D_ANTIFLICKER_VALUE				0x46f5
++#define	GE2D_SET_BLIT_PALETTE				0x46f4
++
++
++#define GE2D_ENDIAN_SHIFT       		24
++#define GE2D_ENDIAN_MASK                  (0x1 << GE2D_ENDIAN_SHIFT)
++#define GE2D_BIG_ENDIAN                      (0 << GE2D_ENDIAN_SHIFT)
++#define GE2D_LITTLE_ENDIAN               (1 << GE2D_ENDIAN_SHIFT)
++
++#define GE2D_COLOR_MAP_SHIFT         20
++#define GE2D_COLOR_MAP_MASK         (0xf << GE2D_COLOR_MAP_SHIFT)
++/* 16 bit */
++#define GE2D_COLOR_MAP_YUV422		(0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB655		(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV655		(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB844		(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV844		(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA6442     	(3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA6442     	(3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA4444     	(4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA4444     	(4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGB565       	(5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV565       	(5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB4444		(6 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV4444		(6 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB1555     	(7 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV1555     	(7 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA4642     	(8 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA4642     	(8 << GE2D_COLOR_MAP_SHIFT)
++/* 24 bit */
++#define GE2D_COLOR_MAP_RGB888       	(0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUV444       	(0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA5658     	(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA5658     	(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB8565     	(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV8565     	(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_RGBA6666     	(3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA6666     	(3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB6666     	(4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV6666     	(4 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_BGR888		(5 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_VUY888		(5 << GE2D_COLOR_MAP_SHIFT)
++/* 32 bit */
++#define GE2D_COLOR_MAP_RGBA8888		(0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_YUVA8888		(0 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ARGB8888     	(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AYUV8888     	(1 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_ABGR8888     	(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_AVUY8888     	(2 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_BGRA8888     	(3 << GE2D_COLOR_MAP_SHIFT)
++#define GE2D_COLOR_MAP_VUYA8888     	(3 << GE2D_COLOR_MAP_SHIFT)
++
++#define GE2D_FMT_S8_Y            		0x00000	/* 00_00_0_00_0_00 */
++#define GE2D_FMT_S8_CB           		0x00040	/* 00_01_0_00_0_00 */
++#define GE2D_FMT_S8_CR           		0x00080	/* 00_10_0_00_0_00 */
++#define GE2D_FMT_S8_R            		0x00000	/* 00_00_0_00_0_00 */
++#define GE2D_FMT_S8_G            		0x00040	/* 00_01_0_00_0_00 */
++#define GE2D_FMT_S8_B            		0x00080	/* 00_10_0_00_0_00 */
++#define GE2D_FMT_S8_A            		0x000c0	/* 00_11_0_00_0_00 */
++#define GE2D_FMT_S8_LUT          		0x00020	/* 00_00_1_00_0_00 */
++#define GE2D_FMT_S16_YUV422      		0x20100	/* 01_00_0_00_0_00 */
++#define GE2D_FMT_S16_RGB         		(GE2D_LITTLE_ENDIAN|0x00100)	/* 01_00_0_00_0_00 */
++#define GE2D_FMT_S24_YUV444      		0x20200	/* 10_00_0_00_0_00 */
++#define GE2D_FMT_S24_RGB         		(GE2D_LITTLE_ENDIAN|0x00200)	/* 10_00_0_00_0_00 */
++#define GE2D_FMT_S32_YUVA444     	0x20300	/* 11_00_0_00_0_00 */
++#define GE2D_FMT_S32_RGBA        		(GE2D_LITTLE_ENDIAN|0x00300)	/* 11_00_0_00_0_00 */
++#define GE2D_FMT_M24_YUV420      	0x20007	/* 00_00_0_00_1_11 */
++#define GE2D_FMT_M24_YUV422      	0x20006	/* 00_00_0_00_1_10 */
++#define GE2D_FMT_M24_YUV444      	0x20004	/* 00_00_0_00_1_00 */
++#define GE2D_FMT_M24_RGB         		0x00004	/* 00_00_0_00_1_00 */
++#define GE2D_FMT_M24_YUV420T     	0x20017	/* 00_00_0_10_1_11 */
++#define GE2D_FMT_M24_YUV420B     	0x2001f	/* 00_00_0_11_1_11 */
++#define GE2D_FMT_S16_YUV422T     	0x20110	/* 01_00_0_10_0_00 */
++#define GE2D_FMT_S16_YUV422B     	0x20138	/* 01_00_0_11_0_00 */
++#define GE2D_FMT_S24_YUV444T     	0x20210	/* 10_00_0_10_0_00 */
++#define GE2D_FMT_S24_YUV444B     	0x20218	/* 10_00_0_11_0_00 */
++
++#define GE2D_FORMAT_YUV             	0x20000
++/* back compatible defines */
++#define GE2D_FORMAT_S8_Y			(GE2D_FORMAT_YUV|GE2D_FMT_S8_Y)
++#define GE2D_FORMAT_S8_CB          	(GE2D_FORMAT_YUV|GE2D_FMT_S8_CB)
++#define GE2D_FORMAT_S8_CR         	(GE2D_FORMAT_YUV|GE2D_FMT_S8_CR)
++#define GE2D_FORMAT_S8_R            	GE2D_FMT_S8_R
++#define GE2D_FORMAT_S8_G            	GE2D_FMT_S8_G
++#define GE2D_FORMAT_S8_B            	GE2D_FMT_S8_B
++#define GE2D_FORMAT_S8_A            	GE2D_FMT_S8_A
++#define GE2D_FORMAT_S8_LUT          	GE2D_FMT_S8_LUT
++#define GE2D_FORMAT_S16_YUV422      (GE2D_FMT_S16_YUV422  | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S16_RGB_655	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGB655)
++#define GE2D_FORMAT_S24_YUV444      (GE2D_FMT_S24_YUV444  | GE2D_COLOR_MAP_YUV444)
++#define GE2D_FORMAT_S24_RGB		(GE2D_FMT_S24_RGB     | GE2D_COLOR_MAP_RGB888)
++#define GE2D_FORMAT_S32_YUVA444	(GE2D_FMT_S32_YUVA444 | GE2D_COLOR_MAP_YUVA4444)
++#define GE2D_FORMAT_S32_RGBA		(GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_RGBA8888)
++#define GE2D_FORMAT_M24_YUV420	GE2D_FMT_M24_YUV420
++#define GE2D_FORMAT_M24_YUV422	GE2D_FMT_M24_YUV422
++#define GE2D_FORMAT_M24_YUV444	GE2D_FMT_M24_YUV444
++#define GE2D_FORMAT_M24_RGB		GE2D_FMT_M24_RGB
++#define GE2D_FORMAT_M24_YUV420T	GE2D_FMT_M24_YUV420T
++#define GE2D_FORMAT_M24_YUV420B	GE2D_FMT_M24_YUV420B
++#define GE2D_FORMAT_S16_YUV422T	(GE2D_FMT_S16_YUV422T | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S16_YUV422B	(GE2D_FMT_S16_YUV422B | GE2D_COLOR_MAP_YUV422)
++#define GE2D_FORMAT_S24_YUV444T	(GE2D_FMT_S24_YUV444T | GE2D_COLOR_MAP_YUV444)
++#define GE2D_FORMAT_S24_YUV444B	(GE2D_FMT_S24_YUV444B | GE2D_COLOR_MAP_YUV444)
++//format added in A1H
++/*16 bit*/
++#define GE2D_FORMAT_S16_RGB_565		(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGB565)
++#define GE2D_FORMAT_S16_RGB_844		(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGB844)
++#define GE2D_FORMAT_S16_RGBA_6442	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGBA6442)
++#define GE2D_FORMAT_S16_RGBA_4444	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGBA4444)
++#define GE2D_FORMAT_S16_ARGB_4444	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_ARGB4444)
++#define GE2D_FORMAT_S16_ARGB_1555	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_ARGB1555)
++#define GE2D_FORMAT_S16_RGBA_4642	(GE2D_FMT_S16_RGB     | GE2D_COLOR_MAP_RGBA4642)
++/*24 bit*/
++#define GE2D_FORMAT_S24_RGBA_5658         (GE2D_FMT_S24_RGB | GE2D_COLOR_MAP_RGBA5658)
++#define GE2D_FORMAT_S24_ARGB_8565         (GE2D_FMT_S24_RGB | GE2D_COLOR_MAP_ARGB8565)
++#define GE2D_FORMAT_S24_RGBA_6666         (GE2D_FMT_S24_RGB | GE2D_COLOR_MAP_RGBA6666)
++#define GE2D_FORMAT_S24_ARGB_6666         (GE2D_FMT_S24_RGB | GE2D_COLOR_MAP_ARGB6666)
++#define GE2D_FORMAT_S24_BGR			  (GE2D_FMT_S24_RGB | GE2D_COLOR_MAP_BGR888)
++/*32 bit*/
++#define GE2D_FORMAT_S32_ARGB        (GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_ARGB8888)
++#define GE2D_FORMAT_S32_ABGR        (GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_ABGR8888)
++#define GE2D_FORMAT_S32_BGRA        (GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_BGRA8888) 
++
++
++#define AML_SUPPORTED_DRAWINGFLAGS (DSDRAW_NOFX |DSDRAW_BLEND)
++
++#define AML_SUPPORTED_DRAWINGFUNCTIONS (DFXL_FILLRECTANGLE)
++
++#define AML_SUPPORTED_BLITTINGFLAGS ( DSBLIT_BLEND_ALPHACHANNEL | DSBLIT_COLORIZE | \
++											DSBLIT_SRC_PREMULTIPLY |DSBLIT_SRC_COLORKEY | \
++											DSBLIT_ROTATE180 )
++
++#define AML_SUPPORTED_BLITTINGFUNCTIONS (DFXL_STRETCHBLIT | DFXL_BLIT)
++
++typedef struct{
++	int x;		/*X coordinate of its top-left point*/
++	int y;		/*Y coordinate of its top-left point*/
++	int w;		/*width of it*/
++	int h;		/*height of it*/
++}rectangle_t;
++
++typedef struct{
++	unsigned long addr;
++	unsigned int w;
++	unsigned int h;
++}config_planes_t;
++
++typedef struct{
++	int key_enable;
++	int key_color;
++	int key_mask;
++	int key_mode;
++}src_key_ctrl_t;
++
++typedef struct{
++	int op_type;
++	int alu_const_color;
++	unsigned int src_format;
++	unsigned int dst_format;		//add for src&dst all in user space.
++
++	config_planes_t src_planes[4];
++	config_planes_t dst_planes[4];
++	src_key_ctrl_t src_key;
++}config_para_t;
++
++typedef struct{
++	unsigned int color;
++	rectangle_t src1_rect;
++	rectangle_t src2_rect;
++	rectangle_t dst_rect;
++	int op;
++}ge2d_op_para_t;
++
++typedef struct{
++	unsigned int num_entries;
++	unsigned long   lut_data[256];
++}lut_entries;
++	  
++typedef  struct  {
++	int  canvas_index;
++	int  top;
++	int  left;
++	int  width;
++	int  height;
++	int  format;
++	int  mem_type;
++	int  color;
++	unsigned char x_rev;
++	unsigned char y_rev;
++	unsigned char fill_color_en;
++	unsigned char fill_mode;
++}src_dst_para_ex_t;
++
++typedef    struct {
++	src_dst_para_ex_t src_para;
++	src_dst_para_ex_t src2_para;
++	src_dst_para_ex_t dst_para;
++
++	//key mask
++	src_key_ctrl_t  src_key;
++	src_key_ctrl_t  src2_key;
++
++	int alu_const_color;
++	unsigned src1_gb_alpha;
++	unsigned op_mode;
++	unsigned char bitmask_en;
++	unsigned char bytemask_only;
++	unsigned int  bitmask;
++	unsigned char dst_xy_swap;
++
++	// scaler and phase releated
++	unsigned hf_init_phase;
++	int hf_rpt_num;
++	unsigned hsc_start_phase_step;
++	int hsc_phase_slope;
++	unsigned vf_init_phase;
++	int vf_rpt_num;
++	unsigned vsc_start_phase_step;
++	int vsc_phase_slope;
++	unsigned char src1_vsc_phase0_always_en;
++	unsigned char src1_hsc_phase0_always_en;
++	unsigned char src1_hsc_rpt_ctrl;  //1bit, 0: using minus, 1: using repeat data
++	unsigned char src1_vsc_rpt_ctrl;  //1bit, 0: using minus  1: using repeat data
++
++	//unsigned char    src1_cmult_asel;
++	//unsigned char    src2_cmult_asel;
++	//canvas info
++	config_planes_t src_planes[4];
++	config_planes_t src2_planes[4];
++	config_planes_t dst_planes[4];
++}config_para_ex_t;
++
++typedef struct {
++	unsigned long addr;
++	unsigned long phys;
++	unsigned long pitch;
++	unsigned long format;
++	int mem_type;
++	int rotation;
++}config_info;
++
++typedef struct{
++	unsigned int color_blending_factor;
++	unsigned int alpha_blending_factor;
++}blend_op_config;
++
++typedef struct{
++	unsigned int color_blending_mode;
++	unsigned int color_blending_src_factor;
++	unsigned int color_blending_dst_factor;
++	unsigned int alpha_blending_mode;
++	unsigned int alpha_blending_src_factor;
++	unsigned int alpha_blending_dst_factor;
++}ge2d_blend_op;
++
++typedef struct {
++	int smf_source;
++	int smf_source2;
++	int smf_destination;
++	int smf_color;
++	int smf_src_color_key;
++	int smf_dst_color_key;
++	int smf_clip;
++}Smf_Flag;
++
++typedef struct {
++	void		*mem;
++	int		size;
++	u32		xres;	
++	u32		yres;
++	u32		bits_per_pixel;
++	unsigned long		phys;
++} AmlFB;
++
++typedef struct {
++	u32 color;
++	u8 gl_alpha;
++	u8 pixeldepth;
++	bool format_change;
++	int format_function_type;
++	
++	config_info src_info;
++	config_info dst_info;
++
++	DFBDimension src_size;
++	DFBDimension dst_size;
++	
++	unsigned int src_colorkey;
++	unsigned int dst_colorkey;
++	
++	DFBRegion clip;
++
++	Smf_Flag aml_smf;
++
++	int function_type;
++	int blitfunction_type;
++
++	int support_flag;
++	int poter_duff_rule;
++
++	CorePalette   *palette;
++	bool           	bNeedCLUTReload;
++	
++	CoreSurfacePool *pool;
++
++	ge2d_blend_op blend_op;
++	config_para_t config_ge2d_info;
++	ge2d_op_para_t op_ge2d_info;
++	config_para_ex_t ge2d_config_ex;
++} AMLGFX_DeviceData;
++
++typedef struct {
++	AMLGFX_DeviceData *amldev;
++
++	CoreDFB *core;
++
++	CoreScreen *screen;
++	CoreLayer *video;
++
++	FBDev *dfb_fbdev;
++
++	AmlFB fb;
++	s32 ge2d_fd;
++} AMLGFX_DriverData;
++
++#define GE2D_IOC_MAGIC  'G'
++
++#define GE2D_CONFIG_EX	     _IOW(GE2D_IOC_MAGIC, 0x01,  config_para_ex_t)
++#define	GE2D_SRCCOLORKEY     _IOW(GE2D_IOC_MAGIC, 0x02, config_para_t)
++
++#endif /*__EDB93XX_H__*/
++
+diff --git a/gfxdrivers/amlgfx/aml_accel.c b/gfxdrivers/amlgfx/aml_accel.c
+new file mode 100644
+index 0000000..f529ce0
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml_accel.c
+@@ -0,0 +1,1081 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#include <string.h>
++
++#include <sys/mman.h>
++#include <fcntl.h>
++#include <sys/ioctl.h>
++
++#include <core/palette.h>
++#include <core/gfxcard.h>
++
++#include <gfx/convert.h>
++
++#include "aml.h"
++#include "amlfb.h"
++#include "aml_accel.h"
++#include "aml_state.h"
++
++D_DEBUG_DOMAIN( BLIT_AML, "BLIT_AML", "AML GFXDRIVERS");
++
++static inline unsigned blendop(unsigned color_blending_mode,
++		unsigned color_blending_src_factor,
++		unsigned color_blending_dst_factor,
++		unsigned alpha_blending_mode,
++		unsigned alpha_blending_src_factor,
++		unsigned alpha_blending_dst_factor)
++{
++	return (color_blending_mode << 24) |
++		(color_blending_src_factor << 20) |
++		(color_blending_dst_factor << 16) |
++		(alpha_blending_mode << 8) |
++		(alpha_blending_src_factor << 4) | (alpha_blending_dst_factor << 0);
++}
++
++void
++amlFlushTextureCache(void *drv, void *dev)
++{
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	amldev->src_info.addr = amldev->dst_info.addr = 0x0;
++	amldev->src_info.pitch = amldev->dst_info.pitch = 0x0;
++}
++
++DFBResult
++amlEngineSync(void *drv, void *dev)
++{
++	return DFB_OK;
++}
++
++void
++amlEngineReset(void *drv, void *dev)
++{
++#if 0	// solve the problem that res_change cause black window
++	memset((void*)dfb_system_video_memory_virtual(0), 0, dfb_gfxcard_memory_length());
++#endif
++}
++
++static void aml_setColorKey(void *drv, void *dev,
++		int keymode, int enable)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	
++	amldev->config_ge2d_info.src_key.key_color= amldev->src_colorkey;
++	amldev->config_ge2d_info.src_key.key_enable=enable;
++	amldev->config_ge2d_info.src_key.key_mask=0xff000000;
++	amldev->config_ge2d_info.src_key.key_mode=keymode;
++
++	debug("SrcColorKey is 0x%x\n", amldev->src_colorkey);
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_SRCCOLORKEY, &amldev->config_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ioctl failed!\n",__FUNCTION__,__LINE__);
++	}
++}
++
++static void aml_setDstColorKey(void *drv, void *dev,
++		int keymode, int enable)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	amldev->config_ge2d_info.src_key.key_color=amldev->dst_colorkey;
++	amldev->config_ge2d_info.src_key.key_enable=enable;
++	amldev->config_ge2d_info.src_key.key_mask=0xff000000;
++	amldev->config_ge2d_info.src_key.key_mode=keymode;
++
++	debug("DstColorKey is 0x%x\n", amldev->dst_colorkey);
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_SRCCOLORKEY, &amldev->config_ge2d_info);/*chengman add maybe have problems,I'm not sure*/
++	if(ret!=0)
++	{
++		printf("%s,%d,ioctl failed!\n",__FUNCTION__,__LINE__);
++	}
++}
++
++static bool aml_updatePalette(void *drv, void *dev)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	int i;
++	lut_entries lut;
++
++
++	memset((char*)&lut, 0, sizeof(lut_entries));
++	
++	if(amldev->palette && amldev->bNeedCLUTReload)
++	{
++		lut.num_entries = amldev->palette->num_entries;
++
++		for(i=0; i < lut.num_entries; i++)
++		{
++			DFBColor *color = &amldev->palette->entries[i];
++			lut.lut_data[i] = PIXEL_ARGB(color->r, color->g, color->b, color->a);
++		}
++
++		if ( ioctl(amldrv->ge2d_fd, GE2D_SET_BLIT_PALETTE, &lut )<0 )
++		return false;
++ 	 }
++
++  	return true;
++}
++
++static void
++amlSet_Canvas(DFBDimension size, int *canvas_w, int *canvas_h)
++{
++	if (((size.w)%8) != 0){
++		*canvas_w = (((size.w)/8)+1)*8;
++	}else{
++		*canvas_w = size.w;
++	}
++
++	if (((size.h)%8) != 0){
++		*canvas_h = (((size.h)/8)+1)*8;
++	}else{
++		*canvas_h = size.h;
++	}
++}
++
++static bool
++amlFillRectangle_ConfigEx(void *drv, void *dev, DFBRectangle *rect,
++		config_info dst_info)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	int canvas_w = 0;
++	int canvas_h = 0;
++
++	amlSet_Canvas(amldev->dst_size, &canvas_w, &canvas_h);
++
++	debug("------dst_info phys is 0x%x, mem_type is %d\n", dst_info.phys, dst_info.mem_type);
++	debug("rect info x is %d, y is %d, w is %d, h is %d\n", rect->x, rect->y, rect->w, rect->h);
++	debug("canvas_w is %d, canvas_h is %d\n", canvas_w, canvas_h);
++
++
++	memset((char*)&amldev->ge2d_config_ex, 0, sizeof(config_para_ex_t));
++
++	amldev->ge2d_config_ex.src_planes[0].addr = amldev->dst_info.phys;
++	amldev->ge2d_config_ex.src_para.mem_type = CANVAS_ALLOC;
++	amldev->ge2d_config_ex.src_para.format = amldev->dst_info.format;
++
++	amldev->ge2d_config_ex.src_para.left=0;
++	amldev->ge2d_config_ex.src_para.top=0;
++
++	amldev->ge2d_config_ex.src_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.src_planes[0].w = canvas_w;
++	amldev->ge2d_config_ex.src_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.src_planes[0].h = canvas_h;
++	
++	amldev->ge2d_config_ex.src2_para.mem_type=CANVAS_TYPE_INVALID;
++
++	amldev->ge2d_config_ex.dst_planes[0].addr = amldev->dst_info.phys;
++	amldev->ge2d_config_ex.dst_para.mem_type = CANVAS_ALLOC;
++	amldev->ge2d_config_ex.dst_para.format = amldev->dst_info.format;
++
++	amldev->ge2d_config_ex.dst_para.left = 0;
++	amldev->ge2d_config_ex.dst_para.top = 0;
++
++	amldev->ge2d_config_ex.dst_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.dst_planes[0].w = canvas_w;
++	amldev->ge2d_config_ex.dst_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.dst_planes[0].h = canvas_h;
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_CONFIG_EX, &amldev->ge2d_config_ex);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++
++static bool
++amlFillRectangle_blend_ConfigEx(void *drv, void *dev, DFBRectangle *rect,
++		config_info dst_info)	
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	int canvas_w = 0;
++	int canvas_h = 0;
++
++	amlSet_Canvas(amldev->dst_size, &canvas_w, &canvas_h);
++	
++	debug("------dst_info phys is 0x%x, mem_type is %d\n", dst_info.phys, dst_info.mem_type);
++	debug("rect info x is %d, y is %d, w is %d, h is %d\n", rect->x, rect->y, rect->w, rect->h);
++	debug("canvas_w is %d, canvas_h is %d\n", canvas_w, canvas_h);
++		
++
++	memset((char*)&amldev->ge2d_config_ex, 0, sizeof(config_para_ex_t));
++	amldev->ge2d_config_ex.src_planes[0].addr = amldev->src_info.phys;
++	
++	amldev->ge2d_config_ex.src_para.mem_type = CANVAS_ALLOC;
++	amldev->ge2d_config_ex.src_para.format = amldev->dst_info.format;
++	
++	amldev->ge2d_config_ex.src_para.left=0;
++	amldev->ge2d_config_ex.src_para.top=0;
++
++	amldev->ge2d_config_ex.src_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.src_planes[0].w = canvas_w;
++	amldev->ge2d_config_ex.src_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.src_planes[0].h = canvas_h;
++	
++    amldev->ge2d_config_ex.src_para.color = amldev->color;
++    amldev->ge2d_config_ex.src_para.fill_color_en = 1;		
++
++
++	amldev->ge2d_config_ex.src2_planes[0].addr = amldev->dst_info.phys;
++	amldev->ge2d_config_ex.src2_para.mem_type = CANVAS_ALLOC;
++	amldev->ge2d_config_ex.src2_para.format = amldev->dst_info.format;
++	
++	amldev->ge2d_config_ex.src2_para.top = 0;
++	amldev->ge2d_config_ex.src2_para.left = 0;
++
++	amldev->ge2d_config_ex.src2_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.src2_planes[0].w = canvas_w;
++	amldev->ge2d_config_ex.src2_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.src2_planes[0].h = canvas_h;
++	
++	amldev->ge2d_config_ex.dst_planes[0].addr = amldev->dst_info.phys;
++	amldev->ge2d_config_ex.dst_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.dst_para.format = amldev->dst_info.format;
++	amldev->ge2d_config_ex.dst_para.top = 0;
++	amldev->ge2d_config_ex.dst_para.left = 0;
++
++	amldev->ge2d_config_ex.dst_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.dst_planes[0].w = canvas_w;
++	amldev->ge2d_config_ex.dst_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.dst_planes[0].h = canvas_h;
++
++	amldev->ge2d_config_ex.src1_gb_alpha = amldev->gl_alpha;
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_CONFIG_EX, &amldev->ge2d_config_ex);
++	if(ret!=0)
++	{
++		printf("%s,%d, GE2D_CONFIG_EX failed ret[%d]\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++
++
++static bool
++amlFillRectangle_Start( void *drv, void *dev, DFBRectangle *rect)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++
++	amldev->op_ge2d_info.src1_rect.x = rect->x;
++	amldev->op_ge2d_info.src1_rect.y = rect->y;
++	amldev->op_ge2d_info.src1_rect.w = rect->w;
++	amldev->op_ge2d_info.src1_rect.h = rect->h;
++
++	amldev->op_ge2d_info.dst_rect.x = rect->x;
++	amldev->op_ge2d_info.dst_rect.y = rect->y;
++	amldev->op_ge2d_info.dst_rect.w = rect->w;
++	amldev->op_ge2d_info.dst_rect.h = rect->h;
++	amldev->op_ge2d_info.color = amldev->color;
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_FILLRECTANGLE, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++static bool
++amlFillRectangle_Start_blend( void *drv, void *dev, DFBRectangle *rect)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++		
++	amldev->op_ge2d_info.src1_rect.x = rect->x;
++	amldev->op_ge2d_info.src1_rect.y = rect->y;
++	amldev->op_ge2d_info.src1_rect.w = rect->w;
++	amldev->op_ge2d_info.src1_rect.h = rect->h;
++
++	amldev->op_ge2d_info.src2_rect.x = rect->x;
++	amldev->op_ge2d_info.src2_rect.y = rect->y;
++	amldev->op_ge2d_info.src2_rect.w = rect->w;
++	amldev->op_ge2d_info.src2_rect.h = rect->h;
++
++	amldev->op_ge2d_info.dst_rect.x = rect->x;
++	amldev->op_ge2d_info.dst_rect.y = rect->y;
++	amldev->op_ge2d_info.dst_rect.w = rect->w;
++	amldev->op_ge2d_info.dst_rect.h = rect->h;
++
++	debug("colormode is %d, color src is %d, color dst is %d\n", amldev->blend_op.color_blending_mode,
++			amldev->blend_op.color_blending_src_factor, amldev->blend_op.color_blending_dst_factor);
++	debug("alphamode is %d, alpha src is %d, alpha dst is %d\n", amldev->blend_op.alpha_blending_mode,
++			amldev->blend_op.alpha_blending_src_factor, amldev->blend_op.alpha_blending_dst_factor);
++	amldev->op_ge2d_info.op = blendop(
++			amldev->blend_op.color_blending_mode,
++			amldev->blend_op.color_blending_src_factor,
++			amldev->blend_op.color_blending_dst_factor,
++			amldev->blend_op.alpha_blending_mode,
++			amldev->blend_op.alpha_blending_src_factor,
++			amldev->blend_op.alpha_blending_dst_factor);	
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_BLEND, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++bool 
++amlFillRectangle( void *drv, void *dev, DFBRectangle *rect )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	if (amldev->support_flag == false || amldev->function_type == GE2D_DRAW_NOT_SUPPORT){
++		printf("not support FillRectangle please check configure\n");
++		return false;
++	}
++	switch(amldev->function_type){
++		case GE2D_DRAW_TYPE_NONE:
++		if(amlFillRectangle_ConfigEx(drv, dev, rect, amldev->dst_info))
++		{
++			amlFillRectangle_Start(drv, dev, rect);
++		}
++		else
++		{
++			printf("the amlFillRectangle_ConfigEx failed \n");
++			return false;
++		}
++		break;
++		case GE2D_DRAW_TYPE_BLEND:
++		if(amlFillRectangle_blend_ConfigEx(drv, dev, rect, amldev->dst_info))
++		{
++			amlFillRectangle_Start_blend(drv, dev, rect);
++		}
++		break;
++		default:
++		{
++			printf("the blit function_type is not support\n");
++			return false;
++		}
++		break;
++	}
++
++	return true;
++}
++
++static bool
++amlBlit_ConfigEx(void *drv, void *dev, DFBRectangle *rect,
++		config_info src_info, config_info dst_info)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	int s_canvas_w = 0;
++	int s_canvas_h = 0;
++	int d_canvas_w = 0;
++	int d_canvas_h = 0;
++
++	debug("src_info phys is 0x%x\n", src_info.phys);
++	debug("dst_info phys is 0x%x\n", dst_info.phys);
++
++
++	amlSet_Canvas(amldev->src_size, &s_canvas_w, &s_canvas_h);
++	amlSet_Canvas(amldev->dst_size, &d_canvas_w, &d_canvas_h);
++	
++	memset((char*)&amldev->ge2d_config_ex, 0, sizeof(config_para_ex_t));
++	amldev->ge2d_config_ex.src_planes[0].addr = src_info.phys;//amldev->src_info.phys;
++	amldev->ge2d_config_ex.src_para.mem_type = CANVAS_ALLOC;//amldev->src_info.mem_type;
++
++	amldev->ge2d_config_ex.src_para.format = src_info.format;//amldev->src_info.format;
++	amldev->ge2d_config_ex.src_para.top = 0;
++	amldev->ge2d_config_ex.src_para.left = 0;
++	amldev->ge2d_config_ex.src_para.width = amldev->src_size.w;
++	amldev->ge2d_config_ex.src_planes[0].w = s_canvas_w;
++	amldev->ge2d_config_ex.src_para.height = amldev->src_size.h;
++	amldev->ge2d_config_ex.src_planes[0].h = s_canvas_h;
++
++	amldev->ge2d_config_ex.src2_para.mem_type = CANVAS_TYPE_INVALID;
++
++	amldev->ge2d_config_ex.dst_planes[0].addr = dst_info.phys;//amldev->dst_info.phys;
++	amldev->ge2d_config_ex.dst_para.mem_type = CANVAS_ALLOC;//amldev->dst_info.mem_type;
++
++	amldev->ge2d_config_ex.dst_para.format = dst_info.format;//amldev->dst_info.format;
++	amldev->ge2d_config_ex.dst_para.top = 0;
++	amldev->ge2d_config_ex.dst_para.left = 0;
++
++	amldev->ge2d_config_ex.dst_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++	amldev->ge2d_config_ex.dst_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++
++	switch (amldev->src_info.rotation) {
++		case GE2D_ROTATION_0:
++			break;
++		case GE2D_ROTATION_90:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.src_para.x_rev = 1;
++			break;
++		case GE2D_ROTATION_180:
++			amldev->ge2d_config_ex.src_para.x_rev = 1;
++			amldev->ge2d_config_ex.src_para.y_rev = 1;
++			break;
++		case GE2D_ROTATION_270:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.src_para.y_rev = 1;
++			break;
++		default:
++			break;
++	}
++
++	switch (amldev->dst_info.rotation) {
++		case GE2D_ROTATION_0:
++			break;
++		case GE2D_ROTATION_90:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			break;
++		case GE2D_ROTATION_180:
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		case GE2D_ROTATION_270:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		default:
++			break;
++	}
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_CONFIG_EX, &amldev->ge2d_config_ex);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++static bool
++amlBlit_Start( void *drv, void *dev, DFBRectangle *rect, 
++						int dx, int dy, u16 BlitFunc, u16 functype)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	debug("rect x is %d, y is %d, w is %d, h is %d\n", rect->x, rect->y, rect->w, rect->h);
++	debug("dx is %d, dy is %d\n", dx, dy);
++
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++	amldev->op_ge2d_info.src1_rect.x = rect->x;
++	amldev->op_ge2d_info.src1_rect.y = rect->y;
++	amldev->op_ge2d_info.src1_rect.w = rect->w;
++	amldev->op_ge2d_info.src1_rect.h = rect->h;
++
++	if (functype == SRC_TO_SRC){
++		amldev->op_ge2d_info.dst_rect.x = rect->x;
++		amldev->op_ge2d_info.dst_rect.y = rect->y;
++		amldev->op_ge2d_info.dst_rect.w = rect->w;
++		amldev->op_ge2d_info.dst_rect.h = rect->h;
++	}else if (functype == SRC_TO_DST){
++		amldev->op_ge2d_info.dst_rect.x = dx;
++		amldev->op_ge2d_info.dst_rect.y = dy;
++		amldev->op_ge2d_info.dst_rect.w = rect->w;
++		amldev->op_ge2d_info.dst_rect.h = rect->h;
++	}
++
++	int ret = ioctl(amldrv->ge2d_fd, BlitFunc, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed!\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++#if 0
++static bool
++amlBlend_AlphaPremultiply( void *drv, void *dev, DFBRectangle *rect)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++
++	amldev->op_ge2d_info.src1_rect.x = rect->x;
++	amldev->op_ge2d_info.src1_rect.y = rect->y;
++	amldev->op_ge2d_info.src1_rect.w = rect->w;
++	amldev->op_ge2d_info.src1_rect.h = rect->h;
++
++	amldev->op_ge2d_info.src2_rect.x = rect->x;
++	amldev->op_ge2d_info.src2_rect.y = rect->y;
++	amldev->op_ge2d_info.src2_rect.w = rect->w;
++	amldev->op_ge2d_info.src2_rect.h = rect->h;
++
++	amldev->op_ge2d_info.dst_rect.x = rect->x;
++	amldev->op_ge2d_info.dst_rect.y = rect->y;
++	amldev->op_ge2d_info.dst_rect.w = rect->w;
++	amldev->op_ge2d_info.dst_rect.h = rect->h;
++
++	amldev->op_ge2d_info.op = blendop(OPERATION_ADD,
++			COLOR_FACTOR_ONE,
++			COLOR_FACTOR_ZERO,
++			OPERATION_ADD,
++			ALPHA_FACTOR_CONST_ALPHA,
++			ALPHA_FACTOR_ZERO);
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_BLEND, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++static bool
++amlBlend_ColorPremultiply_SrcAlpha( void *drv, void *dev, DFBRectangle *rect)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++
++	amldev->op_ge2d_info.src1_rect.x = rect->x;
++	amldev->op_ge2d_info.src1_rect.y = rect->y;
++	amldev->op_ge2d_info.src1_rect.w = rect->w;
++	amldev->op_ge2d_info.src1_rect.h = rect->h;
++
++	amldev->op_ge2d_info.src2_rect.x = rect->x;
++	amldev->op_ge2d_info.src2_rect.y = rect->y;
++	amldev->op_ge2d_info.src2_rect.w = rect->w;
++	amldev->op_ge2d_info.src2_rect.h = rect->h;
++
++	amldev->op_ge2d_info.dst_rect.x = rect->x;
++	amldev->op_ge2d_info.dst_rect.y = rect->y;
++	amldev->op_ge2d_info.dst_rect.w = rect->w;
++	amldev->op_ge2d_info.dst_rect.h = rect->h;
++
++	amldev->op_ge2d_info.op = blendop(OPERATION_ADD,
++			COLOR_FACTOR_SRC_ALPHA,
++			COLOR_FACTOR_ZERO,
++			OPERATION_ADD,
++			ALPHA_FACTOR_ONE,
++			ALPHA_FACTOR_ZERO);
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_BLEND, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++#endif
++static bool
++amlBlend_ColorPremultiply_ConstColor( void *drv, void *dev, DFBRectangle *src_rect, 
++													DFBRectangle*dst_rect, int dx, int dy)
++{
++	int dst_x, dst_y, dst_w, dst_h;
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++
++	if (src_rect == dst_rect){
++		dst_x= dx; dst_y = dy;
++		dst_w = src_rect->w;
++		dst_h = src_rect->h;
++	}else{
++		dst_x = dst_rect->x;
++		dst_y = dst_rect->y;
++		dst_w = dst_rect->w;
++		dst_h = dst_rect->h;
++	}
++	
++	amldev->op_ge2d_info.src1_rect.x = src_rect->x;
++	amldev->op_ge2d_info.src1_rect.y = src_rect->y;
++	amldev->op_ge2d_info.src1_rect.w = src_rect->w;
++	amldev->op_ge2d_info.src1_rect.h = src_rect->h;
++
++	amldev->op_ge2d_info.src2_rect.x = dst_x;
++	amldev->op_ge2d_info.src2_rect.y = dst_y;
++	amldev->op_ge2d_info.src2_rect.w = dst_w;
++	amldev->op_ge2d_info.src2_rect.h = dst_h;
++
++	amldev->op_ge2d_info.dst_rect.x = dst_x;
++	amldev->op_ge2d_info.dst_rect.y = dst_y;
++	amldev->op_ge2d_info.dst_rect.w = dst_w;
++	amldev->op_ge2d_info.dst_rect.h = dst_h;
++
++	amldev->op_ge2d_info.op = blendop(OPERATION_ADD,
++			COLOR_FACTOR_CONST_COLOR,
++			COLOR_FACTOR_ZERO,
++			OPERATION_ADD,
++			ALPHA_FACTOR_ONE,
++			ALPHA_FACTOR_ZERO);
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_BLEND, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++
++static bool
++amlBlend_Config_Ex( void *drv, void *dev,
++		DFBRectangle *src_rect, DFBRectangle *dst_rect, config_info* src_info,
++		config_info* src2_info, config_info* dst_info,int flag )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	int s_canvas_w = 0;
++	int s_canvas_h = 0;
++	int d_canvas_w = 0;
++	int d_canvas_h = 0;
++
++	debug("------src_info phys is 0x%x, mem_type is %d\n", src_info->phys, src_info->mem_type);
++	debug("------dst_info phys is 0x%x, mem_type is %d\n", dst_info->phys, dst_info->mem_type);
++	debug("global alpha is 0x%x. const color is 0x%x\n", amldev->gl_alpha, amldev->color);
++	
++	amlSet_Canvas(amldev->src_size, &s_canvas_w, &s_canvas_h);
++	amlSet_Canvas(amldev->dst_size, &d_canvas_w, &d_canvas_h);
++	
++	memset((char*)&amldev->ge2d_config_ex, 0, sizeof(config_para_ex_t));
++
++	amldev->ge2d_config_ex.src_planes[0].addr = src_info->phys;
++	amldev->ge2d_config_ex.src_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.src_para.format = src_info->format;
++	amldev->ge2d_config_ex.src_para.top = 0;
++	amldev->ge2d_config_ex.src_para.left = 0;
++	amldev->ge2d_config_ex.src_para.width = amldev->src_size.w;
++	amldev->ge2d_config_ex.src_planes[0].w = s_canvas_w;
++	amldev->ge2d_config_ex.src_para.height = amldev->src_size.h;
++	amldev->ge2d_config_ex.src_planes[0].h = s_canvas_h;
++
++	amldev->ge2d_config_ex.src2_planes[0].addr = src2_info->phys;
++	amldev->ge2d_config_ex.src2_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.src2_para.format = src2_info->format;
++	amldev->ge2d_config_ex.src2_para.top = 0;
++	amldev->ge2d_config_ex.src2_para.left = 0;
++
++	if(src2_info == src_info){
++		amldev->ge2d_config_ex.src2_para.width = amldev->src_size.w;
++		amldev->ge2d_config_ex.src2_planes[0].w = s_canvas_w;
++		amldev->ge2d_config_ex.src2_para.height = amldev->src_size.h;
++		amldev->ge2d_config_ex.src2_planes[0].h = s_canvas_h;
++	}else if (src2_info == dst_info){
++		amldev->ge2d_config_ex.src2_para.width = amldev->dst_size.w;
++		amldev->ge2d_config_ex.src2_planes[0].w = d_canvas_w;
++		amldev->ge2d_config_ex.src2_para.height = amldev->dst_size.h;
++		amldev->ge2d_config_ex.src2_planes[0].h = d_canvas_h;
++	}
++	
++	amldev->ge2d_config_ex.dst_planes[0].addr = dst_info->phys;
++	amldev->ge2d_config_ex.dst_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.dst_para.format = dst_info->format;
++	amldev->ge2d_config_ex.dst_para.top = 0;
++	amldev->ge2d_config_ex.dst_para.left = 0;
++
++	amldev->ge2d_config_ex.dst_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++	amldev->ge2d_config_ex.dst_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++
++	amldev->ge2d_config_ex.src1_gb_alpha = amldev->gl_alpha;
++	amldev->ge2d_config_ex.alu_const_color = amldev->color;
++
++	switch (amldev->dst_info.rotation) {
++		case GE2D_ROTATION_0:
++			break;
++		case GE2D_ROTATION_90:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			break;
++		case GE2D_ROTATION_180:
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		case GE2D_ROTATION_270:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		default:
++			break;
++	}
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_CONFIG_EX, &amldev->ge2d_config_ex);
++	if(ret!=0)
++	{
++		printf("%s,%d, GE2D_CONFIG_EX failed ret[%d]\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++	return true;
++}
++
++static bool
++amlBlend_Start( void *drv, void *dev, DFBRectangle *src_rect, DFBRectangle *dst_rect, int dx, int dy )
++{
++	int dst_x, dst_y, dst_w, dst_h;
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++	
++	if (src_rect == dst_rect){
++		dst_x= dx; dst_y = dy;
++		dst_w = src_rect->w;
++		dst_h = src_rect->h;
++	}else{
++		dst_x = dst_rect->x;
++		dst_y = dst_rect->y;
++		dst_w = dst_rect->w;
++		dst_h = dst_rect->h;
++	}
++
++	debug("src_rect x is %d, y is %d, w is %d, h is %d\n",
++			src_rect->x, src_rect->y, src_rect->w, src_rect->h);
++	debug("dst_rect x is %d, y is %d, w is %d, h is %d\n",
++			dst_rect->x, dst_rect->y, dst_rect->w, dst_rect->h);
++	debug("dx is %d, dy is %d\n", dx, dy);
++
++		
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++	amldev->op_ge2d_info.src1_rect.x = src_rect->x;
++	amldev->op_ge2d_info.src1_rect.y = src_rect->y;
++	amldev->op_ge2d_info.src1_rect.w = src_rect->w;
++	amldev->op_ge2d_info.src1_rect.h = src_rect->h;
++
++	amldev->op_ge2d_info.src2_rect.x = dst_x;
++	amldev->op_ge2d_info.src2_rect.y = dst_y;
++	amldev->op_ge2d_info.src2_rect.w = dst_w;
++	amldev->op_ge2d_info.src2_rect.h = dst_h;
++
++	amldev->op_ge2d_info.dst_rect.x = dst_x;
++	amldev->op_ge2d_info.dst_rect.y = dst_y;
++	amldev->op_ge2d_info.dst_rect.w = dst_w;
++	amldev->op_ge2d_info.dst_rect.h = dst_h;
++
++	debug("colormode is %d, color src is %d, color dst is %d\n", amldev->blend_op.color_blending_mode,
++			amldev->blend_op.color_blending_src_factor, amldev->blend_op.color_blending_dst_factor);
++	debug("alphamode is %d, alpha src is %d, alpha dst is %d\n", amldev->blend_op.alpha_blending_mode,
++			amldev->blend_op.alpha_blending_src_factor, amldev->blend_op.alpha_blending_dst_factor);
++
++	amldev->op_ge2d_info.op = blendop(
++			amldev->blend_op.color_blending_mode,
++			amldev->blend_op.color_blending_src_factor,
++			amldev->blend_op.color_blending_dst_factor,
++			amldev->blend_op.alpha_blending_mode,
++			amldev->blend_op.alpha_blending_src_factor,
++			amldev->blend_op.alpha_blending_dst_factor);
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_BLEND, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++
++bool
++amlBlit( void *drv, void *dev, DFBRectangle *rect, int dx, int dy )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	//D_DEBUG_AT( BLIT_AML, "blit rect[%d %d %d %d] dxy[%d %d]\n",rect->x,rect->y,rect->w,rect->h,dx,dy);
++
++	if (amldev->support_flag == false || amldev->blitfunction_type == GE2D_NOT_SUPPORT){
++		printf("Not support amlBlit please check configure\n");
++		if(amldev->blitfunction_type == GE2D_NOT_SUPPORT){
++			printf("=====GE2D_NOT_SUPPORT=====\n");
++		}
++		return false;/*chengman modifier 2013-1-6*/
++	}
++
++	if (!(amldev->clip.x1 <= dx) || !(amldev->clip.y1 <= dy) || 
++			!( amldev->clip.x2 >= (dx + rect->w - 1) ) || !( amldev->clip.y2 >= (dy + rect->h - 1) )) {
++		printf("The blit region is not vaild\n");
++		return false;
++	}
++
++	aml_updatePalette(drv, dev);
++	
++	if ((amldev->format_change) && (amldev->format_function_type == FORMAT_CHANGE_NOALPHA)){
++			amlBlit_ConfigEx(drv, dev, rect, amldev->src_info, amldev->dst_info);
++			amlBlit_Start(drv, dev, rect, dx, dy, GE2D_BLIT_NOALPHA, SRC_TO_DST);
++	}else{
++		switch (amldev->blitfunction_type){
++			case GE2D_BLEND_PRE_ALPHACHANNEL:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, rect, rect, dx, dy);
++			break;
++			case GE2D_BLEND_ALPHACHANNEL:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, rect, rect, dx, dy);
++			break;
++			case GE2D_BLEND_COLORIZE_ALPHA:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, rect, rect, dx, dy);
++			break;
++			case GE2D_BLEND_SRC_COLORKEY:
++			amlBlit_ConfigEx(drv, dev, rect, amldev->src_info, amldev->dst_info);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_ENABLE);
++			amlBlit_Start(drv, dev, rect, dx, dy, GE2D_BLIT, SRC_TO_DST);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_DISENABLE);
++			break;
++			case GE2D_BLEND_COLORIZE:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_ColorPremultiply_ConstColor(drv, dev, rect, rect, dx, dy);
++			break;
++			case GE2D_BLEND_SRC_COLORKEY_COLORIZE:
++			amlBlend_Config_Ex(drv, dev, rect, rect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);			
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_ENABLE);
++			amlBlend_ColorPremultiply_ConstColor(drv, dev, rect, rect, dx, dy);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_DISENABLE);
++			break;
++			case GE2D_ROTATION:
++			amlBlit_ConfigEx(drv, dev, rect, amldev->src_info, amldev->dst_info);
++			amlBlit_Start(drv, dev, rect, dx, dy, GE2D_BLIT, SRC_TO_DST);
++			break;
++			case GE2D_BLEND_NOFX:
++			amlBlit_ConfigEx(drv, dev, rect, amldev->src_info, amldev->dst_info);
++			amlBlit_Start(drv, dev, rect, dx, dy, GE2D_BLIT, SRC_TO_DST);
++			break;
++			default:
++			printf("------the blit blitfunction_type is not support\n");
++			break;
++		}
++	}
++	//D_DEBUG_AT(BLIT_AML, "blit ok\n");
++	return true;
++}
++
++static bool
++amlStretchBlit_ConfigEx(void *drv, void *dev, DFBRectangle *srect,
++		DFBRectangle *drect, config_info src_info, config_info dst_info)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	int s_canvas_w = 0;
++	int s_canvas_h = 0;
++	int d_canvas_w = 0;
++	int d_canvas_h = 0;
++	
++	amlSet_Canvas(amldev->src_size, &s_canvas_w, &s_canvas_h);
++	amlSet_Canvas(amldev->dst_size, &d_canvas_w, &d_canvas_h);
++
++	//debug("src_info.mem_type is %d\n", amldev->src_info.mem_type);
++	debug("srect->w is %d, srect->h is %d\n", srect->w, srect->h);
++	debug("s_canvas_w is %d, s_canvas_h is %d\n", s_canvas_w, s_canvas_h);
++	
++	debug("src_info phys is 0x%x\n", src_info.phys);
++	debug("dst_info phys is 0x%x\n", dst_info.phys);
++	//debug("dst_info.mem_type is %d\n", amldev->dst_info.mem_type);
++	debug("drect->w is %d, drect->h is %d\n", drect->w, drect->h);
++	debug("d_canvas_w is %d, d_canvas_h is %d\n", d_canvas_w, d_canvas_h);
++
++	memset((char*)&amldev->ge2d_config_ex, 0, sizeof(config_para_ex_t));
++	amldev->ge2d_config_ex.src_planes[0].addr = amldev->src_info.phys;
++	amldev->ge2d_config_ex.src_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.src_para.format = amldev->src_info.format;
++	amldev->ge2d_config_ex.src_para.top = 0;
++	amldev->ge2d_config_ex.src_para.left = 0;
++	amldev->ge2d_config_ex.src_para.width = amldev->src_size.w;
++	amldev->ge2d_config_ex.src_planes[0].w = s_canvas_w;
++	amldev->ge2d_config_ex.src_para.height = amldev->src_size.h;
++	amldev->ge2d_config_ex.src_planes[0].h = s_canvas_h;
++
++	amldev->ge2d_config_ex.src2_para.mem_type = CANVAS_TYPE_INVALID;
++
++	amldev->ge2d_config_ex.dst_planes[0].addr = amldev->dst_info.phys;
++	amldev->ge2d_config_ex.dst_para.mem_type = CANVAS_ALLOC;
++
++	amldev->ge2d_config_ex.dst_para.format = amldev->dst_info.format;
++	amldev->ge2d_config_ex.dst_para.top = 0;
++	amldev->ge2d_config_ex.dst_para.left = 0;
++
++	amldev->ge2d_config_ex.dst_para.width = amldev->dst_size.w;
++	amldev->ge2d_config_ex.dst_planes[0].w = d_canvas_w;
++	amldev->ge2d_config_ex.dst_para.height = amldev->dst_size.h;
++	amldev->ge2d_config_ex.dst_planes[0].h = d_canvas_h;
++
++	switch (amldev->dst_info.rotation) {
++		case GE2D_ROTATION_0:
++			break;
++		case GE2D_ROTATION_90:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			break;
++		case GE2D_ROTATION_180:
++			amldev->ge2d_config_ex.dst_para.x_rev = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		case GE2D_ROTATION_270:
++			amldev->ge2d_config_ex.dst_xy_swap = 1;
++			amldev->ge2d_config_ex.dst_para.y_rev = 1;
++			break;
++		default:
++			break;
++	}
++
++	int ret = ioctl(amldrv->ge2d_fd, GE2D_CONFIG_EX, &amldev->ge2d_config_ex);
++	if(ret!=0)
++	{
++		printf("%s,%d,GE2D_CONFIG_EX failed ret value:%d\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++
++static bool
++amlStretchBlit_Start( void *drv, void *dev, DFBRectangle *srect,
++			DFBRectangle *drect, u16 StretchBlitFunc, u16 functype)
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	memset((char*)&amldev->op_ge2d_info, 0, sizeof(ge2d_op_para_t));
++
++	amldev->op_ge2d_info.src1_rect.x = srect->x;
++	amldev->op_ge2d_info.src1_rect.y = srect->y;
++	amldev->op_ge2d_info.src1_rect.w = srect->w;
++	amldev->op_ge2d_info.src1_rect.h = srect->h;
++
++	if (functype == SRC_TO_SRC){
++		amldev->op_ge2d_info.dst_rect.x = srect->x;
++		amldev->op_ge2d_info.dst_rect.y = srect->y;
++		amldev->op_ge2d_info.dst_rect.w = srect->w;
++		amldev->op_ge2d_info.dst_rect.h = srect->h;
++	}else if (functype == SRC_TO_DST){
++		amldev->op_ge2d_info.dst_rect.x = drect->x;
++		amldev->op_ge2d_info.dst_rect.y = drect->y;
++		amldev->op_ge2d_info.dst_rect.w = drect->w;
++		amldev->op_ge2d_info.dst_rect.h = drect->h;
++	}
++	
++	int ret = ioctl(amldrv->ge2d_fd, StretchBlitFunc, &amldev->op_ge2d_info);
++	if(ret!=0)
++	{
++		printf("%s,%d,ret %d,ioctl failed\n",__FUNCTION__,__LINE__, ret);
++		return false;
++	}
++
++	return true;
++}
++
++bool
++amlStretchBlit( void *drv, void *dev, DFBRectangle *srect, DFBRectangle *drect )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	D_DEBUG_AT( BLIT_AML, "stretchblit srect[%d %d %d %d] drect[%d %d %d %d]\n",srect->x,srect->y,srect->w,srect->h,drect->x,drect->y,drect->w,drect->h);
++
++	if (amldev->support_flag == false || amldev->blitfunction_type == GE2D_NOT_SUPPORT){
++		printf("not support amlStretchBlit please check configure\n");
++		return false;/*chengman modifier 2013-1-6*/
++	}
++
++	if(srect->w/drect->w>8 || drect->w <= 10 || srect->w==0 || srect->h==0)
++	{
++		D_DEBUG_AT( BLIT_AML, "!!!!!dfb > sw stretchblit !!!!!\n");
++		/*To avoid the ge2d blocked problem*/
++		return false;
++	}
++	
++	if (!(amldev->clip.x1 <= drect->x) || !(amldev->clip.y1 <= drect->y) || 
++			!( amldev->clip.x2 >= (drect->x + drect->w - 1) ) || !( amldev->clip.y2 >= (drect->y + drect->h - 1) )) {
++		printf("the stretchblit region is not vaild\n");
++		return false;
++	}
++
++	aml_updatePalette(drv, dev);
++	if ((amldev->format_change) && (amldev->format_function_type == FORMAT_CHANGE_NOALPHA)){
++			amlStretchBlit_ConfigEx(drv, dev, srect, drect, amldev->src_info, amldev->dst_info);
++			amlStretchBlit_Start(drv, dev, srect, drect, GE2D_STRETCHBLIT_NOALPHA, SRC_TO_DST);
++	}else{
++		switch (amldev->blitfunction_type){
++			case GE2D_BLEND_PRE_ALPHACHANNEL:
++			amlBlend_Config_Ex(drv, dev, srect, drect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, srect, drect, drect->x, drect->y);
++			break;
++			case GE2D_BLEND_ALPHACHANNEL:
++			amlBlend_Config_Ex(drv, dev, srect, drect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, srect, drect, drect->x, drect->y);
++			break;
++			case GE2D_BLEND_COLORIZE_ALPHA:
++			amlBlend_Config_Ex(drv, dev, srect, drect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_Start(drv, dev, srect, drect, drect->x, drect->y);
++			break;
++			case GE2D_BLEND_SRC_COLORKEY:
++			amlStretchBlit_ConfigEx(drv, dev, srect, drect, amldev->src_info, amldev->dst_info);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_ENABLE);
++			amlStretchBlit_Start(drv, dev, srect, drect, GE2D_STRETCHBLIT, SRC_TO_DST);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_DISENABLE);
++			break;
++			case GE2D_BLEND_COLORIZE:
++			amlBlend_Config_Ex(drv, dev, srect, drect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			amlBlend_ColorPremultiply_ConstColor(drv, dev, srect, drect, drect->x, drect->y);
++			break;
++			case GE2D_BLEND_SRC_COLORKEY_COLORIZE:
++			amlBlend_Config_Ex(drv, dev, srect, drect, &amldev->src_info, &amldev->dst_info, &amldev->dst_info, PREMULT_NONE);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_ENABLE);
++			amlBlend_ColorPremultiply_ConstColor(drv, dev, srect, drect, drect->x, drect->y);
++			aml_setColorKey(drv, dev, KEY_OUT, COLOR_KEY_DISENABLE);
++			break;			
++			case GE2D_ROTATION:
++			amlStretchBlit_ConfigEx(drv, dev, srect, drect, amldev->src_info, amldev->dst_info);
++			amlStretchBlit_Start(drv, dev, srect, drect, GE2D_STRETCHBLIT, SRC_TO_DST);
++			break;
++			case GE2D_BLEND_NOFX:
++			amlStretchBlit_ConfigEx(drv, dev, srect, drect, amldev->src_info, amldev->dst_info);
++			amlStretchBlit_Start(drv, dev, srect, drect, GE2D_STRETCHBLIT, SRC_TO_DST);
++			break;
++			default:
++			printf("the stretchblit blitfunction_type is not support");
++			return false;
++			break;
++		}
++	}
++	
++	D_DEBUG_AT( BLIT_AML, "stretchblit ok\n");
++	return true;
++}
++
+diff --git a/gfxdrivers/amlgfx/aml_accel.h b/gfxdrivers/amlgfx/aml_accel.h
+new file mode 100644
+index 0000000..6e5d309
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml_accel.h
+@@ -0,0 +1,98 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#ifndef __AML_ACCEL_H__
++#define __AML_ACCEL_H__
++
++typedef enum{
++	FORMAT_CHANGE_NOALPHA,
++	FORMAT_CHANGE_NORMAL
++}AMLFormatChangeType;
++
++typedef enum {
++	COLOR_KEY_DISENABLE,
++	COLOR_KEY_ENABLE
++}AMLColorKeyEnable;
++
++typedef enum {
++	KEY_OUT,
++	KEY_IN
++}AMLColorKeyType;
++
++typedef enum {
++	SRC_TO_SRC,
++	SRC_TO_DST
++}AMLFunctionType;
++
++typedef enum {
++	GE2D_DRAW_TYPE_NONE,
++	GE2D_DRAW_TYPE_BLEND,
++	GE2D_DRAW_NOT_SUPPORT
++} AMLDrawSubFunction;
++
++typedef enum {
++	GE2D_BLIT_TYPE_NONE,
++	GE2D_BLIT_TYPE_WITHOUT_ALPHA,
++	GE2D_BLIT_TYPE_NOALPHA,
++	GE2D_BLIT_NOT_SUPPORT
++} AMLBlitSubFunction;
++
++typedef enum {
++	GE2D_STRETCHBLIT_TYPE_NONE,
++	GE2D_STRETCHBLIT_TYPE_NOALPHA,
++	GE2D_STRETCHBLIT_NOT_SUPPORT
++} AMLStretchBlitSubFunction;
++
++typedef enum {
++	GE2D_BLEND_NOFX,
++	GE2D_BLEND_PRE_ALPHACHANNEL,
++	GE2D_BLEND_ALPHACHANNEL,
++	GE2D_BLEND_SRC_COLORKEY,
++	GE2D_BLEND_COLORIZE,
++	GE2D_BLEND_COLORIZE_ALPHA,
++	GE2D_BLEND_SRC_COLORKEY_COLORIZE,
++	GE2D_ROTATION,
++	GE2D_NOT_SUPPORT
++} AMLBlendSubFunction;
++
++typedef enum{
++	PREMULT_GLO_AND_SRC_ALPHA,
++	PREMULT_GLOBAL_ALPHA,
++	PREMULT_NONE
++}AMLPRETYPE;
++
++typedef enum{
++	GE2D_ROTATION_0,
++	GE2D_ROTATION_90,
++	GE2D_ROTATION_180,
++	GE2D_ROTATION_270,
++}AMLROTATION;
++
++extern void amlEngineReset(void *drv, void *dev);
++extern DFBResult amlEngineSync(void *drv, void *dev);
++extern void amlFlushTextureCache(void *drv, void *dev);
++extern bool amlFillRectangle( void *drv, void *dev, DFBRectangle *rect );
++extern bool amlBlit( void *drv, void *dev, DFBRectangle *rect, int dx, int dy );
++extern bool amlStretchBlit( void *drv, void *dev, DFBRectangle *srect, DFBRectangle *drect );
++//extern bool amlBlend( void *drv, void *dev, DFBRectangle *rect, int dx, int dy, int sx2, int sy2 );
++#endif
++
++
+diff --git a/gfxdrivers/amlgfx/aml_state.c b/gfxdrivers/amlgfx/aml_state.c
+new file mode 100644
+index 0000000..38d9598
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml_state.c
+@@ -0,0 +1,596 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#include <config.h>
++
++#include <dfb_types.h>
++
++#include <directfb.h>
++
++#include <core/coredefs.h>
++#include <core/screens.h>
++#include <core/core.h>
++
++#include <core/state.h>
++#include <core/gfxcard.h>
++#include <core/surface_buffer.h>
++
++#include <gfx/convert.h>
++#include <gfx/util.h>
++#include <misc/conf.h>
++#include <misc/util.h>
++
++#include "aml.h"
++#include "amlfb.h"
++#include "aml_state.h"
++
++__attribute__((warn_unused_result))
++aml_ge2d_convert_to_supported_porterduff(const CardState * const state)
++{
++	/* the blending maths we can support */
++	switch (state->src_blend)
++	{	
++		case DSBF_ZERO:
++			if (state->dst_blend == DSBF_ZERO)
++				return DSPD_CLEAR;
++			if (state->dst_blend == DSBF_ONE)
++				return DSPD_DST;
++			if (state->dst_blend == DSBF_SRCALPHA)
++				return DSPD_DST_IN;
++			if (state->dst_blend == DSBF_INVSRCALPHA)
++				return DSPD_DST_OUT;
++		break;
++		case DSBF_ONE:
++			if (state->dst_blend == DSBF_ZERO)
++				return DSPD_SRC;
++			if (state->dst_blend == DSBF_ONE)
++				return DSPD_ADD;
++			if (state->dst_blend == DSBF_INVSRCALPHA)
++				return DSPD_SRC_OVER;
++		break;
++		case DSBF_SRCALPHA:
++			if (state->dst_blend == DSBF_INVSRCALPHA)
++				return DSPD_NONE;
++		break;
++		case DSBF_DESTALPHA:
++			if (state->dst_blend == DSBF_ZERO)
++				return DSPD_SRC_IN;
++			if (state->dst_blend == DSBF_INVSRCALPHA)
++				return DSPD_SRC_ATOP;
++		break;
++		case DSBF_INVDESTALPHA:
++			if (state->dst_blend == DSBF_ONE)
++				return DSPD_DST_OVER;
++			if (state->dst_blend == DSBF_ZERO)
++				return DSPD_SRC_OUT;
++			if (state->dst_blend == DSBF_SRCALPHA)
++				return DSPD_DST_ATOP;
++			if (state->dst_blend == DSBF_INVSRCALPHA)
++				return DSPD_XOR;
++		break;
++		default:
++		break;
++	}
++
++	return DSPD_UNSUPPORTED;
++}
++
++static bool
++aml_mem_type(unsigned long srcphy,
++		unsigned long phystart,
++		unsigned long phyend)
++{
++	if (srcphy >= phystart && srcphy <= phyend)
++		return true;
++	else
++		return false;
++}
++
++static inline void
++aml_set_format(CoreSurfaceBuffer *buffer, config_info *infors)
++{
++	switch (buffer->format) {
++		case DSPF_LUT8:
++			debug("------DSPF_LUT8\n");
++			infors->format = GE2D_FORMAT_S8_LUT |GE2D_LITTLE_ENDIAN;
++		break;
++		case DSPF_RGB16:
++			debug("------DSPF_RGB16\n");
++			infors->format = GE2D_FORMAT_S16_RGB_565;
++		break;
++		case DSPF_ARGB:
++			debug("------DSPF_ARGB\n");
++			infors->format = GE2D_FORMAT_S32_ARGB;
++		break;
++		default:
++			printf("!!!!!!aml_state.c %d > Unexpected pixelformat format is 0x%x\n",__LINE__, buffer->format);
++		break;
++	}
++}
++
++static inline void 
++aml_set_dst( AMLGFX_DriverData *amldrv,
++		AMLGFX_DeviceData *amldev,
++		CardState *state )
++{
++	if (amldev->aml_smf.smf_destination){
++		return;
++	}
++
++	amldev->dst_info.addr = (unsigned long)state->dst.addr;
++	amldev->dst_info.phys = state->dst.phys;
++	amldev->dst_info.pitch = state->dst.pitch;
++#ifdef ZOOM_BY_DFB /*chengman modifier 2012-12-20 for debug res_change*/ 
++	if(state->destination->num_buffers > 1 && state->to == CSBR_FRONT)
++	{
++		amldev->dst_size.w = state->destination->config.front_size.w;
++		amldev->dst_size.h = state->destination->config.front_size.h;
++	}
++	else
++	{
++		amldev->dst_size.w = state->destination->config.size.w;
++		amldev->dst_size.h = state->destination->config.size.h;
++	}
++#else
++	amldev->dst_size.w = state->destination->config.size.w;
++	amldev->dst_size.h = state->destination->config.size.h;
++
++#endif
++	/*printf("dst_front_size.w,dst_front_size.h,dst_size.w,dst_size.h:[%d %d %d %d]\n",
++	state->destination->config.front_size.w,state->destination->config.front_size.h,state->destination->config.size.w,state->destination->config.size.h);
++	printf("caps:0x%x,dst_size.w,dst_size.h:[%d %d]\n",state->destination->config.caps,amldev->dst_size.w,amldev->dst_size.h);*/
++	amldev->aml_smf.smf_destination = 1;
++}
++
++static inline void
++aml_set_src(AMLGFX_DriverData *amldrv,
++		AMLGFX_DeviceData *amldev,
++		CardState *state)
++{
++	debug("------\n");
++	if (amldev->aml_smf.smf_source)
++		return;
++
++	amldev->src_info.addr = (unsigned long)state->src.addr;
++	amldev->src_info.phys = state->src.phys;
++	amldev->src_info.pitch = state->src.pitch;
++
++#ifdef ZOOM_BY_DFB /*chengman modifier 2012-12-20 for debug res_change*/
++	if(state->source->num_buffers > 1 && state->from== CSBR_BACK)
++	{
++		amldev->src_size.w = state->source->config.size.w;
++		amldev->src_size.h = state->source->config.size.h;
++	}
++	else
++	{
++		amldev->src_size.w = state->source->config.front_size.w;
++		amldev->src_size.h = state->source->config.front_size.h;
++	}
++#else
++	amldev->src_size.w = state->source->config.size.w;
++	amldev->src_size.h = state->source->config.size.h;
++#endif
++	amldev->aml_smf.smf_source = 1;
++}
++
++static inline void
++aml_set_color( AMLGFX_DriverData *amldrv, AMLGFX_DeviceData *amldev,
++					CardState *state )
++{
++	CoreSurfaceBuffer *buffer = state->dst.buffer;
++
++	if (amldev->aml_smf.smf_color)
++		return;
++
++	amldev->gl_alpha = state->color.a;
++	switch (buffer->format) {
++		case DSPF_ARGB:
++			amldev->color = PIXEL_ARGB( state->color.r,
++					state->color.g,
++					state->color.b,
++					state->color.a );
++			break;
++		default:
++			printf("!!!!!!aml_state.c %d > No match format for aml_set_color!\n",__LINE__);
++			break;
++	}
++
++	debug("------Color is 0x%x\n", amldev->color);
++
++	amldev->aml_smf.smf_color = 1;
++
++}
++
++static inline void
++aml_set_src_color_key(AMLGFX_DriverData *amldrv,
++		AMLGFX_DeviceData *amldev,
++		CardState *state)
++{
++	int 			ColorKey	= -1;
++	unsigned 		a,r,g,b;
++	
++	if (amldev->aml_smf.smf_src_color_key)
++		return;
++	
++	r = (state->src_colorkey >> 16) & 0xff ;  
++	g = (state->src_colorkey >> 8)  & 0xff ;
++	b = state->src_colorkey & 0xff ;
++	a = state->src_colorkey >> 24 & 0xff;
++
++	ColorKey = ((r << 24) | (g << 16) | (b << 8) | a);
++
++	debug("------Src_color_key is 0x%x\n", state->src_colorkey);
++
++	amldev->src_colorkey = ColorKey;
++
++	amldev->aml_smf.smf_src_color_key = 1;
++}
++
++static inline void
++aml_set_dst_color_key(AMLGFX_DriverData *amldrv,
++		AMLGFX_DeviceData *amldev,
++		CardState *state)
++{
++	int 			ColorKey	= -1;
++	unsigned 		a,r,g,b;
++
++	if (amldev->aml_smf.smf_dst_color_key)
++		return;
++
++	r = (state->dst_colorkey >> 16) & 0xff;  
++	g = (state->dst_colorkey >> 8)  & 0xff;
++	b = state->dst_colorkey & 0xff;
++	a = state->dst_colorkey >> 24 & 0xff;
++
++	ColorKey = ((r << 24) | (g << 16) | (b << 8) | a); 
++
++	debug("------Dst_color_key is 0x%x\n",ColorKey);
++
++	amldev->dst_colorkey = ColorKey;
++
++	amldev->aml_smf.smf_dst_color_key = 1;
++}
++
++static inline void
++aml_set_clip( AMLGFX_DriverData *amldrv,
++		AMLGFX_DeviceData *amldev,
++		DFBRegion *clip )
++{
++	if (amldev->aml_smf.smf_clip)
++		return;
++
++	amldev->clip.x1 = clip->x1;
++	amldev->clip.y1 = clip->y1;
++	amldev->clip.x2 = clip->x2 + 1;
++	amldev->clip.y2 = clip->y2 + 1;
++
++	amldev->aml_smf.smf_clip = 1;
++}
++
++static void
++aml_src_dst_memtype(AMLGFX_DriverData *amldrv,
++							AMLGFX_DeviceData *amldev,
++							CardState *state)
++{
++	unsigned long phys = 0;
++	unsigned long physstart = amldrv->fb.phys;
++	unsigned long physend = amldrv->fb.phys + amldrv->fb.size;
++
++	debug("------Fb0 phys is 0x%x, size is 0x%x\n",amldrv->fb.phys, amldrv->fb.size);
++
++	if (state->src.phys){
++		phys = state->src.phys;
++		if (aml_mem_type(phys, physstart, physend-1)){
++			amldev->src_info.mem_type = CANVAS_ALLOC;
++		}else{
++			amldev->src_info.mem_type = CANVAS_TYPE_INVALID;
++		}
++	}else{
++		amldev->src_info.mem_type = CANVAS_TYPE_INVALID;
++	}
++
++	if (state->dst.phys){
++		phys = state->dst.phys;
++		if (aml_mem_type(phys, physstart, physend-1)){
++			amldev->dst_info.mem_type = CANVAS_ALLOC;
++		}else{
++			amldev->dst_info.mem_type = CANVAS_TYPE_INVALID;
++		}
++	}else{
++		amldev->dst_info.mem_type = CANVAS_TYPE_INVALID;
++	}
++}
++
++static void 
++aml_src_dst_formattype(AMLGFX_DriverData *amldrv,
++								AMLGFX_DeviceData *amldev,
++								CardState *state)
++{	
++	CoreSurfaceBuffer *buffer = NULL;
++	const CoreSurface  * const srcSurf = state->source;
++
++	if (state->src.buffer){
++		buffer = state->src.buffer;
++		switch (buffer->format){
++			case DSPF_RGB16:
++				amldev->bNeedCLUTReload = false;
++				amldev->format_function_type = FORMAT_CHANGE_NOALPHA;
++			break;
++			case DSPF_LUT8:
++				amldev->palette = srcSurf->palette;
++  				amldev->bNeedCLUTReload = true;
++				amldev->format_function_type = FORMAT_CHANGE_NORMAL;
++			break;
++			default:
++				amldev->bNeedCLUTReload = false;
++				amldev->format_function_type = FORMAT_CHANGE_NORMAL;
++			break;
++		}
++		aml_set_format(buffer, &amldev->src_info);
++	}
++
++	if (state->dst.buffer){
++		buffer = state->dst.buffer;
++		switch (buffer->format) {
++			case DSPF_ARGB:
++				amldev->pixeldepth = 4;
++			break;
++			default:
++				printf("------unexpected pixelformat is 0x%x\n", buffer->format);
++			break;
++		}
++		aml_set_format(buffer, &amldev->dst_info);
++	}
++
++	if (amldev->src_info.format == amldev->dst_info.format){
++		amldev->format_change = false;
++	}else{
++		amldev->format_change = true;
++	}	
++}
++
++static DFBResult
++aml_set_fillrect_config(AMLGFX_DriverData *adrv,
++								AMLGFX_DeviceData *adev,
++								CardState *state)
++{
++	DFBSurfaceDrawingFlags flags = state->drawingflags;
++
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData*)adrv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData*)adev;
++#if 0 /*chengman for accel 12-10*/
++	if (amldev->dst_info.mem_type == CANVAS_TYPE_INVALID){
++		amldev->support_flag = false;
++		printf("------Src_mem_type is CANVAS_TYPE_INVALID\n");
++		return DFB_BUG;
++	}
++#endif
++	switch(flags){
++		case DSDRAW_NOFX:
++		amldev->function_type = GE2D_DRAW_TYPE_NONE;
++		break;
++		case DSDRAW_BLEND:
++		amldev->function_type = GE2D_DRAW_TYPE_BLEND;
++		break;			
++		default:
++		amldev->function_type = GE2D_DRAW_NOT_SUPPORT;
++		break;
++	}
++
++	return DFB_OK;
++}
++
++static bool
++aml_blend_optype(AMLGFX_DeviceData *adev, CardState *state)
++{
++	DFBSurfaceBlittingFlags flags = state->blittingflags;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData*) adev;
++
++	if (amldev->poter_duff_rule != DSPD_UNSUPPORTED){
++		debug("------Poter_duff_rule is %d\n", amldev->poter_duff_rule);
++		
++		amldev->blend_op.color_blending_mode = OPERATION_ADD;
++		amldev->blend_op.alpha_blending_mode = OPERATION_ADD;
++
++		amldev->blend_op.color_blending_src_factor = blend_conf[state->src_blend]->color_blending_factor;
++		amldev->blend_op.alpha_blending_src_factor = blend_conf[state->src_blend]->alpha_blending_factor;
++		amldev->blend_op.color_blending_dst_factor = blend_conf[state->dst_blend]->color_blending_factor;
++		amldev->blend_op.alpha_blending_dst_factor = blend_conf[state->dst_blend]->alpha_blending_factor;
++
++
++		switch (flags) {
++			case DSBLIT_NOFX:
++			amldev->blitfunction_type = GE2D_BLEND_NOFX;
++			break;
++			case DSBLIT_BLEND_ALPHACHANNEL:
++			amldev->blitfunction_type = GE2D_BLEND_ALPHACHANNEL;
++			break;
++			case DSBLIT_SRC_COLORKEY:
++			amldev->blitfunction_type = GE2D_BLEND_SRC_COLORKEY;
++			break;
++			case DSBLIT_COLORIZE:
++			amldev->blitfunction_type = GE2D_BLEND_COLORIZE;
++			break;
++			case DSBLIT_BLEND_ALPHACHANNEL | DSBLIT_SRC_PREMULTIPLY:
++			amldev->blend_op.color_blending_src_factor = COLOR_FACTOR_SRC_ALPHA;
++			amldev->blitfunction_type = GE2D_BLEND_PRE_ALPHACHANNEL;
++			break;
++			case DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL:
++			amldev->blend_op.color_blending_src_factor = COLOR_FACTOR_CONST_COLOR;
++			amldev->blitfunction_type = GE2D_BLEND_COLORIZE_ALPHA;
++			break;
++			case DSBLIT_SRC_COLORKEY |	DSBLIT_COLORIZE:
++			amldev->blitfunction_type = GE2D_BLEND_SRC_COLORKEY_COLORIZE;
++			break;
++			case DSBLIT_ROTATE90:
++			amldev->dst_info.rotation = GE2D_ROTATION_90;
++			amldev->blitfunction_type = GE2D_ROTATION;
++			break;
++			case DSBLIT_ROTATE180:
++			amldev->dst_info.rotation = GE2D_ROTATION_180;
++			amldev->blitfunction_type = GE2D_ROTATION;
++			break;
++			case DSBLIT_ROTATE270:	
++			amldev->dst_info.rotation = GE2D_ROTATION_270;
++			amldev->blitfunction_type = GE2D_ROTATION;
++			break;
++			default:
++			printf("!!!!!!aml_state.c %d > DSPD_SRC_OVER flags[0x%x]***NULL\n",__LINE__,flags);
++			amldev->blitfunction_type = GE2D_NOT_SUPPORT;
++			break;
++		}
++	}else{
++		printf("!!!!!!aml_state.c %d > Poter_duff_rule is %d DSPD_UNSUPPORTED\n", __LINE__,amldev->poter_duff_rule);
++		amldev->blitfunction_type = GE2D_NOT_SUPPORT;
++	}
++
++	return true;
++}
++
++static DFBResult
++aml_set_blend_config( AMLGFX_DriverData *adrv,
++		AMLGFX_DeviceData *adev,
++		CardState *state )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData*) adrv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData*) adev;
++	bool op_state = false;
++#if 0 /*chengman accel 12-10*/
++	if ((amldev->src_info.phys == CANVAS_TYPE_INVALID) ||
++			(amldev->dst_info.phys == CANVAS_TYPE_INVALID))
++	{
++		printf("------Src and dst phys is CANVAS_TYPE_INVALID\n");
++		amldev->support_flag = false;
++	}
++#endif
++	op_state = aml_blend_optype(amldev, state);
++
++	if (op_state){
++		return DFB_OK;
++	}
++
++	return DFB_BUG;
++}
++
++void
++amlCheckState(void *drv, void *dev,
++		CardState *state, DFBAccelerationMask accel )
++{
++	switch (state->destination->config.format) {
++		case DSPF_ARGB:
++			break;
++		default:
++			return;
++	}
++	if (DFB_DRAWING_FUNCTION(accel)) {
++		if (!(accel & ~AML_SUPPORTED_DRAWINGFUNCTIONS) &&
++			!(state->drawingflags & ~AML_SUPPORTED_DRAWINGFLAGS)){
++			state->accel |= AML_SUPPORTED_DRAWINGFUNCTIONS;
++		}
++	}else{
++		if (!(accel & ~AML_SUPPORTED_BLITTINGFUNCTIONS) &&
++			!(state->blittingflags & ~AML_SUPPORTED_BLITTINGFLAGS)) {
++			switch (state->source->config.format) {
++				case DSPF_LUT8:
++				case DSPF_RGB16:
++				case DSPF_ARGB:
++					break;
++				default:
++					return;
++			}
++
++			state->accel |= AML_SUPPORTED_BLITTINGFUNCTIONS;
++		}
++	}
++}
++
++void
++amlSetState( void *drv, void *dev,
++		GraphicsDeviceFuncs *funcs,
++		CardState *state, DFBAccelerationMask accel )
++{
++	AMLGFX_DriverData *amldrv = (AMLGFX_DriverData *) drv;
++	AMLGFX_DeviceData *amldev = (AMLGFX_DeviceData *) dev;
++
++	if (state->mod_hw & SMF_SOURCE && state->source)
++		amldev->aml_smf.smf_source = 0;
++
++	if (state->mod_hw & SMF_SOURCE2 && state->source2)
++		amldev->aml_smf.smf_source2 = 0;
++
++	if (state->mod_hw & SMF_DESTINATION)
++		amldev->aml_smf.smf_destination = amldev->aml_smf.smf_color = 0;
++
++	if (state->mod_hw & SMF_COLOR)
++		amldev->aml_smf.smf_color = 0;
++
++	if (state->mod_hw & SMF_SRC_COLORKEY)
++		amldev->aml_smf.smf_src_color_key= 0;
++
++	if (state->mod_hw & SMF_DST_COLORKEY)
++		amldev->aml_smf.smf_dst_color_key= 0;
++
++	if (state->mod_hw & SMF_CLIP)
++		amldev->aml_smf.smf_clip = 0;
++
++	if (state->mod_hw & (SMF_SRC_BLEND | SMF_DST_BLEND))
++		amldev->poter_duff_rule = aml_ge2d_convert_to_supported_porterduff (state);
++
++	aml_set_color( amldrv, amldev, state );
++	//aml_src_dst_memtype( amldrv, amldev, state );/*chengman 12-10 for accel*/
++	aml_src_dst_formattype( amldrv, amldev, state );
++	aml_set_dst( amldrv, amldev, state );
++	amldev->dst_info.rotation = 0;
++	amldev->src_info.rotation = 0;
++
++	amldev->support_flag = true;
++	switch (accel) {
++		case DFXL_FILLRECTANGLE:
++			aml_set_fillrect_config(amldrv, amldev, state);
++			state->set |= DFXL_FILLRECTANGLE;
++			break;
++		case DFXL_BLIT:
++			aml_set_src( amldrv, amldev, state );
++			if (state->blittingflags & DSBLIT_SRC_COLORKEY)
++				aml_set_src_color_key(amldrv, amldev, state);
++			aml_set_blend_config(amldrv, amldev, state);
++			state->set |= DFXL_BLIT;
++			break;
++		case DFXL_STRETCHBLIT:
++			aml_set_src( amldrv, amldev, state );
++			if (state->blittingflags & DSBLIT_SRC_COLORKEY)
++				aml_set_src_color_key(amldrv, amldev, state);
++			aml_set_blend_config( amldrv, amldev, state);
++			state->set |= DFXL_STRETCHBLIT;
++			break;
++		default:
++			printf("!!!!!!aml_state.c %d > Unexpected drawing/blitting function accel[0x%x]\n",__LINE__,accel);
++			break;
++
++	}
++
++	if (state->mod_hw & SMF_CLIP){
++		aml_set_clip( amldrv, amldev, &state->clip);
++	}
++
++	state->mod_hw = 0;
++}
++
+diff --git a/gfxdrivers/amlgfx/aml_state.h b/gfxdrivers/amlgfx/aml_state.h
+new file mode 100644
+index 0000000..e7b597c
+--- /dev/null
++++ b/gfxdrivers/amlgfx/aml_state.h
+@@ -0,0 +1,69 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#ifndef __AML_STATE_H__
++#define __AML_STATE_H__
++
++#define DSPD_SATURATE          	        (DSPD_DST + 1)
++#define DSPD_UNSUPPORTED          (DSPD_SATURATE + 1)
++#define GE2D_UNKOWN_FORMAT	(-1)
++
++#include "aml.h"
++#include "aml_accel.h"
++
++typedef enum
++{
++	CANVAS_OSD0 =0,
++	CANVAS_OSD1,
++	CANVAS_ALLOC,
++	CANVAS_TYPE_INVALID,
++}ge2d_src_canvas_type;
++
++typedef  enum
++{
++	OSD0_OSD0 =0,
++	OSD0_OSD1,
++	OSD1_OSD1,
++	OSD1_OSD0,
++	ALLOC_OSD0,
++	ALLOC_OSD1,
++	ALLOC_ALLOC,
++	TYPE_INVALID,
++}ge2d_src_dst_t;
++
++static blend_op_config  blend_conf[][2] = {
++	{{-1}, {-1}},
++	{{COLOR_FACTOR_ZERO}, {ALPHA_FACTOR_ZERO}},
++	{{COLOR_FACTOR_ONE}, {ALPHA_FACTOR_ONE}},
++	{{COLOR_FACTOR_SRC_COLOR}, {ALPHA_FACTOR_SRC_ALPHA}},
++	{{COLOR_FACTOR_ONE_MINUS_SRC_COLOR}, {ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA}},
++	{{COLOR_FACTOR_SRC_ALPHA}, {ALPHA_FACTOR_SRC_ALPHA}},
++	{{COLOR_FACTOR_ONE_MINUS_SRC_ALPHA}, {ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA}},
++	{{COLOR_FACTOR_DST_ALPHA}, {ALPHA_FACTOR_DST_ALPHA}},
++	{{COLOR_FACTOR_ONE_MINUS_DST_ALPHA}, {ALPHA_FACTOR_ONE_MINUS_DST_ALPHA}},
++	{{COLOR_FACTOR_DST_COLOR}, {ALPHA_FACTOR_DST_ALPHA}},
++	{{COLOR_FACTOR_ONE_MINUS_DST_COLOR}, {ALPHA_FACTOR_ONE_MINUS_DST_ALPHA}},
++};
++
++extern void amlCheckState(void *drv, void *dev, CardState *state, DFBAccelerationMask accel );
++extern void amlSetState( void *drv, void *dev, GraphicsDeviceFuncs *funcs, CardState *state, DFBAccelerationMask accel );
++#endif
++
+diff --git a/gfxdrivers/amlgfx/amlfb.h b/gfxdrivers/amlgfx/amlfb.h
+new file mode 100644
+index 0000000..f13c9ae
+--- /dev/null
++++ b/gfxdrivers/amlgfx/amlfb.h
+@@ -0,0 +1,47 @@
++/*
++   (c) Copyright 2001-2007  The DirectFB Organization (directfb.org)
++   (c) Copyright 2000-2004  Convergence (integrated media) GmbH
++
++   All rights reserved.
++
++   This library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2 of the License, or (at your option) any later version.
++
++   This library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with this library; if not, write to the
++   Free Software Foundation
++*/
++
++#ifndef __AMLFB_H__
++#define __AMLFB_H__
++
++/* include Linux files */
++#include <linux/fb.h>
++
++D_DEBUG_DOMAIN( AML_GFX, "AML", "AML GFXDRIVERS" );
++
++#define DEBUG
++#ifdef DEBUG
++#include <stdio.h>
++#define debug(fmt, x...) 	\
++do 						\
++{ 						\
++	D_DEBUG_AT( AML_GFX, "%s %d> "fmt, __FILE__,  __LINE__, ##x); \
++}while(0)
++#else
++#define debug(fmt, x...)
++#endif
++
++#ifndef FBIO_WAITFORVSYNC
++#define FBIO_WAITFORVSYNC	_IOW('F', 0x20, u_int32_t)
++#endif
++
++#endif
++
+diff --git a/systems/fbdev/fb.h b/systems/fbdev/fb.h
+index 6cc1399..7c58f99 100644
+--- a/systems/fbdev/fb.h
++++ b/systems/fbdev/fb.h
+@@ -105,6 +105,7 @@
+ #define FB_ACCEL_NV_40          46      /* nVidia Arch 40               */
+ #define FB_ACCEL_XGI_VOLARI_V	47	/* XGI Volari V3XT, V5, V8      */
+ #define FB_ACCEL_XGI_VOLARI_Z	48	/* XGI Volari Z7                */
++#define FB_ACCEL_AML_GE2D 		 49 	/* Amlogic fb dev		*/
+ #define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
+ #define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
+ #define FB_ACCEL_NEOMAGIC_NM2093 92	/* NeoMagic NM2093              */
+-- 
+2.10.2
+

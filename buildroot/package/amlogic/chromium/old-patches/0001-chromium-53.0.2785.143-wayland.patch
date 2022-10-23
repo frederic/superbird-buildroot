@@ -1,0 +1,357 @@
+Index: chromium-53.0.2785.143/src/build/common.gypi
+===================================================================
+--- chromium-53.0.2785.143.orig/src/build/common.gypi
++++ chromium-53.0.2785.143/src/build/common.gypi
+@@ -310,7 +310,7 @@
+             # incorrect results when passed to pkg-config
+             'conditions': [
+               ['target_arch=="arm"', {
+-                'sysroot%': '<!(cd <(DEPTH) && pwd -P)/build/linux/debian_wheezy_arm-sysroot',
++                'sysroot%': '<(target_sysroot)',
+               }],
+               ['target_arch=="arm64"', {
+                 'sysroot%': '<!(cd <(DEPTH) && pwd -P)/build/linux/debian_jessie_arm64-sysroot',
+@@ -1431,7 +1431,7 @@
+ 
+     # Disable fatal linker warnings, similarly to how we make it possible
+     # to disable -Werror (e.g. for different toolchain versions).
+-    'disable_fatal_linker_warnings%': 0,
++    'disable_fatal_linker_warnings%': 1,
+ 
+     'release_valgrind_build%': 0,
+ 
+@@ -3052,12 +3052,6 @@
+             # third-party code either.
+             'cflags!': [ '-Wall' ],
+           }],
+-          # TODO: Fix all warnings on chromeos too.
+-          [ 'os_posix==1 and OS!="mac" and OS!="ios" and (clang!=1 or chromeos==1)', {
+-            'cflags!': [
+-              '-Werror',
+-            ],
+-          }],
+           [ 'OS=="win"', {
+             'defines': [
+               '_CRT_SECURE_NO_DEPRECATE',
+@@ -3593,10 +3587,10 @@
+     }],
+     ['os_posix==1 and OS!="mac" and OS!="ios"', {
+       'target_defaults': {
+-        # Enable -Werror by default, but put it in a variable so it can
++        # Disable -Werror by default, but put it in a variable so it can
+         # be disabled in ~/.gyp/include.gypi on the valgrind builders.
+         'variables': {
+-          'werror%': '-Werror',
++          'werror%': '',
+           'libraries_for_target%': '',
+           'conditions' : [
+             # Enable -Wextra for chromium_code when we control the compiler.
+@@ -3899,6 +3893,11 @@
+                       '-target arm-linux-gnueabihf',
+                     ],
+                   }],
++		  ['clang==0 and arm_arch!="" and OS!="android"', {
++                    'ldflags': [
++                      '-lEGL', '-lwayland-client',
++                    ],
++                  }],
+                   ['arm_arch!=""', {
+                     'cflags': [
+                       '-march=<(arm_arch)',
+@@ -5062,7 +5061,7 @@
+           'GCC_OBJC_CALL_CXX_CDTORS': 'YES',        # -fobjc-call-cxx-cdtors
+           'GCC_SYMBOLS_PRIVATE_EXTERN': 'YES',      # -fvisibility=hidden
+           'GCC_THREADSAFE_STATICS': 'NO',           # -fno-threadsafe-statics
+-          'GCC_TREAT_WARNINGS_AS_ERRORS': 'YES',    # -Werror
++          'GCC_TREAT_WARNINGS_AS_ERRORS': 'NO',    # -Werror
+           'GCC_VERSION': 'com.apple.compilers.llvm.clang.1_0',
+           'USE_HEADERMAP': 'NO',
+           'WARNING_CFLAGS': [
+Index: chromium-53.0.2785.143/src/build/config/compiler/BUILD.gn
+===================================================================
+--- chromium-53.0.2785.143.orig/src/build/config/compiler/BUILD.gn
++++ chromium-53.0.2785.143/src/build/config/compiler/BUILD.gn
+@@ -1039,9 +1039,6 @@ config("chromium_code") {
+     cflags = [ "/W4" ]  # Warning level 4.
+   } else {
+     cflags = [ "-Wall" ]
+-    if (treat_warnings_as_errors) {
+-      cflags += [ "-Werror" ]
+-    }
+     if (is_clang) {
+       # Enable -Wextra for chromium_code when we control the compiler.
+       cflags += [ "-Wextra" ]
+Index: chromium-53.0.2785.143/src/build/nocompile.gypi
+===================================================================
+--- chromium-53.0.2785.143.orig/src/build/nocompile.gypi
++++ chromium-53.0.2785.143/src/build/nocompile.gypi
+@@ -82,7 +82,7 @@
+             '<(nocompile_driver)',
+             '4', # number of compilers to invoke in parallel.
+             '<(RULE_INPUT_PATH)',
+-            '-Wall -Werror -Wfatal-errors -I<(DEPTH)',
++            '-Wall -I<(DEPTH)',
+             '<(nc_result_path)',
+             ],
+           'message': 'Generating no compile results for <(RULE_INPUT_PATH)',
+Index: chromium-53.0.2785.143/src/chrome/browser/ui/browser.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/browser/ui/browser.cc
++++ chromium-53.0.2785.143/src/chrome/browser/ui/browser.cc
+@@ -1379,7 +1379,7 @@ void Browser::OnWindowDidShow() {
+ }
+ 
+ void Browser::ShowFirstRunBubble() {
+-  window()->GetLocationBar()->ShowFirstRunBubble();
++ // window()->GetLocationBar()->ShowFirstRunBubble();
+ }
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+Index: chromium-53.0.2785.143/src/chrome/browser/ui/exclusive_access/exclusive_access_manager.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/browser/ui/exclusive_access/exclusive_access_manager.cc
++++ chromium-53.0.2785.143/src/chrome/browser/ui/exclusive_access/exclusive_access_manager.cc
+@@ -46,7 +46,7 @@ ExclusiveAccessManager::GetExclusiveAcce
+ #if !defined(OS_MACOSX)  // App mode (kiosk) is not available on Mac yet.
+   app_mode = chrome::IsRunningInAppMode();
+ #endif
+-
++  return EXCLUSIVE_ACCESS_BUBBLE_TYPE_NONE;
+   if (fullscreen_controller_.IsWindowFullscreenForTabOrPending()) {
+     if (!fullscreen_controller_.IsTabFullscreen())
+       return EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_EXIT_INSTRUCTION;
+Index: chromium-53.0.2785.143/src/chrome/browser/ui/startup/bad_flags_prompt.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/browser/ui/startup/bad_flags_prompt.cc
++++ chromium-53.0.2785.143/src/chrome/browser/ui/startup/bad_flags_prompt.cc
+@@ -101,7 +101,7 @@ void ShowBadFlagsPrompt(Browser* browser
+ 
+     NULL
+   };
+-
++#if 0
+   for (const char** flag = kBadFlags; *flag; ++flag) {
+     if (base::CommandLine::ForCurrentProcess()->HasSwitch(*flag)) {
+       SimpleAlertInfoBarDelegate::Create(
+@@ -116,6 +116,7 @@ void ShowBadFlagsPrompt(Browser* browser
+       return;
+     }
+   }
++#endif
+ }
+ 
+ void MaybeShowInvalidUserDataDirWarningDialog() {
+Index: chromium-53.0.2785.143/src/chrome/browser/ui/startup/startup_browser_creator.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/browser/ui/startup/startup_browser_creator.cc
++++ chromium-53.0.2785.143/src/chrome/browser/ui/startup/startup_browser_creator.cc
+@@ -101,7 +101,7 @@
+ #include "chrome/browser/metrics/jumplist_metrics_win.h"
+ #endif
+ 
+-#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
++#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_X11)
+ #include "ui/views/widget/desktop_aura/x11_desktop_handler.h"
+ #endif
+ 
+Index: chromium-53.0.2785.143/src/chrome/browser/ui/views/chrome_browser_main_extra_parts_views_linux.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/browser/ui/views/chrome_browser_main_extra_parts_views_linux.cc
++++ chromium-53.0.2785.143/src/chrome/browser/ui/views/chrome_browser_main_extra_parts_views_linux.cc
+@@ -35,6 +35,7 @@
+ #endif
+ 
+ namespace {
++#if 0
+ ui::NativeTheme* GetNativeThemeForWindow(aura::Window* window) {
+   if (!window)
+     return nullptr;
+@@ -64,7 +65,7 @@ ui::NativeTheme* GetNativeThemeForWindow
+ 
+   return ui::NativeThemeAura::instance();
+ }
+-
++#endif
+ }  // namespace
+ 
+ ChromeBrowserMainExtraPartsViewsLinux::ChromeBrowserMainExtraPartsViewsLinux() {
+Index: chromium-53.0.2785.143/src/chrome/chrome_browser.gypi
+===================================================================
+--- chromium-53.0.2785.143.orig/src/chrome/chrome_browser.gypi
++++ chromium-53.0.2785.143/src/chrome/chrome_browser.gypi
+@@ -3708,6 +3708,9 @@
+           ],
+         }],
+         ['OS=="linux" and chromeos!=1', {
++          'dependencies': [
++            '../build/linux/system.gyp:glib',
++          ],
+           'sources': [ '<@(chrome_browser_libsecret_sources)' ],
+           'defines': [
+             'USE_LIBSECRET',
+Index: chromium-53.0.2785.143/src/media/capture/video/linux/v4l2_capture_delegate.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/media/capture/video/linux/v4l2_capture_delegate.cc
++++ chromium-53.0.2785.143/src/media/capture/video/linux/v4l2_capture_delegate.cc
+@@ -253,8 +253,8 @@ void V4L2CaptureDelegate::AllocateAndSta
+   // Set anti-banding/anti-flicker to 50/60Hz. May fail due to not supported
+   // operation (|errno| == EINVAL in this case) or plain failure.
+   if ((power_line_frequency_ == V4L2_CID_POWER_LINE_FREQUENCY_50HZ) ||
+-      (power_line_frequency_ == V4L2_CID_POWER_LINE_FREQUENCY_60HZ) ||
+-      (power_line_frequency_ == V4L2_CID_POWER_LINE_FREQUENCY_AUTO)) {
++      (power_line_frequency_ == V4L2_CID_POWER_LINE_FREQUENCY_60HZ)// ||
++      /*(power_line_frequency_ == V4L2_CID_POWER_LINE_FREQUENCY_AUTO)*/) {
+     struct v4l2_control control = {};
+     control.id = V4L2_CID_POWER_LINE_FREQUENCY;
+     control.value = power_line_frequency_;
+Index: chromium-53.0.2785.143/src/media/capture/video/linux/video_capture_device_linux.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/media/capture/video/linux/video_capture_device_linux.cc
++++ chromium-53.0.2785.143/src/media/capture/video/linux/video_capture_device_linux.cc
+@@ -143,7 +143,7 @@ int VideoCaptureDeviceLinux::TranslatePo
+       return V4L2_CID_POWER_LINE_FREQUENCY_60HZ;
+     default:
+       // If we have no idea of the frequency, at least try and set it to AUTO.
+-      return V4L2_CID_POWER_LINE_FREQUENCY_AUTO;
++      return V4L2_CID_POWER_LINE_FREQUENCY_60HZ;
+   }
+ }
+ 
+Index: chromium-53.0.2785.143/src/ozone/ui/webui/ozone_webui.cc
+===================================================================
+--- chromium-53.0.2785.143.orig/src/ozone/ui/webui/ozone_webui.cc
++++ chromium-53.0.2785.143/src/ozone/ui/webui/ozone_webui.cc
+@@ -145,7 +145,7 @@ gfx::Image OzoneWebUI::GetIconForContent
+ std::unique_ptr<Border> OzoneWebUI::CreateNativeBorder(
+   views::LabelButton* owning_button,
+   std::unique_ptr<views::LabelButtonBorder> border) {
+-  return border;
++  return nullptr; //border;
+ }
+ 
+ void OzoneWebUI::AddWindowButtonOrderObserver(
+Index: chromium-53.0.2785.143/src/ozone/wayland/wayland.gyp
+===================================================================
+--- chromium-53.0.2785.143.orig/src/ozone/wayland/wayland.gyp
++++ chromium-53.0.2785.143/src/ozone/wayland/wayland.gyp
+@@ -5,13 +5,9 @@
+ 
+ {
+   'variables': {
+-    'variables': {
+-      'enable_drm_support%': 0,
+-    },
+-    'enable_drm_support%': '<(enable_drm_support)',
+     'conditions': [
+       ['sysroot!=""', {
+-        'pkg-config': '../../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)"',
++        'pkg-config': '../../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" lib',
+       }, {
+         'pkg-config': 'pkg-config'
+       }],
+@@ -26,10 +22,8 @@
+         'WAYLAND_VERSION': '1.4.0',
+         'MESA_VERSION': '9.1.3',
+         'wayland_packages': [
+-          'egl >= <(MESA_VERSION)',
+-          'wayland-client >= <(WAYLAND_VERSION)',
+-          'wayland-cursor >= <(WAYLAND_VERSION)',
+-          'wayland-egl >= <(MESA_VERSION)',
++          'wayland-client',
++          'wayland-cursor',
+           'xkbcommon',
+         ],
+       },
+@@ -42,17 +36,14 @@
+       'direct_dependent_settings': {
+         'cflags': [
+           '<!@(<(pkg-config) --cflags <(wayland_packages))',
+-          '<!@(<(pkg-config) --cflags gbm)',
+         ],
+       },
+       'link_settings': {
+         'ldflags': [
+           '<!@(<(pkg-config) --libs-only-L --libs-only-other <(wayland_packages))',
+-          '<!@(<(pkg-config) --libs-only-L --libs-only-other gbm)',
+         ],
+         'libraries': [
+           '<!@(<(pkg-config) --libs-only-l <(wayland_packages))',
+-          '<!@(<(pkg-config) --libs-only-l gbm)',
+         ],
+       },
+       'dependencies': [
+@@ -65,19 +56,6 @@
+         '../..',
+         '<(DEPTH)/third_party/khronos',
+       ],
+-      'conditions': [
+-        ['<(enable_drm_support)==1', {
+-          'defines': [
+-          'ENABLE_DRM_SUPPORT',
+-          ],
+-          'sources': [
+-            'egl/wayland_pixmap.cc',
+-            'egl/wayland_pixmap.h',
+-            'protocol/wayland-drm-protocol.cc',
+-            'protocol/wayland-drm-protocol.h',
+-          ],
+-        }],
+-      ],
+       'sources': [
+         'data_device.cc',
+         'data_device.h',
+Index: chromium-53.0.2785.143/src/third_party/angle/src/libGLESv2.gypi
+===================================================================
+--- chromium-53.0.2785.143.orig/src/third_party/angle/src/libGLESv2.gypi
++++ chromium-53.0.2785.143/src/third_party/angle/src/libGLESv2.gypi
+@@ -881,14 +881,14 @@
+                             ],
+                             'cflags':
+                             [
+-                                '<!@(<(pkg-config) --cflags libdrm gbm)',
++                                '<!@(<(pkg-config) --cflags libdrm)',
+                             ],
+                             'link_settings': {
+                                 'ldflags': [
+-                                    '<!@(<(pkg-config) --libs-only-L --libs-only-other libdrm gbm)',
++                                    '<!@(<(pkg-config) --libs-only-L --libs-only-other libdrm)',
+                                 ],
+                                 'libraries': [
+-                                    '<!@(<(pkg-config) --libs-only-l libdrm gbm) -ldl',
++                                    '<!@(<(pkg-config) --libs-only-l libdrm) -ldl',
+                                 ],
+                             },
+                         }],
+Index: chromium-53.0.2785.143/src/ui/events/keycodes/BUILD.gn
+===================================================================
+--- chromium-53.0.2785.143.orig/src/ui/events/keycodes/BUILD.gn
++++ chromium-53.0.2785.143/src/ui/events/keycodes/BUILD.gn
+@@ -17,6 +17,10 @@ source_set("xkb") {
+     "//base",
+     "//ui/events:dom_keycode_converter",
+   ]
++
++  if (use_xkbcommon) {
++    defines = [ "USE_XKBCOMMON" ]
++  }
+ }
+ 
+ if (use_x11 || ozone_platform_x11) {
+Index: chromium-53.0.2785.143/src/ui/events/keycodes/events_keycodes.gyp
+===================================================================
+--- chromium-53.0.2785.143.orig/src/ui/events/keycodes/events_keycodes.gyp
++++ chromium-53.0.2785.143/src/ui/events/keycodes/events_keycodes.gyp
+@@ -21,6 +21,13 @@
+         'scoped_xkb.h',
+         'xkb_keysym.h',
+       ],
++      'conditions': [
++        ['use_xkbcommon==1', {
++          'defines': [
++            'USE_XKBCOMMON',
++          ],
++        }],
++      ],
+     },
+   ],
+   'conditions': [

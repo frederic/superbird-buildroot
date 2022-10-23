@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Amlogic record control</title>
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+    <link href="styles/app.css" rel="stylesheet" type="text/css">
+</head>
+
+<body background="./images/bg.PNG">
+
+<nav class="navbar">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="./index.html">
+        <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+      </a>
+    </div>
+        <ul class="nav navbar-nav navbar-right">
+            <li><a class="list-group-item" role="button" data-toggle="modal" data-target="#recordModal">Start record</a></li>
+            <li><a class="list-group-item" role="button" href="./dl_record_file.html">Download File</a></li>
+        </ul>
+    </div>
+</nav>
+
+<!--configure option-->
+<table border="0" align="center" width="100%">
+    <tr>
+        <td align="center">
+            channal：
+            <select id="select-ch">
+                <option id="channal_2" value="2">2</option>
+                <option id="channal_4" value="4">4</option>
+                <option id="channal_6" value="6">6</option>
+                <option id="channal_8" value="8">8</option>
+            </select>
+        </td>
+        <td align="center">
+            record bits：
+            <select id="select-bits">
+                <option id="S32_LE" value="S32_LE">S32_LE</option>
+                <option id="S24_LE" value="S24_LE">S24_LE</option>
+                <option id="S16_LE" value="S16_LE">S16_LE</option>
+            </select>
+        </td>
+        <td align="center">
+            sample rate：
+            <select id="select-rate">
+                <option id="rate48000" value="48000">48000</option>
+                <option id="rate44100" value="44100">44100</option>
+                <option id="rate32000" value="32000">32000</option>
+                <option id="rate16000" value="16000">16000</option>
+                <option id="rate8000" value="8000">8000</option>
+            </select>
+        </td>
+    </tr>
+</table>
+
+<div class="panel panel-default">
+	<div id="gettext" class="panel-heading">RECORD LIST
+		<img src="./images/refresh.png" onclick="get_record_list()"/>
+	</div>
+	<ul class="list-group" id="recordtext"></ul>
+</div>
+
+<!-- 模态(input name and start record)-->
+<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-backdrop="static">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+          <fieldset>
+            <div class="input-group" align="center">
+
+            </div>
+          </fieldset>
+      </div>
+        <div class="modal-body" align="center">
+            <div class="input-group" align="center">
+                <span class="input-group-addon" id="basic-addon1">File Name</span>
+                <input type="text" onkeyup="value=value.replace(/\s/g,'')" class="form-control" placeholder="please enter file name here" aria-describedby="basic-addon1" id="modal_filename">
+            </div>
+      </div>
+        <div class="modal-footer">
+               <!--start button will not close modal-->
+            <button type="button" class="btn btn-primary" onclick="start_record()">start</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="done_record()">end</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="play_record()">play</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="delete_record()">delete</button>
+            <!--<button type="button" class="btn btn-primary" data-dismiss="modal" onclick="play_online_record()">haha</button>-->
+            <button type="button" class="btn btn-default" data-dismiss="modal">cancle</button>
+      </div>
+    </div>
+  </div><!-- /.modal-content -->
+</div><!-- /.modal -->
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ajax.js"></script>
+  <!-- Include all compiled plugins (below), or include individual files as needed -->
+  <script src="js/bootstrap.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+	window.onload = function(){
+		get_record_list();
+	};
+
+  </script>
+
+</body>
+</html

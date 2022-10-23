@@ -1,0 +1,6 @@
+config BR2_PACKAGE_AML_AAA
+	bool "amlogic AAA fake driver"
+	depends on BR2_LINUX_KERNEL
+	help
+        fake aml kernel driver
+

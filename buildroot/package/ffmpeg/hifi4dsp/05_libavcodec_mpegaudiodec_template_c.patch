@@ -1,0 +1,87 @@
+From: Yeping Miao
+Subject: ffmpeg hifi4 dsp support patch
+
+Index: ffmpeg-3.4.5/libavcodec/mpegaudiodec_template.c
+===================================================================
+--- ffmpeg-3.4.5-ori/libavcodec/mpegaudiodec_template.c	2018-11-02 02:34:24.000000000 +0800
++++ ffmpeg-3.4.5/libavcodec/mpegaudiodec_template.c	2019-08-05 16:16:43.223292071 +0800
+@@ -42,6 +42,8 @@
+
+ #include "mpegaudio.h"
+ #include "mpegaudiodecheader.h"
++#include "amldec.h"
++
+
+ #define BACKSTEP_SIZE 512
+ #define EXTRABYTES 24
+@@ -416,6 +418,12 @@
+
+     return 0;
+ }
++#else
++static av_cold int decode_close(AVCodecContext * avctx)
++{
++    aml_decode_close(avctx);
++    return 0;
++}
+ #endif
+
+ static av_cold int decode_init(AVCodecContext * avctx)
+@@ -448,6 +456,7 @@
+     if (avctx->codec_id == AV_CODEC_ID_MP3ADU)
+         s->adu_mode = 1;
+
++    aml_decode_open(avctx);
+     return 0;
+ }
+
+@@ -1653,6 +1662,7 @@
+     MPADecodeContext *s = avctx->priv_data;
+     uint32_t header;
+     int ret;
++#if 0 // If for original mp3 decoder frame code
+
+     int skipped = 0;
+     while(buf_size && !*buf){
+@@ -1713,6 +1723,25 @@
+     }
+     s->frame_size = 0;
+     return buf_size + skipped;
++#else
++    ret = aml_decode_frame(avctx, data, buf, buf_size);
++
++    if (ret >= 0) {
++      *got_frame_ptr       = 1;
++
++    } else {
++      av_log(avctx, AV_LOG_ERROR, "Error while decoding MPEG audio frame.\n");
++        /* Only return an error if the bad frame makes up the whole packet or
++         * the error is related to buffer management.
++         * If there is more data in the packet, just consume the bad frame
++         * instead of returning an error, which would discard the whole
++         * packet. */
++        *got_frame_ptr = 0;
++        return ret;
++    }
++    s->frame_size = 0;
++    return buf_size;
++#endif
+ }
+
+ static void mp_flush(MPADecodeContext *ctx)
+@@ -1725,6 +1754,7 @@
+
+ static void flush(AVCodecContext *avctx)
+ {
++    aml_decode_flush(avctx);
+     mp_flush(avctx->priv_data);
+ }
+
+@@ -1895,7 +1925,6 @@
+         s->mp3decctx[i]->mpadsp = s->mp3decctx[0]->mpadsp;
+         s->mp3decctx[i]->fdsp = s->mp3decctx[0]->fdsp;
+     }
+-
+     return 0;
+ alloc_fail:
+     decode_close_mp3on4(avctx);

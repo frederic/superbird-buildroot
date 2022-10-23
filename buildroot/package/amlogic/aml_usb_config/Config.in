@@ -1,0 +1,18 @@
+config BR2_PACKAGE_AML_USB_CONFIG
+	bool  "aml usb config"
+	help
+		usb function
+
+if BR2_PACKAGE_AML_USB_CONFIG
+
+config BR2_PACKAGE_MASS_STORAGE
+	bool  "mass storage"
+	help
+		U disk function
+
+config BR2_PACKAGE_ADB_RNDIS
+	bool  "adb & rndis"
+	help
+		adb & rndis function
+
+endif

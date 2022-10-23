@@ -58,6 +58,9 @@ config BR2_TARGET_UBOOT_CUSTOM_HG
 config BR2_TARGET_UBOOT_CUSTOM_SVN
 	bool "Custom Subversion repository"
 
+config BR2_TARGET_UBOOT_CUSTOM_LOCAL
+	bool "Custom local"
+
 endchoice
 
 config BR2_TARGET_UBOOT_CUSTOM_VERSION_VALUE
@@ -67,6 +70,14 @@ config BR2_TARGET_UBOOT_CUSTOM_VERSION_VALUE
 config BR2_TARGET_UBOOT_CUSTOM_TARBALL_LOCATION
 	string "URL of custom U-Boot tarball"
 	depends on BR2_TARGET_UBOOT_CUSTOM_TARBALL
+
+config BR2_TARGET_UBOOT_CUSTOM_LOCAL_VERSION_VALUE
+	string "custom U-Boot version value"
+	depends on BR2_TARGET_UBOOT_CUSTOM_LOCAL
+
+config BR2_TARGET_UBOOT_CUSTOM_LOCAL_LOCATION
+	string "Path of custom U-Boot"
+	depends on BR2_TARGET_UBOOT_CUSTOM_LOCAL
 
 if BR2_TARGET_UBOOT_CUSTOM_GIT || BR2_TARGET_UBOOT_CUSTOM_HG || BR2_TARGET_UBOOT_CUSTOM_SVN
 
@@ -91,6 +102,8 @@ config BR2_TARGET_UBOOT_VERSION
 	default BR2_TARGET_UBOOT_CUSTOM_VERSION_VALUE \
 		if BR2_TARGET_UBOOT_CUSTOM_VERSION
 	default "custom"	if BR2_TARGET_UBOOT_CUSTOM_TARBALL
+	default BR2_TARGET_UBOOT_CUSTOM_LOCAL_VERSION_VALUE \
+		if BR2_TARGET_UBOOT_CUSTOM_LOCAL
 	default BR2_TARGET_UBOOT_CUSTOM_REPO_VERSION \
 		if BR2_TARGET_UBOOT_CUSTOM_GIT || BR2_TARGET_UBOOT_CUSTOM_HG || BR2_TARGET_UBOOT_CUSTOM_SVN
 
@@ -511,6 +524,40 @@ config BR2_TARGET_UBOOT_ENVIMAGE_REDUNDANT
 	  mechanism of U-Boot.
 
 endif # BR2_TARGET_UBOOT_ENVIMAGE
+
+config BR2_TARGET_UBOOT_AMLOGIC_REPO
+    bool "amlogic uboot repo"
+    select BR2_PACKAGE_HOST_AML_IMG_PACKER_NEW
+    help
+        amlogic uboot repo version
+
+config BR2_TARGET_UBOOT_AMLOGIC_BOOTARGS
+    string "amlogic uboot bootargs"
+    depends on BR2_TARGET_UBOOT_AMLOGIC_REPO
+    default "root=/dev/system rootfstype=ext4 init=/sbin/init"
+    help
+	amlogic uboot bootargs when mkbootimg
+
+config BR2_TARGET_UBOOT_PLATFORM
+    string "platform name"
+    default "gxb"
+
+config BR2_TARGET_UBOOT_ENCRYPTION
+    bool "secure boot"
+
+config BR2_TARGET_USBTOOL_AMLOGIC
+    bool "amlogic usb tool"
+    help
+        for amlogic usb tool
+
+config BR2_TARGET_USBTOOL_UBI_AMLOGIC
+    bool "amlogic usb tool using  rootfs.ubi product *.image"
+	default n
+
+config BR2_TARGET_UBOOT_WITH_SECURE_OS
+    bool "amlogic uboot + secure os"
+    help
+        build uboot with secure os
 
 config BR2_TARGET_UBOOT_BOOT_SCRIPT
 	bool "Generate a U-Boot boot script"

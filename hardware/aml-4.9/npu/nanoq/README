@@ -1,0 +1,33 @@
+
+Files layout
+============
+<AQROOT>/
+    |
+    +----compiler
+    |    |
+    |    \---libVSC                  : compiler backend
+    |
+    +---hal
+    |    |
+    |    +---inc                     : HAL header files
+    |    |
+    |    +---os                      : OS layer HAL driver
+    |    |
+    |    +---user                    : User mode HAL driver
+    |    |    |
+    |    |    \---arch               : Hardware specific driver code
+    |    |
+    |    \---kernel                  : Kernel mode HAL driver
+    |         |
+    |         \---arch               : Hardware specific driver code
+    |
+    |
+    +---release/SW                   : SDK release ReadMe files
+    |
+    \---sdk
+        |
+        \---inc                      : SDK/Driver header files
+
+How to build
+============
+1. Build steps for Linux: $(AQROOT)/release/SW/ReadMe_Linux.txt

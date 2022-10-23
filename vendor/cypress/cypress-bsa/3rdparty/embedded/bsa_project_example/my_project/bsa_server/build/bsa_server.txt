@@ -1,0 +1,642 @@
+
+######################## HCI ########################
+HCIC_INCLUDED = TRUE                # Makefile only
+HCITHIN_INCLUDED = FALSE
+HCILP_INCLUDED = FALSE
+HCISU_H4_INCLUDED = TRUE
+
+# Voice over HCI
+BTM_SCO_HCI_INCLUDED = FALSE
+
+
+# Serial device name.  The selection logic for the device name to use is the following:
+#     - if the command line contains a device name, it is used, otherwise,
+#     - if BSA_SERIAL_DEV_NAME is defined, it is used, otherwise,
+#     - the port number configured in brcm/bsa/server/bta/bta_main.c appended to:
+#         + on cygwin : "/dev/com"
+#         + on linux : "/dev/ttyS"
+# Finally, the behavior of the USERIAL implementation depends on:
+#     - if the device name contains "btusb", it implements the broadcom USB H4 emulator 
+#       extensions
+#     - otherwise, it behaves as a simple H4 driver
+BSA_SERIAL_DEV_NAME = "/dev/btusb0"
+
+# Default HCI UART baud rate is 115200, but it can be changed during initialization
+#BSA_CHANGE_STARTUP_BAUDRATE = USERIAL_BAUD_921600
+
+# include BTSNOOP file capture
+BTSNOOPDISP_INCLUDED = TRUE
+
+# Remove HCI Command data dump 
+# HCI_DUMP_CMD_MAX = 0
+
+# Remove HCI Event data dump 
+# HCI_DUMP_EVT_MAX = 0
+
+######################## BTA BRCM  ########################
+BT_BRCM_VS_INCLUDED = TRUE
+
+######################## GAP ########################
+GAP_INCLUDED = TRUE
+
+######################## GATT & BLE ########################
+BTA_GATT_INCLUDED = TRUE
+BLE_INCLUDED = TRUE
+
+ATT_INCLUDED = TRUE
+GATT_SERVER_ENABLED = TRUE
+GATT_CLIENT_ENABLED = TRUE
+
+# Maximum number of GATT Client
+BTA_GATTC_CL_MAX = 4
+BSA_BLE_CLIENT_MAX = (BTA_GATTC_CL_MAX - 1)
+
+SMP_INCLUDED = TRUE
+BTA_GATT_DEBUG = TRUE
+
+BTA_HH_LE_INCLUDED = TRUE
+BTA_GATTC_NOTIF_REG_MAX = 10
+
+# Increase HH MTU (for Voice over BLE2)
+#BTA_HH_GATT_MTU = 255
+
+BLE_AUDIO_INCLUDED = TRUE
+SBC_FOR_EMBEDDED_LINUX = TRUE
+
+######################## L2CAP ########################
+L2CAP_INCLUDED = TRUE
+L2CAP_COMPRESSION_INCLUDED = FALSE
+L2CAP_HOST_FLOW_CTRL       = FALSE
+# L2CAP 1.2 FEC overrides
+#L2CAP_FCR_INCLUDED = TRUE
+
+# FCR needed by HDP
+L2CAP_FCR_INCLUDED = TRUE
+
+L2CAP_HCI_FLOW_CONTROL_DEBUG = FALSE
+
+# For 3DTV applications allow up to 7 ACL Connections 
+MAX_L2CAP_LINKS = 7
+
+#  For 3DTV applications allow up to 16 Channels: (7 * 2) + 2 spares
+MAX_L2CAP_CHANNELS = 20
+
+# The maximum number of simultaneous applications that can register with L2CAP
+MAX_L2CAP_CLIENTS = 16
+
+L2CAP_DESIRED_LINK_ROLE = HCI_ROLE_MASTER
+
+# L2CAP extra features needed for MCAP
+L2CAP_EXTFEA_SUPPORTED_MASK = (L2CAP_EXTFEA_ENH_RETRANS | L2CAP_EXTFEA_STREAM_MODE | L2CAP_EXTFEA_NO_CRC | L2CAP_EXTFEA_UCD_RECEPTION)
+
+# UCD is needed for 3D Sync profile (to receive Connection Announcement messages)
+L2CAP_UCD_INCLUDED = TRUE
+
+######################## SDP ########################
+SDP_INCLUDED = TRUE                 # Makefile only
+SDP_DI_INCLUDED = TRUE
+SDP_RAW_DATA_INCLUDED = TRUE
+
+# increase SDP_MAX_PAD_LEN for HL
+SDP_MAX_PAD_LEN = 1024
+SDP_MTU_SIZE = 510
+
+######################## RFCOMM ########################
+RFCOMM_INCLUDED = TRUE
+MAX_BD_CONNECTIONS = 4
+
+######################## OBEX ########################
+OBX_INCLUDED = FALSE
+OBX_SERVER_INCLUDED = FALSE
+OBX_CLIENT_INCLUDED = FALSE
+OBX_MD5_INCLUDED    = FALSE
+
+# GOEP
+GOEP_INCLUDED = FALSE
+GOEP_FS_INCLUDED = FALSE
+
+##################################### DATA GATEWAY ###############################
+BTA_DG_INCLUDED = TRUE
+SPP_INCLUDED = FALSE
+DUN_INCLUDED = TRUE
+
+###################################### AUDIO GATEWAY #############################
+BTA_AG_INCLUDED = FALSE
+
+
+###################################### HEADSET/HANDSFREE #############################
+BTA_HS_INCLUDED = FALSE
+HSP2_INCLUDED = FALSE
+HFP_INCLUDED = FALSE
+HSA_INCLUDED = FALSE                 # Makefile only
+
+
+###################################### OBJECT PUSH ################################
+OPP_INCLUDED = FALSE
+OPP_SERVER_INCLUDED = FALSE
+OPP_CLIENT_INCLUDED = FALSE
+
+BTA_OP_INCLUDED = FALSE
+BTA_OPS_INCLUDED = FALSE
+BTA_OPC_INCLUDED = FALSE
+
+# debug OPS
+BTA_OPS_DEBUG = FALSE
+
+###################################### FILE TRANSFER #############################
+FTP_INCLUDED = FALSE
+FTP_SERVER_INCLUDED = FALSE
+FTP_CLIENT_INCLUDED = FALSE
+
+BTA_FT_INCLUDED = FALSE
+BTA_FTS_INCLUDED = FALSE
+BTA_FTC_INCLUDED = FALSE
+
+
+######################## Printing ######################## 
+# BIP needed by File Transfer
+BIP_INCLUDED = FALSE
+BIP_INITR_INCLUDED = FALSE
+BIP_RSPDR_INCLUDED = FALSE
+BTA_BI_INCLUDED = FALSE
+BIP_PRINTING_INCLUDED = FALSE
+
+
+BIP_PUSH_INCLUDED = FALSE
+BIP_PULL_INCLUDED = FALSE
+BIP_ARCHIVE_INCLUDED = FALSE
+BIP_CAMERA_INCLUDED = FALSE
+BIP_DISPLAY_INCLUDED = FALSE
+
+# BPP
+BPP_INCLUDED = FALSE
+BPP_SND_INCLUDED = FALSE
+
+HCRP_INCLUDED = FALSE
+HCRP_CLIENT_INCLUDED = FALSE
+HCRP_SERVER_INCLUDED = FALSE
+
+BTA_PR_INCLUDED = FALSE
+
+################################### AVRC - RC #############################
+BTA_RC_INCLUDED = TRUE
+
+######################## ADVANCED AUDIO & VIDEO ########################
+AVCT_INCLUDED = TRUE
+AVRC_INCLUDED = TRUE
+AVDT_INCLUDED = TRUE
+AVDTC_INCLUDED = TRUE               # Makefile only
+A2D_INCLUDED = TRUE
+A2D_SBC_INCLUDED = TRUE
+A2D_M12_INCLUDED = TRUE
+A2D_M24_INCLUDED = TRUE
+VDP_INCLUDED     = TRUE
+VDP_H263_INCLUDED = TRUE
+VDP_MPEG_INCLUDED = TRUE
+VDP_VEND_INCLUDED = TRUE
+
+BTA_AV_INCLUDED = TRUE
+BTA_AVK_INCLUDED = TRUE
+BTA_AR_INCLUDED = TRUE
+
+# Configure the BSA AV buffer size.  This will be set the maximum latency
+# that can be added before the SBC encoder.  When setting this value, you
+# should take into account:
+# - the ring buffer mechanism requires 1 byte to be always free, the
+#    actual size used is smaller by 1
+# - the size must be a multiple of the sample size (2x16 for 16 bit stereo)
+#   because if the buffer write is non blocking, samples could get truncated
+# examples:
+# - 48kHz 16 bit stereo:
+# 8193 -> 8192 byte buffer -> 2048 sample buffer -> 42.666 ms
+BSA_AV_UIPC_BUFFER_SIZE = 20001
+
+# Configure the SBC supported sampling frequencies in [A2D_SBC_IE_SAMP_FREQ_48, A2D_SBC_IE_SAMP_FREQ_44]
+BSA_AV_SBC_CAPS_SAMP_FREQ = A2D_SBC_IE_SAMP_FREQ_48
+
+# Configure the SBC default sampling frequencies in [A2D_SBC_IE_SAMP_FREQ_48, A2D_SBC_IE_SAMP_FREQ_44]
+BSA_AV_SBC_DEFAULT_SAMP_FREQ = A2D_SBC_IE_SAMP_FREQ_48
+
+# Configure the SBC encoding mode:
+#   - channel mode in [A2D_SBC_IE_CH_MD_MONO, A2D_SBC_IE_CH_MD_STEREO, A2D_SBC_IE_CH_MD_JOINT, A2D_SBC_IE_CH_MD_DUAL]
+BSA_AV_SBC_CH_MODE = A2D_SBC_IE_CH_MD_JOINT
+#   - block length in [A2D_SBC_IE_BLOCKS_16, A2D_SBC_IE_BLOCKS_12, A2D_SBC_IE_BLOCKS_8, A2D_SBC_IE_BLOCKS_4]
+BSA_AV_SBC_BLOCK_LEN = A2D_SBC_IE_BLOCKS_16
+#   - number of subbands in [A2D_SBC_IE_SUBBAND_4, A2D_SBC_IE_SUBBAND_8]
+BSA_AV_SBC_NUM_SUBBAND = A2D_SBC_IE_SUBBAND_8
+#   - allocation method in [A2D_SBC_IE_ALLOC_MD_L, A2D_SBC_IE_ALLOC_MD_S]
+BSA_AV_SBC_ALLOC_MD = A2D_SBC_IE_ALLOC_MD_L
+#   - maximum bit pool
+BSA_AV_SBC_MAX_BP = 0x59
+#   - minimum bit pool
+BSA_AV_SBC_MIN_BP = 0x5
+
+
+# Debug media task
+BSA_MEDIA_AV_FLOW_DEBUG = FALSE
+
+# Configure the bitrate step to use (in kpbs) to find a matching bitpool
+BSA_MEDIA_BITRATE_STEP = 10
+
+# Enable/disable the overfeeding (slightly overfeed the stream to make sure the
+# headset never runs out of sound samples)
+BSA_MEDIA_OVERFEED_INCLUDED = FALSE
+
+# Enable/disable the underfeeding (slightly underfeed the stream to make sure the
+# headset buffer is always empty)
+BSA_MEDIA_UNDERFEED_INCLUDED = FALSE
+
+AVDT_DEBUG = TRUE
+
+BSA_AVK_SEC_SUPPORT = FALSE
+
+# Define codec order(SBC, SEC, APTX) for each stream end point
+BSA_SV_AV_AA_SBC_INDEX  = 0  
+BSA_SV_AV_AA_SEC_INDEX  = 1
+BSA_SV_AV_AA_APTX_INDEX = 2
+BSA_SV_AV_AA_SEP_MAX  = 3
+
+AVDT_NUM_SEPS = 6
+
+# Overwrite default SBC rate (increase/decrease quality vs. rate) 
+BSA_AV_SBC_RATE_LEVEL_0 = 250
+BSA_AV_SBC_RATE_LEVEL_1 = 250
+BSA_AV_SBC_RATE_LEVEL_2 = 200
+BSA_AV_SBC_RATE_LEVEL_3 = 150
+BSA_AV_SBC_RATE_LEVEL_4 = 120
+BSA_AV_SBC_RATE_LEVEL_5 = 100
+
+# Set SEC bitrate. Cusomter can choose preferred values
+# Not sure SEC codec can change bit rate
+BSA_AV_SEC_RATE_LEVEL_0 = 348
+BSA_AV_SEC_RATE_LEVEL_1 = 348
+BSA_AV_SEC_RATE_LEVEL_2 = 348
+BSA_AV_SEC_RATE_LEVEL_3 = 348
+BSA_AV_SEC_RATE_LEVEL_4 = 348
+BSA_AV_SEC_RATE_LEVEL_5 = 348
+
+# Control A2DP bit rate by BSA_AvBusyLevel API
+BSA_AV_BITRATE_CONTROL_BY_USER = FALSE
+
+# Broadcast AV
+BTA_BAV_INCLUDED = FALSE
+BTA_BAV_DEBUG = TRUE
+BTA_BAV_STREAM_MAX = 2
+
+# By default, BSA uses 12 NbBlocks for SBC to generate SBC frames of 2 ms (10 SBC frames per packet)
+# 16 NbBlocks will generate SBC frames of 2.666ms (alternatively 8 or 7 SBC frames per packet)
+#BSA_SV_AV_BAV_SBC_NB_BLOCKS = 16
+
+# Vendor Dependent Company ID
+BTA_AV_RC_COMP_ID = AVRC_CO_METADATA
+BTA_AVK_RC_COMP_ID = AVRC_CO_METADATA
+
+######################## SBC ########################
+SBC_ENCODER_INCLUDED = TRUE         # Makefile only
+SBC_DECODER_INCLUDED = TRUE        # Makefile only
+MMP_INCLUDED = FALSE        # Makefile only
+
+SBC_FOR_EMBEDDED_LINUX = TRUE
+
+
+##################################### ADVANCED CAMERA ###############################
+BTA_AC_INCLUDED = FALSE
+
+
+
+###################################### CORDLESS TELEPHONY ################################
+BTA_CT_INCLUDED = FALSE
+BTA_CG_INCLUDED = FALSE
+CTP_INCLUDED = FALSE
+TCS_INCLUDED = FALSE
+ICP_INCLUDED = FALSE
+ICA_INCLUDED = FALSE
+
+
+###################################### NETWORK ################################
+BNEP_INCLUDED = FALSE
+PAN_INCLUDED = FALSE
+BTA_PAN_INCLUDED = FALSE
+
+
+###################################### HID Host ############################
+HID_HOST_INCLUDED = TRUE
+BTA_HH_DEBUG = TRUE
+BTA_HH_INCLUDED = TRUE
+
+HID_HOST_MAX_CONN_RETRY = 1
+
+# To save power, the RC must be slave (i.e. TV master)
+BTA_HH_ROLE = BTA_MASTER_ROLE_ONLY
+
+BTM_SEC_MAX_DEVICE_RECORDS = 40
+
+HID_HOST_MAX_DEVICES = 20
+
+###################################### HID Device ###########################
+HID_DEV_INCLUDED = TRUE
+BTA_HD_INCLUDED = TRUE
+HID_DEV_MTU_SIZE = 200
+HID_HOST_DEV_COEX_SUPPORTED = TRUE
+HID_DEV_SET_CONN_MODE = FALSE
+BTA_HD_CUST_REPT_SIZE = 100
+
+###################################### SIM ################################
+SAP_SERVER_INCLUDED = FALSE
+SAP_INCLUDED = FALSE
+
+###################################### PHONE BOOK ################################
+BTA_PBS_INCLUDED = FALSE
+BTA_PBC_INCLUDED = FALSE
+
+###################################### SYNC ################################
+BTA_SS_INCLUDED = FALSE
+BTA_SC_INCLUDED = FALSE
+
+###################################### FM ################################
+BTA_FM_INCLUDED = FALSE
+BTA_FMTX_INCLUDED = FALSE
+
+###################################### HEALTH ##############################
+BTA_HL_INCLUDED = TRUE
+BTA_HL_DEBUG = TRUE
+
+# The size of Discovery buffer must be increased to support peer device with 
+# lot of HL Applications
+BTA_HL_DISC_SIZE = 3000
+
+####################################### MIP ################################
+BTA_MIP_INCLUDED = FALSE
+
+###################################### SLIP ################################
+SLIP_INCLUDED = FALSE
+SLIP_STATIS_INCLUDED = FALSE
+SLIP_SW_FLOW_CTRL = FALSE
+BT_TRACE_SLIP = FALSE
+SLIP_SLEEP_TO = 5000
+SLIP_HOST_SLIDING_WINDOW_SIZE = 7
+
+###################################### MCAP ################################
+#Multi-Channel Adaptation Protocol (needed for HL)
+
+MCA_INCLUDED = TRUE
+MCA_SYNC_INCLUDED = TRUE
+
+# The maximum number of MDEP (including HDP echo) per registered MCAP instances
+#MCA_NUM_DEPS = 3
+MCA_NUM_DEPS = 8
+
+# The maximum number of MDL link per control channel.
+#MCA_NUM_MDLS = 4
+MCA_NUM_MDLS = 8
+
+BTA_HL_NUM_MDEPS = 8
+
+###################################### 3D  ################################
+# Add 3D Synchronizaton Profile support
+# Note that BSA_3DTV_INCLUDED is the legacy 3D implementation based on Vendor
+# Specific Commands and BSA_3DS_INCLUDED is based on an official BT Profile.
+# BSA_3DS_INCLUDED and BSA_3DTV_INCLUDED options are compatible but
+# it is recommended to use -3d type option to indicate which one to use 
+# BSA_3DS_INCLUDED allows backward compatibility with legacy 3D Glasses
+#BSA_3DS_INCLUDED = TRUE
+#BTA_3DS_INCLUDED = TRUE
+#BTA_3DS_DEBUG = TRUE
+
+# 3D Sync Profile features. The bit signignifications are:
+#    b0 => indicates if Association Nofification supported
+#    b1 => indicates if Battery Level Report supported
+#    b2 => indicates if 3DG must send Battery Level Report at every connection
+# Note that b2 increases 3DG connection latency (ACL connection needed) 
+#BTA_3DS_FEAT_DEF_MASK = 0x03
+
+################################## Legacy 3D #############################
+# Added 3DTV support
+#BSA_3DTV_INCLUDED = TRUE
+
+# BSA_MIP_HYBRID is used to switch between MIP and MIP_HYBRID
+#BSA_MIP_HYBRID = FALSE
+# BSA_3DTV_MCAST is used to indicate is MCAST (Legacy) must be supported
+#BSA_3DTV_MCAST = TRUE
+
+###################################### BTA Basis ################################
+BTA_INCLUDED = TRUE                 # Makefile only
+BTA_BRCM_INCLUDED = TRUE
+BTA_DM_INCLUDED = TRUE
+BTA_FS_INCLUDED = TRUE
+BTA_DI_INCLUDED = TRUE
+BTA_EIR_CANNED_UUID_LIST = FALSE
+GPS_INCLUDED = FALSE
+BTA_EIR_ADDITIONAL_DATA_FIRST = TRUE
+
+# change the BTA system timer period to allows smaller timer (300 ms for MIP)
+BTA_SYS_TIMER_PERIOD = 100
+
+BTA_DM_REMOTE_DEVICE_NAME_LENGTH = 248
+
+# The BSA_POWER_INCLUDED must be set to compile/link the BSA DM Power management
+# It should be defined if any of BSA_POWER_xxx_INCLUDED is defined
+BSA_POWER_INCLUDED = TRUE
+# Capability to change Inquiry Response Tx Power
+BSA_POWER_INQ_TX_RSP_INCLUDED = TRUE
+# Capability to change Tx Power (point to point)
+#BSA_POWER_TX_INCLUDED = TRUE
+# Initialize TxPower at startup
+#BSA_POWER_TX_INIT = TRUE
+
+# Force Master role for AV devices
+BTA_AV_ROLE = BTA_MASTER_ROLE_ONLY
+
+# Do not allow Scatternet mode
+BTA_DM_SCATTERNET = BTA_DM_NO_SCATTERNET
+
+# Default Page Timeout(625us)
+BTA_DM_PAGE_TIMEOUT = 8192
+
+###################################### BTM Basis ################################
+BTM_INQ_DB_SIZE = 50
+BTM_INQ_GET_REMOTE_NAME = FALSE
+BTM_INCLUDED = TRUE                 # Makefile only
+BTM_SCO_INCLUDED = FALSE
+# Bluetooth 2.1 support
+BTM_LISBON_INCLUDED = TRUE
+BTM_OOB_INCLUDED = FALSE
+
+# BTM_LOCAL_IO_CAPS allowed values:
+#       BTM_IO_CAP_OUT => Display Only
+#       BTM_IO_CAP_IO  => Display Yes/No
+#       BTM_IO_CAP_IN  => Keyboard only
+#       BTM_IO_CAP_NONE    => No Input no Output
+# If BTM_LOCAL_IO_CAPS is not defined, Default => BTM_SEC_IO_CAP_IO
+# This allows the application to change this value using BSA Sec API
+#BTM_LOCAL_IO_CAPS =  BTM_IO_CAP_NONE
+
+
+BTM_MAX_REM_BD_NAME_LEN = 100
+
+# Start PageScan every 800 slots (500ms for HH to reduce connection latency)
+BTM_DEFAULT_CONN_INTERVAL = 800
+
+# Start PageScan every 160 slots (62.5ms for HH to reduce connection latency)
+#BTM_DEFAULT_CONN_INTERVAL = 160
+# Use 36 slots for PageScanWindow (22.5ms for HH to reduce connection latency)
+#BTM_DEFAULT_CONN_WINDOW = 36
+
+# this option indicates if the PATCHRAM download from the host is supported BSA
+PATCHRAM_INCLUDED = TRUE
+# indicates the function to call after device init (contains the PATCHRAM 
+# download)
+BTM_APP_DEV_INIT = bta_sys_dev_init
+# indicate the default PATCHRAM file to use, if NULL, no PATCHRAM file is 
+# downloaded unless specified at the command line.  If the file is not found
+# the initialization will not fail, just a simple message will be printed out
+# "bta_patch_ram_cback: Failed !!!"
+#BTM_PATCH_FILE = "BCM20702A1_001.002.014.0210.0000.hcd"
+# indicate if the HCI port should be re-opened after the PATCHRAM download
+# (this is used for btusb connected devices)
+#PATCHRAM_REOPEN_HCI = TRUE
+
+BTM_SSR_INCLUDED = FALSE
+
+# Allow not paired devices to connect if InquiryScan not enabled 
+BTM_ALLOW_CONN_IF_NONDISCOVER = TRUE
+
+# TBFC feature
+#BTM_TBFC_INCLUDED = TRUE
+#BTM_BI_DIR_TBFC_INCLUDED = TRUE
+#BSA_TBFC_SCAN_INCLUDED = TRUE
+
+# ConnectionLess Broadcast (CLB) feature is needed for 3D sync profile
+#BTM_CLB_INCLUDED = TRUE
+# This application supports 3D Rx (TV 2 TV Sync)
+#BTM_CLB_RX_INCLUDED = TRUE
+
+###################################### BTU Basis ################################
+BTU_INCLUDED = TRUE                 # Makefile only
+BTUTHIN_INCLUDED = FALSE            # Makefile only
+BTU_BTA_INCLUDED = TRUE
+
+BTU_STACK_LITE_ENABLED = FALSE
+
+#BTU_DUAL_STACK_DEBUG = TRUE
+#BTU_DUAL_STACK_INCLUDED = TRUE
+#BTU_DUAL_STACK_BTC_INCLUDED = FALSE
+#BTU_DUAL_STACK_MM_INCLUDED = TRUE 
+
+# Switch to MM/Kernel mode during Server startup
+#BSA_DM_DUAL_STACK_MODE_INITIAL = BSA_DM_DUAL_STACK_MODE_MM
+
+###################################### TRACE ################################
+BTTRC_INCLUDED = FALSE
+BTTRC_PARSER_INCLUDED = FALSE
+MAX_TRACE_RAM_SIZE = 10000
+
+TRACE_TASK_INCLUDED = TRUE
+BT_TRACE_PROTOCOL = TRUE
+BT_USE_TRACES = TRUE
+BT_TRACE_APPL = TRUE
+
+BT_USE_TRACES_TIMESTAMP = TRUE
+BSA_COLORED_TRACES = TRUE
+
+BSA_INITIAL_TRACE_LEVEL = BT_TRACE_LEVEL_DEBUG
+BTM_INITIAL_TRACE_LEVEL = BT_TRACE_LEVEL_DEBUG
+L2CAP_INITIAL_TRACE_LEVEL = BT_TRACE_LEVEL_DEBUG
+APPL_INITIAL_TRACE_LEVEL = BT_TRACE_LEVEL_DEBUG
+AVDT_INITIAL_TRACE_LEVEL = BT_TRACE_LEVEL_DEBUG
+
+###################################### GKI ################################
+# For Voix over HCI 7 pools are needed (6 otherwise)
+#GKI_NUM_FIXED_BUF_POOLS = 7
+# For Health profile 9 pools are needed
+GKI_NUM_FIXED_BUF_POOLS = 9
+GKI_BUF3_SIZE = 4096
+GKI_BUF3_MAX = 100
+
+#GKI_ENABLE_BUF_CORRUPTION_CHECK = TRUE
+
+BRCM_GKI_INCLUDED = TRUE
+GKI_USE_PTHREADS = TRUE
+GKI_TIMER_LIST_NOPREEMPT = TRUE
+UCODEC_TASK = 3
+BT_MEDIA_TASK = UCODEC_TASK
+
+
+
+###################################### TM (Test Module) #######################
+BSA_TM_INCLUDED = TRUE
+
+######################### NSA (Interface with NSA server) ####################
+BSA_NSA_INCLUDED = FALSE
+
+###################################### BTAPP ################################
+BTAPP_INCLUDED = TRUE
+
+BTA_CONFIG_PATH_LEN = 500
+BTA_CONFIG_FILE_LEN = 300
+BTA_DEVICES_PATH_LEN = 500
+BTA_DEVICES_FILE_LEN = 300
+BTA_FS_PATH_LEN = 500
+BTA_FS_FILE_LEN = 300
+
+###################################### SERIALUI & BTUI ########################
+#SERIAL_UI_INCLUDED = TRUE
+#
+BTA_DM_CO_INCLUDE_BTUI = FALSE
+#BTUI_INCLUDED = TRUE
+#LINUX_BTUI_INCLUDED = TRUE
+#BTUI_TEST_MENU = TRUE
+
+
+###################################### OS ################################
+# Linux specific code must be included
+LINUX_OS = TRUE
+GKI_SIGNAL_HANDLER_EXCLUDED = TRUE
+
+###################################### PLATFORM ################################
+BTM_SEC_TIMEOUT_VALUE = 30
+
+
+###################################### APPLICATION ################################
+
+# TV (MajorService = 0) (MajorDevclass = Audio/Video) (Minor=Display & Speaker)
+BTA_DM_COD = {0x00, 0x04, 0x3C}
+
+# Link supervision : 3 seconds
+BTA_DM_LINK_TIMEOUT = 4800
+
+
+###################################### ??? ################################
+AT91_MAIN_INCLUDED = FALSE  
+AT91_DRV_INCLUDED = FALSE
+AT91_LIB_INCLUDED = FALSE
+AT91_GKI_INCLUDED = FALSE
+UNV_INCLUDED = FALSE
+BBY_MAIN_INCLUDED = FALSE
+
+
+
+# Linking files option
+BRCM_LIB_INCLUDED = TRUE
+BRCM_DRV_INCLUDED = TRUE
+
+# Serial UI MMI is used
+MMI_INCLUDED = FALSE
+
+# BTE applications and other
+FLASHEXE_INCLUDED = FALSE            # Makefile only
+
+
+
+XML_INCLUDED = TRUE                 # Makefile only
+BTA_JV_INCLUDED = FALSE
+#BTELIB_INCLUDED = FALSE    # Makefile only
+# Eval kit rpc file
+RPC_INCLUDED = FALSE
+RSI_INCLUDED = TRUE
+RPC_TRACE_ONLY = FALSE
+
+
+BSA_SET_THREAD_NAME = FALSE
+
+# End of file

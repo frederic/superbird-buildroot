@@ -1,7 +1,3 @@
-comment "gstreamer 1.x needs a toolchain w/ wchar, threads"
-	depends on BR2_USE_MMU
-	depends on !BR2_USE_WCHAR || !BR2_TOOLCHAIN_HAS_THREADS
-
 config BR2_PACKAGE_GSTREAMER1
 	bool "gstreamer 1.x"
 	depends on BR2_USE_WCHAR # glib2
@@ -58,3 +54,7 @@ config BR2_PACKAGE_GSTREAMER1_INSTALL_TOOLS
 	  up additional space on the target.
 
 endif
+
+comment "gstreamer 1.x needs a toolchain w/ wchar, threads"
+	depends on BR2_USE_MMU
+	depends on !BR2_USE_WCHAR || !BR2_TOOLCHAIN_HAS_THREADS

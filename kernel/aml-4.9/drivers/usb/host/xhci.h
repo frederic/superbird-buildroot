@@ -429,6 +429,9 @@ struct xhci_op_regs {
 /* USB3 Protocol PORTLI  Port Link Information */
 #define PORT_RX_LANES(p)	(((p) >> 16) & 0xf)
 #define PORT_TX_LANES(p)	(((p) >> 20) & 0xf)
+#ifdef CONFIG_AMLOGIC_USB
+#define PORT_TEST_MODE_SHIFT	28
+#endif
 
 /* USB2 Protocol PORTHLPMC */
 #define PORT_HIRDM(p)((p) & 3)
@@ -914,7 +917,11 @@ struct xhci_virt_ep {
 	unsigned int			ep_state;
 #define SET_DEQ_PENDING		(1 << 0)
 #define EP_HALTED		(1 << 1)	/* For stall handling */
-#define EP_HALT_PENDING		(1 << 2)	/* For URB cancellation */
+#ifdef CONFIG_AMLOGIC_USB
+#define EP_STOP_CMD_PENDING	(1 << 2)	/* For URB cancellation */
+#else
+#define EP_HALT_PENDING	(1 << 2)        /* For URB cancellation */
+#endif
 /* Transitioning the endpoint to using streams, don't enqueue URBs */
 #define EP_GETTING_STREAMS	(1 << 3)
 #define EP_HAS_STREAMS		(1 << 4)
@@ -926,7 +933,9 @@ struct xhci_virt_ep {
 	unsigned int		stopped_stream;
 	/* Watchdog timer for stop endpoint command to cancel URBs */
 	struct timer_list	stop_cmd_timer;
-	int			stop_cmds_pending;
+#ifndef CONFIG_AMLOGIC_USB
+	int                     stop_cmds_pending;
+#endif
 	struct xhci_hcd		*xhci;
 	/* Dequeue pointer and dequeue segment for a submitted Set TR Dequeue
 	 * command.  We'll need to update the ring's dequeue segment and dequeue
@@ -1662,7 +1671,9 @@ struct xhci_hcd {
 #define XHCI_LIMIT_ENDPOINT_INTERVAL_7	(1 << 26)
 /* Reserved. It was XHCI_U2_DISABLE_WAKE */
 #define XHCI_ASMEDIA_MODIFY_FLOWCONTROL	(1 << 28)
-
+#ifdef CONFIG_AMLOGIC_USB
+#define XHCI_AML_SUPER_SPEED_SUPPORT (1 << 29)
+#endif
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;
 	/* There are two roothubs to keep track of bus suspend info for */
@@ -1687,6 +1698,9 @@ struct xhci_hcd {
 	/* Compliance Mode Recovery Data */
 	struct timer_list	comp_mode_recovery_timer;
 	u32			port_status_u0;
+#ifdef CONFIG_AMLOGIC_USB
+	u16			test_mode;
+#endif
 /* Compliance Mode Timer Triggered every 2 seconds */
 #define COMP_MODE_RCVRY_MSECS 2000
 
@@ -1986,6 +2000,7 @@ struct xhci_input_control_ctx *xhci_get_input_control_ctx(struct xhci_container_
 struct xhci_slot_ctx *xhci_get_slot_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx);
 struct xhci_ep_ctx *xhci_get_ep_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx, unsigned int ep_index);
 
+
 struct xhci_ring *xhci_triad_to_transfer_ring(struct xhci_hcd *xhci,
 		unsigned int slot_id, unsigned int ep_index,
 		unsigned int stream_id);
@@ -1996,5 +2011,15 @@ static inline struct xhci_ring *xhci_urb_to_transfer_ring(struct xhci_hcd *xhci,
 					xhci_get_endpoint_index(&urb->ep->desc),
 					urb->stream_id);
 }
+
+extern struct timer_list	xhci_reset_timer;
+#ifdef CONFIG_AMLOGIC_USB
+int xhci_start(struct xhci_hcd *xhci);
+int xhci_test_single_step(struct xhci_hcd *xhci, gfp_t mem_flags,
+		struct urb *urb, int slot_id,
+		unsigned int ep_index, int testflag);
+extern void set_usb_phy_host_tuning(int port, int default_val);
+extern void set_usb_phy_host_low_reset(int port);
+#endif
 
 #endif /* __LINUX_XHCI_HCD_H */

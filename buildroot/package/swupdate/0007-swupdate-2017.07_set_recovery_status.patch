@@ -1,0 +1,29 @@
+--- swupdate-2018.11/bootloader/none.c	2019-07-08 19:16:09.804949200 +0800
++++ swupdate-2018.11/bootloader/none.c	2019-07-08 17:38:44.230761300 +0800
+@@ -53,9 +53,14 @@
+ #include <string.h>
+ #include "bootloader.h"
+ 
++static int env_init = 0;
++
+ int bootloader_env_init()
+ {
+-	bootenv_init();
++	if (env_init == 0) {
++		bootenv_init();
++		env_init = 1;
++	}
+ 	return 0;
+ }
+ 
+--- swupdate-2018.11/corelib/stream_interface.c	2019-07-08 14:10:29.877492655 +0800
++++ swupdate-2018.11/corelib/stream_interface.c	2019-07-08 18:37:28.011849892 +0800
+@@ -272,6 +272,8 @@
+ 				}
+ 				break;
+ 			case INSTALL_FROM_STREAM:
++				bootloader_env_init();
++				bootloader_env_set("recovery_status", "in_progress");
+ 				TRACE("Installing STREAM %s, %lld bytes", img->fname, img->size);
+ 				/*
+ 				 * If we are streaming data to store in a UBI volume, make

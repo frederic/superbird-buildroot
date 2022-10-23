@@ -1,0 +1,14 @@
+<!--
+//   The confidential and proprietary information contained in this file may
+//   only be used by a person authorised under and to the extent permitted
+//   by a subsisting licensing agreement from ARM Limited or its affiliates.
+//
+//          (C) COPYRIGHT 2018 ARM Limited or its affiliates.
+//                        ALL RIGHTS RESERVED
+//
+//   This entire notice must be reproduced on all copies of this file
+//   and copies of this file may only be made by a person if such person is
+//   permitted to do so under the terms of a subsisting license agreement
+//   from ARM Limited or its affiliates.
+//-->
+<!DOCTYPE html><html><head><meta charset="utf-8" content="text/html" property=""/><title>Pipeline Visualisation</title><link rel="shortcut icon" href="../img/ct32.png"/><link rel="stylesheet" type="text/css" href="../css/tools.min.css"/><link rel="stylesheet" type="text/css" href="../css/pipe.min.css"/></head><body><div id="es6-warning-header">ES6 not supported by the current browser: Please upgrade to the latest version of either Chrome or Firefox</div><div class="content"><h3>Pipeline Visualisation</h3><div id="toolbar" class="toolbar"><input type="file" id="file-upload" accept=".xml"><button id="redraw" disabled>Redraw</button><label id="main-root-label" class="hidden">Main Root ID: </label><select id="main-root" title="The root component id of the main group" class="hidden"></select><label for="zoom">Zoom: </label><input id="zoom" type="range" value="1" min="0.1" max="2" step="0.1"><button id="save">Save</button></div><div id="drawing-area-container"><div id="drawing-area"></div><div id="component-properties" class="hidden"><h1>Component Properties</h1><table><tr><td>Name</td><td class="name"></td></tr><tr><td>ID</td><td class="id"></td></tr><tr><td>Type</td><td class="type"></td></tr></table></div><div id="loading-screen" class="hidden"><div id="loading-text">Loading...</div></div></div></div><script src="../js/isp.js"></script><script src="../js/nav.js"></script></body></html>

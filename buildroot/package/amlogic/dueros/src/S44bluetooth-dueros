@@ -1,0 +1,118 @@
+#!/bin/sh
+
+NAME1=bsa_server
+DAEMON1=/usr/bin/$NAME1
+PIDFILE1=/var/run/$NAME1.pid
+
+NAME2=aml_musicBox
+DAEMON2=/usr/bin/$NAME2
+PIDFILE2=/var/run/$NAME2.pid
+
+fw_path="/etc/bluetooth"
+
+function set_btname()
+{
+    name_file=/etc/wifi/ap_name
+    local cnt=1
+    bt_name="amlogic"
+    while [ $cnt -lt 10 ]
+    do
+        if [ -f $name_file ];then
+            bt_name=`cat /etc/wifi/ap_name`
+			last_bt_name=`echo ${bt_name:8} | tr '[a-z]' '[A-Z]'`
+            if [ "$last_bt_name" != "" ];then
+                break
+            fi
+        else
+            cnt=$((cnt + 1))
+            sleep 1
+        fi
+    done
+
+    configure_file="/etc/bsa/config/bt_configure.txt"
+    if [ -f $configure_file ];then
+        sed -i -e "/bt_name/abt_name=DuerOS_$last_bt_name" -e "/bt_name=/d" $configure_file
+    else
+        echo "create configure file"
+        echo "bt_name=DuerOS_$last_bt_name" > $configure_file
+        echo "debug=0" >> $configure_file
+    fi
+
+}
+
+Blue_start()
+{
+    echo 0 > /sys/class/rfkill/rfkill0/state
+    sleep 1
+    echo 1 > /sys/class/rfkill/rfkill0/state
+    sleep 1
+
+    set_btname
+
+    cd /etc/bsa/config
+    grep -Insr "debug=1" /etc/bsa/config/bt_configure.txt > /dev/null
+    if [ $? -eq 0 ]; then
+        echo "start broadcom bluetooth server bsa_sever in debug mode"
+        start-stop-daemon -S  -m -p $PIDFILE1 -x $DAEMON1 -- -r 13 -lpm -b /etc/bsa/config/btsnoop.log -pp $fw_path -d /dev/ttyS1 > /etc/bsa/config/bsa_server.log &
+    else
+    echo "start broadcom bluetooth server bsa_sever"
+        start-stop-daemon -S  -m -p $PIDFILE1 -x $DAEMON1 -- -r 13 -lpm -all=0 -pp $fw_path -d /dev/ttyS1 &
+    fi
+    sleep 2
+
+    echo "start aml_musicBox"
+    start-stop-daemon -S  -m -p $PIDFILE2 -x $DAEMON2 &
+
+    sleep 1
+
+    echo
+    echo "|-----bluetooth speaker is ready for connections------|"
+
+    cd - > /dev/null
+
+}
+
+Blue_stop()
+{
+    echo -n "Stopping broadcom bluetooth server & app"
+    start-stop-daemon -K -o -p $PIDFILE2
+    sleep 1
+    start-stop-daemon -K -o -p $PIDFILE1
+    sleep 2
+    rm -f $PIDFILE1
+    rm -f $PIDFILE2
+    echo 0 > /sys/class/rfkill/rfkill0/state
+    echo
+    echo "|-----bluetooth speaker is shutdown------|"
+}
+
+skt_handle()
+{
+		skt_board=`cat /proc/device-tree/amlogic-dt-id`
+		case ${skt_board} in
+			"axg_a113d_skt_v1")
+				exit 0
+				;;
+			"axg_a113x_skt_v1")
+				exit 0
+				;;
+		esac
+	Blue_start &
+}
+
+case "$1" in
+    start)
+	skt_handle &
+
+        ;;
+    netready|netup|netdown|netchange) ;;
+    stop)
+        Blue_stop
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+esac
+
+exit $?
+

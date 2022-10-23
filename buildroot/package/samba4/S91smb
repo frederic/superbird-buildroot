@@ -12,6 +12,8 @@ start() {
 	printf "Starting NMB services: "
 	nmbd -D
 	[ $? = 0 ] && echo "OK" || echo "FAIL"
+
+        chmod -R 777 /tmp
 }
 
 stop() {

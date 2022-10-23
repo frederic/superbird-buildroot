@@ -1,0 +1,42 @@
+Index: chromium-53.0.2785.143/src/build/common.gypi
+===================================================================
+--- chromium-53.0.2785.143.orig/src/build/common.gypi
++++ chromium-53.0.2785.143/src/build/common.gypi
+@@ -313,7 +313,7 @@
+                 'sysroot%': '<(target_sysroot)',
+               }],
+               ['target_arch=="arm64"', {
+-                'sysroot%': '<!(cd <(DEPTH) && pwd -P)/build/linux/debian_jessie_arm64-sysroot',
++                'sysroot%': '<(target_sysroot)',
+               }],
+               ['target_arch=="x64"', {
+                 'sysroot%': '<!(cd <(DEPTH) && pwd -P)/build/linux/debian_wheezy_amd64-sysroot',
+@@ -4106,6 +4106,11 @@
+                        '-target aarch64-linux-gnu',
+                      ],
+                  }],
++		  ['clang==0 and arm_arch!="" and OS!="android"', {
++                    'ldflags': [
++                      '-lEGL', '-lwayland-client',
++                    ],
++                  }],
+                 ],
+               }],
+             ],
+@@ -6025,6 +6030,16 @@
+         ['CC.host', '<(host_cc)'],
+         ['CXX.host', '<(host_cxx)'],
+       ],
++    }],
++    ['OS=="linux" and target_arch=="arm64" and host_arch!="arm" and chromeos==0 and clang==0', {
++      # Set default AARCH64 cross tools on linux.  These can be overridden
++      # using CC,CXX,CC.host and CXX.host environment variables.
++      'make_global_settings': [
++        ['CC', '<!(which aarch64-linux-gnu-gcc)'],
++        ['CXX', '<!(which aarch64-linux-gnu-g++)'],
++        ['CC.host', '<(host_cc)'],
++        ['CXX.host', '<(host_cxx)'],
++      ],
+     }],
+     ['OS=="linux" and target_arch=="arm" and host_arch!="arm" and chromeos==0 and clang==0', {
+       # Set default ARM cross tools on linux.  These can be overridden

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_ARMEABIHF
+    bool "gcc-linaro-armeabihf"
+    default n
+    help
+	gcc toolchain for amlogic 32bit-hf soc browser

@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# onvif_rtsp
+#
+
+PID_FILE=/tmp/onvif_rtsp.pid
+
+DAEMON=onvif_rtsp
+DAEMON_ARGS=""
+
+set_network_options()
+{
+  sysctl -w net.core.rmem_max=16777216
+  sysctl -w net.core.wmem_max=16777216
+  sysctl -w net.core.rmem_default=8388608
+  sysctl -w net.core.wmem_default=8388608
+  sysctl -w net.core.netdev_max_backlog=2000
+}
+
+start() {
+  if [ -f $PID_FILE ] && kill -0 $(cat $PID_FILE); then
+    echo "$DAEMON already running"
+    return 1
+  fi
+  printf "Starting onvif rtsp server..."
+  set_network_options
+  eval "$DAEMON $DAEMON_ARGS &"
+  echo $! > $PID_FILE
+}
+
+stop() {
+  if [ ! -f "$PID_FILE" ] || ! kill -0 $(cat "$PID_FILE"); then
+    echo "$DAEMON not running"
+    return 1
+  fi
+  printf "Stopping $DAEMON "
+  pid=$(cat $PID_FILE)
+  kill $pid && rm -f $PID_FILE
+  while true; do
+   if kill -0 $pid > /dev/null 2>&1; then
+      echo "Waiting for $DAEMON exit..."
+      sleep 1
+   else
+      break
+   fi
+  done
+  echo "$DAEMON stopped"
+}
+restart() {
+  stop
+  start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload)
+    restart
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit $?
+

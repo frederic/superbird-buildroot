@@ -1,0 +1,18 @@
+config BR2_PACKAGE_TDK
+	bool "tdk driver and lib"
+	depends on BR2_LINUX_KERNEL
+	help
+	  tdk driver and lib
+
+config BR2_PACKAGE_TDK_GIT_VERSION
+	string "tdk driver and lib branch"
+	depends on BR2_PACKAGE_TDK
+	help
+		Branch for tdk driver and lib git
+
+config BR2_PACKAGE_TDK_GIT_REPO_URL
+	string "tdk driver and lib git"
+	depends on BR2_PACKAGE_TDK
+	help
+		tdk driver and lib git
+

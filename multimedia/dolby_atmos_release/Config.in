@@ -1,0 +1,5 @@
+config BR2_PACKAGE_DOLBY_ATMOS_RELEASE
+	bool "dolby_atmos"
+	help
+	  Dolby Atmos For Soundbar Products
+

@@ -1,0 +1,12 @@
+config BR2_PACKAGE_AML_LIBGE2D
+    bool "GE2D library"
+    select BR2_PACKAGE_AML_LIBION
+    help
+        Support AML GE2D library
+
+config BR2_PACKAGE_AML_LIBGE2D_LOCAL_PATH
+    string "amlogic libge2d local path"
+    depends on BR2_PACKAGE_AML_LIBGE2D
+    help
+        aml ge2d local path
+

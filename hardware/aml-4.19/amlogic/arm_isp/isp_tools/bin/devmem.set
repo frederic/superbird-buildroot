@@ -1,0 +1,6 @@
+http-port     = 8002
+hw_acc        = direct
+hw_channel    = devmem
+hw_mem_offset = 0x64000000
+hw_mem_size   = 0x8262000
+fw_acc        = none

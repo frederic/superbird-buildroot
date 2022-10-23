@@ -20,6 +20,10 @@ ifeq ($(BR2_LINUX_KERNEL_CUSTOM_TARBALL),y)
 LINUX_TARBALL = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION))
 LINUX_SITE = $(patsubst %/,%,$(dir $(LINUX_TARBALL)))
 LINUX_SOURCE = $(notdir $(LINUX_TARBALL))
+BR_NO_CHECK_HASH_FOR += $(LINUX_SOURCE)
+else ifeq ($(BR2_LINUX_KERNEL_CUSTOM_LOCAL),y)
+LINUX_SITE = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_LOCAL_PATH))
+LINUX_SITE_METHOD = local
 else ifeq ($(BR2_LINUX_KERNEL_CUSTOM_GIT),y)
 LINUX_SITE = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_REPO_URL))
 LINUX_SITE_METHOD = git
@@ -103,6 +107,74 @@ endif
 ifeq ($(BR2_PACKAGE_HOST_UBOOT_TOOLS),y)
 LINUX_DEPENDENCIES += host-uboot-tools
 endif
+ifeq ($(BR2_PACKAGE_AML_CUSTOMER),y)
+	LINUX_DEPENDENCIES += aml_customer
+endif
+ifeq ($(BR2_PACKAGE_AML_NAND),y)
+ifneq ($(BR2_PACKAGE_AML_NAND_STANDALONE),y)
+	LINUX_DEPENDENCIES += aml_nand
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8188EU),y)
+ifneq ($(BR2_PACKAGE_RTK8188EU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8188eu
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8192CU),y)
+ifneq ($(BR2_PACKAGE_RTK8192CU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8192cu
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8192DU),y)
+	LINUX_DEPENDENCIES += rtk8192du
+endif
+ifeq ($(BR2_PACKAGE_RTK8192EU),y)
+ifneq ($(BR2_PACKAGE_RTK8192EU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8192eu
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8189ES),y)
+ifneq ($(BR2_PACKAGE_RTK8189ES_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8189es
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8723BS),y)
+ifneq ($(BR2_PACKAGE_RTK8723BS_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8723bs
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8723AU),y)
+ifneq ($(BR2_PACKAGE_RTK8723AU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8723au
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8811AU),y)
+ifneq ($(BR2_PACKAGE_RTK8811AU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8811au
+endif
+endif
+ifeq ($(BR2_PACKAGE_RTK8812AU),y)
+ifneq ($(BR2_PACKAGE_RTK8812AU_STANDALONE),y)
+	LINUX_DEPENDENCIES += rtk8812au
+endif
+endif
+ifeq ($(BR2_PACKAGE_BRCMAP6XXX),y)
+ifneq ($(BR2_PACKAGE_BRCMAP6XXX_STANDALONE),y)
+	LINUX_DEPENDENCIES += brcmap6xxx
+endif
+endif
+ifeq ($(BR2_PACKAGE_BRCMUSI),y)
+	LINUX_DEPENDENCIES += brcmusi
+endif
+ifeq ($(BR2_PACKAGE_AML_TVIN),y)
+	LINUX_DEPENDENCIES += aml_tvin
+endif
+ifeq ($(BR2_PACKAGE_AML_PMU),y)
+	LINUX_DEPENDENCIES += aml_pmu
+endif
+ifeq ($(BR2_PACKAGE_AML_TOUCH),y)
+	LINUX_DEPENDENCIES += aml_touch
+endif
 
 ifneq ($(ARCH_XTENSA_OVERLAY_FILE),)
 define LINUX_XTENSA_OVERLAY_EXTRACT
@@ -116,7 +188,7 @@ LINUX_MAKE_FLAGS = \
 	HOSTCC="$(HOSTCC) $(HOST_CFLAGS) $(HOST_LDFLAGS)" \
 	ARCH=$(KERNEL_ARCH) \
 	INSTALL_MOD_PATH=$(TARGET_DIR) \
-	CROSS_COMPILE="$(TARGET_CROSS)" \
+	CROSS_COMPILE="$(TARGET_KERNEL_CROSS)" \
 	DEPMOD=$(HOST_DIR)/sbin/depmod
 
 LINUX_MAKE_ENV = \
@@ -147,7 +219,8 @@ endif
 
 # Get the real Linux version, which tells us where kernel modules are
 # going to be installed in the target filesystem.
-LINUX_VERSION_PROBED = `$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) --no-print-directory -s kernelrelease 2>/dev/null`
+#LINUX_VERSION_PROBED = `$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) --no-print-directory -s kernelrelease 2>/dev/null`
+LINUX_VERSION_PROBED = `$(MAKE) $(LINUX_MAKE_FLAGS) -C $(LINUX_DIR) --no-print-directory include/config/kernel.release1>/dev/null 2>/dev/null; head -1 $(LINUX_DIR)/include/config/kernel.release`
 
 LINUX_DTS_NAME += $(call qstrip,$(BR2_LINUX_KERNEL_INTREE_DTS_NAME))
 
@@ -158,6 +231,8 @@ LINUX_DTS_NAME += $(call qstrip,$(BR2_LINUX_KERNEL_INTREE_DTS_NAME))
 LINUX_DTS_NAME += $(basename $(filter %.dts,$(notdir $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_DTS_PATH)))))
 
 LINUX_DTBS = $(addsuffix .dtb,$(LINUX_DTS_NAME))
+AML_DTBS=$(patsubst amlogic/%,%,$(LINUX_DTBS))
+LINUX_DTDS = $(addsuffix .dtd,$(LINUX_DTS_NAME))
 
 ifeq ($(BR2_LINUX_KERNEL_IMAGE_TARGET_CUSTOM),y)
 LINUX_IMAGE_NAME = $(call qstrip,$(BR2_LINUX_KERNEL_IMAGE_NAME))
@@ -170,6 +245,7 @@ ifeq ($(BR2_LINUX_KERNEL_UIMAGE),y)
 LINUX_IMAGE_NAME = uImage
 else ifeq ($(BR2_LINUX_KERNEL_APPENDED_UIMAGE),y)
 LINUX_IMAGE_NAME = uImage
+LINUX_TARGET_NAME = zImage
 else ifeq ($(BR2_LINUX_KERNEL_BZIMAGE),y)
 LINUX_IMAGE_NAME = bzImage
 else ifeq ($(BR2_LINUX_KERNEL_ZIMAGE),y)
@@ -183,7 +259,12 @@ LINUX_IMAGE_NAME = cuImage.$(firstword $(LINUX_DTS_NAME))
 else ifeq ($(BR2_LINUX_KERNEL_SIMPLEIMAGE),y)
 LINUX_IMAGE_NAME = simpleImage.$(firstword $(LINUX_DTS_NAME))
 else ifeq ($(BR2_LINUX_KERNEL_IMAGE),y)
-LINUX_IMAGE_NAME = Image
+#C1 have special requirement for bootup performance, it dont want compressed kernel here.
+ifeq ($(BR2_LINUX_KERNEL_IMAGE_NOGZIP),y)
+  LINUX_IMAGE_NAME = Image
+else
+  LINUX_IMAGE_NAME = Image.gz
+endif
 else ifeq ($(BR2_LINUX_KERNEL_LINUX_BIN),y)
 LINUX_IMAGE_NAME = linux.bin
 else ifeq ($(BR2_LINUX_KERNEL_VMLINUX_BIN),y)
@@ -195,10 +276,12 @@ LINUX_IMAGE_NAME = vmlinuz
 else ifeq ($(BR2_LINUX_KERNEL_VMLINUZ_BIN),y)
 LINUX_IMAGE_NAME = vmlinuz.bin
 endif
+ifeq ($(LINUX_TARGET_NAME),)
 # The if-else blocks above are all the image types we know of, and all
 # come from a Kconfig choice, so we know we have LINUX_IMAGE_NAME set
 # to something
 LINUX_TARGET_NAME = $(LINUX_IMAGE_NAME)
+endif
 endif
 
 LINUX_KERNEL_UIMAGE_LOADADDR = $(call qstrip,$(BR2_LINUX_KERNEL_UIMAGE_LOADADDR))
@@ -206,6 +289,10 @@ ifneq ($(LINUX_KERNEL_UIMAGE_LOADADDR),)
 LINUX_MAKE_FLAGS += LOADADDR="$(LINUX_KERNEL_UIMAGE_LOADADDR)"
 endif
 
+LINUX_KERNEL_IMAGE_LOADADDR = $(call qstrip,$(BR2_LINUX_KERNEL_IMAGE_LOADADDR))
+ifneq ($(LINUX_KERNEL_IMAGE_LOADADDR),)
+LINUX_MAKE_FLAGS += LOADADDR="$(LINUX_KERNEL_IMAGE_LOADADDR)"
+endif
 # Compute the arch path, since i386 and x86_64 are in arch/x86 and not
 # in arch/$(KERNEL_ARCH). Even if the kernel creates symbolic links
 # for bzImage, arch/i386 and arch/x86_64 do not exist when copying the
@@ -227,6 +314,14 @@ LINUX_IMAGE_PATH = $(LINUX_DIR)/$(LINUX_IMAGE_NAME)
 else
 LINUX_IMAGE_PATH = $(LINUX_ARCH_PATH)/boot/$(LINUX_IMAGE_NAME)
 endif # BR2_LINUX_KERNEL_VMLINUX
+
+ifeq ($(BR2_LINUX_KERNEL_CUSTOM_LOCAL),y)
+define LINUX_COPY_GIT_DIR
+	test -d $(LINUX_SITE)/.git && ln -s $(LINUX_SITE)/.git $(@D)/ || true
+endef
+
+LINUX_PRE_PATCH_HOOKS += LINUX_COPY_GIT_DIR
+endif
 
 define LINUX_APPLY_LOCAL_PATCHES
 	for p in $(filter-out ftp://% http://% https://%,$(LINUX_PATCHES)) ; do \
@@ -281,6 +376,7 @@ LINUX_KCONFIG_EDITORS = menuconfig xconfig gconfig nconfig
 # therefore host-ccache would be ready, we use HOSTCC_NOCCACHE for
 # consistency with other kconfig packages.
 LINUX_KCONFIG_OPTS = $(LINUX_MAKE_FLAGS) HOSTCC="$(HOSTCC_NOCCACHE)"
+LINUX_KCONFIG_CONFIG_TARGET = olddefconfig
 
 # If no package has yet set it, set it from the Kconfig option
 LINUX_NEEDS_MODULES ?= $(BR2_LINUX_NEEDS_MODULES)
@@ -299,7 +395,15 @@ define LINUX_FIXUP_CONFIG_ENDIANNESS
 endef
 endif
 
+ifeq ($(BR2_TARGET_ROOTFS_CPIO_GZIP),y)
+	ROOTFS_CPIO = rootfs.cpio.gz
+else
+	ROOTFS_CPIO = rootfs.cpio
+endif
+
 define LINUX_KCONFIG_FIXUP_CMDS
+        $(if $(BR2_PACKAGE_AML_CUSTOMER),
+                ln -sf $(AML_CUSTOMER_DIR) $(LINUX_DIR)/customer)
 	$(if $(LINUX_NEEDS_MODULES),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_MODULES,$(@D)/.config))
 	$(call KCONFIG_ENABLE_OPT,$(strip $(LINUX_COMPRESSION_OPT_y)),$(@D)/.config)
@@ -307,20 +411,23 @@ define LINUX_KCONFIG_FIXUP_CMDS
 		$(call KCONFIG_DISABLE_OPT,$(opt),$(@D)/.config)
 	)
 	$(LINUX_FIXUP_CONFIG_ENDIANNESS)
-	$(if $(BR2_arm)$(BR2_armeb),
-		$(call KCONFIG_ENABLE_OPT,CONFIG_AEABI,$(@D)/.config))
+        $(if $(BR2_arm)$(BR2_armeb),
+                $(call KCONFIG_ENABLE_OPT,CONFIG_AEABI,$(@D)/.config))
 	$(if $(BR2_TARGET_ROOTFS_CPIO),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_BLK_DEV_INITRD,$(@D)/.config))
-	# As the kernel gets compiled before root filesystems are
-	# built, we create a fake cpio file. It'll be
-	# replaced later by the real cpio archive, and the kernel will be
+        # As the kernel gets compiled before root filesystems are
+        # built, we create a fake cpio file. It'll be
+        # replaced later by the real cpio archive, and the kernel will be
 	# rebuilt using the linux-rebuild-with-initramfs target.
-	$(if $(BR2_TARGET_ROOTFS_INITRAMFS),
-		mkdir -p $(BINARIES_DIR)
-		touch $(BINARIES_DIR)/rootfs.cpio
-		$(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_SOURCE,"$${BR_BINARIES_DIR}/rootfs.cpio",$(@D)/.config)
-		$(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_ROOT_UID,0,$(@D)/.config)
-		$(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_ROOT_GID,0,$(@D)/.config))
+    $(if $(BR2_TARGET_ROOTFS_INITRAMFS),
+				mkdir -p $(BINARIES_DIR)
+                touch $(BINARIES_DIR)/$(ROOTFS_CPIO)
+		$(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_SOURCE,"$(BINARIES_DIR)/$(ROOTFS_CPIO)",$(@D)/.config)
+                $(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_ROOT_UID,0,$(@D)/.config)
+                $(call KCONFIG_SET_OPT,CONFIG_INITRAMFS_ROOT_GID,0,$(@D)/.config))
+		$(if $(BR2_TARGET_ROOTFS_CPIO_GZIP),
+                $(call KCONFIG_ENABLE_OPT,CONFIG_KERNEL_GZIP,$(@D)/.config)
+				$(call KCONFIG_ENABLE_OPT,CONFIG_INITRAMFS_COMPRESSION_GZIP,$(@D)/.config))
 	$(if $(BR2_ROOTFS_DEVICE_CREATION_STATIC),,
 		$(call KCONFIG_ENABLE_OPT,CONFIG_DEVTMPFS,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_DEVTMPFS_MOUNT,$(@D)/.config))
@@ -372,8 +479,49 @@ define LINUX_KCONFIG_FIXUP_CMDS
 		$(call KCONFIG_ENABLE_OPT,CONFIG_CRYPTO_MANAGER,$(@D)/.config))
 	$(if $(BR2_LINUX_KERNEL_APPENDED_DTB),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_ARM_APPENDED_DTB,$(@D)/.config))
+	$(if $(BR2_LINUX_KERNEL_IRCUT),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_AMLOGIC_IRCUT,$(@D)/.config))
 	$(if $(BR2_PACKAGE_KERNEL_MODULE_IMX_GPU_VIV),
 		$(call KCONFIG_DISABLE_OPT,CONFIG_MXC_GPU_VIV,$(@D)/.config))
+
+	# Add extra configurations here
+	$(call KCONFIG_ENABLE_OPT,CONFIG_TMPFS_POSIX_ACL,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_TMPFS_XATTR,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_VT,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_CONSOLE_TRANSLATIONS,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_VT_CONSOLE,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_VT_CONSOLE_SLEEP,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_HW_CONSOLE,$(@D)/.config)
+	$(call KCONFIG_SET_OPT,CONFIG_OVERLAY_FS,y,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_SYSVIPC,$(@D)/.config)
+
+	# Get rid of unwanted configurations here
+	$(call KCONFIG_DISABLE_OPT,CONFIG_ANDROID_PARANOID_NETWORK,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_VT_HW_CONSOLE_BINDING,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_FRAMEBUFFER_CONSOLE,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_SPEAKUP,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_CONSOLE_EARLYSUSPEND,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_FB_OSD_SUPPORT_SYNC_FENCE,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_AMLOGIC_MEDIA_FB_OSD_SYNC_FENCE,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_SYNC,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_SYNC_FILE,$(@D)/.config)
+	#optee linuxdriver compile should depend on CONFIG_DMA_SHARED_BUFFER enabled.
+	#CONFIG_DMA_SHARED_BUFFER is selected by CONFIG_SYNC_FILE.
+	#when CONFIG_SYNC_FILE is removed, CONFIG_DMA_SHARED_BUFFER will not be set.
+	$(if $(BR2_PACKAGE_TDK),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_SYNC_FILE,$(@D)/.config))
+	$(call KCONFIG_DISABLE_OPT,CONFIG_SW_SYNC,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_SW_SYNC_USER,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_PM_RUNTIME,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_ANDROID_LOW_MEMORY_KILLER,$(@D)/.config)
+	$(call KCONFIG_DISABLE_OPT,CONFIG_ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES,$(@D)/.config)
+	# Allow project to reconfigure kernel options
+	# If the option is still required by other module, disable it here can not work
+	$(if $(BR2_PACKAGE_AML_CUSTOMIZE_KERNEL),
+		$(call KCONFIG_DISABLE_OPT_LIST,$(BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_DISABLE_OPT_LIST),$(@D)/.config)
+		$(call KCONFIG_ENABLE_OPT_LIST,$(BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_ENABLE_OPT_LIST),$(@D)/.config)
+		$(call KCONFIG_SET_OPT_LIST,$(BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_SET_OPT_LIST),$(@D)/.config))
+
 	$(if $(LINUX_KERNEL_CUSTOM_LOGO_PATH),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_FB,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_LOGO,$(@D)/.config)
@@ -387,9 +535,38 @@ ifeq ($(BR2_LINUX_KERNEL_DTS_SUPPORT),y)
 LINUX_DEPENDENCIES += host-bison host-flex
 
 ifeq ($(BR2_LINUX_KERNEL_DTB_IS_SELF_BUILT),)
+
+define LINUX_STRIP_DTD
+	$(TARGET_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_DTDS)
+endef
+ifeq ($(BR2_LINUX_KERNEL_AMLOGIC_DTD),y)
+define LINUX_BUILD_DTB
+	$(TARGET_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_DTBS)
+endef
+define LINUX_INSTALL_DTB
+	# dtbs moved from arch/<ARCH>/boot to arch/<ARCH>/boot/dts since 3.8-rc1
+	cp $(addprefix \
+		$(LINUX_ARCH_PATH)/boot/$(if $(wildcard $(addprefix \
+		$(LINUX_ARCH_PATH)/boot/dts/amlogic/,$(AML_DTBS))),dts/amlogic/),$(AML_DTBS)) \
+		$(BINARIES_DIR)/
+endef
+define LINUX_INSTALL_DTB_TARGET
+	# dtbs moved from arch/<ARCH>/boot to arch/<ARCH>/boot/dts since 3.8-rc1
+	cp $(addprefix \
+		$(LINUX_ARCH_PATH)/boot/$(if $(wildcard $(addprefix \
+		$(LINUX_ARCH_PATH)/boot/dts/amlogic/,$(AML_DTBS))),dts/amlogic/),$(AML_DTBS)) \
+		$(TARGET_DIR)/boot/
+endef
+else #BR2_LINUX_KERNEL_AMLOGIC_DTD
+ifeq ($(BR2_LINUX_KERNEL_DEFAULT_DTS),y)
 define LINUX_BUILD_DTB
 	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_DTBS)
 endef
+else
+define LINUX_BUILD_DTB
+	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) dtbs
+endef
+endif
 ifeq ($(BR2_LINUX_KERNEL_APPENDED_DTB),)
 define LINUX_INSTALL_DTB
 	# dtbs moved from arch/<ARCH>/boot to arch/<ARCH>/boot/dts since 3.8-rc1
@@ -402,8 +579,15 @@ endif # BR2_LINUX_KERNEL_APPENDED_DTB
 endif # BR2_LINUX_KERNEL_DTB_IS_SELF_BUILT
 endif # BR2_LINUX_KERNEL_DTS_SUPPORT
 
+endif
+
 ifeq ($(BR2_LINUX_KERNEL_APPENDED_DTB),y)
 # dtbs moved from arch/$ARCH/boot to arch/$ARCH/boot/dts since 3.8-rc1
+ifeq ($(BR2_LINUX_KERNEL_AMLOGIC_DTD),y)
+define LINUX_APPEND_DTB
+	cat $(LINUX_ARCH_PATH)/boot/dts/amlogic/$(KERNEL_DTS_NAME).dtb >> $(LINUX_ARCH_PATH)/boot/zImage
+endef
+else #BR2_LINUX_KERNEL_AMLOGIC_DTD
 define LINUX_APPEND_DTB
 	(cd $(LINUX_ARCH_PATH)/boot; \
 		for dtb in $(LINUX_DTS_NAME); do \
@@ -415,6 +599,7 @@ define LINUX_APPEND_DTB
 			cat zImage $${dtbpath} > zImage.$${dtb} || exit 1; \
 		done)
 endef
+endif
 ifeq ($(BR2_LINUX_KERNEL_APPENDED_UIMAGE),y)
 # We need to generate a new u-boot image that takes into
 # account the extra-size added by the device tree at the end
@@ -442,6 +627,10 @@ define LINUX_BUILD_CMDS
 	@if grep -q "CONFIG_MODULES=y" $(@D)/.config; then \
 		$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) modules ; \
 	fi
+	for km in $(LINUX_RDEPENDENCIES); do \
+		rm -rf $(BUILD_DIR)/$${km}-* ;\
+	done
+	$(if $(BR2_LINUX_KERNEL_AMLOGIC_DTD_STRIP), $(LINUX_STRIP_DTD))
 	$(LINUX_BUILD_DTB)
 	$(LINUX_APPEND_DTB)
 endef
@@ -461,11 +650,16 @@ define LINUX_INSTALL_IMAGE
 endef
 endif
 
+ifeq ($(BR2_LINUX_KERNEL_ANDROID_FORMAT),y)
+define LINUX_INSTALL_KERNEL_IMAGE_TO_TARGET
+endef
+else
 ifeq ($(BR2_LINUX_KERNEL_INSTALL_TARGET),y)
 define LINUX_INSTALL_KERNEL_IMAGE_TO_TARGET
 	$(call LINUX_INSTALL_IMAGE,$(TARGET_DIR)/boot)
 	$(call LINUX_INSTALL_DTB,$(TARGET_DIR)/boot)
 endef
+endif
 endif
 
 define LINUX_INSTALL_HOST_TOOLS
@@ -555,11 +749,12 @@ endif # BR_BUILDING
 $(eval $(kconfig-package))
 
 # Support for rebuilding the kernel after the cpio archive has
-# been generated.
+# been generated in $(BINARIES_DIR)/rootfs.cpio.
 .PHONY: linux-rebuild-with-initramfs
 linux-rebuild-with-initramfs: $(LINUX_DIR)/.stamp_target_installed
 linux-rebuild-with-initramfs: $(LINUX_DIR)/.stamp_images_installed
 linux-rebuild-with-initramfs: rootfs-cpio
+linux-rebuild-with-initramfs: $(BINARIES_DIR)/$(ROOTFS_CPIO)
 linux-rebuild-with-initramfs:
 	@$(call MESSAGE,"Rebuilding kernel with initramfs")
 	# Build the kernel.

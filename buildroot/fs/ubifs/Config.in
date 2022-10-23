@@ -12,6 +12,9 @@ config BR2_TARGET_ROOTFS_UBIFS_LEBSIZE
 	  Logical eraseblock (LEB) size. The value provided here is
 	  passed to the -e/--leb-size option of mkfs.ubifs.
 
+config BR2_PACKAGE_SWUPDATE_AB_SUPPORT
+    string "use a/b system"
+
 config BR2_TARGET_ROOTFS_UBIFS_MINIOSIZE
 	hex "minimum I/O unit size"
 	default 0x800

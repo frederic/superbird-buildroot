@@ -9,6 +9,7 @@
 #include <dm.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
+#include <dm/pinctrl.h>
 #include "mmc_private.h"
 
 int dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
@@ -146,8 +147,10 @@ int mmc_of_parse(struct udevice *dev, struct mmc_config *cfg)
 
 	if (dev_read_bool(dev, "cap-sd-highspeed"))
 		cfg->host_caps |= MMC_CAP(SD_HS);
-	if (dev_read_bool(dev, "cap-mmc-highspeed"))
+	if (dev_read_bool(dev, "cap-mmc-highspeed")) {
 		cfg->host_caps |= MMC_CAP(MMC_HS);
+		cfg->host_caps |= MMC_CAP(MMC_HS_52);
+	}
 	if (dev_read_bool(dev, "sd-uhs-sdr12"))
 		cfg->host_caps |= MMC_CAP(UHS_SDR12);
 	if (dev_read_bool(dev, "sd-uhs-sdr25"))
@@ -202,6 +205,10 @@ struct mmc *find_mmc_device(int dev_num)
 	mmc_dev = dev_get_parent(dev);
 
 	struct mmc *mmc = mmc_get_mmc_dev(mmc_dev);
+	if (mmc) {
+		mmc_set_clock(mmc, mmc->clock, true);
+	}
+	pinctrl_select_state(mmc->dev, "default");
 
 	return mmc;
 }
@@ -298,7 +305,10 @@ int mmc_bind(struct udevice *dev, struct mmc *mmc, const struct mmc_config *cfg)
 	ret = dev_read_alias_seq(dev, &devnum);
 	debug("%s: alias ret=%d, devnum=%d\n", __func__, ret, devnum);
 #endif
-
+	if (!strcmp(dev->name, "emmc"))
+		devnum = 1;
+	else
+		devnum = 0;
 	ret = blk_create_devicef(dev, "mmc_blk", "blk", IF_TYPE_MMC,
 			devnum, 512, 0, &bdev);
 	if (ret) {

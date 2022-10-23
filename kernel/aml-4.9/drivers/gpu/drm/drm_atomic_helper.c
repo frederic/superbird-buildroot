@@ -2011,6 +2011,8 @@ void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
 	struct drm_crtc_commit *commit;
+	struct drm_private_obj *obj;
+	struct drm_private_state *obj_state;
 
 	if (stall) {
 		for_each_crtc_in_state(state, crtc, crtc_state, i) {
@@ -2058,6 +2060,12 @@ void drm_atomic_helper_swap_state(struct drm_atomic_state *state,
 		plane->state->state = state;
 		swap(state->planes[i].state, plane->state);
 		plane->state->state = NULL;
+	}
+
+	for_each_private_obj(state, obj, obj_state, i) {
+		obj->state->state = state;
+		swap(state->private_objs[i].state, obj->state);
+		obj->state->state = NULL;
 	}
 }
 EXPORT_SYMBOL(drm_atomic_helper_swap_state);
@@ -2421,7 +2429,7 @@ int __drm_atomic_helper_set_config(struct drm_mode_set *set,
 	primary_state->crtc_h = vdisplay;
 	primary_state->src_x = set->x << 16;
 	primary_state->src_y = set->y << 16;
-	if (primary_state->rotation & (DRM_ROTATE_90 | DRM_ROTATE_270)) {
+	if (drm_rotation_90_or_270(primary_state->rotation)) {
 		primary_state->src_w = vdisplay << 16;
 		primary_state->src_h = hdisplay << 16;
 	} else {
@@ -3166,6 +3174,9 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane_state *state)
 {
 	if (state->fb)
 		drm_framebuffer_unreference(state->fb);
+
+	if (state->fence)
+		fence_put(state->fence);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_destroy_state);
 
@@ -3482,3 +3493,18 @@ backoff:
 	goto retry;
 }
 EXPORT_SYMBOL(drm_atomic_helper_legacy_gamma_set);
+
+/**
+ * __drm_atomic_helper_private_duplicate_state - copy atomic private state
+ * @obj: CRTC object
+ * @state: new private object state
+ *
+ * Copies atomic state from a private objects's current state and resets inferred values.
+ * This is useful for drivers that subclass the private state.
+ */
+void __drm_atomic_helper_private_obj_duplicate_state(struct drm_private_obj *obj,
+						     struct drm_private_state *state)
+{
+	memcpy(state, obj->state, sizeof(*state));
+}
+EXPORT_SYMBOL(__drm_atomic_helper_private_obj_duplicate_state);

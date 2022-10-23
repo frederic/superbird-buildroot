@@ -1,0 +1,28 @@
+#! /bin/sh
+
+OPTIONS="-D hw:0,2 -u 20000"
+NAME=airplaydemo
+DAEMON=/usr/bin/$NAME
+PIDFILE=/var/run/$NAME.pid
+
+case "$1" in
+    start)
+	printf "Starting AirPlay ... "
+	start-stop-daemon -b -S -q -m -p $PIDFILE --exec $DAEMON -- $OPTIONS
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	;;
+    stop)
+	printf "Stopping AirPlay ... "
+	start-stop-daemon -K -q -p $PIDFILE
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	;;
+    netready|netup|netdown|netchange) ;;
+    restart)
+	$0 stop
+	$0 start
+	;;
+    *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+	;;
+esac

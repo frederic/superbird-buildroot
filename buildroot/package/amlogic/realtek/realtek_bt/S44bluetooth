@@ -1,0 +1,16 @@
+#!/bin/sh
+
+case "$1" in
+    start)
+        /usr/bin/bluez_tool.sh start rtk &
+        ;;
+    stop)
+        /usr/bin/bluez_tool.sh stop
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+esac
+
+exit $?
+

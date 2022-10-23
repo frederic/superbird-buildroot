@@ -97,6 +97,20 @@ LINUX_HEADERS_INSTALL_STAGING = YES
 # linux-headers is part of the toolchain so disable the toolchain dependency
 LINUX_HEADERS_ADD_TOOLCHAIN_DEPENDENCY = NO
 
+LINUX_HEADER_ARCH = $(shell echo "$(BR2_ARCH)" | sed -e "s/-.*//" \
+        -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+        -e s/arcle/arc/ \
+        -e s/arceb/arc/ \
+        -e s/arm.*/arm/ -e s/sa110/arm/ \
+        -e s/aarch64.*/arm64/ \
+        -e s/bfin/blackfin/ \
+        -e s/or1k/openrisc/ \
+        -e s/parisc64/parisc/ \
+        -e s/powerpc64.*/powerpc/ \
+        -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
+        -e s/sh.*/sh/ \
+        -e s/microblazeel/microblaze/)
+
 # For some architectures (eg. Arc, Cris, Hexagon, ia64, parisc,
 # score and xtensa), the Linux buildsystem tries to call the
 # cross-compiler, although it is not needed at all.
@@ -110,7 +124,7 @@ LINUX_HEADERS_ADD_TOOLCHAIN_DEPENDENCY = NO
 define LINUX_HEADERS_CONFIGURE_CMDS
 	(cd $(@D); \
 		$(TARGET_MAKE_ENV) $(MAKE) \
-			ARCH=$(KERNEL_ARCH) \
+			ARCH=$(LINUX_HEADER_ARCH) \
 			HOSTCC="$(HOSTCC)" \
 			HOSTCFLAGS="$(HOSTCFLAGS)" \
 			HOSTCXX="$(HOSTCXX)" \
@@ -121,7 +135,7 @@ endef
 define LINUX_HEADERS_INSTALL_STAGING_CMDS
 	(cd $(@D); \
 		$(TARGET_MAKE_ENV) $(MAKE) \
-			ARCH=$(KERNEL_ARCH) \
+			ARCH=$(LINUX_HEADER_ARCH) \
 			HOSTCC="$(HOSTCC)" \
 			HOSTCFLAGS="$(HOSTCFLAGS)" \
 			HOSTCXX="$(HOSTCXX)" \

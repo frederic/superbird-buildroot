@@ -1,0 +1,12 @@
+
+This package contains the DTV/STB sample Application.
+
+To compile the it you have to type:
+> cd 3rdparty/embedded/bsa_project_example/my_project/my_app/build
+> make              <= For PC/Linux target (default)
+> make CPU=arm      <= For DTV/STB Linux target
+
+To enable Alsa and Bthid, the following command can be entered
+> make ENABLE_ALSA=TRUE ENABLE_BTHID=TRUE
+
+

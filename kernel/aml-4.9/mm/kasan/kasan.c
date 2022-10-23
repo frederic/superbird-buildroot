@@ -39,6 +39,16 @@
 #include "kasan.h"
 #include "../slab.h"
 
+void kasan_enable_current(void)
+{
+	current->kasan_depth++;
+}
+
+void kasan_disable_current(void)
+{
+	current->kasan_depth--;
+}
+
 /*
  * Poisons the shadow memory for 'size' bytes starting from 'addr'.
  * Memory addresses should be aligned to KASAN_SHADOW_SCALE_SIZE.
@@ -406,8 +416,18 @@ void kasan_cache_create(struct kmem_cache *cache, size_t *size,
 	if (redzone_adjust > 0)
 		*size += redzone_adjust;
 
+#ifdef CONFIG_AMLOGIC_KASAN32 /* compile problem */
+	{
+		size_t s1;
+
+		s1 = max(*size, cache->object_size +
+			optimal_redzone(cache->object_size));
+		*size = s1 >= KMALLOC_MAX_SIZE ?  KMALLOC_MAX_SIZE : s1;
+	}
+#else
 	*size = min(KMALLOC_MAX_SIZE, max(*size, cache->object_size +
 					optimal_redzone(cache->object_size)));
+#endif
 
 	/*
 	 * If the metadata doesn't fit, don't enable KASAN at all.
@@ -428,7 +448,7 @@ void kasan_cache_shrink(struct kmem_cache *cache)
 	quarantine_remove_cache(cache);
 }
 
-void kasan_cache_destroy(struct kmem_cache *cache)
+void kasan_cache_shutdown(struct kmem_cache *cache)
 {
 	quarantine_remove_cache(cache);
 }
@@ -559,7 +579,13 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object)
 
 	shadow_byte = READ_ONCE(*(s8 *)kasan_mem_to_shadow(object));
 	if (shadow_byte < 0 || shadow_byte >= KASAN_SHADOW_SCALE_SIZE) {
-		kasan_report_double_free(cache, object, shadow_byte);
+	#ifdef CONFIG_AMLOGIC_KASAN32 /* for compile problems */
+		kasan_report_double_free(cache, object,
+				__builtin_return_address(0));
+	#else
+		kasan_report_double_free(cache, object,
+				__builtin_return_address(1));
+	#endif
 		return true;
 	}
 
@@ -615,11 +641,41 @@ void kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
 	redzone_start = round_up((unsigned long)(ptr + size),
 				KASAN_SHADOW_SCALE_SIZE);
 	redzone_end = (unsigned long)ptr + (PAGE_SIZE << compound_order(page));
+#ifdef CONFIG_AMLOGIC_MEMORY_EXTEND
+	if (PageOwnerPriv1(page)) { /* end of this page was freed */
+		redzone_end = (unsigned long)ptr + PAGE_ALIGN(size);
+	}
+#endif
 
 	kasan_unpoison_shadow(ptr, size);
 	kasan_poison_shadow((void *)redzone_start, redzone_end - redzone_start,
 		KASAN_PAGE_REDZONE);
 }
+
+#ifdef CONFIG_AMLOGIC_MEMORY_EXTEND
+void kasan_kmalloc_save(const void *ptr, size_t size, gfp_t flags)
+{
+	struct page *page;
+	unsigned long redzone_start;
+	unsigned long redzone_end;
+
+	if (gfpflags_allow_blocking(flags))
+		quarantine_reduce();
+
+	if (unlikely(ptr == NULL))
+		return;
+
+	page = virt_to_page(ptr);
+	redzone_start = round_up((unsigned long)(ptr + size),
+				KASAN_SHADOW_SCALE_SIZE);
+	redzone_end = (unsigned long)ptr + PAGE_ALIGN(size);
+
+	kasan_unpoison_shadow(ptr, size);
+	kasan_poison_shadow((void *)redzone_start, redzone_end - redzone_start,
+		KASAN_PAGE_REDZONE);
+}
+
+#endif
 
 void kasan_krealloc(const void *object, size_t size, gfp_t flags)
 {
@@ -695,6 +751,11 @@ static void register_global(struct kasan_global *global)
 {
 	size_t aligned_size = round_up(global->size, KASAN_SHADOW_SCALE_SIZE);
 
+#ifdef CONFIG_AMLOGIC_KASAN32
+	/* avoid FUCKING close source ko panic here */
+	if ((unsigned long)global->beg < MODULES_VADDR)
+		return;
+#endif
 	kasan_unpoison_shadow(global->beg, global->size);
 
 	kasan_poison_shadow(global->beg + aligned_size,
@@ -782,6 +843,55 @@ void __asan_unpoison_stack_memory(const void *addr, size_t size)
 	kasan_unpoison_shadow(addr, size);
 }
 EXPORT_SYMBOL(__asan_unpoison_stack_memory);
+
+/* Emitted by compiler to poison alloca()ed objects. */
+void __asan_alloca_poison(unsigned long addr, size_t size)
+{
+	size_t rounded_up_size = round_up(size, KASAN_SHADOW_SCALE_SIZE);
+	size_t padding_size = round_up(size, KASAN_ALLOCA_REDZONE_SIZE) -
+			rounded_up_size;
+	size_t rounded_down_size = round_down(size, KASAN_SHADOW_SCALE_SIZE);
+
+	const void *left_redzone = (const void *)(addr -
+			KASAN_ALLOCA_REDZONE_SIZE);
+	const void *right_redzone = (const void *)(addr + rounded_up_size);
+
+	WARN_ON(!IS_ALIGNED(addr, KASAN_ALLOCA_REDZONE_SIZE));
+
+	kasan_unpoison_shadow((const void *)(addr + rounded_down_size),
+			      size - rounded_down_size);
+	kasan_poison_shadow(left_redzone, KASAN_ALLOCA_REDZONE_SIZE,
+			KASAN_ALLOCA_LEFT);
+	kasan_poison_shadow(right_redzone,
+			padding_size + KASAN_ALLOCA_REDZONE_SIZE,
+			KASAN_ALLOCA_RIGHT);
+}
+EXPORT_SYMBOL(__asan_alloca_poison);
+
+/* Emitted by compiler to unpoison alloca()ed areas when the stack unwinds. */
+void __asan_allocas_unpoison(const void *stack_top, const void *stack_bottom)
+{
+	if (unlikely(!stack_top || stack_top > stack_bottom))
+		return;
+
+	kasan_unpoison_shadow(stack_top, stack_bottom - stack_top);
+}
+EXPORT_SYMBOL(__asan_allocas_unpoison);
+
+/* Emitted by the compiler to [un]poison local variables. */
+#define DEFINE_ASAN_SET_SHADOW(byte) \
+	void __asan_set_shadow_##byte(const void *addr, size_t size)	\
+	{								\
+		__memset((void *)addr, 0x##byte, size);			\
+	}								\
+	EXPORT_SYMBOL(__asan_set_shadow_##byte)
+
+DEFINE_ASAN_SET_SHADOW(00);
+DEFINE_ASAN_SET_SHADOW(f1);
+DEFINE_ASAN_SET_SHADOW(f2);
+DEFINE_ASAN_SET_SHADOW(f3);
+DEFINE_ASAN_SET_SHADOW(f5);
+DEFINE_ASAN_SET_SHADOW(f8);
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 static int kasan_mem_notifier(struct notifier_block *nb,

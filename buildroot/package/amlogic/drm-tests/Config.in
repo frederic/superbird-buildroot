@@ -1,0 +1,7 @@
+config BR2_PACKAGE_DRM_TESTS
+	bool "DRM Tests"
+        depends on BR2_PACKAGE_AML_MINIGBM
+        depends on BR2_PACKAGE_LIBDRM
+	help
+	    chromiumos drm test programs
+

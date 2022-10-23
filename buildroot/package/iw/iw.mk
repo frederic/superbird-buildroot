@@ -20,7 +20,7 @@ define IW_BUILD_CMDS
 endef
 
 define IW_INSTALL_TARGET_CMDS
-	$(IW_MAKE_ENV) $(MAKE) -C $(@D) DESTDIR=$(TARGET_DIR) install
+	$(IW_MAKE_ENV) $(MAKE) -C $(@D) PREFIX=$(TARGET_DIR)/usr install
 endef
 
 $(eval $(generic-package))

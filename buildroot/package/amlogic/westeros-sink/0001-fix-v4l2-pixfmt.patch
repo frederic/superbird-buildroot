@@ -1,0 +1,33 @@
+From 78c18a276d6378431d32effab515ba684f6ae2dd Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Tue, 5 Nov 2019 23:07:41 -0800
+Subject: [PATCH] fix v4l2 pixfmt
+
+---
+ v4l2/westeros-sink/westeros-sink-soc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/v4l2/westeros-sink/westeros-sink-soc.c b/v4l2/westeros-sink/westeros-sink-soc.c
+index 0099a67..e0dc059 100644
+--- a/v4l2/westeros-sink/westeros-sink-soc.c
++++ b/v4l2/westeros-sink/westeros-sink-soc.c
+@@ -963,6 +963,7 @@ static void wstGetMaxFrameSize( GstWesterosSink *sink )
+ 
+    memset( &framesize, 0, sizeof(struct v4l2_frmsizeenum) );
+    framesize.index= 0;
++   //framesize.pixel_format= (sink->soc.isMultiPlane ? V4L2_PIX_FMT_NV12: V4L2_PIX_FMT_NV12M);
+    framesize.pixel_format= V4L2_PIX_FMT_NV12;
+ 
+    rc= IOCTL( sink->soc.v4l2Fd, VIDIOC_ENUM_FRAMESIZES, &framesize);
+@@ -1185,7 +1186,7 @@ static bool wstSetOutputFormat( GstWesterosSink *sink )
+ 
+    if ( sink->soc.isMultiPlane )
+    {
+-      sink->soc.fmtOut.fmt.pix_mp.pixelformat= V4L2_PIX_FMT_NV12;
++      sink->soc.fmtOut.fmt.pix_mp.pixelformat= V4L2_PIX_FMT_NV12M;
+       sink->soc.fmtOut.fmt.pix_mp.width= sink->soc.frameWidth;
+       sink->soc.fmtOut.fmt.pix_mp.height= sink->soc.frameHeight;
+       sink->soc.fmtOut.fmt.pix_mp.num_planes= 2;
+-- 
+2.7.4
+

@@ -20,6 +20,14 @@
 *.bin
 *.patch
 *.cfgtmp
+*.diff
+*.bl2
+*.tpl
+*.efuse
+*.encrypt
+
+# folder
+customer/
 
 # host programs on Cygwin
 *.exe
@@ -48,6 +56,7 @@
 /LOG
 /spl/
 /tpl/
+/build/
 
 #
 # Generated include files

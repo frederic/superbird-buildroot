@@ -75,7 +75,11 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 
 	page = ion_page_pool_alloc(pool);
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+	if (cached && page)
+#else
 	if (cached)
+#endif
 		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
 					  DMA_BIDIRECTIONAL);
 	return page;
@@ -314,6 +318,10 @@ static int ion_system_heap_create_pools(struct ion_page_pool **pools,
 
 		if (orders[i] > 4)
 			gfp_flags = high_order_gfp_flags;
+#ifdef CONFIG_AMLOGIC_MODIFY
+		else if (!orders[i])
+			gfp_flags = low_order_gfp_flags;
+#endif
 
 		pool = ion_page_pool_create(gfp_flags, orders[i], cached);
 		if (!pool)

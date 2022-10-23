@@ -1,0 +1,35 @@
+Installation Instructions
+*************************
+
+Requirements
+============
+In order to use the library and run included examples, at least this
+dependency should be installed:
+
+- Qt Framework [1].
+
+Build on Unix systems
+=====================
+If you want to install the library with the default prefix (/usr/local), simply
+execute these commands:
+
+ qmake
+ make
+ sudo make install
+
+If you want to install the library in a custom path, you can specify the PREFIX
+option during the qmake step (e.g. /usr):
+
+ qmake PREFIX=/usr
+
+Build on Windows systems
+========================
+TODO
+
+Build on MacOS systems
+======================
+TODO
+
+References
+==========
+[1] http://qt.nokia.com/downloads

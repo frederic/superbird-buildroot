@@ -1,0 +1,17 @@
+diff --git a/src/content/gpu/BUILD.gn b/src/content/gpu/BUILD.gn
+index ee2cf00..bec4371 100644
+--- a/src/content/gpu/BUILD.gn
++++ b/src/content/gpu/BUILD.gn
+@@ -129,8 +129,8 @@ target(link_target_type, "gpu_sources") {
+   }
+ 
+   # Use DRI on desktop Linux builds.
+-  if (current_cpu != "s390x" && current_cpu != "ppc64" && is_desktop_linux &&
+-      (!is_chromecast || is_cast_desktop_build)) {
+-    configs += [ "//build/config/linux/dri" ]
+-  }
++  #if (current_cpu != "s390x" && current_cpu != "ppc64" && is_desktop_linux &&
++  #    (!is_chromecast || is_cast_desktop_build)) {
++  #  configs += [ "//build/config/linux/dri" ]
++  #}
+ }

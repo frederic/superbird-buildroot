@@ -56,6 +56,10 @@
 #include "braille.h"
 #include "internal.h"
 
+#ifdef CONFIG_EARLY_PRINTK_DIRECT
+extern void printascii(char *);
+#endif
+
 int console_printk[4] = {
 	CONSOLE_LOGLEVEL_DEFAULT,	/* console_loglevel */
 	MESSAGE_LOGLEVEL_DEFAULT,	/* default_message_loglevel */
@@ -338,6 +342,9 @@ struct printk_log {
 	u8 facility;		/* syslog facility */
 	u8 flags:5;		/* internal record flags */
 	u8 level:3;		/* syslog level */
+#ifdef CONFIG_AMLOGIC_DRIVER
+	int cpu;
+#endif
 }
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 __packed __aligned(4)
@@ -353,6 +360,9 @@ DEFINE_RAW_SPINLOCK(logbuf_lock);
 
 #ifdef CONFIG_PRINTK
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
+#ifdef CONFIG_AMLOGIC_DRIVER
+static int current_cpu;
+#endif
 /* the next printk record to read by syslog(READ) or /proc/kmsg */
 static u64 syslog_seq;
 static u32 syslog_idx;
@@ -574,6 +584,9 @@ static int log_store(int facility, int level,
 	msg->facility = facility;
 	msg->level = level & 7;
 	msg->flags = flags & 0x1f;
+#ifdef CONFIG_AMLOGIC_DRIVER
+	msg->cpu = smp_processor_id();
+#endif
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
@@ -602,7 +615,7 @@ static int syslog_action_restricted(int type)
 	       type != SYSLOG_ACTION_SIZE_BUFFER;
 }
 
-int check_syslog_permissions(int type, int source)
+static int check_syslog_permissions(int type, int source)
 {
 	/*
 	 * If this is from /proc/kmsg and we've already opened it, then we've
@@ -630,7 +643,6 @@ int check_syslog_permissions(int type, int source)
 ok:
 	return security_syslog(type);
 }
-EXPORT_SYMBOL_GPL(check_syslog_permissions);
 
 static void append_char(char **pp, char *e, char c)
 {
@@ -1181,10 +1193,19 @@ static size_t print_time(u64 ts, char *buf)
 	rem_nsec = do_div(ts, 1000000000);
 
 	if (!buf)
+#ifdef CONFIG_AMLOGIC_MODIFY
+		return snprintf(NULL, 0, "[%5lu.000000@0] ", (unsigned long)ts);
+#else
 		return snprintf(NULL, 0, "[%5lu.000000] ", (unsigned long)ts);
+#endif
 
+#if defined(CONFIG_SMP) && defined(CONFIG_AMLOGIC_DRIVER)
+	return sprintf(buf, "[%5lu.%06lu@%d] ",
+		       (unsigned long)ts, rem_nsec / 1000, current_cpu);
+#else
 	return sprintf(buf, "[%5lu.%06lu] ",
 		       (unsigned long)ts, rem_nsec / 1000);
+#endif
 }
 
 static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
@@ -1205,7 +1226,9 @@ static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
 				len++;
 		}
 	}
-
+#ifdef CONFIG_AMLOGIC_DRIVER
+	current_cpu = msg->cpu;
+#endif
 	len += print_time(msg->ts_nsec, buf ? buf + len : NULL);
 	return len;
 }
@@ -1735,6 +1758,8 @@ static size_t cont_print_text(char *text, size_t size)
 	return textlen;
 }
 
+#define AML_LOSE_CONTLINE_DEF 1
+
 static size_t log_output(int facility, int level, enum log_flags lflags, const char *dict, size_t dictlen, char *text, size_t text_len)
 {
 	/*
@@ -1742,7 +1767,11 @@ static size_t log_output(int facility, int level, enum log_flags lflags, const c
 	 * write from the same process, try to add it to the buffer.
 	 */
 	if (cont.len) {
+#if (AML_LOSE_CONTLINE_DEF == 1)
+		if (cont.owner == current && !(lflags & LOG_PREFIX)) {
+#else
 		if (cont.owner == current && (lflags & LOG_CONT)) {
+#endif
 			if (cont_add(facility, level, lflags, text, text_len))
 				return text_len;
 		}
@@ -1869,6 +1898,10 @@ asmlinkage int vprintk_emit(int facility, int level,
 			text += 2;
 		}
 	}
+
+#ifdef CONFIG_EARLY_PRINTK_DIRECT
+	printascii(text);
+#endif
 
 	if (level == LOGLEVEL_DEFAULT)
 		level = default_message_loglevel;

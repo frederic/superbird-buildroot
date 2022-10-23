@@ -1,0 +1,39 @@
+From 5d0aae2f96cf765e3702996b1935feaa31681005 Mon Sep 17 00:00:00 2001
+From: pengcheng chen <pengcheng.chen@amlogic.com>
+Date: Wed, 19 Sep 2018 17:16:46 +0800
+Subject: [PATCH] sync ge2d.h in qt with kernel
+
+Signed-off-by: pengcheng chen <pengcheng.chen@amlogic.com>
+---
+ src/gui/painting/ge2d.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+ mode change 100755 => 100644 src/gui/painting/ge2d.h
+
+diff --git a/src/gui/painting/ge2d.h b/src/gui/painting/ge2d.h
+old mode 100755
+new mode 100644
+index 1051851..eaedb79
+--- a/src/gui/painting/ge2d.h
++++ b/src/gui/painting/ge2d.h
+@@ -7,7 +7,7 @@
+ #ifndef GE2D_H
+ #define GE2D_H
+ 
+-
++#define CONFIG_GE2D_SRC2
+ #define OPERATION_ADD           0    /* Cd = Cs*Fs+Cd*Fd */
+ #define OPERATION_SUB           1    /* Cd = Cs*Fs-Cd*Fd */
+ #define OPERATION_REVERSE_SUB   2    /* Cd = Cd*Fd-Cs*Fs */
+@@ -136,6 +136,9 @@ struct config_para_ex_s {
+ 
+     int alu_const_color;
+     unsigned src1_gb_alpha;
++#ifdef CONFIG_GE2D_SRC2
++	unsigned int src2_gb_alpha;
++#endif
+     unsigned op_mode;
+     unsigned char bitmask_en;
+     unsigned char bytemask_only;
+-- 
+1.9.1
+

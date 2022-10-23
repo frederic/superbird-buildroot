@@ -121,6 +121,8 @@ ifeq ($(KBUILD_SRC),)
 # Do we want to locate output files in a separate directory?
 ifeq ("$(origin O)", "command line")
   KBUILD_OUTPUT := $(O)
+else
+  KBUILD_OUTPUT := build
 endif
 
 # That's our default target when none is given on the command line
@@ -215,7 +217,10 @@ obj		:= $(objtree)
 
 VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
-export srctree objtree VPATH
+buildsrc	:= $(abspath $(srctree))
+buildtree	:= $(abspath $(CURDIR)/$(KBUILD_OUTPUT))
+
+export srctree objtree VPATH buildsrc buildtree KBUILD_OUTPUT
 
 # Make sure CDPATH settings don't interfere
 unexport CDPATH
@@ -243,6 +248,9 @@ export	HOSTARCH HOSTOS
 ifeq ($(HOSTARCH),$(ARCH))
 CROSS_COMPILE ?=
 endif
+
+CROSS_COMPILE ?=/opt/gcc-linaro-7.3.1-2018.05-i686_aarch64-elf/bin/aarch64-elf-
+export CROSS_COMPILE
 
 KCONFIG_CONFIG	?= .config
 export KCONFIG_CONFIG
@@ -801,6 +809,7 @@ endif
 
 # Always append ALL so that arch config.mk's can add custom ones
 ALL-y += u-boot.srec u-boot.bin u-boot.sym System.map binary_size_check
+ALL-y += bl301.bin
 
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
@@ -1035,6 +1044,18 @@ else
 u-boot.bin: u-boot-nodtb.bin FORCE
 	$(call if_changed,copy)
 endif
+
+.PHONY : bl301.bin
+bl301.bin: tools prepare acs.bin bl21.bin
+	$(Q)$(MAKE) -C $(srctree)/arch/arm/mach-meson/${SOC}/firmware/scp_task
+
+.PHONY : acs.bin
+acs.bin: tools prepare u-boot.bin
+	$(Q)$(MAKE) -C $(srctree)/arch/arm/mach-meson/${SOC}/firmware/acs all FIRMWARE=$@
+
+.PHONY : bl21.bin
+bl21.bin: tools prepare u-boot.bin acs.bin
+	$(Q)$(MAKE) -C $(srctree)/arch/arm/mach-meson/${SOC}/firmware/bl21 all FIRMWARE=$@
 
 %.imx: %.bin
 	$(Q)$(MAKE) $(build)=arch/arm/mach-imx $@
@@ -1582,6 +1603,8 @@ prepare: prepare0
 define filechk_version.h
 	(echo \#define PLAIN_VERSION \"$(UBOOTRELEASE)\"; \
 	echo \#define U_BOOT_VERSION \"U-Boot \" PLAIN_VERSION; \
+	echo \#define CONFIG_SYSTEM_AS_ROOT \"${SYSTEMMODE}\"; \
+	echo \#define CONFIG_AVB2 \"${AVBMODE}\"; \
 	echo \#define CC_VERSION_STRING \"$$(LC_ALL=C $(CC) --version | head -n 1)\"; \
 	echo \#define LD_VERSION_STRING \"$$(LC_ALL=C $(LD) --version | head -n 1)\"; )
 endef
@@ -1795,6 +1818,7 @@ distclean: mrproper
 		-o -name '*.pyc' \) \
 		-type f -print | xargs rm -f
 	@rm -f boards.cfg
+	@rm -rf $(srctree)/build
 
 backup:
 	F=`basename $(srctree)` ; cd .. ; \

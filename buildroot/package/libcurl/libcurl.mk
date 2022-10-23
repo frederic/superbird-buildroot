@@ -66,7 +66,8 @@ LIBCURL_CONF_OPTS += --without-nss
 endif
 
 ifeq ($(BR2_PACKAGE_LIBCURL_MBEDTLS),y)
-LIBCURL_CONF_OPTS += --with-mbedtls=$(STAGING_DIR)/usr
+LIBCURL_CONF_OPTS += --with-mbedtls=$(STAGING_DIR)/usr \
+					 --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt
 LIBCURL_DEPENDENCIES += mbedtls
 else
 LIBCURL_CONF_OPTS += --without-mbedtls

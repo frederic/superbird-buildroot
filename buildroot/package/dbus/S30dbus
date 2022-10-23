@@ -60,6 +60,10 @@ case "$1" in
             start
         fi
         ;;
+    netready) ;;
+    netup) ;;
+    netdown) ;;
+    netchange) ;;
     reload)
         echo "Message bus can't reload its configuration, you have to restart it"
         RETVAL=$?

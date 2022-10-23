@@ -1,0 +1,6 @@
+config BR2_PACKAGE_AML_MINIGBM
+	bool "Amlogic Minigbm"
+	select BR2_PACKAGE_LIBDRM
+	help
+	    amlogic minigbm programs
+

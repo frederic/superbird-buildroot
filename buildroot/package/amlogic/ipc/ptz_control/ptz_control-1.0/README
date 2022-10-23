@@ -1,0 +1,49 @@
+WHAT IT IS
+----------
+
+ptz_control is a module program that controls the PTZ device.
+
+
+HOW TO USE IT
+-------------
+
+make output:
+ptz_control
+
+command line args:
+Options:                      description:
+
+       --ttys         [value] Set serial port (default = 2, /dev/ttyS*)
+       --naddr        [value] Set the address of ptz device (default = 1)
+       --pelco_type   [value] Set the protocol type of pelco (default = D)
+       --baudrate     [value] Set the baudrate of pelco (default = 2400，if pelco-P, default 4800)
+       --command      [value] Set PTZ command (default = 19, PTZ_STOP)
+       --offset       [value] Set pan or lilt speed, or preset point (default = 0)
+  -d   --debug				  printf debug infomation
+  -r,  --recv_test            Display received infomation
+  -h,  --help                 Display this help
+  e.g.  /usr/bin/ptz_control --ttys 2 --naddr 1 --pelco_type D --baudrate 2400 --command 1 --offset 10
+
+
+PELCO-D/P protocol command support:
+TILT_UP             =   0
+TILT_DOWN           =   1
+PAN_LEFT            =   2
+PAN_RIGHT           =   3
+PANTILT_LEFT_UP     =   4
+PANTILT_LEFT_DOWN   =   5
+PANTILT_RIGHT_UP    =   6
+PANTILT_RIGHT_DOWN  =   7
+ZOOM_IN             =   8
+ZOOM_OUT            =   9
+FOCUS_FAR           =   10
+FOCUS_NEAR          =   11
+IRIS_OPEN           =   12
+IRIS_CLOSE          =   13
+SET_PRESET          =   14
+GOTO_PRESET         =   15
+CLE_PRESET          =   16
+PAN_AUTO            =   17
+PAN_AUTO_STOP       =   18
+PTZ_STOP            =   19
+

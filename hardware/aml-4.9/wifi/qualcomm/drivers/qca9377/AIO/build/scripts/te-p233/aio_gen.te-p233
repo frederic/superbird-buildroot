@@ -1,0 +1,172 @@
+#!/bin/bash
+# Add customer specific patches download.
+# Add components need to be downloaded.
+# 
+
+# subversion of AIO
+BRD_TYPE_VER=te-p233
+
+#
+# For each board type,
+# determine which components should be downloaded.
+# The settings here will overwrite the default in aio_gen_bit.sh.
+# 
+# ONLY add/enable those components need download.
+#
+# 1. patch files
+DOWNLOAD_PATCH=y
+DOWNLOAD_COMMON_PATCH=n
+
+# 2. kernel
+DOWNLOAD_KERNEL_BACKPORT_3_12=n
+# For te-p233 patches are on stable kernel. No more backports
+CLONE_KERNEL=n
+# Cloned kernel path
+CLONE_KERNEL_PATH=
+
+# 3. WLAN/BT host drivers
+DOWNLOAD_DRIVER_WLAN_HOST=y
+# For te-p233 currently snapshots are not available. So clone.
+CLONE_DRIVER_WLAN_HOST=n
+
+# 4. APPs
+DOWNLOAD_APP_WLAN_WPA_SUPPLICANT_8=y
+DOWNLOAD_APP_WLAN_LIBNL_3_2_25=y
+DOWNLOAD_APP_WLAN_IW_3_0=y
+DOWNLOAD_APP_WLAN_HOSTAP_2_4=n
+# replace this with proper version
+WPA_SUPPLICANT_NAME=wpa_supplicant_8-wlan-aosp-service.lnx.2.0-rel
+DOWNLOAD_SIGMA_DUT=y
+SIGMA_DUT_NAME="LE.BR.1.2.1.c2-02400-9x07"
+SIGMA_DUT_CAF="https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/utils/sigma-dut/snapshot"
+
+# Convert to "cus12_9" from "cus12-9".
+BOARD_TYPE_PREFIX=${INPUT_BOARD_TYPE/-/_}
+
+# Please use "te_p233" instead of "te-p233".
+# The format of array should be composed of "BOARD_TYPE_PREFIX + BOARD_TYPE_POSTFIX"
+declare -a te_p233_aio_patch_arr=(
+)
+# Please add the correct link on CAF if related folder released
+BOARD_TYPE_AIO_PATCH_CAF="https://www.codeaurora.org/patches/external/wlan/fixce/3rdparty/patches/te-p233"
+
+OLD_DIR=`pwd`
+
+if [ ${CLONE_DRIVER_WLAN_HOST} == "y" ]
+then
+    echo "======================================================="
+    echo " Downloading qcacld-2.0 branch ${HOST_DRIVER_BRANCH}"
+    echo "======================================================="
+    if [ -d ${AIO_TOP}/drivers/qcacld-new ]
+    then
+        rm -rf ${AIO_TOP}/drivers/qcacld-2.0_old
+        mv -f ${AIO_TOP}/drivers/qcacld-new ${AIO_TOP}/drivers/qcacld-old
+    fi
+
+    cd ${AIO_TOP}/drivers/
+    git clone https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-2.0 -b ${HOST_DRIVER_BRANCH}
+
+    if [ ${HOST_DRIVER_VERSION} != "" ]
+    then
+        cd qcacld-2.0
+        echo "======================================================="
+        echo "Pointing to qcacld-2.0 version ${HOST_DRIVER_VERSION}" 
+        echo "======================================================="
+        git reset --hard ${HOST_DRIVER_VERSION}
+        cd ../
+    fi
+
+    mv qcacld-2.0 qcacld-new
+    cd ${OLD_DIR}
+fi
+
+echo "======================================================="
+if [ -z "${CLONE_KERNEL_PATH}" ]
+then
+    echo "Kernel clone directory unspecified. Assuming default:"
+    CLONE_KERNEL_PATH=${TOPDIR}/..
+fi
+echo ${CLONE_KERNEL_PATH}
+echo "======================================================="
+
+if [ ${CLONE_KERNEL} == "y" ] && [ -n "${KTAG}" ]
+then
+    if [ -d ${CLONE_KERNEL_PATH}/linux-stable ]
+    then
+        echo "======================================================="
+        echo "Kernel already exists skip clone"
+        echo "======================================================="
+    else
+        echo "======================================================="
+        echo " Downloading the kernel version ${KTAG} and applying patches"
+        echo "======================================================="
+        git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+	cd linux-stable
+        git checkout ${KTAG}
+
+	cd -
+        mkdir -p ${CLONE_KERNEL_PATH}
+        mv linux-stable ${CLONE_KERNEL_PATH}/.
+    fi
+fi
+
+if [ -d ${CLONE_KERNEL_PATH}/linux-stable ] && [ -n "${KTAG}" ]
+then
+    echo "======================================================="
+    echo " Trying to patch kernel"
+    echo "======================================================="
+    cd ${CLONE_KERNEL_PATH}/linux-stable
+    if [ $ENG_PATCH == 0 ]
+    then
+              wget --no-check-certificate ${BOARD_TYPE_AIO_PATCH_CAF}.tar.gz
+              tar -zxf ${INPUT_BOARD_TYPE}.tar.gz
+              git am ${INPUT_BOARD_TYPE}/${KTAG}/*
+              rm -rf ${TOPDIR}/../patch
+              mkdir -p ${TOPDIR}/../patch
+              mv ${INPUT_BOARD_TYPE} ${TOPDIR}/../patch/
+              rm -rf ${INPUT_BOARD_TYPE}.tar.gz
+    else
+        git am ${OSS_ENGPATH_DIR}/${INPUT_BOARD_TYPE}/${KTAG}/*
+    fi
+    ret=$?
+    if [ "$ret" -eq 0 ]
+    then
+         echo "Applied all patches successfully"
+    else
+         echo "Failed. Perhaps already patched or do not match"
+         git am --abort
+    fi
+    cd -
+else
+    echo "======================================================="
+    echo "Check if these are correctly set..!"
+    echo "CLONE_KERNEL=${CLONE_KERNEL}"
+    echo "CLONE_KERNEL_PATH=${CLONE_KERNEL_PATH}"
+    echo "KTAG=${KTAG}"
+    echo "======================================================="
+fi
+
+if [ "$DOWNLOAD_SIGMA_DUT" == "y" ]
+then
+    echo "===================================="
+    echo " Downloading sigma-dut ..."
+    echo "===================================="
+    wget ${SIGMA_DUT_CAF}/${SIGMA_DUT_NAME}.tar.gz
+    tar -zxf ${SIGMA_DUT_NAME}.tar.gz
+    mv -f ${SIGMA_DUT_NAME} ${AIO_TOP}/apps
+    mv ${AIO_TOP}/apps/${SIGMA_DUT_NAME} ${AIO_TOP}/apps/sigma-dut
+    rm -f ${SIGMA_DUT_NAME}.tar.gz
+fi
+
+#PATCH_PATH=${AIO_TOP}/drivers/patches/te-p233
+#CAF_PATH=https://source.codeaurora.org/patches/external/wlan/fixce/3rdparty
+
+#echo "======================================================="
+#echo " Downloading the patches from ${CAF_PATH} to ${PATCH_PATH}"
+#echo "======================================================="
+
+# Kernel patches - These are anyway copied from the local patch directory in aio_gen_bit.sh. When CAF patches are available lets enable this
+#wget ${CAF_PATH}/patches/te-p233/WLAN/${KTAG}/0001-xyz.patch -O ${AIO_TOP}/drivers/patches/0001-xyz.patch
+
+
+cd ${OLD_DIR}

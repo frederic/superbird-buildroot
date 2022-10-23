@@ -19,9 +19,28 @@
 #include <linux/compiler.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
+#include <asm/arch/secure_apb.h>
 #include <asm/io.h>
 #include <power/regulator.h>
 #include "designware.h"
+#include <linux/ioport.h>
+
+#ifdef CONFIG_DM_ETH
+#include <asm/arch/pwr_ctrl.h>
+#endif
+
+#define ETH_PLL_CTL0 0x44
+#define ETH_PLL_CTL1 0x48
+#define ETH_PLL_CTL2 0x4C
+#define ETH_PLL_CTL3 0x50
+#define ETH_PLL_CTL4 0x54
+#define ETH_PLL_CTL5 0x58
+#define ETH_PLL_CTL6 0x5C
+#define ETH_PLL_CTL7 0x60
+
+#define ETH_PHY_CNTL0 0x80
+#define ETH_PHY_CNTL1 0x84
+#define ETH_PHY_CNTL2 0x88
 
 static int dw_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 {
@@ -667,6 +686,150 @@ static int designware_eth_bind(struct udevice *dev)
 	return 0;
 }
 
+#ifdef CONFIG_DM_ETH
+unsigned int setup_amp;
+void setup_tx_amp(struct udevice *dev)
+{
+	unsigned int tx_amp_src = 0;
+	tx_amp_src = dev_read_u32_default(dev, "tx_amp_src", 0);
+	if (0 == tx_amp_src) {
+		printf("not set tx_amp_src\n");
+	} else {
+		setup_amp = readl(tx_amp_src);
+		printf("addr 0x%x  =  0x%x\n", tx_amp_src, readl(tx_amp_src));
+	}
+}
+static void setup_internal_phy(struct udevice *dev)
+{
+	int phy_cntl1 = 0;
+	int mc_val = 0;
+	int pll_val[3] = {0};
+	int analog_val[3] = {0};
+	int rtn = 0;
+	struct resource eth_top, eth_cfg;
+
+	phy_cntl1 = dev_read_u32_default(dev, "phy_cntl1", 4);
+	if (phy_cntl1 < 0) {
+		printf("miss phy_cntl1\n");
+	}
+
+	mc_val = dev_read_u32_default(dev, "mc_val", 4);
+	if (mc_val < 0) {
+		printf("miss mc_val\n");
+	}
+
+	rtn = dev_read_u32_array(dev, "pll_val", pll_val, ARRAY_SIZE(pll_val));
+	if (rtn < 0) {
+		printf("miss pll_val\n");
+	}
+
+	dev_read_u32_array(dev, "analog_val", analog_val, ARRAY_SIZE(analog_val));
+	if (rtn < 0) {
+		printf("miss analog_val\n");
+	}
+
+	for (int i = 0;i <3; i++) {
+		debug("pll_val 0x%08x\n", pll_val[i]);
+	}
+
+	for (int i = 0;i <3; i++) {
+		debug("analog_val 0x%08x\n", analog_val[i]);
+	}
+
+	rtn = dev_read_resource_byname(dev, "eth_top", &eth_top);
+	if (rtn) {
+		printf("can't get eth_top resource(ret = %d)\n", rtn);
+	}
+
+	rtn = dev_read_resource_byname(dev, "eth_cfg", &eth_cfg);
+	if (rtn) {
+		printf("can't get eth_cfg resource(ret = %d)\n", rtn);
+	}
+	printf("wzh eth_top 0x%x eth_cfg 0x%x \n", eth_top.start, eth_cfg.start);
+
+	setup_tx_amp(dev);
+	/*top*/
+//	setbits_le32(ETHTOP_CNTL0, mc_val);
+	setbits_le32(eth_top.start, mc_val);
+	/*pll*/
+	writel(pll_val[0] | 0x30000000, eth_cfg.start + ETH_PLL_CTL0);
+	writel(pll_val[1], eth_cfg.start + ETH_PLL_CTL1);
+	writel(pll_val[2], eth_cfg.start + ETH_PLL_CTL2);
+	writel(0x00000000, eth_cfg.start + ETH_PLL_CTL3);
+	udelay(200);
+	writel(pll_val[0] | 0x10000000, eth_cfg.start + ETH_PLL_CTL0);
+
+	/*analog*/
+	writel(analog_val[0], eth_cfg.start + ETH_PLL_CTL5);
+	writel(analog_val[1], eth_cfg.start + ETH_PLL_CTL6);
+	writel(analog_val[2], eth_cfg.start + ETH_PLL_CTL7);
+
+	/*ctrl*/
+	/*config phyid should between  a 0~0xffffffff*/
+	/*please don't use 44000181, this has been used by internal phy*/
+	writel(0x33000180, eth_cfg.start + ETH_PHY_CNTL0);
+
+	/*use_phy_smi | use_phy_ip | co_clkin from eth_phy_top*/
+	writel(0x260, eth_cfg.start + ETH_PHY_CNTL2);
+	writel(phy_cntl1, eth_cfg.start + ETH_PHY_CNTL1);
+	writel(phy_cntl1 & (~0x40000), eth_cfg.start + ETH_PHY_CNTL1);
+	writel(phy_cntl1, eth_cfg.start + ETH_PHY_CNTL1);
+	udelay(200);
+
+
+	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 6));
+	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 7));
+	clrbits_le32(ANACTRL_PLL_GATE_DIS, (0x1 << 19));
+}
+
+static void setup_external_phy(struct udevice *dev)
+{
+#if 0
+	u32 mc_val;
+
+	/*driver strength*/
+	writel(0xaaaaaaa5, P_PAD_DS_REG4A);
+
+	/*pinmux*/
+	writel(0x11111111, P_PERIPHS_PIN_MUX_6);
+	writel(0x111111, P_PERIPHS_PIN_MUX_7);
+
+	/*top*/
+	mc_val = dev_read_u32_default(dev, "mc_val", 4);
+	debug("mc_val = 0x%x\n", mc_val);
+	setbits_le32(P_PREG_ETH_REG0, mc_val);
+
+	/*switch to exphy*/
+	writel(0x0, P_ETH_PHY_CNTL2);
+	/*81*/
+	setbits_le32(HHI_GCLK_MPEG1, 0x1 << 3);
+	/* power on memory */
+	clrbits_le32(HHI_MEM_PD_REG0, (1 << 3) | (1<<2));
+#endif
+}
+
+#endif
+#ifdef CONFIG_DM_ETH
+static void __iomem *DM_network_interface_setup(struct udevice *dev)
+{
+	u32 internal_phy = 0;
+
+	internal_phy = dev_read_u32_default(dev, "internal_phy", 1);
+	if (internal_phy < 0) {
+		debug("miss internal_phy item\n");
+	}
+	debug("internal_phy = 0x%x\n", internal_phy);
+	if (internal_phy) {
+		printf("in-phy\n");
+		setup_internal_phy(dev);
+	} else {
+		printf("ex-phy\n");
+		setup_external_phy(dev);
+	}
+	udelay(1000);
+}
+#endif
+/*parse dts end*/
 int designware_eth_probe(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_platdata(dev);
@@ -675,6 +838,12 @@ int designware_eth_probe(struct udevice *dev)
 	ulong ioaddr;
 	int ret;
 	struct reset_ctl_bulk reset_bulk;
+
+#ifdef CONFIG_DM_ETH
+	printf("pwr up eth\n");
+	pwr_ctrl_psci_smc(PM_ETH, 1);
+	DM_network_interface_setup(dev);
+#endif
 #ifdef CONFIG_CLK
 	int i, err, clock_nb;
 
@@ -837,6 +1006,7 @@ static const struct udevice_id designware_eth_ids[] = {
 	{ .compatible = "allwinner,sun7i-a20-gmac" },
 	{ .compatible = "altr,socfpga-stmmac" },
 	{ .compatible = "amlogic,meson6-dwmac" },
+	{ .compatible = "amlogic,g12a-eth-dwmac" },
 	{ .compatible = "amlogic,meson-gx-dwmac" },
 	{ .compatible = "amlogic,meson-gxbb-dwmac" },
 	{ .compatible = "amlogic,meson-axg-dwmac" },

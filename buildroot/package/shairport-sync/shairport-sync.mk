@@ -33,6 +33,15 @@ else
 SHAIRPORT_SYNC_CONF_OPTS += --with-tinysvcmdns
 endif
 
+ifeq ($(BR2_PACKAGE_PULSEAUDIO), y)
+SHAIRPORT_SYNC_CONFIG_ARCH = shairport-sync-pulse.conf
+else
+ifeq ($(BR2_aarch64),y)
+SHAIRPORT_SYNC_CONFIG_ARCH = shairport-sync-64.conf
+else
+SHAIRPORT_SYNC_CONFIG_ARCH = shairport-sync-32.conf
+endif
+endif
 # OpenSSL or mbedTLS
 ifeq ($(BR2_PACKAGE_OPENSSL),y)
 SHAIRPORT_SYNC_DEPENDENCIES += openssl
@@ -54,13 +63,13 @@ endif
 define SHAIRPORT_SYNC_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/shairport-sync \
 		$(TARGET_DIR)/usr/bin/shairport-sync
-	$(INSTALL) -D -m 0644 $(@D)/scripts/shairport-sync.conf \
+	$(INSTALL) -D -m 0644 package/shairport-sync/$(SHAIRPORT_SYNC_CONFIG_ARCH) \
 		$(TARGET_DIR)/etc/shairport-sync.conf
 endef
 
 define SHAIRPORT_SYNC_INSTALL_INIT_SYSV
-	$(INSTALL) -D -m 0755 package/shairport-sync/S99shairport-sync \
-		$(TARGET_DIR)/etc/init.d/S99shairport-sync
+	$(INSTALL) -D -m 0755 package/shairport-sync/S78shairport-sync \
+		$(TARGET_DIR)/etc/init.d/S78shairport-sync
 endef
 
 $(eval $(autotools-package))

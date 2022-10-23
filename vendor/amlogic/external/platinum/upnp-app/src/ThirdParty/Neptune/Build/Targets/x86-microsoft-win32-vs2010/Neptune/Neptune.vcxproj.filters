@@ -1,0 +1,384 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\TLS">
+      <UniqueIdentifier>{01efe49b-1fd2-48ba-9fd2-4288d1c001f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\TLS\Data">
+      <UniqueIdentifier>{5a2f3f5a-6220-4849-b0df-60ebce04664a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\Source\Core\NptBase64.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Bsd\NptBsdSockets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptBufferedStreams.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptCommon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptConsole.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptCrypto.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptDataBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptDebug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptDigest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptHttp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptList.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptLogging.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptMessaging.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptNetwork.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Posix\NptPosixFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptResults.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptRingBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptSimpleMessageQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptSockets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\StdC\NptStdcEnvironment.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\StdC\NptStdcFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptStreams.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptStrings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptThreads.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptTime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptTls.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptUri.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Console.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32DynamicLibraries.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32File.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32MessageQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Network.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32SerialPort.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32System.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Threads.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\Win32\NptWin32Time.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\WinCE\NptWinceConsole.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\WinCE\NptWinceEnvironment.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\System\WinCE\NptWinceMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Core\NptXml.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\aes.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\asn1.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\bigint.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\crypto_misc.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\gen_cert.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\hmac.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\loader.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\md2.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\md5.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\p12.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\rc4.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\rsa.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\crypto\sha1.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\tls1.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\tls1_clnt.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\tls1_svr.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\ThirdParty\axTLS\ssl\x509.c">
+      <Filter>Source Files\TLS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Data\TLS\NptTlsDefaultTrustAnchorsBase.cpp">
+      <Filter>Source Files\TLS\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Source\Data\TLS\NptTlsDefaultTrustAnchorsExtended.cpp">
+      <Filter>Source Files\TLS\Data</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\crypto\bigint.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\crypto\bigint_impl.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\cert.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\config\Win32\config.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\crypto\crypto.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\crypto_misc.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\os_port.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\ssl.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\tls1.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\ThirdParty\axTLS\ssl\version.h">
+      <Filter>Source Files\TLS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\Neptune.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptArray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptBase64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptBufferedStreams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptConsole.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptCrypto.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptDataBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptDebug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptDefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptDigest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptHttp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptInterfaces.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptList.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptLogging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptMessaging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptNetwork.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptReferences.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptResults.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptRingBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptSelectableMessageQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptSerialPort.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptSimpleMessageQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptSockets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptStack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptStreams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptStrings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptThreads.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptTime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptTls.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptUri.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptVersion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\System\Win32\NptWin32MessageQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\System\Win32\NptWin32Network.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\System\Win32\NptWin32Threads.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Source\Core\NptXml.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

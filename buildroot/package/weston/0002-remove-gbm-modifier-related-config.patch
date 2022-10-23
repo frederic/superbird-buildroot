@@ -1,0 +1,23 @@
+Index: weston-6.0.0/configure.ac
+===================================================================
+--- weston-6.0.0.orig/configure.ac	2019-06-04 13:48:35.067615488 +0800
++++ weston-6.0.0/configure.ac	2019-06-04 13:52:48.933872683 +0800
+@@ -231,12 +231,12 @@
+   PKG_CHECK_MODULES(DRM_COMPOSITOR_FORMATS_BLOB, [libdrm >= 2.4.83],
+ 		    [AC_DEFINE([HAVE_DRM_FORMATS_BLOB], 1, [libdrm supports modifier advertisement])],
+ 		    [AC_MSG_WARN([libdrm does not support modifier advertisement])])
+-  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM_MODIFIERS, [gbm >= 17.1],
+-		    [AC_DEFINE([HAVE_GBM_MODIFIERS], 1, [GBM supports modifiers])],
+-		    [AC_MSG_WARN([GBM does not support modifiers])])
+-  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM, [gbm >= 17.2],
+-		    [AC_DEFINE([HAVE_GBM_FD_IMPORT], 1, [gbm supports import with modifiers])],
+-		    [AC_MSG_WARN([GBM does not support dmabuf import, will omit that capability])])
++#  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM_MODIFIERS, [gbm >= 17.1],
++#		    [AC_DEFINE([HAVE_GBM_MODIFIERS], 1, [GBM supports modifiers])],
++#		    [AC_MSG_WARN([GBM does not support modifiers])])
++#  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM, [gbm >= 17.2],
++#		    [AC_DEFINE([HAVE_GBM_FD_IMPORT], 1, [gbm supports import with modifiers])],
++#		    [AC_MSG_WARN([GBM does not support dmabuf import, will omit that capability])])
+ fi
+ 
+ AC_ARG_ENABLE(remoting, [  --enable-remoting],,

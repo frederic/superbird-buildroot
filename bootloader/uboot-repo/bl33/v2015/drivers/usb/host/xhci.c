@@ -256,10 +256,12 @@ static int xhci_configure_endpoints(struct usb_device *udev, bool ctx_change)
 	virt_dev = ctrl->devs[udev->slot_id];
 	in_ctx = virt_dev->in_ctx;
 
-	xhci_flush_cache((uint32_t)in_ctx->bytes, in_ctx->size);
+	xhci_flush_cache((ulong)in_ctx->bytes, in_ctx->size);
 	xhci_queue_command(ctrl, in_ctx->bytes, udev->slot_id, 0,
 			   ctx_change ? TRB_EVAL_CONTEXT : TRB_CONFIG_EP);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
+	if (!event)
+		return -EINVAL;
 	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags))
 		!= udev->slot_id);
 
@@ -325,7 +327,7 @@ static int xhci_set_configuration(struct usb_device *udev)
 			max_ep_flag = ep_flag;
 	}
 
-	xhci_inval_cache((uint32_t)out_ctx->bytes, out_ctx->size);
+	xhci_inval_cache((ulong)out_ctx->bytes, out_ctx->size);
 
 	/* slot context */
 	xhci_slot_copy(ctrl, in_ctx, out_ctx);
@@ -363,6 +365,9 @@ static int xhci_set_configuration(struct usb_device *udev)
 			cpu_to_le32(((0 & MAX_BURST_MASK) << MAX_BURST_SHIFT) |
 			((3 & ERROR_COUNT_MASK) << ERROR_COUNT_SHIFT));
 
+		if (endpt_desc->bInterval > 0)
+			ep_ctx[ep_index]->ep_info |= cpu_to_le32((endpt_desc->bInterval-1)<<16);
+
 		trb_64 = (uintptr_t)
 				virt_dev->eps[ep_index].ring->enqueue;
 		ep_ctx[ep_index]->deq = cpu_to_le64(trb_64 |
@@ -372,6 +377,9 @@ static int xhci_set_configuration(struct usb_device *udev)
 	return xhci_configure_endpoints(udev, false);
 }
 
+
+#define TRB_BSR		(1<<9)
+
 /**
  * Issue an Address Device command (which will issue a SetAddress request to
  * the device).
@@ -379,7 +387,7 @@ static int xhci_set_configuration(struct usb_device *udev)
  * @param udev pointer to the Device Data Structure
  * @return 0 if successful else error code on failure
  */
-static int xhci_address_device(struct usb_device *udev)
+static int xhci_enable_device(struct usb_device *udev)
 {
 	int ret = 0;
 	struct xhci_ctrl *ctrl = udev->controller;
@@ -390,6 +398,14 @@ static int xhci_address_device(struct usb_device *udev)
 	union xhci_trb *event;
 
 	virt_dev = ctrl->devs[slot_id];
+
+	slot_ctx = xhci_get_slot_ctx(ctrl, virt_dev->out_ctx);
+	if (GET_SLOT_STATE(le32_to_cpu(slot_ctx->dev_state)) ==
+			SLOT_STATE_DEFAULT) {
+		printf("Slot already in default state\n");
+		return -1;
+	}
+
 
 	/*
 	 * This is the first Set Address since device plug-in
@@ -402,8 +418,10 @@ static int xhci_address_device(struct usb_device *udev)
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
 	ctrl_ctx->drop_flags = 0;
 
-	xhci_queue_command(ctrl, (void *)ctrl_ctx, slot_id, 0, TRB_ADDR_DEV);
+	xhci_queue_command(ctrl, (void *)ctrl_ctx, slot_id, 0, TRB_ADDR_DEV | TRB_BSR);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
+	if (!event)
+		return -EINVAL;
 	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags)) != slot_id);
 
 	switch (GET_COMP_CODE(le32_to_cpu(event->event_cmd.status))) {
@@ -442,7 +460,89 @@ static int xhci_address_device(struct usb_device *udev)
 		 */
 		return ret;
 
-	xhci_inval_cache((uint32_t)virt_dev->out_ctx->bytes,
+	xhci_inval_cache((ulong)virt_dev->out_ctx->bytes,
+				virt_dev->out_ctx->size);
+	slot_ctx = xhci_get_slot_ctx(ctrl, virt_dev->out_ctx);
+
+	debug("xHC internal address is: %d\n",
+		le32_to_cpu(slot_ctx->dev_state) & DEV_ADDR_MASK);
+
+	return 0;
+}
+
+/**
+ * Issue an Address Device command (which will issue a SetAddress request to
+ * the device).
+ *
+ * @param udev pointer to the Device Data Structure
+ * @return 0 if successful else error code on failure
+ */
+static int xhci_address_device(struct usb_device *udev)
+{
+	int ret = 0;
+	struct xhci_ctrl *ctrl = udev->controller;
+	struct xhci_slot_ctx *slot_ctx;
+	struct xhci_input_control_ctx *ctrl_ctx;
+	struct xhci_virt_device *virt_dev;
+	int slot_id = udev->slot_id;
+	union xhci_trb *event;
+
+	virt_dev = ctrl->devs[slot_id];
+
+	/*
+	 * This is the first Set Address since device plug-in
+	 * so setting up the slot context.
+	 */
+	debug("Setting up addressable devices\n");
+	xhci_setup_addressable_virt_dev(udev);
+
+	ctrl_ctx = xhci_get_input_control_ctx(virt_dev->in_ctx);
+	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
+	ctrl_ctx->drop_flags = 0;
+
+	xhci_queue_command(ctrl, (void *)ctrl_ctx, slot_id, 0, TRB_ADDR_DEV);
+	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
+	if (!event)
+		return -EINVAL;
+	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags)) != slot_id);
+
+	switch (GET_COMP_CODE(le32_to_cpu(event->event_cmd.status))) {
+	case COMP_CTX_STATE:
+	case COMP_EBADSLT:
+		printf("Setup ERROR: address device command for slot %d.\n",
+								slot_id);
+		ret = -EINVAL;
+		break;
+	case COMP_TX_ERR:
+		puts("Device not responding to set address.\n");
+		ret = -EPROTO;
+		break;
+	case COMP_DEV_ERR:
+		puts("ERROR: Incompatible device"
+					"for address device command.\n");
+		ret = -ENODEV;
+		break;
+	case COMP_SUCCESS:
+		debug("Successful Address Device command\n");
+		udev->status = 0;
+		break;
+	default:
+		printf("ERROR: unexpected command completion code 0x%x.\n",
+			GET_COMP_CODE(le32_to_cpu(event->event_cmd.status)));
+		ret = -EINVAL;
+		break;
+	}
+
+	xhci_acknowledge_event(ctrl);
+
+	if (ret < 0)
+		/*
+		 * TODO: Unsuccessful Address Device command shall leave the
+		 * slot in default state. So, issue Disable Slot command now.
+		 */
+		return ret;
+
+	xhci_inval_cache((ulong)virt_dev->out_ctx->bytes,
 				virt_dev->out_ctx->size);
 	slot_ctx = xhci_get_slot_ctx(ctrl, virt_dev->out_ctx);
 
@@ -479,6 +579,8 @@ int usb_alloc_device(struct usb_device *udev)
 
 	xhci_queue_command(ctrl, NULL, 0, 0, TRB_ENABLE_SLOT);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
+	if (!event)
+		return -EINVAL;
 	BUG_ON(GET_COMP_CODE(le32_to_cpu(event->event_cmd.status))
 		!= COMP_SUCCESS);
 
@@ -525,7 +627,7 @@ int xhci_check_maxpacket(struct usb_device *udev)
 	ifdesc = &udev->config.if_desc[0];
 
 	out_ctx = ctrl->devs[slot_id]->out_ctx;
-	xhci_inval_cache((uint32_t)out_ctx->bytes, out_ctx->size);
+	xhci_inval_cache((ulong)out_ctx->bytes, out_ctx->size);
 
 	ep_ctx = xhci_get_ep_ctx(ctrl, out_ctx, ep_index);
 	hw_max_packet_size = MAX_PACKET_DECODED(le32_to_cpu(ep_ctx->ep_info2));
@@ -866,7 +968,12 @@ submit_int_msg(struct usb_device *udev, unsigned long pipe, void *buffer,
 	 * TODO: Not addressing any interrupt type transfer requests
 	 * Add support for it later.
 	 */
-	return -EINVAL;
+	if (usb_pipetype(pipe) != PIPE_INTERRUPT) {
+		printf("non-interrupt pipe (type=%lu)", usb_pipetype(pipe));
+		return -EINVAL;
+	}
+
+	return xhci_bulk_tx(udev, pipe, length, buffer);
 }
 
 /**
@@ -914,6 +1021,9 @@ submit_control_msg(struct usb_device *udev, unsigned long pipe, void *buffer,
 
 	if (usb_pipedevice(pipe) == ctrl->rootdev)
 		return xhci_submit_root(udev, pipe, buffer, setup);
+
+	if (setup->request == USB_ENABLE)
+		return xhci_enable_device(udev);
 
 	if (setup->request == USB_REQ_SET_ADDRESS)
 		return xhci_address_device(udev);
@@ -970,8 +1080,16 @@ int usb_lowlevel_init(int index, enum usb_init_type init, void **controller)
 		return -ENOMEM;
 
 	reg = xhci_readl(&hccr->cr_hcsparams1);
+#ifdef CONFIG_USB_XHCI_AMLOGIC_V2
+#ifdef CONFIG_USB_U2_PORT_NUM
+	descriptor.hub.bNbrPorts = CONFIG_USB_U2_PORT_NUM;
+#else
+	descriptor.hub.bNbrPorts = 2;
+#endif
+#else
 	descriptor.hub.bNbrPorts = ((reg & HCS_MAX_PORTS_MASK) >>
 						HCS_MAX_PORTS_SHIFT);
+#endif
 	printf("Register %x NbrPorts %d\n", reg, descriptor.hub.bNbrPorts);
 
 	/* Port Indicators */

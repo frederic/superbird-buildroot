@@ -18,6 +18,9 @@ config BR2_PACKAGE_VLC
 
 	  http://www.videolan.org/vlc/
 
+config BR2_VLC_FOR_AUDIO
+	bool "enable vlc for audio"
+
 config BR2_PACKAGE_VLC_OPENCV_BACKEND
 	bool
 	select BR2_PACKAGE_OPENCV_LIB_IMGPROC

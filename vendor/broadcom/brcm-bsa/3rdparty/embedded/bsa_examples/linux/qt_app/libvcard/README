@@ -1,0 +1,16 @@
+libvcard 1.0.0
+**************
+
+Introduction
+============
+
+This is a C++ library for all your vCard needs.
+
+For more info please visit: http://www.imc.org/pdi/vcard-21.txt
+
+It depends on "QtCore" module (from "Qt Framework", visit: http://qt.nokia.com).
+
+Installation
+============
+
+Follow the instructions in the INSTALL file.

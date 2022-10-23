@@ -1,0 +1,696 @@
+#  Obfuscation Target -- START
+# See also def/obf.txt, which contains Makefile target definitions used in obfuscation 
+
+obf = FALSE
+
+ifeq ($(strip $(obf)),TRUE)
+
+BTA_FM_INCLUDED = TRUE
+BTA_FMTX_INCLUDED = TRUE
+
+targetdir = $(cfgincdir)
+
+widcommtools = $(componentdir)/tools/widcomm
+ifeq ($(strip $(OBS_USE_PERL_SCRIPT)),FALSE)
+PERL      = 
+H2TOK = $(widcommtools)/h2tok.exe
+else
+PERL      = perl
+H2TOK = $(widcommtools)/h2tok.pl
+endif
+
+obfdir = $(componentdir)/obf
+obfsbcdir = $(obfdir)/sbc
+obftmpdir = $(componentdir)/temp
+cobfdir= $(componentdir)/tools/widcomm/cobf
+
+cobf_name=cobf.h
+uncobf_name=uncobf.h
+
+#  Add '-d' to add debug info to shrouded files
+#cobfcfg = -d -b -v -r 220 -o $(obftmpdir)
+
+cobfcfg = -b -r 380 -o $(obftmpdir) \
+    -p pp_ger_msvc.bat \
+    -t c.tok \
+    -m c.mak \
+    -t cansilib.tok \
+    -m macros.tok \
+    -t tokens.tok
+
+
+
+#################
+# BTM Obfuscation
+#################
+
+
+obfbtmdir = $(obfdir)/btm
+
+obfbtmcfg = \
+    -i $(componentdir)/stack/btm \
+    -i $(componentdir)/stack/amp \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(componentdir)/stack/l2cap \
+    -i $(componentdir)/stack/sdp \
+    -i $(componentdir)/embdrv/slip \
+    -i $(componentdir)/stack/avdt \
+    -i $(componentdir)/udrv/include \
+    -i $(componentdir)/bta/av \
+    -i $(componentdir)/hcis \
+    -i $(componentdir)/bttrc \
+    -i $(componentdir)/stack/rfcomm \
+	-i $(componentdir)/udrv/include/ \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hi btm_api.h \
+    -hi btm_int.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hi bt_types.h \
+    -hi btu.h \
+    -hs dyn_mem.h \
+    -hi gki.h \
+    -hi hcidefs.h \
+    -hi hcimsgs.h \
+    -hi l2c_int.h \
+    -hi rfcdefs.h \
+    -hi sdp_api.h \
+    -hi sdpint.h \
+    -hi sdpdefs.h \
+    -hi trace_api.h \
+    -hi bte_stack_entry.h \
+    -hi amp_api.h \
+    -hi ampdefs.h \
+    -hi amp_int.h \
+    -hi l2cdefs.h \
+    -hi l2c_api.h \
+    -hi btm_n2bt.h \
+#    -hs slip_api.h \
+    -hi avdt_int.h \
+    -hi uipc.h \
+    -hi avdt_api.h \
+    -hi avdt_defs.h \
+    -hi avdtc_api.h \
+    -hi hciutil.h \
+    -hi userial.h \
+    -hi hcilp.h \
+    -hi upio.h \
+    -hi uipc_msg.h \
+    -hs bttrc_int.h \
+    -hi slip.h \
+    -hi rfc_int.h \
+    -hi port_int.h \
+    -hi port_api.h 
+    
+
+# hdr's are files that will get run through h2tok.pl
+#
+
+
+obfbtmhdrs = \
+    $(stackincdir)/btm_api.h \
+    $(componentdir)/stack/btm/btm_int.h \
+    $(stackincdir)/bt_types.h \
+    $(stackincdir)/btu.h \
+    $(stackincdir)/hcimsgs.h \
+    $(stackincdir)/hcidefs.h \
+    $(stackincdir)/sdp_api.h \
+    $(componentdir)/stack/l2cap/l2c_int.h \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(componentdir)/gki/common/gki.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/stack/amp/amp_int.h \
+#    $(componentdir)/embdrv/slip/slip_api.h \
+    $(componentdir)/stack/avdt/avdt_int.h \
+    $(componentdir)/udrv/include/uipc.h \
+    $(componentdir)/stack/include/avdt_api.h \
+    $(componentdir)/stack/avdt/avdt_defs.h \
+    $(componentdir)/stack/include/avdtc_api.h \
+    $(componentdir)/hcis/hciutil.h \
+    $(componentdir)/udrv/include/userial.h \
+    $(componentdir)/hcis/hcilp.h \
+    $(componentdir)/udrv/include/upio.h \
+    $(componentdir)/stack/include/uipc_msg.h \
+    $(componentdir)/bttrc/bttrc_int.h \
+    $(componentdir)/embdrv/slip/slip.h \
+    $(componentdir)/rpc/include/trace_api.h \
+    $(componentdir)/stack/rfcomm/rfc_int.h \
+    $(componentdir)/stack/rfcomm/port_int.h \
+    $(componentdir)/stack/include/port_api.h
+    
+obfbtm = $(obfbtmdir)/btm_acl.c
+
+
+
+#################
+#  FM Interface
+#################
+obffmdir = $(obfdir)/fm
+ifeq ($(strip $(BTA_FM_INCLUDED)),TRUE)
+
+obffmcfg = \
+    -i $(componentdir)/stack/a2dp \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/bta/fm \
+    -i $(componentdir)/bta/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(componentdir)/bta/sys \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hs bt_types.h \
+    -hs dyn_mem.h \
+    -hi gki.h \
+    -hi bte_stack_entry.h \
+    -hi bta_rds_int.h \
+    -hi bta_rds_api.h \
+    -hs bta_api.h \
+    -hs bta_fm_api.h \
+    -hs btm_api.h \
+    -hs sdp_api.h \
+    -hs hcidefs.h \
+    -hs sdpdefs.h \
+    -hi bta_fm_af.h
+
+
+# hdr's are files that will get run through h2tok.pl
+#
+obffmhdrs = \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(componentdir)/gki/common/gki.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/bta/fm/bta_rds_int.h \
+    $(componentdir)/bta/include/bta_rds_api.h \
+    $(componentdir)/bta/include/bta_api.h \
+    $(componentdir)/bta/include/bta_fm_api.h \
+    $(componentdir)/stack/include/btm_api.h \
+    $(componentdir)/stack/include/sdp_api.h \
+    $(componentdir)/stack/include/hcidefs.h \
+    $(componentdir)/stack/include/sdpdefs.h \
+    $(componentdir)/bta/fm/bta_fm_af.h
+
+obffm = $(obffmdir)/bta_fm_rdsp.c
+
+endif
+
+
+
+#################
+#  FMTX RDS_ENC INTERFACE
+#################
+obffmtxencdir = $(obfdir)/fmtx/rds_enc
+ifeq ($(strip $(BTA_FMTX_INCLUDED)),TRUE)
+
+obffmtxenccfg = \
+    -i $(componentdir)/bta/fmtx \
+    -i $(componentdir)/bta/fmtx/rds_enc \
+    -i $(componentdir)/bta/include \
+    -i $(componentdir)/stack/a2dp \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/bta/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(componentdir)/bta/sys \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hi bta_rdse_int.h \
+    -hi bta_rdse_api.h \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hs bt_types.h \
+    -hs dyn_mem.h \
+    -hi bte_stack_entry.h \
+    -hs bta_api.h \
+    -hs btm_api.h \
+    -hs hcidefs.h \
+    -hs sdpdefs.h \
+    -hs sdp_api.h
+
+
+
+# hdr's are files that will get run through h2tok.pl
+#
+obffmtxenchdrs = \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/bta/fmtx/rds_enc/bta_rdse_int.h \
+    $(componentdir)/bta/include/bta_rdse_api.h \
+    $(componentdir)/bta/include/bta_api.h \
+    $(componentdir)/stack/include/sdp_api.h \
+    $(componentdir)/stack/include/hcidefs.h \
+    $(componentdir)/stack/include/sdpdefs.h \
+
+
+#Components\bta\fmtx\rds_enc\bta_rds_enc.c
+#Components\bta\fmtx\rds_enc\bta_rdse_utils.c
+
+obffmtxenc = $(obffmtxencdir)/bta_rds_enc.c
+
+endif
+
+
+
+##################
+# AV Specific Defs
+##################
+
+
+obfesbcdir = $(obfdir)/sbc/encoder
+obfdsbcdir = $(obfdir)/sbc/decoder
+obfa2dpdir = $(obfdir)/a2dp
+
+ifeq ($(strip $(SBC_ENCODER_INCLUDED)),TRUE)
+#################
+# SBC Encoder
+#################
+
+obfesbccfg = \
+    -i $(componentdir)/embdrv/sbc/encoder/include \
+    -i $(componentdir)/embdrv/sbc/encoder/srce \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hi bt_types.h \
+    -hs dyn_mem.h \
+    -hi gki.h \
+    -hi sbc_encoder.h \
+    -hi sbc_dct.h \
+    -hi sbc_enc_func_declare.h \
+    -hi sbc_types.h \
+    -hi bte_stack_entry.h
+
+# hdr's are files that will get run through h2tok.pl
+#
+obfesbchdrs = \
+    $(stackincdir)/bt_types.h \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(componentdir)/gki/common/gki.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/embdrv/sbc/encoder/include/sbc_encoder.h
+
+obfesbc = $(obfesbcdir)/sbc_analysis.c
+
+
+#################
+# SBC Decoder
+#################
+
+
+obfdsbccfg = \
+    -i $(componentdir)/embdrv/sbc/decoder/include \
+    -i $(componentdir)/embdrv/sbc/decoder/srce \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hi bt_types.h \
+    -hs dyn_mem.h \
+    -hi gki.h \
+    -hi sbc_basicop.h \
+    -hi sbc_dec_func_declare.h \
+    -hi sbc_decoder.h \
+    -hi sbc_types.h \
+    -hi bte_stack_entry.h 
+
+# hdr's are files that will get run through h2tok.pl
+#
+obfdsbchdrs = \
+    $(stackincdir)/bt_types.h \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(componentdir)/gki/common/gki.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/embdrv/sbc/decoder/include/sbc_decoder.h
+
+obfdsbc = $(obfdsbcdir)/sbc_basicop.c
+
+#################
+#  A2DP SBC Interface
+#################
+
+obfa2dpcfg = \
+    -i $(componentdir)/stack/a2dp \
+    -i $(componentdir)/stack/include \
+    -i $(componentdir)/rpc/include \
+    -i $(projectdir)/bte/main \
+    -i $(projectdir)/bte/build \
+    -i $(componentdir)/gki/common \
+    -i $(bsadir)/gki/$(os_name) \
+    -i $(obfdir) \
+    -i $(appdir)/include/ \
+    -hs buildcfg.h \
+    -hi bt_trace.h \
+    -hs bt_target.h \
+    -hi data_types.h \
+    -hs bt_types.h \
+    -hs dyn_mem.h \
+    -hi gki.h \
+    -hi bte_stack_entry.h \
+    -hi sdp_api.h \
+    -hi sdpint.h \
+    -hi sdpdefs.h \
+    -hi a2d_api.h \
+    -hi a2d_int.h \
+    -hi a2d_sbc.h
+
+# hdr's are files that will get run through h2tok.pl
+#
+obfa2dphdrs = \
+    $(projectdir)/bte/main/bt_target.h \
+    $(projectdir)/bte/main/bt_trace.h \
+    $(stackincdir)/dyn_mem.h \
+    $(componentdir)/gki/common/gki.h \
+    $(bsadir)/gki/$(os_name)/data_types.h \
+    $(componentdir)/stack/a2dp/a2d_int.h \
+    $(componentdir)/stack/include/a2d_api.h \
+    $(componentdir)/stack/include/a2d_sbc.h 
+
+obfa2dp = $(obfa2dpdir)/a2d_sbc.c
+endif
+
+
+# Obfuscation targets
+
+obfsrc = $(obfbtm)
+
+ifeq ($(strip $(SBC_ENCODER_INCLUDED)),TRUE)
+obfsrc = $(obfa2dp) \
+	$(obfesbc) \
+	$(obfdsbc) \
+	$(obfbtm)
+endif
+ifeq ($(strip $(BTA_FM_INCLUDED)),TRUE)
+obfsrc := $(obfsrc) \
+	$(obffm)
+endif
+ifeq ($(strip $(BTA_FMTX_INCLUDED)),TRUE)
+obfsrc := $(obfsrc) \
+	$(obffmtxenc)
+endif
+ 
+
+
+#  Obfuscation Target -- END
+
+
+
+
+###############################################################################
+########################obf.tgt###################################################
+
+
+
+#  Obfuscation Target -- START
+
+$(obftmpdir):
+	@$(ECHO) Creating temporary directory to hold obfuscated files.
+	@$(MKDIR) $(obftmpdir)
+
+$(obfdir):
+	@$(ECHO) Creating obf directory to hold obfuscated files.
+	-@$(MKDIR) $(obfdir)
+
+$(obfbtmdir): $(obfdir)
+	@$(ECHO) Creating $@ directory to hold obfuscated files.
+	-@$(MKDIR) $(obfbtmdir)
+
+$(obfsbcdir): $(obfdir)
+	@$(ECHO) Creating $@  directory to hold obfuscated files.
+	-@$(MKDIR) $(obfsbcdir)
+
+$(obfesbcdir): $(obfsbcdir)
+	@$(ECHO) Creating obf $@ directory to hold obfuscated files.
+	-@$(MKDIR) $(obfesbcdir)
+
+$(obfdsbcdir): $(obfsbcdir)
+	@$(ECHO) Creating obf $@ directories to hold obfuscated files.
+	-@$(MKDIR) $(obfdsbcdir)
+
+$(obfa2dpdir): $(obfsbcdir)
+	@$(ECHO) Creating obf $@ directories to hold obfuscated files.
+	-@$(MKDIR) $(obfa2dpdir)
+
+$(obffmdir): $(obfdir)
+	@$(ECHO) Creating obf $@ directories to hold obfuscated files.
+	-@$(MKDIR) $@
+
+$(obffmtxencdir): $(obfdir)
+	@$(ECHO) Creating obf $@ directories to hold obfuscated files.
+	-@$(MKDIR) $(obfdir)/fmtx
+	-@$(MKDIR) $(obfdir)/fmtx/rds_enc
+
+
+####################
+# BTM OBFUSCATION
+####################
+
+$(obfbtm): $(cfgfile) $(obfbtmhdrs) $(obftmpdir) $(obfbtmdir)
+	@$(ECHO) Generating Obfuscated BTM files
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) $(cobfdir)/etc/*.tok .
+	@$(CP) $(cobfdir)/etc/*.mak .
+	@$(CP) $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obfbtmhdrs)
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h
+	@$(widcommtools)/cobf.exe -x l1009 $(cobfcfg) $(obfbtmcfg) $(btmsrcs)
+	@$(CP) $(stackdir)/btm/btm_int.h $(obfbtmdir)
+	@$(RM) $(obfdir)/bte_stack_entry.h
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+#	@$(RM) $(obftmpdir)/slip_api.h
+#	@$(RM) $(obftmpdir)/bttrc_int.h
+	@$(CP) $(obftmpdir)/*.c $(obfbtmdir)
+	@$(CP) $(obftmpdir)/*.h $(obfbtmdir)
+	@$(RM) $(obftmpdir)/*.h
+	@$(RM) $(obftmpdir)/*.c
+
+
+ifeq ($(strip $(SBC_ENCODER_INCLUDED)),TRUE)
+
+
+####################
+# SBC ENCODER 
+####################
+
+$(obfesbc): $(cfgfile) $(obfesbchdrs) $(obftmpdir) $(obfesbcdir)
+	@$(ECHO) Generating Obfuscated SBC Encoder files
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) $(cobfdir)/etc/*.tok .
+	@$(CP) $(cobfdir)/etc/*.mak .
+	@$(CP) $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obfesbchdrs)
+	@$(ECHO) "BUILDCFG" >> macros.tok
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h;
+	@$(widcommtools)/cobf.exe -x l1010 $(cobfcfg) $(obfesbccfg) $(sbcencsrcs)
+	@$(RM) $(obfdir)/bte_stack_entry.h
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+	@$(CP) $(obftmpdir)/sbc_*.c $(obfesbcdir)
+	@$(CP) $(obftmpdir)/*cobf.h $(obfesbcdir)
+	@$(RM) $(obftmpdir)/sbc_*.c
+	@$(RM) $(obftmpdir)/*cobf.h
+
+
+####################
+# SBC DECODER 
+####################
+
+$(obfdsbc): $(cfgfile) $(obfdsbchdrs) $(obftmpdir) $(obfdsbcdir)
+	@$(ECHO) Generating Obfuscated SBC Decoder files
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) $(cobfdir)/etc/*.tok .
+	@$(CP) $(cobfdir)/etc/*.mak .
+	@$(CP) $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obfdsbchdrs)
+	@$(ECHO) "BUILDCFG" >> macros.tok
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h;
+	@$(widcommtools)/cobf.exe -x l1011 $(cobfcfg) $(obfdsbccfg) $(sbcdecsrcs)
+	@$(RM) $(obfdir)/bte_stack_entry.h
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+	@$(CP) $(obftmpdir)/sbc_*.c $(obfdsbcdir)
+	@$(CP) $(obftmpdir)/*cobf.h $(obfdsbcdir)
+	@$(RM) $(obftmpdir)/sbc_*.c
+	@$(RM) $(obftmpdir)/*cobf.h
+
+
+####################
+# A2DP SBC INTERFACE
+####################
+
+$(obfa2dp): $(cfgfile) $(obfa2dphdrs) $(obftmpdir) $(obfa2dpdir) 
+	@$(ECHO) Generating Obfuscated A2DP SBC Interface
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) -f $(cobfdir)/etc/*.tok .
+	@$(CP) -f $(cobfdir)/etc/*.mak .
+	@$(CP) -f $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obfa2dphdrs)
+	@$(ECHO) "BUILDCFG" >> macros.tok
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h;
+	@$(widcommtools)/cobf.exe -x l1100 $(cobfcfg) $(obfa2dpcfg) a2d_sbc.c
+	@$(RM) $(obfdir)/bte_stack_entry.h
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+	@$(RM) $(obftmpdir)/bt_types.h
+	@$(CP) $(obftmpdir)/a2d_sbc.c $(obfa2dpdir)
+	@$(CP) $(obftmpdir)/*cobf.h $(obfa2dpdir)
+	@$(RM) $(obftmpdir)/a2d_sbc.c
+	@$(RM) $(obftmpdir)/*cobf.h
+	
+endif
+
+
+####################
+# FM INTERFACE
+####################
+
+$(obffm): $(cfgfile) $(obffmhdrs) $(obftmpdir) $(obffmdir)
+	@$(ECHO) Generating Obfuscated FM Interface
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) $(cobfdir)/etc/*.tok .
+	@$(CP) $(cobfdir)/etc/*.mak .
+	@$(CP) $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obffmhdrs)
+	@$(ECHO) "BUILDCFG" >> macros.tok
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h;
+	@$(widcommtools)/cobf.exe -x l1300 $(cobfcfg) $(obffmcfg) $(fm_obf_srcs)
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+	@$(RM) $(obftmpdir)/bt_types.h
+	@$(CP) $(obftmpdir)/bta_fm_*.c $(obffmdir)
+	@$(CP) $(obftmpdir)/*cobf.h $(obffmdir)
+	@$(RM) $(obftmpdir)/bta_fm_*.c
+	@$(RM) $(obftmpdir)/*cobf.h
+	@$(RM) $(obftmpdir)/sdp_api.h
+	@$(RM) $(obftmpdir)/hcidefs.h
+	@$(RM) $(obftmpdir)/sdpdefs.h
+	@$(RM) $(obftmpdir)/btm_api.h	
+	@$(RM) $(obftmpdir)/bta_api.h
+	@$(RM) $(obftmpdir)/bta_fm_api.h
+
+
+####################
+# FMTX RDS_ENC INTERFACE
+####################
+
+$(obffmtxenc): $(cfgfile) $(obffmtxenchdrs) $(obftmpdir) $(obffmtxencdir)
+	@$(ECHO) Generating Obfuscated FMTX RDS_ENC Interface
+	@$(ECHO) Copy needed *.tok and *.mak  files to curent directory
+	@$(CP) $(cobfdir)/etc/*.tok .
+	@$(CP) $(cobfdir)/etc/*.mak .
+	@$(CP) $(cobfdir)/etc/pp_ger_msvc.bat .
+	@$(PERL) $(H2TOK) $(obffmtxenchdrs)
+	@$(ECHO) "BUILDCFG" >> macros.tok
+	@$(TOUCH) $(obfdir)/bte_stack_entry.h;
+	@$(widcommtools)/cobf.exe -x l1400 $(cobfcfg) $(obffmtxenccfg) $(fmtxenc_obf_srcs)
+	@$(RM) -f *.tok
+	@$(RM) -f c.mak cc.mak
+	@$(RM) -f pp_ger_msvc.bat
+	@$(RM) $(obftmpdir)/buildcfg.h
+	@$(RM) $(obftmpdir)/bt_target.h
+	@$(RM) $(obftmpdir)/bt_types.h
+	@$(RM) $(obftmpdir)/dyn_mem.h
+	@$(CP) $(obftmpdir)/bta_rds*.c $(obffmtxencdir)
+	@$(CP) $(obftmpdir)/*cobf.h $(obffmtxencdir)
+	@$(RM) $(obftmpdir)/bta_rds*.c
+	@$(RM) $(obftmpdir)/*cobf.h
+	@$(RM) $(obftmpdir)/bta_api.h
+	@$(RM) $(obftmpdir)/btm_api.h
+	@$(RM) $(obftmpdir)/hcidefs.h
+	@$(RM) $(obftmpdir)/sdpdefs.h
+	@$(RM) $(obftmpdir)/sdp_api.h
+
+
+makeobf: $(obfsrc)
+
+cleanobf: 
+	@$(ECHO) Removing obfuscation files 
+	@$(ECHO) Removing $(obftmpdir)/*.log
+	@$(RM) -rf $(obftmpdir)/*.log
+	@$(ECHO) Removing *.tok
+	@$(RM) -rf *.tok
+	@$(ECHO) Removing $(obfesbcdir)/*.*
+	@$(RM) -rf $(obfesbcdir)/*.*
+	@$(ECHO) Removing $(obfdsbcdir)/*.*
+	@$(RM) -rf $(obfdsbcdir)/*.*
+	@$(ECHO) Removing $(obfa2dpdir)/*.*
+	@$(RM) -rf $(obfa2dpdir)/*.*
+	@$(ECHO) Removing $(obfbtmdir)/*.*
+	@$(RM) -rf $(obfbtmdir)/*.*
+	@$(ECHO) Removing $(obffmdir)/*.*
+	@$(RM) -rf $(obffmdir)/*.*
+	@$(ECHO) Removing $(obffmtxencdir)/*.*
+	@$(RM) -rf $(obffmtxencdir)/*.*
+
+#  Obfuscation Target -- END
+
+
+# This is the endif of 'ifeq ($(strip $(obf)),TRUE)'
+endif 
+

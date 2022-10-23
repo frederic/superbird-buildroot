@@ -33,6 +33,7 @@
 #include <linux/cpufreq.h>
 #include <linux/cpuidle.h>
 #include <linux/timer.h>
+#include <linux/wakeup_reason.h>
 
 #include "../base.h"
 #include "power.h"
@@ -965,9 +966,10 @@ void dpm_complete(pm_message_t state)
 	}
 	list_splice(&list, &dpm_list);
 	mutex_unlock(&dpm_list_mtx);
-
+#ifndef CONFIG_AMLOGIC_MODIFY
 	/* Allow device probing and trigger re-probing of deferred devices */
 	device_unblock_probing();
+#endif
 	trace_suspend_resume(TPS("dpm_complete"), state.event, false);
 }
 
@@ -1353,6 +1355,7 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 	pm_callback_t callback = NULL;
 	char *info = NULL;
 	int error = 0;
+	char suspend_abort[MAX_SUSPEND_ABORT_LEN];
 	DECLARE_DPM_WATCHDOG_ON_STACK(wd);
 
 	TRACE_DEVICE(dev);
@@ -1373,6 +1376,9 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 		pm_wakeup_event(dev, 0);
 
 	if (pm_wakeup_pending()) {
+		pm_get_active_wakeup_sources(suspend_abort,
+			MAX_SUSPEND_ABORT_LEN);
+		log_suspend_abort_reason(suspend_abort);
 		async_error = -EBUSY;
 		goto Complete;
 	}
@@ -1627,7 +1633,7 @@ int dpm_prepare(pm_message_t state)
 
 	trace_suspend_resume(TPS("dpm_prepare"), state.event, true);
 	might_sleep();
-
+#ifndef CONFIG_AMLOGIC_MODIFY
 	/*
 	 * Give a chance for the known devices to complete their probes, before
 	 * disable probing of devices. This sync point is important at least
@@ -1641,7 +1647,7 @@ int dpm_prepare(pm_message_t state)
 	 * instead. The normal behavior will be restored in dpm_complete().
 	 */
 	device_block_probing();
-
+#endif
 	mutex_lock(&dpm_list_mtx);
 	while (!list_empty(&dpm_list)) {
 		struct device *dev = to_device(dpm_list.next);

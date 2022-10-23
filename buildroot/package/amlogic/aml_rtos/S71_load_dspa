@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Starts the input_eventd daemon.
+#
+
+
+case "$1" in
+  start)
+    # load firmware
+    if [ -f /lib/firmware/dspbootA_sram.bin ]; then
+        dsp_util --load2 --dsp hifi4a --firmware1 dspbootA_sdram.bin --firmware2 dspbootA_sram.bin
+    else
+        dsp_util --load --dsp hifi4a -f dspbootA.bin
+    fi
+    # Launch DSP rtos
+    dsp_util -S --dsp hifi4a
+    ;;
+  stop)
+    echo -n "Do thing: "
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|restart}"
+    exit 1
+esac
+
+exit 0

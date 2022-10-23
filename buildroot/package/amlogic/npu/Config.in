@@ -1,0 +1,42 @@
+config BR2_PACKAGE_NPU
+	bool "amlogic npu driver git repo"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  The git of amlogic npu driver git repo
+
+config BR2_PACKAGE_NPU_VERSION
+	string "amlogic npu branch" 
+	depends on BR2_PACKAGE_NPU
+	help
+	  the branch of amlogic npu driver
+
+config BR2_PACKAGE_NPU_GIT_URL
+	string "amlogic npu driver git repo url"
+	depends on BR2_PACKAGE_NPU
+	help
+	  the URL of amlogic npu driver git repo
+
+config BR2_PACKAGE_NPU_CUSTOM_TARBALL_LOCATION
+	string "amlogic npu driver tarball url"
+	depends on BR2_PACKAGE_NPU
+	help
+	  the URL of amlogic npu driver
+
+config BR2_PACKAGE_NPU_LOCAL
+	bool "amlogic npu driver local"
+	depends on BR2_PACKAGE_NPU
+	help
+		npu local
+
+config BR2_PACKAGE_NPU_LOCAL_PATH
+	string "amlogic npu local path"
+	depends on BR2_PACKAGE_NPU_LOCAL
+	depends on BR2_PACKAGE_NPU
+	help
+		npu local path
+
+config BR2_PACKAGE_NPU_NBG_IMAGE
+	string "amlogic npu NBG image"
+	depends on BR2_PACKAGE_NPU
+	help
+		npu local NBG image

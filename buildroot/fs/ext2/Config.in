@@ -9,6 +9,9 @@ if BR2_TARGET_ROOTFS_EXT2
 config BR2_TARGET_ROOTFS_EXT2_2
 	bool
 
+config BR2_PACKAGE_SWUPDATE_AB_SUPPORT
+    string "use a/b system"
+
 choice
 	bool "ext2/3/4 variant"
 	default BR2_TARGET_ROOTFS_EXT2_2r1
@@ -131,5 +134,10 @@ config BR2_TARGET_ROOTFS_EXT2_XZ
 	  Do compress the ext2 filesystem with xz.
 
 endchoice
+
+config BR2_TARGET_MBR_IMAGE
+	bool "mbr image"
+	help
+	  Create an image with an mbr
 
 endif # BR2_TARGET_ROOTFS_EXT2

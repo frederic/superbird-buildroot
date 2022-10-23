@@ -33,6 +33,7 @@ obj-y += nand_ecc.o
 obj-y += nand_base.o
 obj-y += nand_timings.o
 
+
 endif # not spl
 
 ifdef NORMAL_DRIVERS

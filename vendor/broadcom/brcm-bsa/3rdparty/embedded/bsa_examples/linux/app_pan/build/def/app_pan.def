@@ -1,0 +1,31 @@
+# list of required include directories for the current application
+appincdir := $(appdir)/include \
+             $(appdir)/../app_common/include
+
+# list of required source directories for the current application
+appsrcdir := $(appdir)/source \
+            $(appdir)/../app_common/source
+
+# list of sources for the current application
+appsrcs := \
+    app_pan_main.c \
+    app_pan.c \
+    app_pan_util.c \
+    app_pan_tap.c \
+    app_mgt.c \
+    app_disc.c \
+    app_utils.c \
+    app_thread.c \
+    app_xml_param.c \
+    app_xml_utils.c \
+    app_services.c \
+    app_mutex.c \
+    nanoxml.c
+
+# add the include and source directories to the whole project
+incdirs := $(incdirs) $(appincdir)
+srcdirs := $(srcdirs) $(appsrcdir)
+
+# add the list of sources to the current list
+appsources := $(appsources) $(appsrcs)
+

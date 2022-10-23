@@ -1,0 +1,79 @@
+config BR2_PACKAGE_COBALT
+	bool "Build Cobalt package"
+	select BR2_PACKAGE_PCIUTILS
+	select BR2_PACKAGE_PULSEAUDIO
+	select BR2_PACKAGE_KRB5
+	select BR2_PACKAGE_LIBEXIF
+	select BR2_PACKAGE_GCONF
+	select BR2_PACKAGE_LIBXKBCOMMON
+	select BR2_PACKAGE_CUPS
+	select BR2_PACKAGE_LIBNSS
+	select BR2_PACKAGE_PANGO
+	select BR2_PACKAGE_LIBPLAYER
+	select BR2_PACKAGE_WAYLAND
+	select BR2_PACKAGE_WAYLAND_PROTOCOLS
+	select BR2_PACKAGE_CA_CERTIFICATES
+	select BR2_PACKAGE_LIBSOUNDTOUCH
+	select BR2_PACKAGE_LIBSOUNDTOUCHCWRAP
+
+	help
+	  cobalt browser
+
+#	select BR2_PACKAGE_CAIRO
+#	select BR2_PACKAGE_FONTCONFIG
+#	select BR2_PACKAGE_LIBCAP
+#	select BR2_PACKAGE_NINJA
+#	select BR2_PACKAGE_OPENSSL
+
+config BR2_PACKAGE_COBALT_VERSION
+	string "Cobalt version"
+    default ""
+	help
+	  cobalt version
+
+if BR2_PACKAGE_COBALT
+
+choice
+	prompt "cobalt compile mode choice"
+	default BR2_PACKAGE_COBALT_PREBUILT
+	help
+	  Select using prebuilt cobalt binary package or recompile cobalt project.
+
+config BR2_PACKAGE_COBALT_COMPILE_ALL
+	bool "recompile the total cobalt"
+    select BR2_PACKAGE_BROWSER_TOOLCHAIN_DEPOT_TOOLS
+    select BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_AARCH64 if BR2_aarch64
+    select BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_ARMEABIHF if BR2_arm
+
+config BR2_PACKAGE_COBALT_PREBUILT
+	bool "Use prebuilt cobalt binary package"
+
+endchoice
+
+choice
+    prompt "cobalt graphic mode"
+    default BR2_PACKAGE_COBALT_GLES
+    depends on !BR2_PACKAGE_COBALT_PREBUILT
+    help
+      Select the graphic mode used by cobalt
+
+config BR2_PACKAGE_COBALT_GLES
+    bool "gles"
+    depends on BR2_PACKAGE_HAS_LIBGLES
+
+config BR2_PACKAGE_COBALT_DFB
+    bool "directfb"
+    depends on BR2_PACKAGE_DIRECTFB
+endchoice
+
+config BR2_PACKAGE_COBALT_WIDEVINE
+	bool "enable widevine drm support"
+    default n
+    depends on BR2_PACKAGE_COBALT_COMPILE_ALL && BR2_PACKAGE_WIDEVINE_BIN_VERSION_14
+
+config BR2_PACKAGE_COBALT_UPDATE_PREBUILD
+    bool "update cobalt prebuild"
+    default n
+    depends on BR2_PACKAGE_COBALT_COMPILE_ALL
+
+endif

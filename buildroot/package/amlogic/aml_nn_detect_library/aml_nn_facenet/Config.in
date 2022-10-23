@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_NN_FACENET
+    bool "aml nn facenet library"
+    depends on BR2_PACKAGE_NPU
+    help
+        Support nn facenet library
