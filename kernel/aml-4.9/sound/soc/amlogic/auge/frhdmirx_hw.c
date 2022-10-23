@@ -36,6 +36,9 @@ void frhdmirx_enable(bool enable)
 			0x0 << 28);
 
 	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 31, enable << 31);
+
+	/* from tm2 revb, need enable pao separately */
+	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 19, enable << 19);
 }
 
 /* source select

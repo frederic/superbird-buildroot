@@ -182,7 +182,7 @@ void osd_vsc_top_ini_rcv_num_set(struct osd_scaler_reg_s *reg, u32 data)
 /*vsc bank length??*/
 void osd_vsc_bank_length_set(struct osd_scaler_reg_s *reg, u32 data)
 {
-	VSYNCOSD_WR_MPEG_REG_BITS(reg->vpp_osd_vsc_ctrl0, data, 0, 2);
+	VSYNCOSD_WR_MPEG_REG_BITS(reg->vpp_osd_vsc_ctrl0, data, 0, 3);
 }
 /*********vsc config end**********/
 
@@ -244,7 +244,7 @@ void osd_hsc_ini_rcv_num0_set(struct osd_scaler_reg_s *reg, u32 data)
 /*hsc bank length*/
 void osd_hsc_bank_length_set(struct osd_scaler_reg_s *reg, u32 data)
 {
-	VSYNCOSD_WR_MPEG_REG_BITS(reg->vpp_osd_hsc_ctrl0, data, 0, 2);
+	VSYNCOSD_WR_MPEG_REG_BITS(reg->vpp_osd_hsc_ctrl0, data, 0, 3);
 }
 /*
  *hsc init pattern
@@ -352,12 +352,12 @@ void osd_sc_coef_set(struct osd_scaler_reg_s *reg, bool flag, u32 *coef)
 }
 /*********sc top ctrl end************/
 static void f2v_get_vertical_phase(
-	u32 zoom_ratio, enum f2v_vphase_type_e type,
-	u8 bank_length, struct f2v_vphase_s *vphase)
+	u32 zoom_ratio, enum osd_scaler_f2v_vphase_type_e type,
+	u8 bank_length, struct osd_scaler_f2v_vphase_s *vphase)
 {
-	u8 f2v_420_in_pos_luma[F2V_TYPE_MAX] = {
+	u8 f2v_420_in_pos_luma[OSD_SCALER_F2V_TYPE_MAX] = {
 		0, 2, 0, 2, 0, 0, 0, 2, 0};
-	u8 f2v_420_out_pos[F2V_TYPE_MAX] = {
+	u8 f2v_420_out_pos[OSD_SCALER_F2V_TYPE_MAX] = {
 		0, 2, 2, 0, 0, 2, 0, 0, 0};
 	s32 offset_in, offset_out;
 
@@ -399,7 +399,7 @@ void osd_scaler_config(struct osd_scaler_reg_s *reg,
 	u32 hsc_init_rec_num, hsc_init_rpt_p0_num, hsc_bank_length;
 	u32 vsc_bot_init_rec_num, vsc_top_rpt_l0_num, vsc_bot_rpt_l0_num;
 	u32 vsc_top_init_phase, vsc_bot_init_phase;
-	struct f2v_vphase_s vphase;
+	struct osd_scaler_f2v_vphase_s vphase;
 	u8 version = vblk->pipeline->osd_version;
 	u32 linebuffer = scaler->linebuffer;
 	u32 bank_length = scaler->bank_length;
@@ -436,19 +436,19 @@ void osd_scaler_config(struct osd_scaler_reg_s *reg,
 		phase_step_v =
 			(height_in << OSD_ZOOM_HEIGHT_BITS) / height_out;
 	if (scan_mode_out) {
-		f2v_get_vertical_phase(phase_step_v, F2V_P2IT,
+		f2v_get_vertical_phase(phase_step_v, OSD_SCALER_F2V_P2IT,
 			vsc_bank_length, &vphase);
 		vsc_top_init_rec_num = vphase.rcv_num;
 		vsc_top_rpt_l0_num = vphase.rpt_num;
 		vsc_top_init_phase = vphase.phase;
-		f2v_get_vertical_phase(phase_step_v, F2V_P2IB,
+		f2v_get_vertical_phase(phase_step_v, OSD_SCALER_F2V_P2IB,
 			vsc_bank_length, &vphase);
 		vsc_bot_init_rec_num = vphase.rcv_num;
 		vsc_bot_rpt_l0_num = vphase.rpt_num;
 		vsc_bot_init_phase = vphase.phase;
 	} else {
 		f2v_get_vertical_phase(
-			phase_step_v, F2V_P2P,
+			phase_step_v, OSD_SCALER_F2V_P2P,
 			vsc_bank_length, &vphase);
 		vsc_top_init_rec_num = vphase.rcv_num;
 		vsc_top_rpt_l0_num = vphase.rpt_num;

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_LOGWRAPPER
+    bool "logwrapper"
+    help
+      logwrapper

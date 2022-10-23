@@ -1,7 +1,7 @@
 /*
  * Platform Dependent file for usage of Preallocted Memory
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_custom_memprealloc.c 744015 2018-01-31 05:51:10Z $
+ * $Id: dhd_custom_memprealloc.c 805764 2019-02-20 08:46:57Z $
  */
 
 #include <linux/device.h>
@@ -175,8 +175,8 @@ void
 	if (section == WLAN_STATIC_DHD_INFO_BUF) {
 		if (size > WLAN_DHD_INFO_BUF_SIZE) {
 			pr_err("request DHD_INFO size(%lu) is bigger than"
-				   " static size(%d).\n", size,
-				   WLAN_DHD_INFO_BUF_SIZE);
+				" static size(%d).\n", size,
+				WLAN_DHD_INFO_BUF_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_info_buf;
@@ -185,8 +185,8 @@ void
 	if (section == WLAN_STATIC_DHD_WLFC_BUF)  {
 		if (size > WLAN_DHD_WLFC_BUF_SIZE) {
 			pr_err("request DHD_WLFC size(%lu) is bigger than"
-				   " static size(%d).\n",
-				   size, WLAN_DHD_WLFC_BUF_SIZE);
+				" static size(%d).\n",
+				size, WLAN_DHD_WLFC_BUF_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_wlfc_buf;
@@ -195,8 +195,8 @@ void
 	if (section == WLAN_STATIC_DHD_WLFC_HANGER) {
 		if (size > WLAN_DHD_WLFC_HANGER_SIZE) {
 			pr_err("request DHD_WLFC_HANGER size(%lu) is bigger than"
-				   " static size(%d).\n",
-				   size, WLAN_DHD_WLFC_HANGER_SIZE);
+				" static size(%d).\n",
+				size, WLAN_DHD_WLFC_HANGER_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_wlfc_hanger;
@@ -205,8 +205,8 @@ void
 	if (section == WLAN_STATIC_DHD_IF_FLOW_LKUP)  {
 		if (size > WLAN_DHD_IF_FLOW_LKUP_SIZE) {
 			pr_err("request DHD_WLFC size(%lu) is bigger than"
-				   " static size(%d).\n",
-				   size, WLAN_DHD_WLFC_BUF_SIZE);
+				" static size(%d).\n",
+				size, WLAN_DHD_WLFC_BUF_SIZE);
 			return NULL;
 		}
 		return wlan_static_if_flow_lkup;
@@ -215,8 +215,8 @@ void
 	if (section == WLAN_STATIC_DHD_MEMDUMP_RAM) {
 		if (size > WLAN_DHD_MEMDUMP_SIZE) {
 			pr_err("request DHD_MEMDUMP_RAM size(%lu) is bigger"
-				   " than static size(%d).\n",
-				   size, WLAN_DHD_MEMDUMP_SIZE);
+				" than static size(%d).\n",
+				size, WLAN_DHD_MEMDUMP_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_memdump_ram;
@@ -225,8 +225,8 @@ void
 	if (section == WLAN_STATIC_DHD_PKTID_MAP)  {
 		if (size > WLAN_DHD_PKTID_MAP_SIZE) {
 			pr_err("request DHD_PKTID_MAP size(%lu) is bigger than"
-				   " static size(%d).\n",
-				   size, WLAN_DHD_PKTID_MAP_SIZE);
+				" static size(%d).\n",
+				size, WLAN_DHD_PKTID_MAP_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_pktid_map;
@@ -235,8 +235,8 @@ void
 	if (section == WLAN_STATIC_DHD_PKTID_IOCTL_MAP)  {
 		if (size > WLAN_DHD_PKTID_IOCTL_MAP_SIZE) {
 			pr_err("request DHD_PKTID_IOCTL_MAP size(%lu) is bigger than"
-				   " static size(%d).\n",
-				   size, WLAN_DHD_PKTID_IOCTL_MAP_SIZE);
+				" static size(%d).\n",
+				size, WLAN_DHD_PKTID_IOCTL_MAP_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_pktid_ioctl_map;
@@ -245,8 +245,8 @@ void
 	if (section == WLAN_STATIC_DHD_LOG_DUMP_BUF) {
 		if (size > DHD_LOG_DUMP_BUF_SIZE) {
 			pr_err("request DHD_LOG_DUMP_BUF size(%lu) is bigger then"
-				   " static size(%d).\n",
-				   size, DHD_LOG_DUMP_BUF_SIZE);
+				" static size(%d).\n",
+				size, DHD_LOG_DUMP_BUF_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_log_dump_buf;
@@ -255,8 +255,8 @@ void
 	if (section == WLAN_STATIC_DHD_LOG_DUMP_BUF_EX) {
 		if (size > DHD_LOG_DUMP_BUF_EX_SIZE) {
 			pr_err("request DHD_LOG_DUMP_BUF_EX size(%lu) is bigger then"
-				   " static size(%d).\n",
-				   size, DHD_LOG_DUMP_BUF_EX_SIZE);
+				" static size(%d).\n",
+				size, DHD_LOG_DUMP_BUF_EX_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_log_dump_buf_ex;
@@ -265,8 +265,8 @@ void
 	if (section == WLAN_STATIC_DHD_PKTLOG_DUMP_BUF) {
 		if (size > DHD_PKTLOG_DUMP_BUF_SIZE) {
 			pr_err("request DHD_PKTLOG_DUMP_BUF size(%lu) is bigger then"
-				   " static size(%d).\n",
-				   size, DHD_PKTLOG_DUMP_BUF_SIZE);
+					" static size(%d).\n",
+					size, DHD_PKTLOG_DUMP_BUF_SIZE);
 			return NULL;
 		}
 		return wlan_static_dhd_pktlog_dump_buf;
@@ -290,12 +290,14 @@ dhd_init_wlan_mem(void)
 	int i;
 	int j;
 
+#if !defined(CONFIG_BCMDHD_PCIE)
 	for (i = 0; i < DHD_SKB_1PAGE_BUF_NUM; i++) {
 		wlan_static_skb[i] = __dev_alloc_skb(DHD_SKB_1PAGE_BUFSIZE, GFP_KERNEL);
 		if (!wlan_static_skb[i]) {
 			goto err_skb_alloc;
 		}
 	}
+#endif /* !CONFIG_BCMDHD_PCIE */
 
 	for (i = DHD_SKB_1PAGE_BUF_NUM; i < WLAN_SKB_1_2PAGE_BUF_NUM; i++) {
 		wlan_static_skb[i] = __dev_alloc_skb(DHD_SKB_2PAGE_BUFSIZE, GFP_KERNEL);
@@ -354,7 +356,7 @@ dhd_init_wlan_mem(void)
 
 #ifdef CONFIG_BCMDHD_PCIE
 	wlan_static_if_flow_lkup = kmalloc(WLAN_DHD_IF_FLOW_LKUP_SIZE,
-									   GFP_KERNEL);
+		GFP_KERNEL);
 	if (!wlan_static_if_flow_lkup) {
 		pr_err("Failed to alloc wlan_static_if_flow_lkup\n");
 		goto err_mem_alloc;
@@ -362,14 +364,14 @@ dhd_init_wlan_mem(void)
 
 #ifdef CONFIG_BCMDHD_PREALLOC_PKTIDMAP
 	wlan_static_dhd_pktid_map = kmalloc(WLAN_DHD_PKTID_MAP_SIZE,
-										GFP_KERNEL);
+		GFP_KERNEL);
 	if (!wlan_static_dhd_pktid_map) {
 		pr_err("Failed to alloc wlan_static_dhd_pktid_map\n");
 		goto err_mem_alloc;
 	}
 
 	wlan_static_dhd_pktid_ioctl_map = kmalloc(WLAN_DHD_PKTID_IOCTL_MAP_SIZE,
-									  GFP_KERNEL);
+		GFP_KERNEL);
 	if (!wlan_static_dhd_pktid_ioctl_map) {
 		pr_err("Failed to alloc wlan_static_dhd_pktid_ioctl_map\n");
 		goto err_mem_alloc;
@@ -377,14 +379,14 @@ dhd_init_wlan_mem(void)
 #endif /* CONFIG_BCMDHD_PREALLOC_PKTIDMAP */
 #else
 	wlan_static_dhd_wlfc_buf = kmalloc(WLAN_DHD_WLFC_BUF_SIZE,
-									   GFP_KERNEL);
+		GFP_KERNEL);
 	if (!wlan_static_dhd_wlfc_buf) {
 		pr_err("Failed to alloc wlan_static_dhd_wlfc_buf\n");
 		goto err_mem_alloc;
 	}
 
 	wlan_static_dhd_wlfc_hanger = kmalloc(WLAN_DHD_WLFC_HANGER_SIZE,
-										  GFP_KERNEL);
+		GFP_KERNEL);
 	if (!wlan_static_dhd_wlfc_hanger) {
 		pr_err("Failed to alloc wlan_static_dhd_wlfc_hanger\n");
 		goto err_mem_alloc;

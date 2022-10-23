@@ -29,6 +29,13 @@ endif # BR2_ROOTFS_DEVICE_CREATION_STATIC
 
 ROOTFS_CPIO_PRE_GEN_HOOKS += ROOTFS_CPIO_ADD_INIT
 
+# --reproducible option was introduced in cpio v2.12, which may not be
+# available in some old distributions, so we build host-cpio
+ifeq ($(BR2_REPRODUCIBLE),y)
+ROOTFS_CPIO_DEPENDENCIES += host-cpio
+ROOTFS_CPIO_OPTS += --reproducible
+endif
+
 RECOVERY_OTA_DIR := $(patsubst "%",%,$(BR2_RECOVERY_OTA_DIR))
 ifneq ($(BR2_TARGET_ROOTFS_INITRAMFS_LIST),"")
 ifeq ($(BR2_PACKAGE_SWUPDATE),y)
@@ -63,7 +70,7 @@ endef
 endif
 else
 define ROOTFS_CPIO_CMD
-	cd $(TARGET_DIR) && find . | cpio --quiet -o -H newc > $@
+	cd $(TARGET_DIR) && find . | cpio $(ROOTFS_CPIO_OPTS) --quiet -o -H newc > $@
 endef
 endif # BR2_TARGET_ROOTFS_INITRAMFS_LIST
 

@@ -15,11 +15,13 @@
 #ifndef OPTEE_PRIVATE_H
 #define OPTEE_PRIVATE_H
 
+#include <linux/device.h>
 #include <linux/arm-smccc.h>
 #include <linux/semaphore.h>
 #include <linux/types.h>
 #include "tee_drv.h"
 #include "optee_msg.h"
+#include "../tee_private.h"
 
 #define OPTEE_MAX_ARG_SIZE	1024
 
@@ -74,6 +76,19 @@ struct optee_supp {
 };
 
 /**
+ * struct optee_timer - timer struct
+ * @mutex:          held while accessing timer_list
+ * @timer_list:     list of timer data
+ * @wq:             work queue of the timer
+ */
+
+struct optee_timer {
+	struct mutex mutex;
+	struct list_head timer_list;
+	struct workqueue_struct *wq;
+};
+
+/**
  * struct optee - main service struct
  * @supp_teedev:	supplicant device
  * @teedev:		client device
@@ -92,6 +107,7 @@ struct optee {
 	struct optee_call_queue call_queue;
 	struct optee_wait_queue wait_queue;
 	struct optee_supp supp;
+	struct optee_timer timer;
 	struct tee_shm_pool *pool;
 	void *memremaped_shm;
 };
@@ -154,6 +170,9 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
 int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
 		       const struct tee_param *params);
 
+int optee_log_init(struct tee_device *, phys_addr_t, uint32_t);
+void optee_log_exit(struct tee_device *);
+
 /*
  * Small helpers
  */
@@ -168,5 +187,9 @@ static inline void reg_pair_from_64(u32 *reg0, u32 *reg1, u64 val)
 	*reg0 = val >> 32;
 	*reg1 = val;
 }
+
+void optee_timer_init(struct optee_timer *timer);
+void optee_timer_destroy(struct optee_timer *timer);
+void optee_timer_missed_destroy(struct tee_context *ctx, u32 session);
 
 #endif /*OPTEE_PRIVATE_H*/

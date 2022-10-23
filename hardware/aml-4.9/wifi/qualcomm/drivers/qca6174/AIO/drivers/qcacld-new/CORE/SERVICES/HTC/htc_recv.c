@@ -57,8 +57,8 @@ void DebugDumpBytes(A_UCHAR *buffer, A_UINT16 length, char *pDescription)
         if(count == 16) {
             count = 0;
             offset = 0;
-            //A_SNPRINTF(byteOffsetStr, sizeof(byteOffset), "%4.4X",byteOffset);
-            A_PRINTF("[%x]: %s\n", byteOffset, stream);
+            A_SNPRINTF(byteOffsetStr, sizeof(byteOffset), "%4.4X",byteOffset);
+            A_PRINTF("[%s]: %s\n", byteOffsetStr, stream);
             A_MEMZERO(stream, 60);
             byteOffset += 16;
         }

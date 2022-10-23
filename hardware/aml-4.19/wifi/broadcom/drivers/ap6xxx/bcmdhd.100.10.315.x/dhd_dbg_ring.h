@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_dbg_ring.h 754183 2018-03-26 11:15:16Z $
+ * $Id: dhd_dbg_ring.h 795094 2018-12-17 08:56:58Z $
  */
 
 #ifndef __DHD_DBG_RING_H__
@@ -81,6 +81,7 @@ typedef struct dhd_dbg_ring {
 	uint32  ring_size;	/* numbers of item in ring */
 	uint32  wp;		/* write pointer */
 	uint32  rp;		/* read pointer */
+	uint32  rp_tmp;		/* tmp read pointer */
 	uint32  log_level;	/* log_level */
 	uint32  threshold;	/* threshold bytes */
 	void *  ring_buf;	/* pointer of actually ring buffer */
@@ -90,6 +91,7 @@ typedef struct dhd_dbg_ring {
 	bool tail_padded;	/* writer does not have enough space */
 	uint32 rem_len;		/* number of bytes from wp_pad to end */
 	bool sched_pull;	/* schedule reader immediately */
+	bool pull_inactive;	/* pull contents from ring even if it is inactive */
 } dhd_dbg_ring_t;
 
 #define DBGRING_FLUSH_THRESHOLD(ring)		(ring->ring_size / 3)
@@ -109,6 +111,7 @@ typedef struct dhd_dbg_ring {
 #define ENTRY_LENGTH(hdr) ((hdr)->len + DBG_RING_ENTRY_SIZE)
 #define PAYLOAD_MAX_LEN 65535
 #define PAYLOAD_ECNTR_MAX_LEN 1648u
+#define PAYLOAD_RTT_MAX_LEN 1648u
 #define PENDING_LEN_MAX 0xFFFFFFFF
 #define DBG_RING_STATUS_SIZE (sizeof(dhd_dbg_ring_status_t))
 
@@ -122,16 +125,16 @@ typedef struct dhd_dbg_ring {
 typedef void (*os_pullreq_t)(void *os_priv, const int ring_id);
 
 int dhd_dbg_ring_init(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring, uint16 id, uint8 *name,
-					  uint32 ring_sz, void *allocd_buf);
+		uint32 ring_sz, void *allocd_buf, bool pull_inactive);
 void dhd_dbg_ring_deinit(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring);
 int dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data);
 int dhd_dbg_ring_pull(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
-					  bool strip_hdr);
+		bool strip_hdr);
 int dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
-							 bool strip_header);
+	bool strip_header);
 uint32 dhd_dbg_ring_get_pending_len(dhd_dbg_ring_t *ring);
 void dhd_dbg_ring_sched_pull(dhd_dbg_ring_t *ring, uint32 pending_len,
-							 os_pullreq_t pull_fn, void *os_pvt, const int id);
+		os_pullreq_t pull_fn, void *os_pvt, const int id);
 int dhd_dbg_ring_config(dhd_dbg_ring_t *ring, int log_level, uint32 threshold);
 void dhd_dbg_ring_start(dhd_dbg_ring_t *ring);
 #endif /* __DHD_DBG_RING_H__ */

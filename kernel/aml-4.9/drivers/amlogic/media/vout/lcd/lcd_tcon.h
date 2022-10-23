@@ -40,13 +40,12 @@ struct lcd_tcon_data_s {
 	unsigned int ctrl_timing_offset;
 	unsigned int ctrl_timing_cnt;
 
-	unsigned int axi_mem_size;
-	unsigned int core_size;
+	unsigned int resv_mem_size;
+	unsigned int axi_size;
 	unsigned int vac_size;
-	unsigned int vac_mem_offset;
 	unsigned int demura_set_size;
 	unsigned int demura_lut_size;
-	unsigned int demura_lut_mem_offset;
+	unsigned int acc_lut_size;
 	unsigned char *reg_table;
 
 	int (*tcon_enable)(struct lcd_config_s *pconf);
@@ -54,24 +53,33 @@ struct lcd_tcon_data_s {
 
 struct tcon_rmem_s {
 	unsigned char flag;
-	void *mem_vaddr;
-	unsigned char *core_mem_vaddr;
+	void *resv_mem_vaddr;
+	unsigned char *data_mem_vaddr;
+	unsigned char *axi_mem_vaddr;
 	unsigned char *vac_mem_vaddr;
 	unsigned char *demura_set_vaddr;
 	unsigned char *demura_lut_vaddr;
-	phys_addr_t mem_paddr;
-	phys_addr_t core_mem_paddr;
+	unsigned char *acc_lut_vaddr;
+	phys_addr_t resv_mem_paddr;
+	phys_addr_t data_mem_paddr;
+	phys_addr_t axi_mem_paddr;
 	phys_addr_t vac_mem_paddr;
 	phys_addr_t demura_set_paddr;
 	phys_addr_t demura_lut_paddr;
-	unsigned int mem_size;
-	unsigned int core_mem_size;
+	phys_addr_t acc_lut_paddr;
+	unsigned int resv_mem_size;
+	unsigned int data_mem_size;
+	unsigned int axi_mem_size;
 	unsigned int vac_mem_size;
 	unsigned int demura_set_mem_size;
 	unsigned int demura_lut_mem_size;
+	unsigned int acc_lut_mem_size;
 	unsigned int vac_valid;
 	unsigned int demura_valid;
+	unsigned int acc_valid;
 };
+
+struct tcon_rmem_s *lcd_tcon_rmem_get(void);
 
 /* **********************************
  * tcon config

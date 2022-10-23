@@ -40,14 +40,12 @@
 #define VP5_TEMPBUF_SIZE                  (1024*1024)
 #define VP5_TASK_BUF_OFFSET               (2*1024*1024)   // common mem = | codebuf(1M) | tempBuf(1M) | taskbuf0x0 ~ 0xF |
 
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
 #define VP5_SUBSAMPLED_ONE_SIZE(_w, _h)       ((((_w/4)+15)&~15)*(((_h/4)+7)&~7))
-#define VP5_AVC_SUBSAMPLED_ONE_SIZE(_w, _h)   ((((_w/4)+31)&~31)*(((_h/4)+3)&~3))
+#define VP5_SUBSAMPLED_ONE_SIZE_AVC(_w, _h)   ((((_w/4)+31)&~31)*(((_h/4)+3)&~3))
 
 #define BSOPTION_ENABLE_EXPLICIT_END        (1<<0)
 
@@ -96,8 +94,7 @@ extern RetCode Vp5VpuSleepWake(
     Uint32 coreIdx,
     int iSleepWake,
     const Uint16* code,
-    Uint32 size,
-    BOOL reset
+    Uint32 size
     );
 
 extern RetCode Vp5VpuReset(

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -110,11 +110,6 @@ OVXLIB_API const char * vsi_nn_VxResourceGetPath();
 OVXLIB_API void vsi_nn_VxResourceSetPath
     (
     char* path
-    );
-
-OVXLIB_API const char * vsi_nn_VxResourceGetResource
-    (
-    char* name
     );
 
 OVXLIB_API const uint8_t * vsi_nn_VxBinResourceGetResource

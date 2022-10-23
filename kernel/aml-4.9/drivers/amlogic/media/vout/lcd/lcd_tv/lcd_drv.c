@@ -157,6 +157,7 @@ static void lcd_venc_set(struct lcd_config_s *pconf)
 	lcd_vcbus_write(ENCL_VIDEO_VAVON_ELINE, v_active - 1  + video_on_line);
 	switch (pconf->lcd_basic.lcd_type) {
 	case LCD_P2P:
+	case LCD_MLVDS:
 		lcd_vcbus_write(ENCL_VIDEO_V_PRE_DE_BLINE,
 			video_on_line - 1 - 4);
 		lcd_vcbus_write(ENCL_VIDEO_V_PRE_DE_ELINE,
@@ -573,13 +574,21 @@ static void lcd_vbyone_hw_filter(int flag)
 			temp = (period >> 16) & 0xf;
 			lcd_vcbus_write(VBO_INFILTER_TICK_PERIOD_H, temp);
 			/* hpd */
-			temp = vx1_conf->hw_filter_cnt & 0xf;
-			temp = (temp == 0) ? 0x7 : temp;
-			lcd_vcbus_setb(VBO_INSGN_CTRL, temp, 8, 4);
+			temp = vx1_conf->hw_filter_cnt & 0xff;
+			if (temp == 0xff) {
+				lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 8, 4);
+			} else {
+				temp = (temp == 0) ? 0x7 : temp;
+				lcd_vcbus_setb(VBO_INSGN_CTRL, temp, 8, 4);
+			}
 			/* lockn */
-			temp = (vx1_conf->hw_filter_cnt >> 8) & 0xf;
-			temp = (temp == 0) ? 0x7 : temp;
-			lcd_vcbus_setb(VBO_INSGN_CTRL, temp, 12, 4);
+			temp = (vx1_conf->hw_filter_cnt >> 8) & 0xff;
+			if (temp == 0xff) {
+				lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 12, 4);
+			} else {
+				temp = (temp == 0) ? 0x7 : temp;
+				lcd_vcbus_setb(VBO_INSGN_CTRL, temp, 12, 4);
+			}
 		} else {
 			temp = (vx1_conf->hw_filter_time >> 8) & 0x1;
 			if (temp) {
@@ -587,15 +596,40 @@ static void lcd_vbyone_hw_filter(int flag)
 						0xff);
 				lcd_vcbus_write(VBO_INFILTER_TICK_PERIOD_H,
 						0x0);
-				lcd_vcbus_setb(VBO_INSGN_CTRL, 0x7, 8, 4);
-				lcd_vcbus_setb(VBO_INSGN_CTRL, 0x7, 12, 4);
-				LCDPR("%s: %d change to min for debug\n",
-				       __func__, flag);
+				lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 8, 4);
+				lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 12, 4);
+				LCDPR("%s: %d disable for debug\n",
+				      __func__, flag);
 			}
 		}
 		break;
 	default:
-		lcd_vcbus_write(VBO_INFILTER_CTRL, 0xff77);
+		if (flag) {
+			lcd_vcbus_setb(VBO_INFILTER_CTRL, 0xff, 8, 8);
+			/* hpd */
+			temp = vx1_conf->hw_filter_cnt & 0xff;
+			if (temp == 0xff) {
+				lcd_vcbus_setb(VBO_INFILTER_CTRL, 0, 0, 3);
+			} else {
+				temp = (temp == 0) ? 0x7 : temp;
+				lcd_vcbus_setb(VBO_INFILTER_CTRL, temp, 0, 3);
+			}
+			/* lockn */
+			temp = (vx1_conf->hw_filter_cnt >> 8) & 0xff;
+			if (temp == 0xff) {
+				lcd_vcbus_setb(VBO_INFILTER_CTRL, 0, 4, 3);
+			} else {
+				temp = (temp == 0) ? 0x7 : temp;
+				lcd_vcbus_setb(VBO_INFILTER_CTRL, temp, 4, 3);
+			}
+		} else {
+			temp = (vx1_conf->hw_filter_time >> 8) & 0x1;
+			if (temp) {
+				lcd_vcbus_write(VBO_INFILTER_CTRL, 0xff00);
+				LCDPR("%s: %d disable for debug\n",
+				      __func__, flag);
+			}
+		}
 		break;
 	}
 }
@@ -717,6 +751,8 @@ static void lcd_vbyone_control_set(struct lcd_config_s *pconf)
 	 * lcd_vcbus_setb(VBO_PXL_CTRL,0x3,VBO_PXL_CTR1_BIT,VBO_PXL_CTR1_WID);
 	 * set_vbyone_ctlbits(1,0,0);
 	 */
+	/* VBO_RGN_GEN clk always on */
+	lcd_vcbus_setb(VBO_GCLK_MAIN, 2, 2, 2);
 
 	/* PAD select: */
 	if ((lane_count == 1) || (lane_count == 2))
@@ -730,7 +766,7 @@ static void lcd_vbyone_control_set(struct lcd_config_s *pconf)
 	/* Mux pads in combo-phy: 0 for dsi; 1 for lvds or vbyone; 2 for edp */
 	/*lcd_hiu_write(HHI_DSI_LVDS_EDP_CNTL0, 0x1);*/
 
-	lcd_vbyone_hw_filter(0);
+	lcd_vbyone_hw_filter(1);
 	lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 2, 2);
 	lcd_vcbus_setb(VBO_CTRL_L, 1, 0, 1);
 
@@ -1178,7 +1214,7 @@ static irqreturn_t lcd_vbyone_interrupt_handler(int irq, void *dev_id)
 
 	if (vx1_conf->vsync_intr_en == 3) {
 		if (data32 & 0x1000) {
-			if (vsync_cnt >= (VSYNC_CNT_VX1_RESET + 1)) {
+			if (vsync_cnt >= (VSYNC_CNT_VX1_STABLE + 1)) {
 				vsync_cnt = 0;
 				LCDPR("vx1 lockn rise edge occurred\n");
 			}
@@ -1296,6 +1332,7 @@ static void lcd_p2p_control_set(struct lcd_config_s *pconf)
 	/* phy_div: 0=div6, 1=div 7, 2=div8, 3=div10 */
 	switch (pconf->lcd_control.p2p_config->p2p_type) {
 	case P2P_CHPI: /* 8/10 coding */
+	case P2P_USIT:
 		phy_div = 3;
 		break;
 	default:

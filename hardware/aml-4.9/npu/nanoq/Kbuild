@@ -2,7 +2,7 @@
 #
 #    The MIT License (MIT)
 #
-#    Copyright (c) 2014 - 2019 Vivante Corporation
+#    Copyright (c) 2014 - 2020 Vivante Corporation
 #
 #    Permission is hereby granted, free of charge, to any person obtaining a
 #    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 #
 #    The GPL License (GPL)
 #
-#    Copyright (C) 2014 - 2019 Vivante Corporation
+#    Copyright (C) 2014 - 2020 Vivante Corporation
 #
 #    This program is free software; you can redistribute it and/or
 #    modify it under the terms of the GNU General Public License
@@ -71,15 +71,18 @@ HAL_KERNEL_DIR  := hal/kernel
 TA_DIR          := hal/security_v1
 HOST := $(shell hostname)
 
-# Include platform config if exists.
--include $(AQROOT)/$(OS_KERNEL_DIR)/platform/$(soc_vendor)/gc_hal_kernel_platform_$(soc_board).config
-
 MODULE_NAME ?= galcore
 CUSTOMER_ALLOCATOR_OBJS    ?=
 ALLOCATOR_ARRAY_H_LOCATION ?= $(OS_KERNEL_DIR)/allocator/default/
+SOC_PLATFORM_LOCATION      ?= $(OS_KERNEL_DIR)/platform/$(soc_vendor)
+
+# Set common platform driver source
+SOC_PLATFORM_OBJS ?= $(SOC_PLATFORM_LOCATION)/gc_hal_kernel_platform_$(soc_board).o
+# Include platform config if exists.
+-include $(AQROOT)/$(SOC_PLATFORM_LOCATION)/gc_hal_kernel_platform_$(soc_board).config
 
 ifeq ($(CONFIG_KASAN),)
-EXTRA_CFLAGS += -Werror
+EXTRA_CFLAGS += -Werror -Wno-implicit-fallthrough
 endif
 
 OBJS := $(OS_KERNEL_DIR)/gc_hal_kernel_device.o \
@@ -92,8 +95,10 @@ OBJS := $(OS_KERNEL_DIR)/gc_hal_kernel_device.o \
         $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_dma.o \
         $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_gfp.o \
         $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_reserved_mem.o \
-        $(OS_KERNEL_DIR)/gc_hal_kernel_driver.o \
-        $(OS_KERNEL_DIR)/platform/$(soc_vendor)/gc_hal_kernel_platform_$(soc_board).o
+        $(OS_KERNEL_DIR)/gc_hal_kernel_driver.o
+
+# Source files for soc platform board
+OBJS += $(SOC_PLATFORM_OBJS)
 
 ifneq ($(CONFIG_DMA_SHARED_BUFFER),)
 OBJS += $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_dmabuf.o
@@ -120,6 +125,7 @@ OBJS += $(HAL_KERNEL_DIR)/gc_hal_kernel.o \
 
 OBJS += $(ARCH_KERNEL_DIR)/gc_hal_kernel_context.o \
         $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware.o \
+        $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware_func.o \
         $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware_async_fe.o \
         $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware_mc_fe.o \
         $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware_waitlink_fe.o
@@ -162,7 +168,7 @@ ifeq ($(KERNELRELEASE),)
 
 # Define targets.
 all:
-	@$(MAKE) V=$(V) ARCH=$(ARCH_TYPE) -C $(KERNEL_DIR) SUBDIRS=`pwd` modules
+	@$(MAKE) V=$(V) ARCH=$(ARCH_TYPE) -C $(KERNEL_DIR) M=`pwd` modules
 
 clean:
 	@rm -rf $(OBJS)
@@ -284,6 +290,7 @@ EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/inc
 EXTRA_CFLAGS += -I$(AQROOT)/hal/os/linux/kernel
 EXTRA_CFLAGS += -I$(AQROOT)/$(ALLOCATOR_ARRAY_H_LOCATION)
 EXTRA_CFLAGS += -I$(AQROOT)/hal/security_v1/
+EXTRA_CFLAGS += -I$(AQROOT)/$(SOC_PLATFORM_LOCATION)
 
 ifneq ($(CONFIG_ARM),)
 EXTRA_CFLAGS += -Iarch/arm/mm

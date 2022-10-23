@@ -57,7 +57,6 @@ define REALTEK_BT_INSTALL_TARGET_CMDS
     #install firmware
 	mkdir -p $(TARGET_DIR)/lib/firmware/rtlbt
 	$(INSTALL) -D -m 0644 $(@D)/fw/* $(TARGET_DIR)/lib/firmware/rtlbt
-	$(INSTALL) -D -m 755 ${REALTEK_BT_SYSTEM_CONFIG_DIR}/S44bluetooth $(TARGET_DIR)/etc/init.d
 endef
 
 

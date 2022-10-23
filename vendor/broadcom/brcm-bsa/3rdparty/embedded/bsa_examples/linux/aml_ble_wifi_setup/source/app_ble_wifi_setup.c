@@ -33,7 +33,7 @@ char version[8] = "20171211";
 char frame_buf[FRAME_BUF_MAX] = {0};
 char ssid_psk_file[] = "/var/www/cgi-bin/wifi/select.txt";
 /*0: wifi set success, 1: wifi set fail*/
-char wifi_status_file[] = "/etc/bsa/config/wifi_status";
+char wifi_status_file[] = "/etc/bluetooth/wifi_status";
 char wifi_status;
 char wifi_success = '1';
 int main(int argc, char **argv)
@@ -109,8 +109,7 @@ int main(int argc, char **argv)
 							APP_INFO0("write wifi password error");
 						}
 						fflush(fd);
-						system("cd /etc/bsa/config");
-						system("sh ./wifi_tool.sh");
+						system("sh /etc/bluetooth/wifi_tool.sh");
 						check_0 = 0;
 						memset(frame_buf, 0, FRAME_BUF_MAX);
 						cnt = 0;

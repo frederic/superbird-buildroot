@@ -131,7 +131,7 @@ obj-$(CONFIG_CMD_IDE) += cmd_ide.o
 obj-$(CONFIG_CMD_IMMAP) += cmd_immap.o
 
 ifdef CONFIG_CMD_INI
-obj-y += ini/model.o ini/ini_proxy.o ini/UnifyKey.o ini/ini_platform.o ini/ini_io.o ini/ini_handler.o ini/ini_core.o ini/ini_log.o
+obj-y += ini/model.o ini/model_data_check.o ini/ini_proxy.o ini/UnifyKey.o ini/ini_platform.o ini/ini_io.o ini/ini_handler.o ini/ini_core.o ini/ini_log.o
 endif
 obj-$(CONFIG_CMD_INI) += cmd_ini.o
 
@@ -361,5 +361,6 @@ obj-$(CONFIG_AML_ANTIROLLBACK) += anti-rollback.o
 obj-$(CONFIG_AML_SUPPORT_TLV) += aml_tlv.o
 obj-y += cmd_tee_log_level.o
 obj-y += cmd_avb.o
+obj-$(CONFIG_AML_FACTORY_PROVISION) += cmd_factory_provision.o
 
 CFLAGS_env_embedded.o := -Wa,--no-warn -DENV_CRC=$(shell tools/envcrc 2>/dev/null)

@@ -1,0 +1,35 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: ACodecG726,
+    param:
+    {
+      codec: g726,
+      bitrate: 16k,
+      endian: le
+    }
+  },
+  {
+    type: ACodecG726,
+    param:
+    {
+      codec: s16le,
+      bitrate: 16k,
+      endian: le
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

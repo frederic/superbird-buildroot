@@ -48,7 +48,7 @@ case $1 in
       fi
       if [ -f $MANU_FILE ]; then
         manu=$(cat $MANU_FILE)
-        sed -i 's/\("manufacturer":\).*,/\1 "'$manu'",/g' /etc/ipc.json
+        sed -i 's/\("manufacturer":\).*,/\1 "'$manu'",/g' /etc/ipc/config.json
         rm -f $MANU_FILE
       fi
     elif [ -f $CUSTOM_RESET_FLAG ]; then

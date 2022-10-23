@@ -41,7 +41,8 @@
 /* v20180925: add tl1 support */
 /* v20190314: add sm1 support */
 /* v20190329: add tm2 support */
-#define VPU_VERION        "v20190329"
+/* v20200325: add tm2b film grain mempd support */
+#define VPU_VERION        "v20200325"
 
 int vpu_debug_print_flag;
 static spinlock_t vpu_mem_lock;
@@ -1561,6 +1562,33 @@ static struct vpu_data_s vpu_data_tm2 = {
 	.reset_table = vpu_reset_tl1,
 };
 
+static struct vpu_data_s vpu_data_tm2b = {
+	.chip_type = VPU_CHIP_TM2B,
+	.chip_name = "tm2b",
+	.clk_level_dft = CLK_LEVEL_DFT_G12A,
+	.clk_level_max = CLK_LEVEL_MAX_G12A,
+	.fclk_div_table = fclk_div_table_g12a,
+
+	.gp_pll_valid = 0,
+	.mem_pd_reg1_valid = 1,
+	.mem_pd_reg2_valid = 1,
+	.mem_pd_reg3_valid = 1,
+	.mem_pd_reg4_valid = 1,
+
+	.mem_pd_table_cnt =
+		sizeof(vpu_mem_pd_tm2b) / sizeof(struct vpu_ctrl_s),
+	.clk_gate_table_cnt =
+		sizeof(vpu_clk_gate_g12a) / sizeof(struct vpu_ctrl_s),
+	.mem_pd_table = vpu_mem_pd_tm2b,
+	.clk_gate_table = vpu_clk_gate_g12a,
+
+	.module_init_table_cnt = 0,
+	.module_init_table = NULL,
+	.hdmi_iso_pre_table = vpu_hdmi_iso_pre_gxb,
+	.hdmi_iso_table = vpu_hdmi_iso_sm1,
+	.reset_table = vpu_reset_tl1,
+};
+
 static const struct of_device_id vpu_of_table[] = {
 	{
 		.compatible = "amlogic, vpu-gxbb",
@@ -1610,7 +1638,11 @@ static const struct of_device_id vpu_of_table[] = {
 		.compatible = "amlogic, vpu-tm2",
 		.data = &vpu_data_tm2,
 	},
-	{},
+	{
+		.compatible = "amlogic, vpu-tm2b",
+		.data = &vpu_data_tm2b,
+	},
+	{}
 };
 
 static int vpu_probe(struct platform_device *pdev)

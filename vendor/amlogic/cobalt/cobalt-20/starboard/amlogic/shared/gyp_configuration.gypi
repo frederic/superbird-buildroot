@@ -32,6 +32,7 @@
       '-lamavutils',
       '-lamadec',
       '-lamvdec',
+      '-lyoutubesign',
     ],
 
     'compiler_flags': [

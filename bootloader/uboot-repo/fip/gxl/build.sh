@@ -201,6 +201,10 @@ function package() {
 		if [ -e "${BUILD_PATH}/bl2.v3.bin" ]; then
 			# acs_tool process ddr timing and configurable parameters
 			python ${FIP_FOLDER}/acs_tool.pyc ${BUILD_PATH}/bl2.v3.bin ${BUILD_PATH}/bl2_acs.bin ${BUILD_PATH}/acs.bin 0
+		else
+			# acs_tool process ddr timing and configurable parameters
+			python ${FIP_FOLDER}/acs_tool.pyc ${BUILD_PATH}/bl2.bin ${BUILD_PATH}/bl2_acs.bin ${BUILD_PATH}/acs.bin 0
+		fi
 			# fix bl2/bl21
 			fix_blx \
 				${BUILD_PATH}/bl2_acs.bin \
@@ -225,10 +229,6 @@ function package() {
 			if [ "y" == "${CONFIG_AML_CRYPTO_IMG}" ]; then
 					${FIP_FOLDER}/stool/sign.sh -s ${CUR_SOC} -p ${UBOOT_SRC_FOLDER}/${BOARD_DIR} -o ${BUILD_FOLDER} -r ${UBOOT_SRC_FOLDER}/${BOARD_DIR}/aml-key -a ${UBOOT_SRC_FOLDER}/${BOARD_DIR}/aml-key
 			fi
-
-		else
-			echo "File ${BUILD_PATH}/bl2.v3.bin not found!"
-		fi
 	else
 		encrypt $@
 	fi

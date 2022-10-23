@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -64,6 +64,7 @@ typedef enum _ATH_BIN_FILE {
     ATH_BOARD_DATA_FILE,
     ATH_FLASH_FILE,
     ATH_SETUP_FILE,
+    ATH_USB_WARM_RESET_FILE,
 } ATH_BIN_FILE;
 
 typedef enum _ol_target_status  {
@@ -244,13 +245,26 @@ struct ol_softc {
 #ifdef PERE_IP_HDR_ALIGNMENT_WAR
     bool                    host_80211_enable; /* Enables native-wifi mode on host */
 #endif
+#ifdef CONFIG_GPIO_OOB
+    u_int32_t               oob_gpio_num;
+    u_int32_t               oob_gpio_flag;
+#endif
     bool                    enableuartprint;    /* enable uart/serial prints from target */
     bool                    enablefwlog;        /* enable fwlog */
     /* enable FW self-recovery for Rome USB */
     bool                    enableFwSelfRecovery;
+#ifdef FEATURE_USB_WARM_RESET
+    bool                    enable_usb_warm_reset;
+#endif
+    bool                    fastfwdump_host;
+    bool                    fastfwdump_fw;
 #ifdef HIF_USB
     /* structure to save FW RAM dump (Rome USB) */
+#ifndef FW_RAM_DUMP_TO_FILE
     struct fw_ramdump       *ramdump[FW_RAM_SEG_CNT];
+#else
+    struct fw_ramdump       *ramdump[FW_RAM_SEG_CNT + 1];
+#endif
     A_UINT8                 ramdump_index;
     bool                    fw_ram_dumping;
 #endif
@@ -311,6 +325,9 @@ struct ol_softc {
     bool enable_fw_hash_check;
 #endif
     uint16_t board_id;
+#ifdef FW_RAM_DUMP_TO_FILE
+    struct work_struct ramdump_usb_work;
+#endif
 };
 
 #ifdef PERE_IP_HDR_ALIGNMENT_WAR

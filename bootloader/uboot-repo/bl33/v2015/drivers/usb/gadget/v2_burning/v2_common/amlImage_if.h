@@ -139,5 +139,14 @@ int get_total_itemnr(HIMAGE hImg);
 
 u64 optimus_img_decoder_get_data_parts_size(HIMAGE hImg, int* hasBootloader);
 
+
+unsigned image_get_crc(HIMAGE hImg);
+
+int optimus_img_item2buf(HIMAGE hImg, const char* main, const char* sub, char* buf, int* bufsz);
+
+int get_subtype_nr(HIMAGE hImg, const char* main_type);
+
+int get_subtype_nm_by_index(HIMAGE hImg, const char* main_type, const char** sub_type, const int itemIndex);
+
 #endif//ifndef __AMLIMAGE_IF_H__
 

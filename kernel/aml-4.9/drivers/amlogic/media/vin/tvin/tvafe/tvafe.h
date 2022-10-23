@@ -32,7 +32,7 @@
 /* ************************************************* */
 /* *** macro definitions ********************************************* */
 /* *********************************************************** */
-#define TVAFE_VER "Ref.2019/08/08"
+#define TVAFE_VER "Ref.2020/04/08"
 
 /* used to set the flag of tvafe_dev_s */
 #define TVAFE_FLAG_DEV_OPENED 0x00000010
@@ -66,11 +66,18 @@ struct tvafe_info_s {
 #define TVAFE_AUTO_DE      (1 << 3)
 #define TVAFE_AUTO_3DCOMB  (1 << 4)
 #define TVAFE_AUTO_PGA     (1 << 5)
+#define TVAFE_AUTO_HS_MODE (1 << 6)
+#define TVAFE_AUTO_VS_MODE (1 << 7)
 
 struct tvafe_user_param_s {
 	unsigned int cutwindow_val_h[5];
 	unsigned int cutwindow_val_v[5];
 	unsigned int cutwindow_val_vs_ve;
+	unsigned int cdto_adj_hcnt_th;
+	unsigned int cdto_adj_ratio_p;
+	unsigned int cdto_adj_offset_p;
+	unsigned int cdto_adj_ratio_n;
+	unsigned int cdto_adj_offset_n;
 	unsigned int auto_adj_en;
 	unsigned int vline_chk_cnt;
 	unsigned int nostd_vs_th;
@@ -81,7 +88,15 @@ struct tvafe_user_param_s {
 	unsigned int nostd_stable_cnt;
 	unsigned int nostd_dmd_clp_step;
 	unsigned int skip_vf_num;
+	unsigned int unlock_cnt_max;
 	unsigned int avout_en;
+
+	/* debug */
+	unsigned int cutwin_test_en;
+	unsigned int cutwin_test_hcnt;
+	unsigned int cutwin_test_vcnt;
+	unsigned int cutwin_test_hcut;
+	unsigned int cutwin_test_vcut;
 };
 
 /* tvafe device structure */
@@ -105,6 +120,7 @@ struct tvafe_dev_s {
 
 	struct tvafe_info_s tvafe;
 
+	const unsigned int (*acd_table)[ACD_REG_NUM+1];
 	struct tvafe_reg_table_s **pq_conf;
 
 	unsigned int cma_config_en;
@@ -145,6 +161,7 @@ unsigned int cvd_get_shift_cnt(enum tvafe_cvd2_shift_cnt_e src);
 
 extern bool disableapi;
 extern bool force_stable;
+extern bool tvafe_atv_search_channel;
 
 extern unsigned int force_nostd;
 

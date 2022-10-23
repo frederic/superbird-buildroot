@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "g12a_u212.config"
+BR2_PACKAGE_LAUNCHER_USE_COBALT=n
+BR2_PACKAGE_COBALT=n
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesong12a_u212/initramfs/ramfslist-64"

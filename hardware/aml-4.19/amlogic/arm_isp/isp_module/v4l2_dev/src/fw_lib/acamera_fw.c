@@ -21,6 +21,8 @@
 #if ACAMERA_ISP_PROFILING
 #include "acamera_profiler.h"
 #endif
+#include <linux/fs.h>
+#include <asm/uaccess.h>
 
 #include "acamera_isp_config.h"
 #include "acamera_command_api.h"
@@ -148,7 +150,7 @@ void acamera_fw_error_routine( acamera_context_t *p_ctx, uint32_t irq_mask )
 
     acamera_isp_input_port_mode_request_write( p_ctx->settings.isp_base, ACAMERA_ISP_INPUT_PORT_MODE_REQUEST_SAFE_START );
 
-    LOG( LOG_INFO, "starting isp from error" );
+    LOG( LOG_ERR, "starting isp from error" );
 }
 
 
@@ -209,8 +211,191 @@ void acamera_fsm_mgr_raise_event( acamera_fsm_mgr_t *p_fsm_mgr, event_id_t event
     }
 }
 
+int32_t acamera_extern_param_calculate(void *param)
+{
+    int32_t rtn = 0;
+    uint32_t alpha = 0;
+    uint32_t i, j;
+    uint32_t r_cnt = 0;
+    uint32_t c_cnt = 0;
+    uint32_t l_gain = 0;
+    uint32_t w_cnt = 0;
+    uint32_t *c_param = NULL;
+    uint32_t *c_result = NULL;
+    uint32_t x0, y0, x1, y1;
+    fsm_ext_param_ctrl_t *p_ctrl = param;
 
-int32_t acamera_update_calibration_set( acamera_context_ptr_t p_ctx )
+    if (p_ctrl == NULL || p_ctrl->ctx == NULL || p_ctrl->result == NULL) {
+        LOG(LOG_CRIT, "Error input param");
+        rtn = -1;
+        goto over_return;
+    }
+
+    c_param = _GET_UINT_PTR(p_ctrl->ctx, p_ctrl->id);
+    l_gain = (p_ctrl->total_gain) >> (LOG2_GAIN_SHIFT - 8);
+    r_cnt = _GET_ROWS(p_ctrl->ctx, p_ctrl->id);
+    c_cnt = _GET_COLS(p_ctrl->ctx, p_ctrl->id);
+    w_cnt = _GET_WIDTH(p_ctrl->ctx, p_ctrl->id);
+    c_result = p_ctrl->result;
+
+    if (l_gain <= c_param[0]) {
+        system_memcpy(c_result, c_param, c_cnt * w_cnt);
+        goto over_return;
+    }
+
+    if (l_gain >= c_param[(r_cnt - 1) * c_cnt]) {
+        system_memcpy(c_result, &c_param[(r_cnt - 1) * c_cnt], c_cnt * w_cnt);
+        goto over_return;
+    }
+
+    for (i = 1; i < r_cnt; i++) {
+        if (l_gain < c_param[i * c_cnt]) {
+            break;
+        }
+    }
+
+    for (j = 1; j < c_cnt; j++) {
+        x0 = c_param[(i - 1) * c_cnt];
+        x1 = c_param[i * c_cnt];
+        y0 = c_param[(i - 1) * c_cnt + j];
+        y1 = c_param[i * c_cnt + j];
+        if (x1 != x0) {
+            alpha = (l_gain - x0) * 256 / (x1 - x0);
+            c_result[j] = (y1 * alpha + y0 * (256 - alpha)) >> 8;
+        } else {
+            c_result[j] = y1;
+            LOG(LOG_CRIT, "AVOIDED DIVISION BY ZERO");
+        }
+    }
+
+    c_result[0] = l_gain;
+
+over_return:
+    return rtn;
+}
+
+static void acamera_open_external_bin(void *ctx, struct file **fp, uint32_t *size)
+{
+    uint32_t mode = 0;
+    char f_name[40] = {'\0'};
+    acamera_context_ptr_t p_ctx;
+    struct kstat stat;
+
+    if (ctx == NULL || fp == NULL) {
+        LOG(LOG_ERR, "Error input param");
+        return;
+    }
+
+    p_ctx = ctx;
+
+    acamera_fsm_mgr_get_param(&p_ctx->fsm_mgr, FSM_PARAM_GET_WDR_MODE, NULL, 0, &mode, sizeof(mode));
+
+    switch (mode) {
+    case WDR_MODE_LINEAR:
+        snprintf(f_name, sizeof(f_name), "/data/isp_tuning/tuning_linear.bin");
+    break;
+    case WDR_MODE_NATIVE:
+        snprintf(f_name, sizeof(f_name), "/data/isp_tuning/tuning_native.bin");
+    break;
+    case WDR_MODE_FS_LIN:
+        snprintf(f_name, sizeof(f_name), "/data/isp_tuning/tuning_fs_lin.bin");
+    break;
+    default:
+        LOG(LOG_ERR, "Error input mode %u", mode);
+        return;
+    }
+
+    if (vfs_stat(f_name, &stat)) {
+        return;
+    }
+
+    *size = stat.size;
+
+    *fp = filp_open(f_name, O_RDONLY, 0);
+}
+
+static int32_t acamera_read_external_bin(struct file *fp, uint8_t *buf, uint32_t size)
+{
+    loff_t pos = 0;
+    int32_t nread = -1;
+
+    if (fp == NULL || buf == NULL || !size) {
+        LOG(LOG_ERR, "Error input param");
+        return nread;
+    }
+
+    nread = vfs_read(fp, buf, size, &pos);
+
+    return nread;
+}
+
+static void acamera_update_external_calibrations(acamera_context_ptr_t p_ctx)
+{
+    int32_t nread = 0;
+    uint32_t idx = 0;
+    uint32_t l_size = 0;
+    uint32_t t_size = 0;
+    uint8_t *l_ptr = NULL;
+    uint8_t *b_buf = NULL;
+    uint8_t *p_mem = NULL;
+    uint32_t f_size = 0;
+    struct file *fp = NULL;
+    mm_segment_t fs;
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+
+    acamera_open_external_bin(p_ctx, &fp, &f_size);
+    if (fp == NULL || !f_size) {
+        LOG(LOG_ERR, "Bin file not exsit");
+        goto error_exit;
+    }
+
+    for (idx = 0; idx < CALIBRATION_TOTAL_SIZE; idx++) {
+        l_size = _GET_SIZE(p_ctx, idx);
+        t_size += l_size;
+    }
+
+    if (t_size != f_size) {
+        LOG(LOG_ERR, "Bin size not match: f_size %u, t_size %u", f_size, t_size);
+        goto error_size;
+    }
+
+    b_buf = kzalloc(t_size, GFP_KERNEL);
+    if (b_buf == NULL) {
+        LOG(LOG_ERR, "Failed to alloc mem");
+        goto error_size;
+    }
+
+    nread = acamera_read_external_bin(fp, b_buf, f_size);
+    if (nread != f_size) {
+        LOG(LOG_ERR, "Failed to read bin");
+        goto error_read;
+    }
+
+    p_mem = b_buf;
+
+    for (idx = 0; idx < CALIBRATION_TOTAL_SIZE; idx++) {
+        l_ptr = (uint8_t *)_GET_LUT_PTR(p_ctx, idx);
+        l_size = _GET_SIZE(p_ctx, idx);
+        if (l_size)
+            memcpy(l_ptr, p_mem, l_size);
+        p_mem += l_size;
+    }
+
+    LOG(LOG_CRIT, "Success update tuning bin");
+
+error_read:
+    if (b_buf)
+        kfree(b_buf);
+error_size:
+    if (fp)
+        filp_close(fp, NULL);
+error_exit:
+    set_fs(fs);
+}
+
+int32_t acamera_update_calibration_set( acamera_context_ptr_t p_ctx, char* s_name)
 {
     int32_t result = 0;
     void *sensor_arg = 0;
@@ -224,9 +409,11 @@ int32_t acamera_update_calibration_set( acamera_context_ptr_t p_ctx )
                 sensor_arg = &( param->modes_table[cur_mode] );
             }
         }
-        if ( p_ctx->settings.get_calibrations( p_ctx->context_id, sensor_arg, &p_ctx->acameraCalibrations ) != 0 ) {
+        if ( p_ctx->settings.get_calibrations( p_ctx->context_id, sensor_arg, &p_ctx->acameraCalibrations, s_name) != 0 ) {
             LOG( LOG_CRIT, "Failed to get calibration set for. Fatal error" );
         }
+
+        acamera_update_external_calibrations(p_ctx);
 
 #if defined( ISP_HAS_GENERAL_FSM )
         acamera_fsm_mgr_set_param( &p_ctx->fsm_mgr, FSM_PARAM_SET_RELOAD_CALIBRATION, NULL, 0 );
@@ -256,8 +443,7 @@ int32_t acamera_update_calibration_set( acamera_context_ptr_t p_ctx )
     return result;
 }
 
-
-int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx )
+int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx , char* s_name)
 {
     int32_t result = 0;
     void *sensor_arg = 0;
@@ -269,7 +455,7 @@ int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx )
     // we need to update the calibration data and update some FSM variables which
     // depends on calibration data.
     if ( p_ctx->initialized == 1 ) {
-        acamera_update_calibration_set( p_ctx );
+        acamera_update_calibration_set( p_ctx, s_name );
     } else {
         if ( p_ctx->settings.get_calibrations != NULL ) {
             const sensor_param_t *param = NULL;
@@ -280,9 +466,11 @@ int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx )
                 sensor_arg = &( param->modes_table[cur_mode] );
             }
 
-            if ( p_ctx->settings.get_calibrations( p_ctx->context_id, sensor_arg, &p_ctx->acameraCalibrations ) != 0 ) {
+            if ( p_ctx->settings.get_calibrations( p_ctx->context_id, sensor_arg, &p_ctx->acameraCalibrations, s_name ) != 0 ) {
                 LOG( LOG_CRIT, "Failed to get calibration set for. Fatal error" );
             }
+
+            acamera_update_external_calibrations(p_ctx);
         } else {
             LOG( LOG_CRIT, "Calibration callback is null. Failed to get calibrations" );
             result = -1;
@@ -585,7 +773,7 @@ void acamera_3aalg_preset(acamera_fsm_mgr_t *p_fsm_mgr)
 		iridix_param.skip_cnt = 90;
 		iridix_param.strength_target = 30681;
 		iridix_param.iridix_contrast = 3986;
-		iridix_param.dark_enh = 1500;
+		iridix_param.dark_enh = 1000;
 		iridix_param.iridix_global_DG = 256;
 		iridix_param.diff = 256;
 		iridix_param.iridix_strength = 30681;
@@ -682,12 +870,8 @@ int32_t acamera_init_context( acamera_context_t *p_ctx, acamera_settings *settin
 	p_ctx->context_ref = (uint32_t *)p_ctx;
 	p_ctx->p_gfw = g_fw;
 	if ( p_ctx->sw_reg_map.isp_sw_config_map != NULL ) {
-
-        LOG( LOG_INFO, "Allocated memory for config space of size %d bytes", ACAMERA_ISP1_SIZE );
-        LOG( LOG_INFO, "Allocated memory for metering of size %d bytes", ACAMERA_METERING_STATS_MEM_SIZE );
         // copy settings
         system_memcpy( (void *)&p_ctx->settings, (void *)settings, sizeof( acamera_settings ) );
-
 
         p_ctx->settings.isp_base = (uintptr_t)p_ctx->sw_reg_map.isp_sw_config_map;
 
@@ -711,10 +895,6 @@ int32_t acamera_init_context( acamera_context_t *p_ctx, acamera_settings *settin
 #if defined( SENSOR_ISP_SEQUENCE_DEFAULT_SETTINGS_FPGA ) && ISP_HAS_FPGA_WRAPPER
         // these settings are loaded only for ARM FPGA demo platform and must be ignored on other systems
         acamera_load_isp_sequence( 0, p_ctx->isp_sequence, SENSOR_ISP_SEQUENCE_DEFAULT_SETTINGS_FPGA );
-#endif
-
-#if ISP_DMA_RAW_CAPTURE
-        dma_raw_capture_init( g_fw );
 #endif
 
         // reset frame counters

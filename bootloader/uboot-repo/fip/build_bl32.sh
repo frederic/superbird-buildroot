@@ -5,7 +5,7 @@ function build_bl32() {
 	local target="$1/bl32.img"
 	# $1: src_folder, $2: bin_folder, $3: soc
 	cd $1
-	/bin/bash build.sh $3
+	/bin/bash build.sh $3 ${CONFIG_CAS}
 	if [ $? != 0 ]; then
 		cd ${MAIN_FOLDER}
 		echo "Error: Build bl32 failed... abort"

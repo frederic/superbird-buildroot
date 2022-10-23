@@ -1,7 +1,7 @@
 /*
  * Misc system wide definitions
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmdefs.h 700870 2017-05-22 19:05:22Z $
+ * $Id: bcmdefs.h 788740 2018-11-13 21:45:01Z $
  */
 
 #ifndef	_bcmdefs_h_
@@ -51,8 +51,8 @@
  * Define these diagnostic macros to help suppress cast-qual warning
  * until all the work can be done to fix the casting issues.
  */
-#if defined(__GNUC__) && defined(STRICT_GCC_WARNINGS) && (__GNUC__ > 4 || (__GNUC__ == \
-	4 && __GNUC_MINOR__ >= 6))
+#if (defined(__GNUC__) && defined(STRICT_GCC_WARNINGS) && (__GNUC__ > 4 || (__GNUC__ == \
+	4 && __GNUC_MINOR__ >= 6)))
 #define GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST()              \
 	_Pragma("GCC diagnostic push")			 \
 	_Pragma("GCC diagnostic ignored \"-Wcast-qual\"")
@@ -63,6 +63,21 @@
 #define GCC_DIAGNOSTIC_POP()
 #endif   /* Diagnostic macros not defined */
 
+/* Support clang for MACOSX compiler */
+#ifdef __clang__
+#define CLANG_DIAGNOSTIC_PUSH_SUPPRESS_CAST()              \
+	_Pragma("clang diagnostic push")			 \
+	_Pragma("clang diagnostic ignored \"-Wcast-qual\"")
+#define CLANG_DIAGNOSTIC_PUSH_SUPPRESS_FORMAT()              \
+	_Pragma("clang diagnostic push")             \
+	_Pragma("clang diagnostic ignored \"-Wformat-nonliteral\"")
+#define CLANG_DIAGNOSTIC_POP()              \
+	_Pragma("clang diagnostic pop")
+#else
+#define CLANG_DIAGNOSTIC_PUSH_SUPPRESS_CAST()
+#define CLANG_DIAGNOSTIC_PUSH_SUPPRESS_FORMAT()
+#define CLANG_DIAGNOSTIC_POP()
+#endif // endif
 /* Compile-time assert can be used in place of ASSERT if the expression evaluates
  * to a constant at compile time.
  */

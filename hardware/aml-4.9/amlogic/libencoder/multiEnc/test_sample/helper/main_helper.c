@@ -56,7 +56,7 @@
 #define MAX_CODE_BUF_SIZE           (512*1024)
 
 #ifdef PLATFORM_WIN32
-#pragma warning(disable : 4996)     //!<< disable waring C4996: The POSIX name for this item is deprecated. 
+#pragma warning(disable : 4996)     //!<< disable waring C4996: The POSIX name for this item is deprecated.
 #endif
 
 char* EncPicTypeStringH264[] = {
@@ -583,7 +583,7 @@ BOOL CalcYuvSize(
     Int32   *yuv3p4b)
 {
     Int32   temp_picWidth;
-    Int32   chromaWidth;
+    Int32   chromaWidth = 0, chromaHeight = 0;
 
     if ( bitDepth != 0)
         *bitDepth = 0;
@@ -646,7 +646,15 @@ BOOL CalcYuvSize(
         if ( bitDepth != 0)
             *bitDepth = 10;
         *lumaSize = picWidth * picHeight * 2;
-        *chromaSize = picWidth * picHeight;
+        chromaWidth = picWidth;
+        chromaHeight = picHeight;
+        if (picWidth & 0x01) {
+            chromaWidth = chromaWidth+1;
+        }
+        if (picHeight & 0x01) {
+            chromaHeight = chromaHeight+1;
+        }
+        *chromaSize = chromaWidth * chromaHeight;
         *frameSize = *lumaSize + *chromaSize;
         break;
     case FORMAT_YUYV_P10_16BIT_MSB:   // 4:2:2 10bit packed

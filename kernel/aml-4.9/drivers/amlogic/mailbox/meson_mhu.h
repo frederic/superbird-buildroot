@@ -15,6 +15,8 @@
  *
  */
 
+#ifndef __MESON_MHU_H__
+#define __MESON_MHU_H__
 #define CONTROLLER_NAME		"mhu_ctlr"
 
 #define CHANNEL_MAX		2
@@ -31,4 +33,7 @@ struct mhu_data_buf {
 };
 
 extern struct device *the_scpi_device;
+extern struct device *dsp_scpi_device;
 extern u32 num_scp_chans;
+extern u32 send_listen_chans;
+#endif

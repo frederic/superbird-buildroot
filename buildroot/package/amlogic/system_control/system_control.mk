@@ -4,25 +4,24 @@ SYSTEM_CONTROL_SITE_METHOD = local
 SYSTEM_CONTROL_HDCPTX22_DIRECTORY = $(SYSTEM_CONTROL_SITE)/firmware
 
 SYSTEM_CONTROL_DEPENDENCIES += libzlib
+#SYSTEM_CONTROL_DEPENDENCIES += aml_ubootenv
 
 ifeq ($(BR2_PACKAGE_MESON_MALI_WAYLAND_DRM_EGL), y)
-	TARGET_CFLAGS += -DAML_OSD_USE_DRM
+SYSTEM_CONTROL_CONF_OPTS += -DAML_OSD_USE_DRM=ON
 endif
-
-define SYSTEM_CONTROL_BUILD_CMDS
-	$(TARGET_CONFIGURE_OPTS) $(MAKE) -C $(@D) all
-endef
 
 ifeq ($(BR2_PACKAGE_INITSCRIPTS_720P),y)
 define SYSTEM_CONTROL_INSTALL_TARGET_CMDS
-    mkdir -p $(TARGET_DIR)/etc/firmware
-	$(TARGET_CONFIGURE_OPTS) $(MAKE) CC=$(TARGET_CC) -C $(@D) install
+	$(INSTALL) -D -m 755 $(@D)/systemcontrol $(TARGET_DIR)/usr/bin/
+	$(INSTALL) -D -m 755 $(@D)/display_util $(TARGET_DIR)/usr/bin/
+	mkdir -p $(TARGET_DIR)/etc/firmware
 	cp -a $(SYSTEM_CONTROL_HDCPTX22_DIRECTORY)/mesondisplay720.cfg   $(TARGET_DIR)/etc/mesondisplay.cfg
 endef
 else
 define SYSTEM_CONTROL_INSTALL_TARGET_CMDS
-    mkdir -p $(TARGET_DIR)/etc/firmware
-	$(TARGET_CONFIGURE_OPTS) $(MAKE) CC=$(TARGET_CC) -C $(@D) install
+	$(INSTALL) -D -m 755 $(@D)/systemcontrol $(TARGET_DIR)/usr/bin/
+	$(INSTALL) -D -m 755 $(@D)/display_util $(TARGET_DIR)/usr/bin/
+	mkdir -p $(TARGET_DIR)/etc/firmware
 	cp -a $(SYSTEM_CONTROL_HDCPTX22_DIRECTORY)/mesondisplay.cfg   $(TARGET_DIR)/etc/
 endef
 endif
@@ -33,4 +32,4 @@ define SYSTEM_CONTROL_INSTALL_INIT_SYSV
 		$(TARGET_DIR)/etc/init.d/S60systemcontrol
 endef
 
-$(eval $(generic-package))
+$(eval $(cmake-package))

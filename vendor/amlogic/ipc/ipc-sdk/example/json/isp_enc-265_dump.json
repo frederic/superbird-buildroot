@@ -1,0 +1,27 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h265,
+      width: 1920,
+      height: 1080
+    }
+  },
+  {
+    type: fileout,
+    param: {
+      path: "/data/isp_h265.dump",
+      skip: 60,
+      dump: 120
+    }
+  }
+]

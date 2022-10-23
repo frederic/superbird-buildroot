@@ -65,9 +65,6 @@ ol_if_dfs_attach(struct ieee80211com *ic, void *ptr, void *radar_info)
 {
     struct ath_dfs_caps *pCap = (struct ath_dfs_caps *) ptr;
 
-    adf_os_print("%s: called; ptr=%pK, radar_info=%pK\n",
-                  __func__, ptr, radar_info);
-
     pCap->ath_chip_is_bb_tlv = 1;
     pCap->ath_dfs_combined_rssi_ok = 0;
     pCap->ath_dfs_ext_chan_ok = 0;

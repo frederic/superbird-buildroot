@@ -5,12 +5,17 @@
 #include <malloc.h>
 #include <string.h>
 
+#ifdef __ANDROID__
+#include <log/log.h>
+#endif
+
+
 #define AVC_ABS(x)   (((x)<0)? -(x) : (x))
 #define AVC_MAX(x,y) ((x)>(y)? (x):(y))
 #define AVC_MIN(x,y) ((x)<(y)? (x):(y))
 #define AVC_MEDIAN(A,B,C) ((A) > (B) ? ((A) < (C) ? (A) : (B) > (C) ? (B) : (C)): (B) < (C) ? (B) : (C) > (A) ? (C) : (A))
 
-#ifdef MAKEANDROID
+#ifdef __ANDROID__
 	#define LOGAPI ALOGE
 #else
 #if defined(DEBUG)
@@ -109,23 +114,22 @@ typedef uint64_t uint64;
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
-typedef enum
-{
+typedef enum {
     NO_DEFINE = -1,
-    M8 = 0,
-    MAX_DEV = 1,
+    M8_FAST = 0,
+    M8 = 1,
+    GXBB = 2,
+    MAX_DEV = 3,
 } ENC_DEV_TYPE;
 
-typedef enum
-{
+typedef enum {
     VMALLOC_BUFFER = 0,
     CANVAS_BUFFER = 1,
     PHYSICAL_BUFF = 2,
     MAX_TYPE = 3,
 } AMVEncBufferType;
 
-typedef enum
-{
+typedef enum {
     AMVENC_YUV422_SINGLE = 0,
     AMVENC_YUV444_SINGLE,
     AMVENC_NV21,
@@ -143,8 +147,7 @@ typedef enum
     AMVENC_FRAME_FMT
 } AMVEncFrameFmt;
 
-typedef enum
-{
+typedef enum {
     /**
     Fail information, need to add more error code for more specific info
     */
@@ -196,8 +199,7 @@ typedef enum
     AMVENC_FORCE_IDR_NEXT = 6, /* force IDR next picutre */
 } AMVEnc_Status;
 
-typedef enum
-{
+typedef enum {
     AMVEnc_Initializing = 0,
     AMVEnc_Encoding_SPS,
     AMVEnc_Encoding_PPS,
@@ -206,8 +208,7 @@ typedef enum
     AMVEnc_Encoding_Frame,
 } AMVEnc_State;
 
-typedef enum
-{
+typedef enum {
     AVC_BASELINE = 66,
     AVC_MAIN = 77,
     AVC_EXTENDED = 88,
@@ -217,8 +218,7 @@ typedef enum
     AVC_HIGH444 = 144
 } AVCProfile;
 
-typedef enum
-{
+typedef enum {
     AVC_LEVEL_AUTO = 0,
     AVC_LEVEL1_B = 9,
     AVC_LEVEL1 = 10,
@@ -238,8 +238,7 @@ typedef enum
     AVC_LEVEL5_1 = 51
 } AVCLevel;
 
-typedef enum
-{
+typedef enum {
     AVC_NALTYPE_SLICE = 1,  /* non-IDR non-data partition */
     AVC_NALTYPE_DPA = 2,    /* data partition A */
     AVC_NALTYPE_DPB = 3,    /* data partition B */
@@ -255,8 +254,7 @@ typedef enum
     AVC_NALTYPE_EMPTY = 0xff /* Empty Nal */
 } AVCNalUnitType;
 
-typedef enum
-{
+typedef enum {
     AVC_P_SLICE = 0,
     AVC_B_SLICE = 1,
     AVC_I_SLICE = 2,
@@ -269,8 +267,7 @@ typedef enum
     AVC_SI_ALL_SLICE = 9
 } AVCSliceType;
 
-typedef enum
-{
+typedef enum {
     AVC_OFF = 0,
     AVC_ON = 1
 } AVCFlag;

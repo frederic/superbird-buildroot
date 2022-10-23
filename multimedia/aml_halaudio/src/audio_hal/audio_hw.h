@@ -394,6 +394,8 @@ struct aml_audio_device {
     int delay_time;  // audio delay time ms
     void * delay_handle;
     void * aml_audio_config; /*cjson handle*/
+    void * post_handle;
+    bool hw_audio_type_det; /* hw audio type detection */
 };
 
 struct aml_stream_out {
@@ -631,6 +633,7 @@ ssize_t hw_write(struct audio_stream_out *stream
 #define IS_DATMOS_DECODER_SUPPORT(format) ((format == AUDIO_FORMAT_AC3) || \
                                             (format == AUDIO_FORMAT_E_AC3) || \
                                             (format == AUDIO_FORMAT_DOLBY_TRUEHD) || \
+                                            (format == AUDIO_FORMAT_MAT) || \
                                             (format == AUDIO_FORMAT_PCM_8_BIT) || \
                                             (format == AUDIO_FORMAT_PCM_16_BIT) || \
                                             (format == AUDIO_FORMAT_PCM_8_24_BIT) || \
@@ -652,6 +655,7 @@ ssize_t hw_write(struct audio_stream_out *stream
                                     (format == AUDIO_FORMAT_AC3) || \
                                     (format == AUDIO_FORMAT_E_AC3) || \
                                     (format == AUDIO_FORMAT_DOLBY_TRUEHD) || \
+                                    (format == AUDIO_FORMAT_MAT) || \
                                     (format == AUDIO_FORMAT_PCM_8_BIT) || \
                                     (format == AUDIO_FORMAT_PCM_16_BIT) || \
                                     (format == AUDIO_FORMAT_PCM_8_24_BIT) || \

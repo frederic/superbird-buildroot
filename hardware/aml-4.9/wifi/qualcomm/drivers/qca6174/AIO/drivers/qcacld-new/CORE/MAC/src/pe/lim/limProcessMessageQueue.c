@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -73,9 +73,170 @@
 #include "vos_packet.h"
 #include "vos_memory.h"
 #include "nan_datapath.h"
+#include "limSecurityUtils.h"
+#include "ieee80211_common.h"
 
 #define CHECK_BIT(value, mask)    ((value) & (1 << (mask)))
 void limLogSessionStates(tpAniSirGlobal pMac);
+
+#ifdef WLAN_FEATURE_SAE
+
+/**
+ * lim_process_sae_msg_sta() - Process SAE message for STA
+ * @mac: Global MAC pointer
+ * @session: Pointer to the PE session entry
+ * @sae_msg: SAE message buffer pointer
+ *
+ * Return: None
+ */
+static void lim_process_sae_msg_sta(tpAniSirGlobal mac,
+				    tpPESession session,
+				    struct sir_sae_msg *sae_msg)
+{
+	switch (session->limMlmState) {
+	case eLIM_MLM_WT_SAE_AUTH_STATE:
+		/* SAE authentication is completed.
+		 * Restore from auth state
+		 */
+		if (tx_timer_running(&mac->lim.limTimers.sae_auth_timer))
+			limDeactivateAndChangeTimer(mac,
+						    eLIM_AUTH_SAE_TIMER);
+		/* success */
+		if (sae_msg->sae_status == IEEE80211_STATUS_SUCCESS)
+			limRestoreFromAuthState(mac,
+						eSIR_SME_SUCCESS,
+						eSIR_MAC_SUCCESS_STATUS,
+						session);
+		else
+			limRestoreFromAuthState(mac, eSIR_SME_AUTH_REFUSED,
+						eSIR_MAC_UNSPEC_FAILURE_STATUS, session);
+	break;
+	default:
+		/* SAE msg is received in unexpected state */
+		limLog(mac, LOGE, FL("received SAE msg in state %X"),
+		       session->limMlmState);
+		limPrintMlmState(mac, LOGE, session->limMlmState);
+	break;
+	}
+}
+
+/**
+ * lim_process_sae_msg_ap() - Process SAE message
+ * @mac: Global MAC pointer
+ * @session: Pointer to the PE session entry
+ * @sae_msg: SAE message buffer pointer
+ *
+ * Return: None
+ */
+static void lim_process_sae_msg_ap(tpAniSirGlobal mac,
+				   tpPESession session,
+				   struct sir_sae_msg *sae_msg)
+{
+	struct tLimPreAuthNode *sta_pre_auth_ctx;
+	struct lim_assoc_data *assoc_req;
+	/* Extract pre-auth context for the STA and move limMlmState
+	 * of preauth node to eLIM_MLM_AUTHENTICATED_STATE
+	 */
+	sta_pre_auth_ctx = limSearchPreAuthList(mac, sae_msg->peer_mac_addr);
+
+	if (!sta_pre_auth_ctx) {
+		limLog(mac, LOGE, FL("No preauth node created for "
+		       MAC_ADDRESS_STR),
+		       MAC_ADDR_ARRAY(sae_msg->peer_mac_addr));
+		return;
+	}
+
+	assoc_req = &sta_pre_auth_ctx->assoc_req;
+
+	if (sae_msg->sae_status != IEEE80211_STATUS_SUCCESS) {
+		limLog(mac, LOGE, FL("SAE authentication failed for "
+		       MAC_ADDRESS_STR " status: %u"),
+		       MAC_ADDR_ARRAY(sae_msg->peer_mac_addr),
+		       sae_msg->sae_status);
+		if (assoc_req->present) {
+			limLog(mac, LOGE, FL("Assoc req cached; clean it up"));
+			lim_process_assoc_cleanup(mac, session,
+						  assoc_req->assoc_req,
+						  assoc_req->sta_ds,
+						  assoc_req->assoc_req_copied);
+			assoc_req->present = false;
+		}
+		limDeletePreAuthNode(mac, sae_msg->peer_mac_addr);
+
+		return;
+	}
+	sta_pre_auth_ctx->mlmState = eLIM_MLM_AUTHENTICATED_STATE;
+	/* Send assoc indication to SME if any assoc request is cached*/
+	if (assoc_req->present) {
+		/* Assoc request is present in preauth context. Get the assoc
+		 * request and make it invalid in preauth context. It'll be
+		 * freed later in the legacy path.
+		 */
+		bool assoc_req_copied;
+
+		assoc_req->present = false;
+		limLog(mac, LOG1, FL("Assoc req cached; handle it"));
+		if (lim_send_assoc_ind_to_sme(mac, session,
+					      assoc_req->sub_type,
+					      &assoc_req->hdr,
+					      assoc_req->assoc_req,
+					      ANI_AKM_TYPE_SAE,
+					      assoc_req->pmf_connection,
+					      &assoc_req_copied) == false)
+			lim_process_assoc_cleanup(mac, session,
+						  assoc_req->assoc_req,
+						  assoc_req->sta_ds,
+						  assoc_req_copied);
+	}
+}
+
+/**
+ * lim_process_sae_msg() - Process SAE message
+ * @mac: Global MAC pointer
+ * @body: Buffer pointer
+ *
+ * Return: None
+ */
+static void lim_process_sae_msg(tpAniSirGlobal mac, struct sir_sae_msg *body)
+{
+	struct sir_sae_msg *sae_msg = body;
+	tpPESession session;
+
+	if (!sae_msg) {
+		limLog(mac, LOGE, FL("SAE msg is NULL"));
+		return;
+	}
+
+	session = pe_find_session_by_sme_session_id(mac,
+			sae_msg->session_id);
+	if (session == NULL) {
+		limLog(mac, LOGE, FL("SAE:Unable to find session"));
+		return;
+	}
+
+	if (session->pePersona != VOS_STA_MODE &&
+	    session->pePersona != VOS_STA_SAP_MODE) {
+		limLog(mac, LOGE, FL("SAE:Not supported in this mode %d"),
+			session->pePersona);
+		return;
+	}
+
+	limLog(mac, LOG1,
+	       FL("SAE:status %d limMlmState %d pePersona %d peer:"
+	       MAC_ADDRESS_STR),
+	       sae_msg->sae_status, session->limMlmState,
+	       session->pePersona, MAC_ADDR_ARRAY(sae_msg->peer_mac_addr));
+	if (LIM_IS_STA_ROLE(session))
+		lim_process_sae_msg_sta(mac, session, sae_msg);
+	else if (LIM_IS_AP_ROLE(session))
+		lim_process_sae_msg_ap(mac, session, sae_msg);
+	else
+		limLog(mac, LOGE, FL("SAE message on unsupported interface"));
+}
+#else
+static void lim_process_sae_msg(tpAniSirGlobal mac, struct sir_sae_msg *body)
+{}
+#endif
 
 /** -------------------------------------------------------------
 \fn defMsgDecision
@@ -672,7 +833,7 @@ limCheckMgmtRegisteredFrames(tpAniSirGlobal pMac, tANI_U8 *pBd,
                      WDA_GET_RX_PAYLOAD_LEN(pBd) + sizeof(tSirMacMgmtHdr),
                      pLimMgmtRegistration->sessionId,
                      WDA_GET_RX_CH(pBd), psessionEntry,
-                     WDA_GET_RX_RSSI_NORMALIZED(pBd));
+                     WDA_GET_RX_RSSI_NORMALIZED(pBd), RXMGMT_FLAG_NONE);
 
         if ( (type == SIR_MAC_MGMT_FRAME) && (fc.type == SIR_MAC_MGMT_FRAME)
               && (subType == SIR_MAC_MGMT_RESERVED15) )
@@ -952,7 +1113,8 @@ limHandle80211Frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, tANI_U8 *pDeferMsg)
                     limSendSmeMgmtFrameInd(pMac, SIR_MAC_MGMT_TIME_ADVERT,
                             (tANI_U8*)pHdr, frameLen + sizeof(tSirMacMgmtHdr),
                             0, WDA_GET_RX_CH(pRxPacketInfo), NULL,
-                            WDA_GET_RX_RSSI_RAW(pRxPacketInfo));
+                            WDA_GET_RX_RSSI_RAW(pRxPacketInfo),
+                            RXMGMT_FLAG_NONE);
                 }
                     break;
 
@@ -1510,7 +1672,11 @@ limProcessMessages(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
             limMsg->bodyptr = NULL;
             break;
         }
-
+        case eWNI_SME_SEND_MGMT_FRAME_TX:
+            lim_send_mgmt_frame_tx(pMac, limMsg);
+            vos_mem_free(limMsg->bodyptr);
+            limMsg->bodyptr = NULL;
+            break;
         case SIR_HAL_P2P_NOA_START_IND:
         {
             tpPESession psessionEntry = &pMac->lim.gpSession[0];
@@ -1747,6 +1913,7 @@ limProcessMessages(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
         case SIR_LIM_DEAUTH_ACK_TIMEOUT:
         case SIR_LIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE:
         case SIR_LIM_AUTH_RETRY_TIMEOUT:
+        case SIR_LIM_AUTH_SAE_TIMEOUT:
             // These timeout messages are handled by MLM sub module
 
             limProcessMlmReqMessages(pMac,
@@ -2228,6 +2395,11 @@ send_link_resp:
     case SIR_HAL_NDP_END_RSP:
     case SIR_HAL_NDP_END_IND:
         lim_handle_ndp_event_message(pMac, limMsg);
+        break;
+    case eWNI_SME_SEND_SAE_MSG:
+        lim_process_sae_msg(pMac, limMsg->bodyptr);
+        vos_mem_free((v_VOID_t*)limMsg->bodyptr);
+        limMsg->bodyptr = NULL;
         break;
     default:
         vos_mem_free((v_VOID_t*)limMsg->bodyptr);

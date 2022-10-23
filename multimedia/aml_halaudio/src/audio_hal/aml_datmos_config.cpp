@@ -90,6 +90,7 @@ extern "C" void *datmos_default_options()
     opts.push_back(Option("-noupresampler", "1"));
     opts.push_back(Option("-dec_joc", "0"));
     opts.push_back(Option("-inputpcm", "inputpcm_mode=disable"));
+    opts.push_back(Option("-iec61937_align", "0"));
 #ifdef DATMOS_DEBUG
     opts.push_back(Option("-dbgout", "0x1f"));
 #endif

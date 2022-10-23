@@ -33,6 +33,7 @@
 #include <linux/reboot.h>
 #include <linux/clk.h>
 #include <linux/of_address.h>
+#include <linux/ftrace.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt)    "meson-watchdog: %s: " fmt, __func__
@@ -322,6 +323,18 @@ void aml_wdt_disable_dbg(void)
 }
 #endif
 
+void aml_wdt_stop_panic(void *data)
+{
+	struct aml_wdt_dev *wdt = data;
+
+	if (!wdt)
+		return;
+
+	pr_info("aml_wdt_stop_panic()\n");
+	disable_watchdog(wdt);
+	wdt->is_running = false;
+}
+
 static int aml_wdt_probe(struct platform_device *pdev)
 {
 	struct watchdog_device *aml_wdt;
@@ -369,6 +382,7 @@ static int aml_wdt_probe(struct platform_device *pdev)
 #ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
 	g_awdt = wdev;
 #endif
+	set_aml_wdt_stop_func(aml_wdt_stop_panic, wdev);
 	return 0;
 }
 

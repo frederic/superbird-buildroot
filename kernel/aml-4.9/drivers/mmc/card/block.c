@@ -1618,6 +1618,10 @@ retry:
 			goto out_retry;
 	}
 
+#ifdef CONFIG_AMLOGIC_MMC
+	if (card->quirks & MMC_QUIRK_BROKEN_SECURE_ERASE)
+		arg  &= ~MMC_SECURE_ERASE_ARG;
+#endif
 	err = mmc_erase(card, from, nr, arg);
 	if (err == -EIO)
 		goto out_retry;
@@ -3013,7 +3017,10 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_TRIM_BROKEN),
 	MMC_FIXUP("V10016", CID_MANFID_KINGSTON, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_TRIM_BROKEN),
-
+#ifdef CONFIG_AMLOGIC_MMC
+	MMC_FIXUP("016G00", CID_MANFID_TOSHIBA, CID_OEMID_ANY, add_quirk_mmc,
+		  MMC_QUIRK_BROKEN_SECURE_ERASE),
+#endif
 	END_FIXUP
 };
 

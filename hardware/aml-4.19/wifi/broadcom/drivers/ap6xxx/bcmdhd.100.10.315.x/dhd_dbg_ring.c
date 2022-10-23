@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_dbg_ring.c 769272 2018-06-25 09:23:27Z $
+ * $Id: dhd_dbg_ring.c 792099 2018-12-03 15:45:56Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -36,13 +36,13 @@
 
 int
 dhd_dbg_ring_init(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring, uint16 id, uint8 *name,
-				  uint32 ring_sz, void *allocd_buf)
+		uint32 ring_sz, void *allocd_buf, bool pull_inactive)
 {
 	void *buf;
 	unsigned long flags = 0;
 
 	if (allocd_buf == NULL) {
-		return BCME_NOMEM;
+			return BCME_NOMEM;
 	} else {
 		buf = allocd_buf;
 	}
@@ -62,6 +62,7 @@ dhd_dbg_ring_init(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring, uint16 id, uint8 *name,
 	ring->state = RING_SUSPEND;
 	ring->rem_len = 0;
 	ring->sched_pull = TRUE;
+	ring->pull_inactive = pull_inactive;
 	DHD_DBG_RING_UNLOCK(ring->lock, flags);
 
 	return BCME_OK;
@@ -85,7 +86,7 @@ dhd_dbg_ring_deinit(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring)
 
 void
 dhd_dbg_ring_sched_pull(dhd_dbg_ring_t *ring, uint32 pending_len,
-						os_pullreq_t pull_fn, void *os_pvt, const int id)
+		os_pullreq_t pull_fn, void *os_pvt, const int id)
 {
 	unsigned long flags = 0;
 	DHD_DBG_RING_LOCK(ring->lock, flags);
@@ -93,7 +94,7 @@ dhd_dbg_ring_sched_pull(dhd_dbg_ring_t *ring, uint32 pending_len,
 	 * threshold is set
 	 */
 	if (ring->threshold > 0 &&
-			(pending_len >= ring->threshold) && ring->sched_pull) {
+	   (pending_len >= ring->threshold) && ring->sched_pull) {
 		/*
 		 * Update the state and release the lock before calling
 		 * the pull_fn. Do not transfer control to other layers
@@ -148,15 +149,15 @@ dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data)
 	w_len = ENTRY_LENGTH(hdr);
 
 	DHD_DBGIF(("%s: RING%d[%s] hdr->len=%u, w_len=%u, wp=%d, rp=%d, ring_start=0x%p;"
-			   " ring_size=%u\n",
-			   __FUNCTION__, ring->id, ring->name, hdr->len, w_len, ring->wp, ring->rp,
-			   ring->ring_buf, ring->ring_size));
+		" ring_size=%u\n",
+		__FUNCTION__, ring->id, ring->name, hdr->len, w_len, ring->wp, ring->rp,
+		ring->ring_buf, ring->ring_size));
 
 	if (w_len > ring->ring_size) {
 		DHD_DBG_RING_UNLOCK(ring->lock, flags);
 		DHD_ERROR(("%s: RING%d[%s] w_len=%u, ring_size=%u,"
-				   " write size exceeds ring size !\n",
-				   __FUNCTION__, ring->id, ring->name, w_len, ring->ring_size));
+			" write size exceeds ring size !\n",
+			__FUNCTION__, ring->id, ring->name, w_len, ring->ring_size));
 		return BCME_BUFTOOLONG;
 	}
 	/* Claim the space */
@@ -168,40 +169,40 @@ dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data)
 				ring->tail_padded = TRUE;
 				ring->rem_len = ring->ring_size - ring->wp;
 				DHD_DBGIF(("%s: RING%d[%s] Insuffient tail space,"
-						   " rp=%d, wp=%d, rem_len=%d, ring_size=%d,"
-						   " avail_size=%d, w_len=%d\n", __FUNCTION__,
-						   ring->id, ring->name, ring->rp, ring->wp,
-						   ring->rem_len, ring->ring_size, avail_size,
-						   w_len));
+					" rp=%d, wp=%d, rem_len=%d, ring_size=%d,"
+					" avail_size=%d, w_len=%d\n", __FUNCTION__,
+					ring->id, ring->name, ring->rp, ring->wp,
+					ring->rem_len, ring->ring_size, avail_size,
+					w_len));
 
 				/* 0 pad insufficient tail space */
 				memset((uint8 *)ring->ring_buf + ring->wp, 0, ring->rem_len);
 				/* If read pointer is still at the beginning, make some room */
 				if (ring->rp == 0) {
 					r_entry = (dhd_dbg_ring_entry_t *)((uint8 *)ring->ring_buf +
-													   ring->rp);
+						ring->rp);
 					ring->rp += ENTRY_LENGTH(r_entry);
 					ring->stat.read_bytes += ENTRY_LENGTH(r_entry);
 					DHD_DBGIF(("%s: rp at 0, move by one entry length"
-							   " (%u bytes)\n",
-							   __FUNCTION__, (uint32)ENTRY_LENGTH(r_entry)));
+						" (%u bytes)\n",
+						__FUNCTION__, (uint32)ENTRY_LENGTH(r_entry)));
 				}
 				if (ring->rp == ring->wp) {
 					ring->rp = 0;
 				}
 				ring->wp = 0;
 				DHD_DBGIF(("%s: new rp=%u, wp=%u\n",
-						   __FUNCTION__, ring->rp, ring->wp));
+					__FUNCTION__, ring->rp, ring->wp));
 			} else {
 				/* Not enough space for new entry, free some up */
 				r_entry = (dhd_dbg_ring_entry_t *)((uint8 *)ring->ring_buf +
-												   ring->rp);
+					ring->rp);
 				/* check bounds before incrementing read ptr */
 				if (ring->rp + ENTRY_LENGTH(r_entry) >= ring->ring_size) {
-					DHD_ERROR(("%s: RING%d[%s] rp points out of boundary,"
-							   "ring->wp=%u, ring->rp=%u, ring->ring_size=%d\n",
-							   __FUNCTION__, ring->id, ring->name, ring->wp,
-							   ring->rp, ring->ring_size));
+					DHD_ERROR(("%s: RING%d[%s] rp points out of boundary, "
+						"ring->wp=%u, ring->rp=%u, ring->ring_size=%d\n",
+						__FUNCTION__, ring->id, ring->name, ring->wp,
+						ring->rp, ring->ring_size));
 					ASSERT(0);
 					DHD_DBG_RING_UNLOCK(ring->lock, flags);
 					return BCME_BUFTOOSHORT;
@@ -209,19 +210,19 @@ dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data)
 				ring->rp += ENTRY_LENGTH(r_entry);
 				/* skip padding if there is one */
 				if (ring->tail_padded &&
-						((ring->rp + ring->rem_len) == ring->ring_size)) {
+					((ring->rp + ring->rem_len) == ring->ring_size)) {
 					DHD_DBGIF(("%s: RING%d[%s] Found padding,"
-							   " avail_size=%d, w_len=%d, set rp=0\n",
-							   __FUNCTION__, ring->id, ring->name,
-							   avail_size, w_len));
+						" avail_size=%d, w_len=%d, set rp=0\n",
+						__FUNCTION__, ring->id, ring->name,
+						avail_size, w_len));
 					ring->rp = 0;
 					ring->tail_padded = FALSE;
 					ring->rem_len = 0;
 				}
 				ring->stat.read_bytes += ENTRY_LENGTH(r_entry);
 				DHD_DBGIF(("%s: RING%d[%s] read_bytes=%d, wp=%d, rp=%d\n",
-						   __FUNCTION__, ring->id, ring->name, ring->stat.read_bytes,
-						   ring->wp, ring->rp));
+					__FUNCTION__, ring->id, ring->name, ring->stat.read_bytes,
+					ring->wp, ring->rp));
 			}
 		} else {
 			break;
@@ -231,8 +232,8 @@ dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data)
 	/* check before writing to the ring */
 	if (ring->wp + w_len >= ring->ring_size) {
 		DHD_ERROR(("%s: RING%d[%s] wp pointed out of ring boundary, "
-				   "wp=%d, ring_size=%d, w_len=%u\n", __FUNCTION__, ring->id,
-				   ring->name, ring->wp, ring->ring_size, w_len));
+			"wp=%d, ring_size=%d, w_len=%u\n", __FUNCTION__, ring->id,
+			ring->name, ring->wp, ring->ring_size, w_len));
 		ASSERT(0);
 		DHD_DBG_RING_UNLOCK(ring->lock, flags);
 		return BCME_BUFTOOLONG;
@@ -251,25 +252,31 @@ dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data)
 	ring->stat.written_records++;
 	ring->stat.written_bytes += w_len;
 	DHD_DBGIF(("%s : RING%d[%s] written_records %d, written_bytes %d, read_bytes=%d,"
-			   " ring->threshold=%d, wp=%d, rp=%d\n", __FUNCTION__, ring->id, ring->name,
-			   ring->stat.written_records, ring->stat.written_bytes, ring->stat.read_bytes,
-			   ring->threshold, ring->wp, ring->rp));
+		" ring->threshold=%d, wp=%d, rp=%d\n", __FUNCTION__, ring->id, ring->name,
+		ring->stat.written_records, ring->stat.written_bytes, ring->stat.read_bytes,
+		ring->threshold, ring->wp, ring->rp));
 
 	DHD_DBG_RING_UNLOCK(ring->lock, flags);
 	return BCME_OK;
 }
 
+/*
+ * This function folds ring->lock, so callers of this function
+ * should not hold ring->lock.
+ */
 int
-dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
-						 bool strip_header)
+dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len, bool strip_header)
 {
 	dhd_dbg_ring_entry_t *r_entry = NULL;
 	uint32 rlen = 0;
 	char *buf = NULL;
+	unsigned long flags;
 
 	if (!ring || !data || buf_len <= 0) {
 		return 0;
 	}
+
+	DHD_DBG_RING_LOCK(ring->lock, flags);
 
 	/* pull from ring is allowed for inactive (suspended) ring
 	 * in case of ecounters only, this is because, for ecounters
@@ -277,19 +284,17 @@ dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
 	 * pulled to dump it to a file. For other rings if ring is
 	 * not in active state return without processing (as before)
 	 */
-#ifndef EWP_ECNTRS_LOGGING
-	if (ring->state != RING_ACTIVE) {
-		return 0;
+	if (!ring->pull_inactive && (ring->state != RING_ACTIVE)) {
+		goto exit;
 	}
-#endif /* EWP_ECNTRS_LOGGING */
 
 	if (ring->rp == ring->wp) {
-		return 0;
+		goto exit;
 	}
 
 	DHD_DBGIF(("%s: RING%d[%s] buf_len=%u, wp=%d, rp=%d, ring_start=0x%p; ring_size=%u\n",
-			   __FUNCTION__, ring->id, ring->name, buf_len, ring->wp, ring->rp,
-			   ring->ring_buf, ring->ring_size));
+		__FUNCTION__, ring->id, ring->name, buf_len, ring->wp, ring->rp,
+		ring->ring_buf, ring->ring_size));
 
 	r_entry = (dhd_dbg_ring_entry_t *)((uint8 *)ring->ring_buf + ring->rp);
 
@@ -297,9 +302,10 @@ dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
 	rlen = ENTRY_LENGTH(r_entry);
 	if ((ring->rp + rlen) > ring->ring_size) {
 		DHD_ERROR(("%s: entry len %d is out of boundary of ring size %d,"
-				   " current ring %d[%s] - rp=%d\n", __FUNCTION__, rlen,
-				   ring->ring_size, ring->id, ring->name, ring->rp));
-		return 0;
+			" current ring %d[%s] - rp=%d\n", __FUNCTION__, rlen,
+			ring->ring_size, ring->id, ring->name, ring->rp));
+		rlen = 0;
+		goto exit;
 	}
 
 	if (strip_header) {
@@ -311,12 +317,13 @@ dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
 	}
 	if (rlen > buf_len) {
 		DHD_ERROR(("%s: buf len %d is too small for entry len %d\n",
-				   __FUNCTION__, buf_len, rlen));
+			__FUNCTION__, buf_len, rlen));
 		DHD_ERROR(("%s: ring %d[%s] - ring size=%d, wp=%d, rp=%d\n",
-				   __FUNCTION__, ring->id, ring->name, ring->ring_size,
-				   ring->wp, ring->rp));
+			__FUNCTION__, ring->id, ring->name, ring->ring_size,
+			ring->wp, ring->rp));
 		ASSERT(0);
-		return 0;
+		rlen = 0;
+		goto exit;
 	}
 
 	memcpy(data, buf, rlen);
@@ -324,23 +331,27 @@ dhd_dbg_ring_pull_single(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,
 	ring->rp += ENTRY_LENGTH(r_entry);
 	/* don't pass wp but skip padding if there is one */
 	if (ring->rp != ring->wp &&
-			ring->tail_padded && ((ring->rp + ring->rem_len) == ring->ring_size)) {
+	    ring->tail_padded && ((ring->rp + ring->rem_len) >= ring->ring_size)) {
 		DHD_DBGIF(("%s: RING%d[%s] Found padding, rp=%d, wp=%d\n",
-				   __FUNCTION__, ring->id, ring->name, ring->rp, ring->wp));
+			__FUNCTION__, ring->id, ring->name, ring->rp, ring->wp));
 		ring->rp = 0;
 		ring->tail_padded = FALSE;
 		ring->rem_len = 0;
 	}
 	if (ring->rp >= ring->ring_size) {
 		DHD_ERROR(("%s: RING%d[%s] rp pointed out of ring boundary,"
-				   " rp=%d, ring_size=%d\n", __FUNCTION__, ring->id,
-				   ring->name, ring->rp, ring->ring_size));
+			" rp=%d, ring_size=%d\n", __FUNCTION__, ring->id,
+			ring->name, ring->rp, ring->ring_size));
 		ASSERT(0);
-		return 0;
+		rlen = 0;
+		goto exit;
 	}
 	ring->stat.read_bytes += ENTRY_LENGTH(r_entry);
 	DHD_DBGIF(("%s RING%d[%s]read_bytes %d, wp=%d, rp=%d\n", __FUNCTION__,
-			   ring->id, ring->name, ring->stat.read_bytes, ring->wp, ring->rp));
+		ring->id, ring->name, ring->stat.read_bytes, ring->wp, ring->rp));
+
+exit:
+	DHD_DBG_RING_UNLOCK(ring->lock, flags);
 
 	return rlen;
 }
@@ -349,12 +360,17 @@ int
 dhd_dbg_ring_pull(dhd_dbg_ring_t *ring, void *data, uint32 buf_len, bool strip_hdr)
 {
 	int32 r_len, total_r_len = 0;
+	unsigned long flags;
 
 	if (!ring || !data)
 		return 0;
 
-	if (ring->state != RING_ACTIVE)
+	DHD_DBG_RING_LOCK(ring->lock, flags);
+	if (!ring->pull_inactive && (ring->state != RING_ACTIVE)) {
+		DHD_DBG_RING_UNLOCK(ring->lock, flags);
 		return 0;
+	}
+	DHD_DBG_RING_UNLOCK(ring->lock, flags);
 
 	while (buf_len > 0) {
 		r_len = dhd_dbg_ring_pull_single(ring, data, buf_len, strip_hdr);

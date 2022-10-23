@@ -1,6 +1,7 @@
 #ifndef AML_MPEG12_PARSER_H
 #define AML_MPEG12_PARSER_H
 
+#include "../aml_vcodec_drv.h"
 #include "../utils/pixfmt.h"
 #include "../utils/common.h"
 

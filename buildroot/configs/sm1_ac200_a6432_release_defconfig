@@ -1,0 +1,7 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "sm1_ac200.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonsm1_ac200/initramfs/ramfslist-32"
+

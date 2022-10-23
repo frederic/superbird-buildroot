@@ -1,0 +1,24 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: ACodecG711,
+    param:
+    {
+      codec: ulaw
+    }
+  },
+  {
+    type: fileout,
+    param:
+    {
+      path: "/data/ain_g711_ulaw.dump"
+    }
+  }
+]

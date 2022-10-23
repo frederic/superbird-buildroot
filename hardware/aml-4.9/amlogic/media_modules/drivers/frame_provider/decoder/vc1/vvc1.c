@@ -43,7 +43,7 @@
 #include "../utils/firmware.h"
 #include <linux/amlogic/tee.h>
 #include <linux/delay.h>
-
+#include "../../../common/chips/decoder_cpu_ver_info.h"
 
 
 #define DRIVER_NAME "amvdec_vc1"
@@ -101,7 +101,7 @@ static int vvc1_vf_states(struct vframe_states *states, void *);
 static int vvc1_event_cb(int type, void *data, void *private_data);
 
 static int vvc1_prot_init(void);
-static void vvc1_local_init(void);
+static void vvc1_local_init(bool is_reset);
 
 static const char vvc1_dec_id[] = "vvc1-dev";
 
@@ -496,7 +496,6 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
 				decoder_bmmu_box_get_mem_handle(
 					mm_blk_handle,
 					buffer_index);
-
 			kfifo_put(&display_q, (const struct vframe_s *)vf);
 			ATRACE_COUNTER(MODULE_NAME, vf->pts);
 
@@ -556,7 +555,6 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
 				decoder_bmmu_box_get_mem_handle(
 					mm_blk_handle,
 					buffer_index);
-
 			kfifo_put(&display_q, (const struct vframe_s *)vf);
 			ATRACE_COUNTER(MODULE_NAME, vf->pts);
 
@@ -642,6 +640,7 @@ static irqreturn_t vvc1_isr(int irq, void *dev_id)
 				decoder_bmmu_box_get_mem_handle(
 					mm_blk_handle,
 					buffer_index);
+
 			kfifo_put(&display_q, (const struct vframe_s *)vf);
 			ATRACE_COUNTER(MODULE_NAME, vf->pts);
 
@@ -719,7 +718,7 @@ static int vvc1_event_cb(int type, void *data, void *private_data)
 		vf_light_unreg_provider(&vvc1_vf_prov);
 #endif
 		spin_lock_irqsave(&lock, flags);
-		vvc1_local_init();
+		vvc1_local_init(true);
 		vvc1_prot_init();
 		spin_unlock_irqrestore(&lock, flags);
 #ifndef CONFIG_AMLOGIC_POST_PROCESS_MANAGER
@@ -920,7 +919,7 @@ static int vvc1_prot_init(void)
 	return r;
 }
 
-static void vvc1_local_init(void)
+static void vvc1_local_init(bool is_reset)
 {
 	int i;
 
@@ -942,25 +941,28 @@ static void vvc1_local_init(void)
 
 	memset(&frm, 0, sizeof(frm));
 
-	for (i = 0; i < DECODE_BUFFER_NUM_MAX; i++)
-		vfbuf_use[i] = 0;
+	if (!is_reset) {
+		for (i = 0; i < DECODE_BUFFER_NUM_MAX; i++)
+			vfbuf_use[i] = 0;
 
-	INIT_KFIFO(display_q);
-	INIT_KFIFO(recycle_q);
-	INIT_KFIFO(newframe_q);
-	cur_pool_idx ^= 1;
-	for (i = 0; i < VF_POOL_SIZE; i++) {
-		const struct vframe_s *vf;
+		INIT_KFIFO(display_q);
+		INIT_KFIFO(recycle_q);
+		INIT_KFIFO(newframe_q);
+		cur_pool_idx ^= 1;
+		for (i = 0; i < VF_POOL_SIZE; i++) {
+			const struct vframe_s *vf;
 
-		if (cur_pool_idx == 0) {
-			vf = &vfpool[i];
-			vfpool[i].index = DECODE_BUFFER_NUM_MAX;
+			if (cur_pool_idx == 0) {
+				vf = &vfpool[i];
+				vfpool[i].index = DECODE_BUFFER_NUM_MAX;
 			} else {
-			vf = &vfpool2[i];
-			vfpool2[i].index = DECODE_BUFFER_NUM_MAX;
+				vf = &vfpool2[i];
+				vfpool2[i].index = DECODE_BUFFER_NUM_MAX;
 			}
-		kfifo_put(&newframe_q, (const struct vframe_s *)vf);
+			kfifo_put(&newframe_q, (const struct vframe_s *)vf);
+		}
 	}
+
 	if (mm_blk_handle) {
 		decoder_bmmu_box_free(mm_blk_handle);
 		mm_blk_handle = NULL;
@@ -980,7 +982,7 @@ static void vvc1_ppmgr_reset(void)
 {
 	vf_notify_receiver(PROVIDER_NAME, VFRAME_EVENT_PROVIDER_RESET, NULL);
 
-	vvc1_local_init();
+	vvc1_local_init(true);
 
 	/* vf_notify_receiver(PROVIDER_NAME,
 	 * VFRAME_EVENT_PROVIDER_START,NULL);
@@ -1008,7 +1010,7 @@ static void error_do_work(struct work_struct *work)
 		vvc1_ppmgr_reset();
 #else
 		vf_light_unreg_provider(&vvc1_vf_prov);
-		vvc1_local_init();
+		vvc1_local_init(true);
 		vf_reg_provider(&vvc1_vf_prov);
 #endif
 		vvc1_prot_init();
@@ -1062,7 +1064,7 @@ static s32 vvc1_init(void)
 	intra_output = 0;
 	amvdec_enable();
 
-	vvc1_local_init();
+	vvc1_local_init(false);
 
 	if (vvc1_amstream_dec_info.format == VIDEO_DEC_FORMAT_WMV3) {
 		pr_info("WMV3 dec format\n");
@@ -1214,6 +1216,9 @@ static int amvdec_vc1_remove(struct platform_device *pdev)
 	}
 
 	amvdec_disable();
+
+	if (get_cpu_major_id() >= AM_MESON_CPU_MAJOR_ID_TM2)
+		vdec_reset_core(NULL);
 
 	if (mm_blk_handle) {
 		decoder_bmmu_box_free(mm_blk_handle);

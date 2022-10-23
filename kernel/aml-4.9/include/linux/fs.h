@@ -1920,6 +1920,11 @@ struct super_operations {
 #define IS_WHITEOUT(inode)	(S_ISCHR(inode->i_mode) && \
 				 (inode)->i_rdev == WHITEOUT_DEV)
 
+static inline bool sb_rdonly(const struct super_block *sb)
+{
+	return sb->s_flags & MS_RDONLY;
+}
+
 static inline bool HAS_UNMAPPED_ID(struct inode *inode)
 {
 	return !uid_valid(inode->i_uid) || !gid_valid(inode->i_gid);
@@ -2031,6 +2036,51 @@ static inline void inode_dec_link_count(struct inode *inode)
 {
 	drop_nlink(inode);
 	mark_inode_dirty(inode);
+}
+
+/**
+ * inode_peek_iversion_raw - grab a "raw" iversion value
+ * @inode: inode from which i_version should be read
+ *
+ * Grab a "raw" inode->i_version value and return it. The i_version is not
+ * flagged or converted in any way. This is mostly used to access a self-managed
+ * i_version.
+ *
+ * With those filesystems, we want to treat the i_version as an entirely
+ * opaque value.
+ */
+static inline u64
+inode_peek_iversion_raw(const struct inode *inode)
+{
+	return inode->i_version;
+}
+
+/*
+ * We borrow the lowest bit in the i_version to use as a flag to tell whether
+ * it has been queried since we last incremented it. If it has, then we must
+ * increment it on the next change. After that, we can clear the flag and
+ * avoid incrementing it again until it has again been queried.
+ */
+#define I_VERSION_QUERIED_SHIFT	(1)
+#define I_VERSION_QUERIED	(1ULL << (I_VERSION_QUERIED_SHIFT - 1))
+#define I_VERSION_INCREMENT	(1ULL << I_VERSION_QUERIED_SHIFT)
+
+/**
+ * inode_set_iversion - set i_version to a particular value
+ * @inode: inode to set
+ * @val: new i_version value to set
+ *
+ * Set @inode's i_version field to @val. This function is for filesystems with
+ * a kernel-managed i_version, for initializing a newly-created inode from
+ * scratch.
+ *
+ * In this case, we do not set the QUERIED flag since we know that this value
+ * has never been queried.
+ */
+static inline void
+inode_set_iversion(struct inode *inode, u64 val)
+{
+	inode->i_version = (val << I_VERSION_QUERIED_SHIFT);
 }
 
 /**

@@ -50,7 +50,7 @@ static aframe_t sensor0_v4l2_temper_frames[ ] = {
 
 extern void sensor_init_v4l2( void** ctx, sensor_control_t*) ;
 extern void sensor_deinit_v4l2( void *ctx ) ;
-extern uint32_t get_calibrations_v4l2( uint32_t ctx_num,void * sensor_arg,ACameraCalibrations *) ;
+extern uint32_t get_calibrations_v4l2( uint32_t ctx_num,void * sensor_arg,ACameraCalibrations *, char* s_name) ;
 
 extern int32_t lens_init( void** ctx, lens_control_t* ctrl ) ;
 extern void lens_deinit( void * ctx) ;

@@ -1,7 +1,7 @@
 /*
  * Common function shared by Linux WEXT, cfg80211 and p2p drivers
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wldev_common.h 695669 2017-04-21 13:04:52Z $
+ * $Id: wldev_common.h 813004 2019-04-03 07:16:21Z $
  */
 #ifndef __WLDEV_COMMON_H__
 #define __WLDEV_COMMON_H__
@@ -111,7 +111,11 @@ extern int net_os_wake_lock_timeout_enable(struct net_device *dev, int val);
 extern int net_os_set_dtim_skip(struct net_device *dev, int val);
 extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val, int force);
+extern int net_os_set_suspend_bcn_li_dtim(struct net_device *dev, int val);
 extern int net_os_set_max_dtim_enable(struct net_device *dev, int val);
+#ifdef DISABLE_DTIM_IN_SUSPEND
+extern int net_os_set_disable_dtim_in_suspend(struct net_device *dev, int val);
+#endif /* DISABLE_DTIM_IN_SUSPEND */
 extern int wl_parse_ssid_list_tlv(char** list_str, wlc_ssid_ext_t* ssid,
 	int max, int *bytes_left);
 

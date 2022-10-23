@@ -160,6 +160,12 @@ function git_operate2() {
 function get_blx_bin() {
 	# $1: current blx index
 	index=$1
+
+	# check for bl40, while only get bl40 from external path
+	if [ "${BLX_NAME[$index]}" == "bl40" ]; then
+		echo "skip to get bl40 from xml git"
+		return 0
+	fi
 	git_operate ${BLX_BIN_FOLDER[index]} log --pretty=oneline
 
 	git_msg=${GIT_OPERATE_INFO}
@@ -190,9 +196,36 @@ function get_blx_bin() {
 					fi
 				fi
 			else
-				cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_BIN_NAME[index]} ${FIP_BUILD_FOLDER} -f
-				if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ]; then
-					cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_IMG_NAME[index]} ${FIP_BUILD_FOLDER} 2>/dev/null
+				if [ "${CONFIG_CAS}" == "irdeto" ]; then
+					if [ "${BLX_BIN_NAME_IRDETO[index]}" != "NULL" ]; then
+						cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_BIN_NAME_IRDETO[index]} \
+							${FIP_BUILD_FOLDER}/${BLX_BIN_NAME[index]} -f || \
+								BLX_READY[${index}]="false"
+					fi
+					if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ] && \
+					   [ "${BLX_IMG_NAME_IRDETO[index]}" != "NULL" ]; then
+						cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_IMG_NAME_IRDETO[index]} \
+							${FIP_BUILD_FOLDER}/${BLX_IMG_NAME[index]} || \
+								BLX_READY[${index}]="false"
+					fi
+				elif [ "${CONFIG_CAS}" == "vmx" ]; then
+					if [ "${BLX_BIN_NAME_VMX[index]}" != "NULL" ]; then
+						cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_BIN_NAME_VMX[index]} \
+							${FIP_BUILD_FOLDER}/${BLX_BIN_NAME[index]} -f || \
+								BLX_READY[${index}]="false"
+					fi
+					if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ]; then
+						if [ "${BLX_IMG_NAME_VMX[index]}" != "NULL" ]; then
+							cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_IMG_NAME_VMX[index]} \
+								${FIP_BUILD_FOLDER}/${BLX_IMG_NAME[index]} || \
+									BLX_READY[${index}]="false"
+						fi
+					fi
+				else
+					cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_BIN_NAME[index]} ${FIP_BUILD_FOLDER} -f
+					if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ]; then
+						cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/${BLX_IMG_NAME[index]} ${FIP_BUILD_FOLDER} 2>/dev/null
+					fi
 				fi
 				if [ -e ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/bl2.v3.bin ]; then
 					cp ${BLX_BIN_FOLDER[index]}/${CUR_SOC}/bl2.v3.bin ${FIP_BUILD_FOLDER} -f
@@ -220,4 +253,26 @@ function get_blx_bin() {
 		fi
 	fi
 	return 0;
+}
+
+function prepare_tools() {
+	echo "*****Compile tools*****"
+
+	mkdir -p ${FIP_BUILD_FOLDER}
+
+	if [ "${CONFIG_DDR_PARSE}" == "1" ]; then
+		if [ -d ${FIP_DDR_PARSE} ]; then
+			cd ${FIP_DDR_PARSE}
+			make clean; make
+			cd ${MAIN_FOLDER}
+
+			mv -f ${FIP_DDR_PARSE}/parse ${FIP_BUILD_FOLDER}
+		fi
+
+		if [ ! -x ${FIP_BUILD_FOLDER}/parse ]; then
+			echo "Error: no ddr_parse... abort"
+			exit -1
+		fi
+	fi
+
 }

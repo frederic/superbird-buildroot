@@ -56,8 +56,6 @@ static int isp_fops_open( struct inode *inode, struct file *f )
     struct isp_dev_context *p_ctx = NULL;
     int minor = iminor( inode );
 
-    LOG( LOG_INFO, "client is opening..., minor: %d.", minor );
-
     if ( !isp_dev_ctx.dev_inited ) {
         LOG( LOG_ERR, "dev is not inited, failed to open." );
         return -ERESTARTSYS;
@@ -85,11 +83,7 @@ static int isp_fops_open( struct inode *inode, struct file *f )
     } else {
         p_ctx->dev_opened = 1;
         rc = 0;
-        LOG( LOG_INFO, "open(%s) succeed.", p_ctx->dev_name );
-
-        LOG( LOG_INFO, "Bf set, private_data: %p.", f->private_data );
         f->private_data = p_ctx;
-        LOG( LOG_INFO, "Af set, private_data: %p.", f->private_data );
     }
 
     mutex_unlock( &p_ctx->fops_lock );

@@ -34,9 +34,11 @@ static void print_usage(const char* name) {
             "Get or change the mode setting of the weston drm output.\n"
             "Options:\n"
             "       -l,--list-modes        \tlist connector support modes\n"
-            "       -c,--change-mode MODE  \tchange connector current mode, MODE format like:%%dx%%d@%%d width,height,refresh\n"
+            "       -c,--change-mode MODE  \tchange current display mode\n"
+            "                              \tMODE format like:\"%%dx%%d[i|d]@%%d %%d:%%d\" width,height,refresh [aspect_ratio_x:aspect_ratio_y],\n"
+            "                              \teg: \"1920x1080i@60 16:9\"\n"
             "       -g,--get-connector-property \"PROPERTY\"\tget connector property\n"
-            "       -s,--set-connector-property \"[Content Protection]\"=value\tset connector property\n"
+            "       -s,--set-connector-property \"[Content Protection | Color Depth | Color Space]\"=value\tset connector property\n"
             "       -G \"[ui-rect|display-mode]\"\tget [logic ui rect|display mode]\n"
             "       -S \"[ui-rect]\"\tset [logic ui rect]\n"
             "       -r,--raw-cmd           \tsend raw cmd\n", name);

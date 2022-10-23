@@ -15,7 +15,7 @@
  * #include <packed_section_end.h>
  *
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -38,7 +38,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: packed_section_end.h 666738 2016-10-24 12:16:37Z $
+ * $Id: packed_section_end.h 776894 2018-08-16 05:50:57Z $
  */
 
 /* Error check - BWL_PACKED_SECTION is defined in packed_section_start.h

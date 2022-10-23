@@ -88,16 +88,16 @@ int noise_reduction_fsm_set_param( void *fsm, uint32_t param_id, void *input, ui
 
         break;
     }
-    case FSM_PARAM_SET_SNR_OFFSET: {
+    case FSM_PARAM_SET_SNR_STRENGTH: {
         if ( !input || input_size != sizeof( uint32_t ) ) {
             LOG( LOG_ERR, "Inavlid param, param_id: %d.", param_id );
             rc = -1;
             break;
         }
 
-        uint8_t offset = *(uint32_t *)input;
+        uint8_t strength = *(uint32_t *)input;
 
-        acamera_isp_sinter_noise_profile_global_offset_write( p_fsm->p_fsm_mgr->isp_base, offset );
+        acamera_isp_sinter_strength_1_write( p_fsm->p_fsm_mgr->isp_base, strength );
 
         break;
     }
@@ -152,14 +152,14 @@ int noise_reduction_fsm_get_param( void *fsm, uint32_t param_id, void *input, ui
 
         break;
     }
-    case FSM_PARAM_GET_SNR_OFFSET: {
+    case FSM_PARAM_GET_SNR_STRENGTH: {
         if ( !output || output_size != sizeof( uint32_t ) ) {
             LOG( LOG_ERR, "Invalid param, param_id: %d.", param_id );
             rc = -1;
             break;
         }
 
-        *(uint32_t *)output = acamera_isp_sinter_noise_profile_global_offset_read( p_fsm->p_fsm_mgr->isp_base );
+        *(uint32_t *)output = acamera_isp_sinter_strength_1_read( p_fsm->p_fsm_mgr->isp_base );
 
         break;
     }

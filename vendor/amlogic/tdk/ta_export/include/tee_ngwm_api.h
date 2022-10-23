@@ -266,6 +266,38 @@ typedef struct {
 	   @retval ::NGWM_HAL_ERROR
 	   The operation failed
 	*/
+
+	void* (*allocate)(size_t xSize);
+	/**<
+	  @brief
+	  Allocates @c xSize bytes of memory.
+
+	  @param[in]      xSize
+	  Number of bytes to allocate
+
+	  @return
+	  Returns a pointer to the allocated buffer when the operation succeeds.
+	  Returns @c NULL otherwise.
+	 */
+
+	void (*free)(void* pxMem);
+	/**<
+	  @brief
+	  Frees the allocated memory referenced by @c pxMem.
+
+	  @param[in]      pxMem
+	  A pointer to the memory to be freed.
+	 */
+
+	void (*log)(const char* pxMessage);
+	/**<
+	  @brief
+	  This function logs a NULL-terminated string message.
+
+	  @param[in] pxMessage
+	  Null-terminated message string to be logged.
+	 */
+
 } INgwmHal;
 
 /*

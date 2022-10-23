@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -34,7 +34,7 @@ typedef struct _vsi_nn_crop_param
 {
     int32_t  axis;
     uint32_t dims;
-    uint32_t offset[4];
+    uint32_t offset[VSI_NN_MAX_DIM_NUM];
 } vsi_nn_crop_param;
 
 #ifdef __cplusplus

@@ -157,7 +157,7 @@ static uint16_t _calibration_black_level_b[][2] = {
 
 // CALIBRATION_STATIC_WB
 static uint16_t _calibration_static_wb[]
- = {450,256,256,460};
+ = {420,256,256,490};
 
 // RR RG RB GR GG GB BR BG BB
 static uint16_t _calibration_mt_absolute_ls_a_ccm[]

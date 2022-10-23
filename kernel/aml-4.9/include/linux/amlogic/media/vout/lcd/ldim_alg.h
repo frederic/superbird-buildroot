@@ -20,19 +20,20 @@
 
 /*========================================*/
 #define LD_STA_BIN_NUM 16
-#define LD_STA_LEN_V 17
+#define LD_STA_LEN_V 17 //32
 /*  support maximum 16x4 regions for statistics (16+1) */
-#define LD_STA_LEN_H 25
+#define LD_STA_LEN_H 25 //48
 /*  support maximum 16x4 regions for statistics (24+1)*/
-#define LD_BLK_LEN_V 25
+#define LD_BLK_LEN_V 25 //57
 /*  support maximum 16 led of each side left/right(16+4+4+1)*/
-#define LD_BLK_LEN_H 33
+#define LD_BLK_LEN_H 33 //57
 /*  support maximum 24 led of each side top/bot  (24+4+4+1)*/
 #define LD_LUT_LEN 32
 #define LD_BLKHMAX 32
 #define LD_BLKVMAX 32
 
-#define LD_BLKREGNUM 384  /* maximum support 24*16*/
+#define LD_BLKREGNUM 384  /* maximum support 48*32*/
+#define LD_NUM_PROFILE 8  //16
 
 struct LDReg_s {
 	int reg_LD_pic_RowMax;            /*u13*/

@@ -1,7 +1,7 @@
 /*
  * Dongle WL Header definitions
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -31,8 +31,8 @@
 #define _dngl_wlhdr_h_
 
 typedef struct wl_header {
-	uint8   type;           /* Header type */
-	uint8   version;        /* Header version */
+    uint8   type;           /* Header type */
+    uint8   version;        /* Header version */
 	int8	rssi;			/* RSSI */
 	uint8	pad;			/* Unused */
 } wl_header_t;

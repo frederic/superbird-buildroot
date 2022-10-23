@@ -21,6 +21,7 @@
 
 #include <common.h>
 #include <amlogic/enc_clk_config.h>
+#include <asm/cpu_id.h>
 #include <asm/arch/io.h>
 #include <asm/io.h>
 #include "hw_enc_clk_config.h"
@@ -213,6 +214,30 @@ static void set_hpll_clk_out(unsigned clk, struct hdmitx_dev *hdev)
 		else
 			break;
 		break;
+	case 5850000:
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL0, 0x3b0004f3);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL1, 0x00018000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL2, 0x00000000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x0a691c00);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x33771290);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL5, 0x39270000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL6, 0x50540000);
+		hd_set_reg_bits(P_HHI_HDMI_PLL_CNTL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_HHI_HDMI_PLL_CNTL0);
+		pr_info("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
+		break;
+	case 5600000:
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL0, 0x3b0004e9);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL1, 0x0000aaab);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL2, 0x00000000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x0a691c00);/*test*/
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x33771290);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL5, 0x39270000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL6, 0x50540000);
+		hd_set_reg_bits(P_HHI_HDMI_PLL_CNTL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_HHI_HDMI_PLL_CNTL0);
+		pr_info("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
+		break;
 	case 5405400:
 		hd_write_reg(P_HHI_HDMI_PLL_CNTL0, 0x3b0004e1);
 		hd_write_reg(P_HHI_HDMI_PLL_CNTL1, 0x00007333);
@@ -333,6 +358,30 @@ static void set_hpll_clk_out(unsigned clk, struct hdmitx_dev *hdev)
 		printk("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
 		WAIT_FOR_PLL_LOCKED(P_HHI_HDMI_PLL_CNTL0);
 		printk("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
+		break;
+	case 4320000:
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL0, 0x3b0004b4);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL1, 0x00000000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL2, 0x00000000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x0a691c00);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x33771290);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL5, 0x39270000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL6, 0x50540000);
+		hd_set_reg_bits(P_HHI_HDMI_PLL_CNTL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_HHI_HDMI_PLL_CNTL0);
+		pr_info("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
+		break;
+	case 3197500:
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL0, 0x3b000485);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL1, 0x00007555);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL2, 0x00000000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x0a691c00);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x33771290);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL5, 0x39270000);
+		hd_write_reg(P_HHI_HDMI_PLL_CNTL6, 0x50540000);
+		hd_set_reg_bits(P_HHI_HDMI_PLL_CNTL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_HHI_HDMI_PLL_CNTL0);
+		pr_info("HPLL: 0x%lx\n", hd_read_reg(P_HHI_HDMI_PLL_CNTL0));
 		break;
 	default:
 		printk("error hpll clk: %d\n", clk);
@@ -539,25 +588,25 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_24[] = {
 		{
 			HDMI_720x576p50_16x9, HDMI_720x480p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 4324320, 4, 4, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 1, -1
+		1, VIU_ENCP, 4324320, 4, 4, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_720x576p100_16x9, HDMI_720x480p120_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 4324320, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 1, -1
+		1, VIU_ENCP, 4324320, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1280x720p50_16x9, HDMI_1280x720p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 5940000, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 1, -1
+		1, VIU_ENCP, 5940000, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1920x1080i60_16x9, HDMI_1920x1080i50_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 5940000, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 1, -1
+		1, VIU_ENCP, 5940000, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_5, 1, 2, 2, -1
 	},
 	{
 		{
@@ -726,6 +775,18 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_24[] = {
 		},
 		1, VIU_ENCP, 3485000, 1, 1, 1, CLK_UTIL_VID_PLL_DIV_5, 2, 1, 1, -1
 	},
+	{
+		{
+			HDMIV_3440x1440p60hz, GROUP_END
+		},
+		1, VIU_ENCP, 3197500, 1, 1, 1, CLK_UTIL_VID_PLL_DIV_5, 2, 1, 1, -1
+	},
+	{
+		{
+			HDMIV_2400x1200p90hz, GROUP_END
+		},
+		1, VIU_ENCP, 5600000, 2, 1, 1, CLK_UTIL_VID_PLL_DIV_5, 2, 1, 1, -1
+	},
 };
 
 /* For colordepth 10bits */
@@ -740,25 +801,25 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_30[] = {
 		{
 			HDMI_720x576p50_16x9, HDMI_720x480p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 5405400, 4, 4, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 1, -1
+		1, VIU_ENCP, 5405400, 4, 4, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_720x576p100_16x9, HDMI_720x480p120_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 5405400, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 1, -1
+		1, VIU_ENCP, 5405400, 4, 2, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1280x720p50_16x9, HDMI_1280x720p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 3712500, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 1, -1
+		1, VIU_ENCP, 3712500, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1920x1080i60_16x9, HDMI_1920x1080i50_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 3712500, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 1, -1
+		1, VIU_ENCP, 3712500, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_6p25, 1, 2, 2, -1
 	},
 	{
 		{
@@ -816,25 +877,25 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_36[] = {
 		{
 			HDMI_720x576p50_16x9, HDMI_720x480p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 3243240, 2, 4, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 1, -1
+		1, VIU_ENCP, 3243240, 2, 4, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_720x576p100_16x9, HDMI_720x480p120_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 3243240, 2, 2, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 1, -1
+		1, VIU_ENCP, 3243240, 2, 2, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1280x720p50_16x9, HDMI_1280x720p60_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 4455000, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 1, -1
+		1, VIU_ENCP, 4455000, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 2, -1
 	},
 	{
 		{
 			HDMI_1920x1080i60_16x9, HDMI_1920x1080i50_16x9, GROUP_END
 		},
-		1, VIU_ENCP, 4455000, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 1, -1
+		1, VIU_ENCP, 4455000, 4, 1, 1, CLK_UTIL_VID_PLL_DIV_7p5, 1, 2, 2, -1
 	},
 	{
 		{
@@ -885,6 +946,28 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_36[] = {
 		1, VIU_ENCP, 4455000, 1, 1, 2, CLK_UTIL_VID_PLL_DIV_3p25, 1, 2, 2, -1
 	},
 };
+
+static void set_hdmitx_fe_clk(struct hdmitx_dev *hdev)
+{
+	unsigned int tmp = 0;
+	enum hdmi_vic vic = hdev->vic;
+
+	if (!is_tm2_verb())
+		return;
+
+	hd_set_reg_bits(P_HHI_VID_CLK_CNTL2, 1, 9, 1);
+	switch (vic) {
+	case HDMI_720x480i60_16x9:
+	case HDMI_720x576i50_16x9:
+		tmp = (hd_read_reg(P_HHI_VID_CLK_DIV) >> 28) & 0xf;
+		break;
+	default:
+		tmp = (hd_read_reg(P_HHI_VID_CLK_DIV) >> 24) & 0xf;
+		break;
+	}
+
+	hd_set_reg_bits(P_HHI_HDMI_CLK_CNTL, tmp, 20, 4);
+}
 
 void hdmitx_set_clk_(struct hdmitx_dev *hdev)
 {
@@ -963,6 +1046,7 @@ next:
 	set_hdmi_tx_pixel_div(p_enc[j].hdmi_tx_pixel_div);
 	set_encp_div(p_enc[j].encp_div);
 	set_enci_div(p_enc[j].enci_div);
+	set_hdmitx_fe_clk(hdev);
 }
 
 static int likely_frac_rate_mode(char *m)

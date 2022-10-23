@@ -641,6 +641,7 @@ static int am_meson_lcd_bind(struct device *dev, struct device *master,
 	 * avoid init with null info when lcd probe with unifykey case.
 	 */
 	vout_register_client(&am_drm_lcd_notifier_nb);
+	am_drm_lcd_display_mode_timing_init(am_drm_lcd);
 
 	drm_panel_init(&am_drm_lcd->panel);
 	am_drm_lcd->panel.dev = NULL;

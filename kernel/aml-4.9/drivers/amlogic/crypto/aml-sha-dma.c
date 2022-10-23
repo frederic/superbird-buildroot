@@ -42,6 +42,7 @@
 #include <crypto/internal/hash.h>
 #include "aml-crypto-dma.h"
 
+#define HMAC	0
 /* SHA flags */
 #define SHA_FLAGS_BUSY			BIT(0)
 #define SHA_FLAGS_DMA_ACTIVE    BIT(1)
@@ -335,7 +336,10 @@ static int aml_sha_update_dma_slow(struct aml_sha_dev *dd,
 	struct aml_sha_reqctx *ctx = ahash_request_ctx(req);
 	unsigned int final;
 	size_t count;
-
+#if 0
+	if (!ctx->total)
+		return 0;
+#endif
 	ctx->flags &= ~SHA_FLAGS_FAST;
 	aml_sha_append_sg(ctx);
 
@@ -946,6 +950,7 @@ static int aml_sha_export(struct ahash_request *req, void *out)
 	return 0;
 }
 
+#if HMAC
 static int aml_shash_digest(struct crypto_shash *tfm, u32 flags,
 				  const u8 *data, unsigned int len, u8 *out)
 {
@@ -1002,6 +1007,7 @@ static int aml_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
 
 	return err;
 }
+#endif
 
 static int aml_sha_cra_init_alg(struct crypto_tfm *tfm, const char *alg_base)
 {
@@ -1042,7 +1048,7 @@ static void aml_sha_cra_exit(struct crypto_tfm *tfm)
 	if (tctx->is_hmac && tctx->shash != NULL)
 		crypto_free_shash(tctx->shash);
 }
-
+#if HMAC
 static int aml_hmac_sha1_cra_init(struct crypto_tfm *tfm)
 {
 	struct aml_sha_ctx *tctx = crypto_tfm_ctx(tfm);
@@ -1070,7 +1076,7 @@ static int aml_hmac_sha256_cra_init(struct crypto_tfm *tfm)
 static void aml_hmac_cra_exit(struct crypto_tfm *tfm)
 {
 }
-
+#endif
 static struct ahash_alg sha_algs[] = {
 	{
 		.init		= aml_sha_init,
@@ -1150,6 +1156,7 @@ static struct ahash_alg sha_algs[] = {
 			}
 		}
 	},
+#if HMAC
 	{
 		.init		= aml_sha_init,
 		.update		= aml_sha_update,
@@ -1234,6 +1241,7 @@ static struct ahash_alg sha_algs[] = {
 			}
 		}
 	}
+#endif
 };
 
 static void aml_sha_done_task(unsigned long data)

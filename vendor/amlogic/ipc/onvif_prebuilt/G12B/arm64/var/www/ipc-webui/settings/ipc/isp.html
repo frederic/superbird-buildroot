@@ -1,0 +1,288 @@
+<?php
+require "../../common.php";
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+    <title>IPC-ISP</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+
+<body>
+
+<form class="layui-form layui-form-pane" id="form_isp" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Brightness</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="brightness" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Contrast</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="contrast" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Hue</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="hue" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Saturation</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="saturation" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Sharpness</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="sharpness" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">WDR</label>
+        </div>
+        <div class="layui-inline">
+            <input id="wdr_enabled" type="checkbox" name="wdr_enabled" lay-skin="switch" lay-text="" lay-filter="enabled" unchecked="">
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Auto Exposure</label>
+            </div>
+            <div class="layui-inline">
+                <input id="exposure_auto" type="checkbox" name="exposure_auto" lay-skin="switch" lay-text="" lay-filter="enabled" unchecked="">
+            </div>
+        </div>
+        <div class="layui-inline" id="div_exposure_absolute" style="display: none">
+            <div class="layui-input-block">
+                <div class="layui-inline">
+                    <label class="layui-form-label locale">Absolute Exposure</label>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-input-inline">
+                        <div id="exposure_absolute" class="demo-slider"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Auto Gain</label>
+            </div>
+            <div class="layui-inline">
+                <input id="gain_auto" type="checkbox" name="gain_auto" lay-skin="switch" lay-text="" lay-filter="enabled" unchecked="">
+            </div>
+        </div>
+        <div class="layui-inline" id="div_gain">
+            <div class="layui-input-block">
+                <div class="layui-inline">
+                    <label class="layui-form-label locale">Manual Gain</label>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-input-inline">
+                        <div id="gain_manual" class="demo-slider"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Auto White Balance</label>
+            </div>
+            <div class="layui-inline">
+                <input id="whitebalance_auto" type="checkbox" name="whitebalance_auto" lay-skin="switch" lay-text="" lay-filter="enabled" unchecked="">
+            </div>
+        </div>
+        <div class="layui-inline" id="div_whitebalance" style="display: none;">
+            <div class="layui-input-block">
+                <div class="layui-inline">
+                    <label class="layui-form-label locale">CbGain</label>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-input-inline">
+                        <div id="whitebalance_cbgain" class="demo-slider"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-input-block">
+                <div class="layui-inline">
+                    <label class="layui-form-label locale">CrGain</label>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-input-inline">
+                        <div id="whitebalance_crgain" class="demo-slider"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Video System</label>
+            <div class="layui-input-inline">
+                <select name="anti-banding" lay-filter="vsys" id="anti-banding"></select>
+            </div>
+            <div class="layui-form-mid layui-word-aux">HZ</div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Mirroring</label>
+            <div class="layui-input-inline">
+                <select name="mirroring" lay-filter="mirror" id="mirroring"></select>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Rotation</label>
+            <div class="layui-input-inline">
+                <select name="rotation" lay-filter="rotation" id="rotation"></select>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Light Compensation</label>
+                <div class="layui-input-inline">
+                    <select name="compensation_action" lay-filter="compensation" id="compensation_action"></select>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_light_compensation_hlc" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="compensation_hlc" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_light_compensation_blc" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="compensation_blc" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">DNR</label>
+                <div class="layui-input-inline">
+                    <select name="nr_action" lay-filter="nr_action" id="nr_action"></select>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_nr_space-normal" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Space Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="nr_space-normal" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_nr_space-expert" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Space Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="nr_space-expert" class="demo-slider"></div>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Time Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="nr_time" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Defog Mode</label>
+                <div class="layui-input-inline">
+                    <select name="defog_action" lay-filter="defog_action" id="defog_action"></select>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_defog_auto" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="defog_auto" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+        <div class="layui-inline" id="div_defog_manual" style="display:none;">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Level</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <div id="defog_manual" class="demo-slider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item" style="margin-left:50px">
+        <button class="layui-btn locale" id="submit" lay-filter="submit">Submit</button>
+        <button class="layui-btn layui-btn-danger locale" id="reset">Reset</button>
+    </div>
+</form>
+
+<script> translate_html(); </script>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="isp.js" type="application/javascript"></script>
+</body>
+</html>

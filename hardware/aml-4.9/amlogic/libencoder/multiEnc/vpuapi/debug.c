@@ -93,7 +93,7 @@ Int32 checkLineFeedInHelp(
 
 #define API_VERSION_MAJOR       5
 #define API_VERSION_MINOR       5
-#define API_VERSION_PATCH       59
+#define API_VERSION_PATCH       60
 #define API_VERSION             ((API_VERSION_MAJOR<<16) | (API_VERSION_MINOR<<8) | API_VERSION_PATCH)
 
 RetCode PrintVpuProductInfo(
@@ -132,6 +132,11 @@ RetCode PrintVpuProductInfo(
             /* checking ONE AXI BIT FILE */
             VLOG(INFO, "MAP CONVERTER REG : %d\n", (stdDef0>>31)&1);
             VLOG(INFO, "MAP CONVERTER SIG : %d\n", (stdDef0>>30)&1);
+            VLOG(INFO, "PVRIC FBC EN      : %d\n", (stdDef0>>27)&1);
+            VLOG(INFO, "PVRIC FBC ID      : %d\n", (stdDef0>>24)&7);
+            VLOG(INFO, "SCALER 2ALIGNED   : %d\n", (stdDef0>>23)&1);
+            VLOG(INFO, "VCORE BACKBONE    : %d\n", (stdDef0>>22)&1);
+            VLOG(INFO, "STD SWITCH EN     : %d\n", (stdDef0>>21)&1);
             VLOG(INFO, "BG_DETECT         : %d\n", (stdDef0>>20)&1);
             VLOG(INFO, "3D NR             : %d\n", (stdDef0>>19)&1);
             VLOG(INFO, "ONE-PORT AXI      : %d\n", (stdDef0>>18)&1);
@@ -155,6 +160,12 @@ RetCode PrintVpuProductInfo(
             VLOG(INFO, "VCORE ID 1        : %d\n", (stdDef1>>17)&1);
             VLOG(INFO, "VCORE ID 0        : %d\n", (stdDef1>>16)&1);
             VLOG(INFO, "BW OPT            : %d\n", (stdDef1>>15)&1);
+            VLOG(INFO, "CODEC STD AV1     : %d\n", (stdDef1>>4)&1);
+            VLOG(INFO, "CODEC STD AVS2    : %d\n", (stdDef1>>3)&1);
+            VLOG(INFO, "CODEC STD AVC     : %d\n", (stdDef1>>2)&1);
+            VLOG(INFO, "CODEC STD VP9     : %d\n", (stdDef1>>1)&1);
+            VLOG(INFO, "CODEC STD HEVC    : %d\n", (stdDef1>>0)&1);
+
             VLOG(INFO, "==========================\n");
             VLOG(INFO, "confFeature       : %08x\n", confFeature);
             if ( productInfo->hwConfigRev > 167455 ) {//20190321
@@ -167,6 +178,10 @@ RetCode PrintVpuProductInfo(
                 VLOG(INFO, "AVC  ENC          : %d\n", (confFeature>>9)&1);
                 VLOG(INFO, "AVC  DEC          : %d\n", (confFeature>>8)&1);
             }
+            VLOG(INFO, "AV1  ENC PROF     : %d\n", (confFeature>>14)&1);
+            VLOG(INFO, "AV1  DEC HIGH     : %d\n", (confFeature>>13)&1);
+            VLOG(INFO, "AV1  DEC MAIN     : %d\n", (confFeature>>12)&1);
+
             VLOG(INFO, "VP9  ENC Profile2 : %d\n", (confFeature>>7)&1);
             VLOG(INFO, "VP9  ENC Profile0 : %d\n", (confFeature>>6)&1);
             VLOG(INFO, "VP9  DEC Profile2 : %d\n", (confFeature>>5)&1);
@@ -332,7 +347,7 @@ static void	DisplayVceEncDebugCommon521(int coreIdx, int vcore_idx, int set_mode
     VLOG(ERR,"\t- cur_prp_dma_state :  0x%x\n", READ_BIT(reg_val,22, 20));
     VLOG(ERR,"\t- cur_prp_state     :  0x%x\n", READ_BIT(reg_val,19, 18));
     VLOG(ERR,"\t- main_ctu_xpos     :  0x%x\n", READ_BIT(reg_val,17,  9));
-    VLOG(ERR,"\t- main_ctu_ypos     :  0x%x\n", READ_BIT(reg_val, 8,  0));
+    VLOG(ERR,"\t- main_ctu_ypos     :  0x%x(HEVC:*32, AVC:*16)\n", READ_BIT(reg_val, 8,  0));
 }
 
 static void	DisplayVceEncDebugMode2(int core_idx, int vcore_idx, int set_mode, int* debug)
@@ -357,6 +372,7 @@ static void	DisplayVceEncDebugMode2(int core_idx, int vcore_idx, int set_mode, i
     VLOG(ERR,"\t- cur_sam_fsm[3:0]   :  0x%x\n", READ_BIT(reg_val, 3, 0));
 }
 
+#define VCE_BUSY                   0xA04
 #define VCE_LF_PARAM               0xA6c
 #define VCE_BIN_WDMA_CUR_ADDR      0xB1C
 #define VCE_BIN_PIC_PARAM          0xB20
@@ -367,9 +383,10 @@ static void	DisplayVceEncReadVCE(int coreIdx, int vcore_idx)
     int reg_val;
 
     VLOG(ERR, "---------------DisplayVceEncReadVCE-----------------\n");
+    reg_val = ReadRegVCE(coreIdx, vcore_idx, VCE_BUSY);
+    VLOG(ERR,"\t- VCE_BUSY                 :  0x%x\n", reg_val);
     reg_val = ReadRegVCE(coreIdx, vcore_idx, VCE_LF_PARAM);
     VLOG(ERR,"\t- VCE_LF_PARAM             :  0x%x\n", reg_val);
-
     reg_val = ReadRegVCE(coreIdx, vcore_idx, VCE_BIN_WDMA_CUR_ADDR);
     VLOG(ERR,"\t- VCE_BIN_WDMA_CUR_ADDR    :  0x%x\n", reg_val);
     reg_val = ReadRegVCE(coreIdx, vcore_idx, VCE_BIN_PIC_PARAM);
@@ -618,6 +635,15 @@ void vp5xx_bpu_status(
     }
 
 
+
+    for (i = 0x8000; i < 0x81FC; i += 16) {
+        VLOG(INFO,"0x%04xh: 0x%08x 0x%08x 0x%08x 0x%08x\n", (VP5_REG_BASE + i),
+            vdi_fio_read_register(coreIdx, (VP5_REG_BASE + i)),
+            vdi_fio_read_register(coreIdx, (VP5_REG_BASE + i + 4 )),
+            vdi_fio_read_register(coreIdx, (VP5_REG_BASE + i + 8 )),
+            vdi_fio_read_register(coreIdx, (VP5_REG_BASE + i + 12)));
+    }
+
     VLOG(INFO,"[-] BPU REG Dump\n");
 
     VLOG(INFO,"[+] MIB REG Dump\n");
@@ -627,16 +653,19 @@ void vp5xx_bpu_status(
     }
     VLOG(INFO,"[-] MIB REG Dump\n");
 
-    // --------- VCE register Dump
-    VLOG(INFO,"[+] VCE REG Dump Core0\n");
-    for (i=0x000; i<0x1fc; i+=16) {
-        VLOG(INFO,"0x%04xh: 0x%08x 0x%08x 0x%08x 0x%08x\n", i,
-            ReadRegVCE(coreIdx, 0, (i+0x00)),
-            ReadRegVCE(coreIdx, 0, (i+0x04)),
-            ReadRegVCE(coreIdx, 0, (i+0x08)),
-            ReadRegVCE(coreIdx, 0, (i+0x0c)));
-    }
-    VLOG(INFO,"[-] VCE REG Dump\n");
+
+    VLOG(INFO,"[-] BPU MSG REG Dump\n");
+
+    VLOG(INFO,"[MSG_0:0x%08x], [MSG_1:0x%08x],[MSG_2:0x%08x],[MSG_3:0x%08x],[MSG_4:0x%08x],[MSG_5:0x%08x] \n",
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1A8),
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1AC),
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1B0),
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1B4),
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1B8),
+        vdi_fio_read_register(coreIdx, VP5_REG_BASE + 0x8000 + 0x1BC));
+
+    VLOG(INFO,"[-] BPU MSG REG Dump\n");
+
 }
 
 

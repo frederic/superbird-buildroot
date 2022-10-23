@@ -124,15 +124,15 @@ static int decode_profile_tier_level(struct get_bits_context *gb, struct PTLComm
 	ptl->tier_flag     = get_bits1(gb);
 	ptl->profile_idc   = get_bits(gb, 5);
 	if (ptl->profile_idc == FF_PROFILE_HEVC_MAIN)
-		pr_info("Main profile bitstream\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Main profile bitstream\n");
 	else if (ptl->profile_idc == FF_PROFILE_HEVC_MAIN_10)
-		pr_info("Main 10 profile bitstream\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Main 10 profile bitstream\n");
 	else if (ptl->profile_idc == FF_PROFILE_HEVC_MAIN_STILL_PICTURE)
-		pr_info("Main Still Picture profile bitstream\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Main Still Picture profile bitstream\n");
 	else if (ptl->profile_idc == FF_PROFILE_HEVC_REXT)
-		pr_info("Range Extension profile bitstream\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Range Extension profile bitstream\n");
 	else
-		pr_info("Unknown HEVC profile: %d\n", ptl->profile_idc);
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Unknown HEVC profile: %d\n", ptl->profile_idc);
 
 	for (i = 0; i < 32; i++) {
 		ptl->profile_compatibility_flag[i] = get_bits1(gb);
@@ -157,7 +157,7 @@ static int parse_ptl(struct get_bits_context *gb, struct PTL *ptl, int max_num_s
 	int i;
 	if (decode_profile_tier_level(gb, &ptl->general_ptl) < 0 ||
 		get_bits_left(gb) < 8 + (8*2 * (max_num_sub_layers - 1 > 0))) {
-		pr_err("PTL information too short\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "PTL information too short\n");
 		return -1;
 	}
 
@@ -174,12 +174,12 @@ static int parse_ptl(struct get_bits_context *gb, struct PTL *ptl, int max_num_s
 	for (i = 0; i < max_num_sub_layers - 1; i++) {
 		if (ptl->sub_layer_profile_present_flag[i] &&
 			decode_profile_tier_level(gb, &ptl->sub_layer_ptl[i]) < 0) {
-			pr_err("PTL information for sublayer %i too short\n", i);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "PTL information for sublayer %i too short\n", i);
 			return -1;
 		}
 		if (ptl->sub_layer_level_present_flag[i]) {
 			if (get_bits_left(gb) < 8) {
-				pr_err("Not enough data for sublayer %i level_idc\n", i);
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Not enough data for sublayer %i level_idc\n", i);
 				return -1;
 			} else
 				ptl->sub_layer_ptl[i].level_idc = get_bits(gb, 8);
@@ -255,7 +255,7 @@ static int decode_hrd(struct get_bits_context *gb,
 		if (!low_delay) {
 			nb_cpb = get_ue_golomb_long(gb) + 1;
 			if (nb_cpb < 1 || nb_cpb > 32) {
-				pr_err("nb_cpb %d invalid\n", nb_cpb);
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "nb_cpb %d invalid\n", nb_cpb);
 				return -1;
 			}
 		}
@@ -273,16 +273,16 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 	int i,j;
 	int vps_id = 0;
 
-	pr_info("Decoding VPS\n");
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Decoding VPS\n");
 
 	vps_id = get_bits(gb, 4);
 	if (vps_id >= HEVC_MAX_VPS_COUNT) {
-		pr_err("VPS id out of range: %d\n", vps_id);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "VPS id out of range: %d\n", vps_id);
 		goto err;
 	}
 
 	if (get_bits(gb, 2) != 3) { // vps_reserved_three_2bits
-		pr_err("vps_reserved_three_2bits is not three\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_reserved_three_2bits is not three\n");
 		goto err;
 	}
 
@@ -291,12 +291,12 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 	vps->vps_temporal_id_nesting_flag = get_bits1(gb);
 
 	if (get_bits(gb, 16) != 0xffff) { // vps_reserved_ffff_16bits
-		pr_err("vps_reserved_ffff_16bits is not 0xffff\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_reserved_ffff_16bits is not 0xffff\n");
 		goto err;
 	}
 
 	if (vps->vps_max_sub_layers > HEVC_MAX_SUB_LAYERS) {
-		pr_err("vps_max_sub_layers out of range: %d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_max_sub_layers out of range: %d\n",
 			vps->vps_max_sub_layers);
 		goto err;
 	}
@@ -313,12 +313,12 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 		vps->vps_max_latency_increase[i]	= get_ue_golomb_long(gb) - 1;
 
 		if (vps->vps_max_dec_pic_buffering[i] > HEVC_MAX_DPB_SIZE || !vps->vps_max_dec_pic_buffering[i]) {
-			pr_err("vps_max_dec_pic_buffering_minus1 out of range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_max_dec_pic_buffering_minus1 out of range: %d\n",
 				vps->vps_max_dec_pic_buffering[i] - 1);
 			goto err;
 		}
 		if (vps->vps_num_reorder_pics[i] > vps->vps_max_dec_pic_buffering[i] - 1) {
-			pr_err("vps_max_num_reorder_pics out of range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_max_num_reorder_pics out of range: %d\n",
 				vps->vps_num_reorder_pics[i]);
 			goto err;
 		}
@@ -328,7 +328,7 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 	vps->vps_num_layer_sets = get_ue_golomb_long(gb) + 1;
 	if (vps->vps_num_layer_sets < 1 || vps->vps_num_layer_sets > 1024 ||
 		(vps->vps_num_layer_sets - 1LL) * (vps->vps_max_layer_id + 1LL) > get_bits_left(gb)) {
-		pr_err("too many layer_id_included_flags\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "too many layer_id_included_flags\n");
 		goto err;
 	}
 
@@ -345,7 +345,7 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 			vps->vps_num_ticks_poc_diff_one = get_ue_golomb_long(gb) + 1;
 		vps->vps_num_hrd_parameters = get_ue_golomb_long(gb);
 		if (vps->vps_num_hrd_parameters > (u32)vps->vps_num_layer_sets) {
-			pr_err("vps_num_hrd_parameters %d is invalid\n", vps->vps_num_hrd_parameters);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vps_num_hrd_parameters %d is invalid\n", vps->vps_num_hrd_parameters);
 			goto err;
 		}
 		for (i = 0; i < vps->vps_num_hrd_parameters; i++) {
@@ -360,7 +360,7 @@ int ff_hevc_parse_vps(struct get_bits_context *gb, struct h265_VPS_t *vps)
 	get_bits1(gb); /* vps_extension_flag */
 
 	if (get_bits_left(gb) < 0) {
-		pr_err("Overread VPS by %d bits\n", -get_bits_left(gb));
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Overread VPS by %d bits\n", -get_bits_left(gb));
 		goto err;
 	}
 
@@ -398,7 +398,7 @@ static int map_pixel_format(struct h265_SPS_t *sps)
 		if (sps->chroma_format_idc == 3) sps->pix_fmt = AV_PIX_FMT_YUV444P12;
 		break;
 	default:
-		pr_info("The following bit-depths are currently specified: 8, 9, 10 and 12 bits, "
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "The following bit-depths are currently specified: 8, 9, 10 and 12 bits, "
 			"chroma_format_idc is %d, depth is %d\n",
 			sps->chroma_format_idc, sps->bit_depth);
 		return -1;
@@ -466,7 +466,7 @@ static int scaling_list_data(struct get_bits_context *gb,
 					// Copy from previous array.
 					delta *= (size_id == 3) ? 3 : 1;
 					if (matrix_id < delta) {
-						pr_err("Invalid delta in scaling list data: %d.\n", delta);
+						v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid delta in scaling list data: %d.\n", delta);
 						return -1;
 					}
 
@@ -541,7 +541,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 		if (is_slice_header) {
 			u32 delta_idx = get_ue_golomb_long(gb) + 1;
 			if (delta_idx > sps->nb_st_rps) {
-				pr_err("Invalid value of delta_idx in slice header RPS: %d > %d.\n",
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value of delta_idx in slice header RPS: %d > %d.\n",
 					delta_idx, sps->nb_st_rps);
 				return -1;
 			}
@@ -553,7 +553,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 		delta_rps_sign = get_bits1(gb);
 		abs_delta_rps  = get_ue_golomb_long(gb) + 1;
 		if (abs_delta_rps < 1 || abs_delta_rps > 32768) {
-			pr_err("Invalid value of abs_delta_rps: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value of abs_delta_rps: %d\n",
 				abs_delta_rps);
 			return -1;
 		}
@@ -579,7 +579,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 		}
 
 		if (k >= ARRAY_SIZE(rps->used)) {
-			pr_err( "Invalid num_delta_pocs: %d\n", k);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid num_delta_pocs: %d\n", k);
 			return -1;
 		}
 
@@ -623,7 +623,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 
 		if (rps->num_negative_pics >= HEVC_MAX_REFS ||
 			nb_positive_pics >= HEVC_MAX_REFS) {
-			pr_err("Too many refs in a short term RPS.\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Too many refs in a short term RPS.\n");
 			return -1;
 		}
 
@@ -633,7 +633,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 			for (i = 0; i < rps->num_negative_pics; i++) {
 				delta_poc = get_ue_golomb_long(gb) + 1;
 				if (delta_poc < 1 || delta_poc > 32768) {
-					pr_err("Invalid value of delta_poc: %d\n",
+					v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value of delta_poc: %d\n",
 						delta_poc);
 					return -1;
 				}
@@ -645,7 +645,7 @@ int ff_hevc_decode_short_term_rps(struct get_bits_context *gb,
 			for (i = 0; i < nb_positive_pics; i++) {
 				delta_poc = get_ue_golomb_long(gb) + 1;
 				if (delta_poc < 1 || delta_poc > 32768) {
-					pr_err("Invalid value of delta_poc: %d\n",
+					v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value of delta_poc: %d\n",
 						delta_poc);
 					return -1;
 				}
@@ -664,7 +664,7 @@ static void decode_vui(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	struct get_bits_context backup;
 	int sar_present, alt = 0;
 
-	pr_info("Decoding VUI\n");
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Decoding VUI\n");
 
 	sar_present = get_bits1(gb);
 	if (sar_present) {
@@ -675,7 +675,8 @@ static void decode_vui(struct get_bits_context *gb, struct h265_SPS_t *sps)
 			vui->sar.num = get_bits(gb, 16);
 			vui->sar.den = get_bits(gb, 16);
 		} else
-			pr_info("Unknown SAR index: %u.\n", sar_idx);
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER,
+				"Unknown SAR index: %u.\n", sar_idx);
 	}
 
 	vui->overscan_info_present_flag = get_bits1(gb);
@@ -732,7 +733,7 @@ static void decode_vui(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	memcpy(&backup_vui, vui, sizeof(backup_vui));
 	if (get_bits_left(gb) >= 68 && show_bits_long(gb, 21) == 0x100000) {
 		vui->default_display_window_flag = 0;
-		pr_info("Invalid default display window\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Invalid default display window\n");
 	} else
 		vui->default_display_window_flag = get_bits1(gb);
 
@@ -752,7 +753,7 @@ timing_info:
 		if (get_bits_left(gb) < 66 && !alt) {
 			// The alternate syntax seem to have timing info located
 			// at where def_disp_win is normally located
-			pr_info("Strange VUI timing information, retrying...\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Strange VUI timing information, retrying...\n");
 			memcpy(vui, &backup_vui, sizeof(backup_vui));
 			memcpy(gb, &backup, sizeof(backup));
 			alt = 1;
@@ -761,7 +762,7 @@ timing_info:
 		vui->vui_num_units_in_tick	= get_bits_long(gb, 32);
 		vui->vui_time_scale		= get_bits_long(gb, 32);
 		if (alt) {
-			pr_info("Retry got %u/%u fps\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Retry got %u/%u fps\n",
 			vui->vui_time_scale, vui->vui_num_units_in_tick);
 		}
 		vui->vui_poc_proportional_to_timing_flag = get_bits1(gb);
@@ -775,7 +776,7 @@ timing_info:
 	vui->bitstream_restriction_flag = get_bits1(gb);
 	if (vui->bitstream_restriction_flag) {
 		if (get_bits_left(gb) < 8 && !alt) {
-			pr_info("Strange VUI bitstream restriction information, retrying"
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Strange VUI bitstream restriction information, retrying"
 				" from timing information...\n");
 			memcpy(vui, &backup_vui, sizeof(backup_vui));
 			memcpy(gb, &backup, sizeof(backup));
@@ -794,7 +795,7 @@ timing_info:
 
 	if (get_bits_left(gb) < 1 && !alt) {
 		// XXX: Alternate syntax when sps_range_extension_flag != 0?
-		pr_info("Overread in VUI, retrying from timing information...\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Overread in VUI, retrying from timing information...\n");
 		memcpy(vui, &backup_vui, sizeof(backup_vui));
 		memcpy(gb, &backup, sizeof(backup));
 		alt = 1;
@@ -811,13 +812,13 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 
 	sps->vps_id = get_bits(gb, 4);
 	if (sps->vps_id >= HEVC_MAX_VPS_COUNT) {
-		pr_err("VPS id out of range: %d\n", sps->vps_id);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "VPS id out of range: %d\n", sps->vps_id);
 		return -1;
 	}
 
 	sps->max_sub_layers = get_bits(gb, 3) + 1;
 		if (sps->max_sub_layers > HEVC_MAX_SUB_LAYERS) {
-			pr_err("sps_max_sub_layers out of range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "sps_max_sub_layers out of range: %d\n",
 				sps->max_sub_layers);
 		return -1;
 	}
@@ -829,13 +830,13 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 
 	sps->sps_id = get_ue_golomb_long(gb);
 	if (sps->sps_id >= HEVC_MAX_SPS_COUNT) {
-		pr_err("SPS id out of range: %d\n", sps->sps_id);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "SPS id out of range: %d\n", sps->sps_id);
 		return -1;
 	}
 
 	sps->chroma_format_idc = get_ue_golomb_long(gb);
 	if (sps->chroma_format_idc > 3U) {
-		pr_err("chroma_format_idc %d is invalid\n", sps->chroma_format_idc);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "chroma_format_idc %d is invalid\n", sps->chroma_format_idc);
 		return -1;
 	}
 
@@ -848,7 +849,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	sps->width	= get_ue_golomb_long(gb);
 	sps->height	= get_ue_golomb_long(gb);
 	if (sps->width > 8192 || sps->height > 8192) {
-		pr_err("width or height oversize.\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "width or height oversize.\n");
 		return -1;
 	}
 
@@ -865,7 +866,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	sps->bit_depth   = get_ue_golomb_long(gb) + 8;
 	bit_depth_chroma = get_ue_golomb_long(gb) + 8;
 	if (sps->chroma_format_idc && bit_depth_chroma != sps->bit_depth) {
-		pr_err("Luma bit depth (%d) is different from chroma bit depth (%d), this is unsupported.\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Luma bit depth (%d) is different from chroma bit depth (%d), this is unsupported.\n",
 			sps->bit_depth, bit_depth_chroma);
 		return -1;
 	}
@@ -877,7 +878,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 
 	sps->log2_max_poc_lsb = get_ue_golomb_long(gb) + 4;
 		if (sps->log2_max_poc_lsb > 16) {
-			pr_err("log2_max_pic_order_cnt_lsb_minus4 out range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "log2_max_pic_order_cnt_lsb_minus4 out range: %d\n",
 				sps->log2_max_poc_lsb - 4);
 		return -1;
 	}
@@ -889,12 +890,12 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 		sps->temporal_layer[i].num_reorder_pics      = get_ue_golomb_long(gb);
 		sps->temporal_layer[i].max_latency_increase  = get_ue_golomb_long(gb) - 1;
 		if (sps->temporal_layer[i].max_dec_pic_buffering > (u32)HEVC_MAX_DPB_SIZE) {
-			pr_err("sps_max_dec_pic_buffering_minus1 out of range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "sps_max_dec_pic_buffering_minus1 out of range: %d\n",
 				sps->temporal_layer[i].max_dec_pic_buffering - 1U);
 			return -1;
 		}
 		if (sps->temporal_layer[i].num_reorder_pics > sps->temporal_layer[i].max_dec_pic_buffering - 1) {
-			pr_info("sps_max_num_reorder_pics out of range: %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "sps_max_num_reorder_pics out of range: %d\n",
 				sps->temporal_layer[i].num_reorder_pics);
 			if (sps->temporal_layer[i].num_reorder_pics > HEVC_MAX_DPB_SIZE - 1) {
 				return -1;
@@ -918,22 +919,22 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	sps->log2_max_trafo_size	= log2_diff_max_min_transform_block_size + sps->log2_min_tb_size;
 
 	if (sps->log2_min_cb_size < 3 || sps->log2_min_cb_size > 30) {
-		pr_err("Invalid value %d for log2_min_cb_size", sps->log2_min_cb_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value %d for log2_min_cb_size", sps->log2_min_cb_size);
 		return -1;
 	}
 
 	if (sps->log2_diff_max_min_coding_block_size > 30) {
-		pr_err("Invalid value %d for log2_diff_max_min_coding_block_size", sps->log2_diff_max_min_coding_block_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value %d for log2_diff_max_min_coding_block_size", sps->log2_diff_max_min_coding_block_size);
 		return -1;
 	}
 
 	if (sps->log2_min_tb_size >= sps->log2_min_cb_size || sps->log2_min_tb_size < 2) {
-		pr_err("Invalid value for log2_min_tb_size");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value for log2_min_tb_size");
 		return -1;
 	}
 
 	if (log2_diff_max_min_transform_block_size < 0 || log2_diff_max_min_transform_block_size > 30) {
-		pr_err("Invalid value %d for log2_diff_max_min_transform_block_size", log2_diff_max_min_transform_block_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid value %d for log2_diff_max_min_transform_block_size", log2_diff_max_min_transform_block_size);
 		return -1;
 	}
 
@@ -962,7 +963,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 		sps->pcm.log2_max_pcm_cb_size = sps->pcm.log2_min_pcm_cb_size +
 			get_ue_golomb_long(gb);
 		if (FFMAX(sps->pcm.bit_depth, sps->pcm.bit_depth_chroma) > sps->bit_depth) {
-			pr_err("PCM bit depth (%d, %d) is greater than normal bit depth (%d)\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "PCM bit depth (%d, %d) is greater than normal bit depth (%d)\n",
 				sps->pcm.bit_depth, sps->pcm.bit_depth_chroma, sps->bit_depth);
 			return -1;
 		}
@@ -972,7 +973,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 
 	sps->nb_st_rps = get_ue_golomb_long(gb);
 	if (sps->nb_st_rps > HEVC_MAX_SHORT_TERM_REF_PIC_SETS) {
-		pr_err("Too many short term RPS: %d.\n", sps->nb_st_rps);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Too many short term RPS: %d.\n", sps->nb_st_rps);
 		return -1;
 	}
 	for (i = 0; i < sps->nb_st_rps; i++) {
@@ -984,7 +985,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	if (sps->long_term_ref_pics_present_flag) {
 		sps->num_long_term_ref_pics_sps = get_ue_golomb_long(gb);
 		if (sps->num_long_term_ref_pics_sps > HEVC_MAX_LONG_TERM_REF_PICS) {
-			pr_err("Too many long term ref pics: %d.\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Too many long term ref pics: %d.\n",
 				sps->num_long_term_ref_pics_sps);
 			return -1;
 		}
@@ -1011,17 +1012,17 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 			sps->explicit_rdpcm_enabled_flag = get_bits1(gb);
 			sps->extended_precision_processing_flag = get_bits1(gb);
 			if (sps->extended_precision_processing_flag)
-				pr_info("extended_precision_processing_flag not yet implemented\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "extended_precision_processing_flag not yet implemented\n");
 
 			sps->intra_smoothing_disabled_flag = get_bits1(gb);
 			sps->high_precision_offsets_enabled_flag = get_bits1(gb);
 			if (sps->high_precision_offsets_enabled_flag)
-				pr_info("high_precision_offsets_enabled_flag not yet implemented\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "high_precision_offsets_enabled_flag not yet implemented\n");
 
 			sps->persistent_rice_adaptation_enabled_flag = get_bits1(gb);
 			sps->cabac_bypass_alignment_enabled_flag  = get_bits1(gb);
 			if (sps->cabac_bypass_alignment_enabled_flag)
-				pr_info("cabac_bypass_alignment_enabled_flag not yet implemented\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "cabac_bypass_alignment_enabled_flag not yet implemented\n");
 		}
 	}
 
@@ -1030,7 +1031,7 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 		ow->top_offset	>= INT_MAX - ow->bottom_offset	  ||
 		ow->left_offset + ow->right_offset  >= sps->width ||
 		ow->top_offset	+ ow->bottom_offset >= sps->height) {
-		pr_err("Invalid cropping offsets: %u/%u/%u/%u\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid cropping offsets: %u/%u/%u/%u\n",
 			ow->left_offset, ow->right_offset, ow->top_offset, ow->bottom_offset);
 		return -1;
 	}
@@ -1041,12 +1042,12 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 	sps->log2_min_pu_size = sps->log2_min_cb_size - 1;
 
 	if (sps->log2_ctb_size > HEVC_MAX_LOG2_CTB_SIZE) {
-		pr_err("CTB size out of range: 2^%d\n", sps->log2_ctb_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "CTB size out of range: 2^%d\n", sps->log2_ctb_size);
 		return -1;
 	}
 	if (sps->log2_ctb_size < 4) {
-		pr_err("log2_ctb_size %d differs from the bounds of any known profile\n", sps->log2_ctb_size);
-		pr_err("log2_ctb_size %d", sps->log2_ctb_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "log2_ctb_size %d differs from the bounds of any known profile\n", sps->log2_ctb_size);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "log2_ctb_size %d", sps->log2_ctb_size);
 		return -1;
 	}
 
@@ -1065,32 +1066,32 @@ int ff_hevc_parse_sps(struct get_bits_context *gb, struct h265_SPS_t *sps)
 
 	if (av_mod_uintp2(sps->width, sps->log2_min_cb_size) ||
 		av_mod_uintp2(sps->height, sps->log2_min_cb_size)) {
-		pr_err("Invalid coded frame dimensions.\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid coded frame dimensions.\n");
 		return -1;
 	}
 
 	if (sps->max_transform_hierarchy_depth_inter > sps->log2_ctb_size - sps->log2_min_tb_size) {
-		pr_err("max_transform_hierarchy_depth_inter out of range: %d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "max_transform_hierarchy_depth_inter out of range: %d\n",
 			sps->max_transform_hierarchy_depth_inter);
 		return -1;
 	}
 	if (sps->max_transform_hierarchy_depth_intra > sps->log2_ctb_size - sps->log2_min_tb_size) {
-		pr_err("max_transform_hierarchy_depth_intra out of range: %d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "max_transform_hierarchy_depth_intra out of range: %d\n",
 			sps->max_transform_hierarchy_depth_intra);
 		return -1;
 	}
 	if (sps->log2_max_trafo_size > FFMIN(sps->log2_ctb_size, 5)) {
-		pr_err("max transform block size out of range: %d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "max transform block size out of range: %d\n",
 			sps->log2_max_trafo_size);
 			return -1;
 	}
 
 	if (get_bits_left(gb) < 0) {
-		pr_err("Overread SPS by %d bits\n", -get_bits_left(gb));
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Overread SPS by %d bits\n", -get_bits_left(gb));
 		return -1;
 	}
 
-	pr_info("Parsed SPS: id %d; ref: %d, coded wxh: %dx%d, cropped wxh: %dx%d; pix_fmt: %d.\n",
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Parsed SPS: id %d; ref: %d, coded wxh: %dx%d, cropped wxh: %dx%d; pix_fmt: %d.\n",
 	       sps->sps_id, sps->temporal_layer[0].num_reorder_pics, sps->width, sps->height,
 	       sps->width - (sps->output_window.left_offset + sps->output_window.right_offset),
 	       sps->height - (sps->output_window.top_offset + sps->output_window.bottom_offset),
@@ -1205,7 +1206,7 @@ static int decode_extradata_ps(u8 *data, int size, struct h265_param_sets *ps)
 
 	if (get_bits1(&gb) != 0) {
 		ret = -1;
-		pr_err("invalid data, return!\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "invalid data, return!\n");
 		goto out;
 	}
 
@@ -1241,7 +1242,7 @@ static int decode_extradata_ps(u8 *data, int size, struct h265_param_sets *ps)
 		ps->pps_parsed = true;
 		break;*/
 	default:
-		pr_err("Unsupport parser nal type (%s).\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Unsupport parser nal type (%s).\n",
 			hevc_nal_unit_name(nal_type));
 		break;
 	}
@@ -1264,7 +1265,7 @@ int h265_decode_extradata_ps(u8 *buf, int size, struct h265_param_sets *ps)
 			len = size - (p - buf);
 			ret = decode_extradata_ps(p, len, ps);
 			if (ret) {
-				pr_err("parse extra data failed. err: %d\n", ret);
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "parse extra data failed. err: %d\n", ret);
 				return ret;
 			}
 

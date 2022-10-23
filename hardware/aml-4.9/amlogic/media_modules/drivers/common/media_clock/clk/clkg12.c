@@ -403,6 +403,11 @@ static struct clk_set_setting clks_for_formats[] = {
 		{1920*1080*60, 166}, {4096*2048*30, 333},
 		{4096*2048*60, 630}, {INT_MAX, 630},}
 	},
+	{/*VFORMAT_AV1*/
+		{{1280*720*30, 100}, {1920*1080*30, 100},
+		{1920*1080*60, 166}, {4096*2048*30, 333},
+		{4096*2048*60, 630}, {INT_MAX, 630},}
+	},
 
 };
 
@@ -1011,6 +1016,7 @@ static int vdec_clock_get(enum vdec_type_e core)
 	AM_MESON_CPU_MAJOR_ID_GXM,\
 	AM_MESON_CPU_MAJOR_ID_TXL,\
 	AM_MESON_CPU_MAJOR_ID_TXLX,\
+	AM_MESON_CPU_MAJOR_ID_GXLX,\
 	AM_MESON_CPU_MAJOR_ID_G12A,\
 	AM_MESON_CPU_MAJOR_ID_G12B,\
 	AM_MESON_CPU_MAJOR_ID_SM1,\

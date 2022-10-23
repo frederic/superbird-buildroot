@@ -52,5 +52,5 @@ void meson_util_canvas_config(u32 index, unsigned long addr, u32 width,
 					u32 height, u32 wrap, u32 blkmode);
 int meson_util_canvas_pool_alloc_table(const char *owner, u32 *table, int size,
 					enum canvas_map_type_e type);
-
+void set_video_enabled(u32 value, u32 index);
 #endif

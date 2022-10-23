@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,11 +26,18 @@
 
 #include "vsi_nn_types.h"
 
+typedef struct _vsi_nn_reducesum_lcl_data_t
+{
+    vsi_nn_tensor_t *reshaped_input;
+    vsi_nn_tensor_t *reshaped_output;
+} vsi_nn_reducesum_lcl_data_t;
+
 typedef struct _vsi_nn_reducesum_internal_param
 {
     vx_uint32   *axis;
     vx_uint32   axis_num;
     vx_bool     keep_dim;
+    vsi_nn_reducesum_lcl_data_t* local;
 } vsi_nn_reducesum_internal_param;
 
 #endif

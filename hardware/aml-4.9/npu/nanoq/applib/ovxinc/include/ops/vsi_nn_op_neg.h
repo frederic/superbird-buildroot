@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,33 +26,6 @@
 
 #include "vsi_nn_types.h"
 
-enum {
-    TENSOR_NEG_CPU_KERNEL,
-
-    TENSOR_NEG_F16TOF16_KERNEL,
-    TENSOR_NEG_F16TOI16_KERNEL,
-    TENSOR_NEG_F16TOI8_KERNEL,
-    TENSOR_NEG_F16TOU8_KERNEL,
-    TENSOR_NEG_I16TOI16_KERNEL,
-    TENSOR_NEG_I16TOF16_KERNEL,
-    TENSOR_NEG_I8TOI8_KERNEL,
-    TENSOR_NEG_I8TOF16_KERNEL,
-    TENSOR_NEG_U8TOU8_KERNEL,
-    TENSOR_NEG_U8TOF16_KERNEL,
-
-    TENSOR_NEG_F16TOF16_2D_KERNEL,
-    TENSOR_NEG_F16TOI16_2D_KERNEL,
-    TENSOR_NEG_F16TOI8_2D_KERNEL,
-    TENSOR_NEG_F16TOU8_2D_KERNEL,
-    TENSOR_NEG_I16TOI16_2D_KERNEL,
-    TENSOR_NEG_I16TOF16_2D_KERNEL,
-    TENSOR_NEG_I8TOI8_2D_KERNEL,
-    TENSOR_NEG_I8TOF16_2D_KERNEL,
-    TENSOR_NEG_U8TOU8_2D_KERNEL,
-    TENSOR_NEG_U8TOF16_2D_KERNEL,
-
-    TENSOR_NEG_KERNEL_COUNTS,
-};
 
 #define _VSI_NN_ELU_LOCAL_TENSOR_NUM 2
 

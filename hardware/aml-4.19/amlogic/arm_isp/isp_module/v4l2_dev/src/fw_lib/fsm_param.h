@@ -352,6 +352,32 @@ typedef struct _fsm_param_fw_status_info_ {
     af_status_info_t af_info;
 } status_info_param_t;
 
+typedef struct _defog_calibration_control {
+    uint32_t defog_en;
+    uint32_t fog_det_mode;
+    uint32_t acc_fog_val_thd;
+    uint32_t hst_fog_idx_thd;
+    uint32_t hst_fog_pec_thd1;
+    uint32_t hst_fog_pec_thd2;
+    uint32_t ratio_delta;
+    uint32_t max_rng;
+    uint32_t min_rng;
+    uint32_t black_percentage;
+    uint32_t white_percentage;
+    uint32_t avg_coeff;
+    uint32_t reserved_0;
+    uint32_t reserved_1;
+    uint32_t reserved_2;
+    uint32_t reserved_3;
+} defog_calibration_control_t;
+
+typedef struct _fsm_ext_param_ctrl {
+    void *ctx;
+    uint32_t id;
+    int32_t total_gain;
+    void *result;
+} fsm_ext_param_ctrl_t;
+
 int acamera_fsm_mgr_get_param( acamera_fsm_mgr_t *p_fsm_mgr, uint32_t param_id, void *input, uint32_t input_size, void *output, uint32_t output_size );
 int acamera_fsm_mgr_set_param( acamera_fsm_mgr_t *p_fsm_mgr, uint32_t param_id, void *input, uint32_t input_size );
 

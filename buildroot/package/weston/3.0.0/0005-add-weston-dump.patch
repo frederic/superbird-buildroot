@@ -1,0 +1,593 @@
+Index: weston-3.0.0/desktop-shell/input-panel.c
+===================================================================
+--- weston-3.0.0.orig/desktop-shell/input-panel.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/desktop-shell/input-panel.c	2017-10-20 15:45:47.828211907 +0800
+@@ -377,6 +377,18 @@
+ 			       "interface object already bound");
+ }
+ 
++static void
++input_panel_dump(struct desktop_shell *shell)
++{
++        struct input_panel_surface *ipsurf, *next;
++        wl_list_for_each_safe(ipsurf, next, &shell->input_panel.surfaces, link) {
++                fprintf(stderr, "    weston_surface: %p\n", ipsurf->surface);
++                fprintf(stderr, "    weston_view:    %p\n", ipsurf->view);
++                fprintf(stderr, "    weston_output:  %p\n", ipsurf->output);
++                fprintf(stderr, "    panel:          %s\n", ipsurf->panel==0?"toplevel":"overlay");
++        }
++}
++
+ void
+ input_panel_destroy(struct desktop_shell *shell)
+ {
+@@ -389,6 +401,7 @@
+ {
+ 	struct weston_compositor *ec = shell->compositor;
+ 
++	shell->input_panel_dump = input_panel_dump;
+ 	shell->show_input_panel_listener.notify = show_input_panels;
+ 	wl_signal_add(&ec->show_input_panel_signal,
+ 		      &shell->show_input_panel_listener);
+Index: weston-3.0.0/desktop-shell/shell.c
+===================================================================
+--- weston-3.0.0.orig/desktop-shell/shell.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/desktop-shell/shell.c	2017-10-20 15:45:47.828211907 +0800
+@@ -4942,6 +4942,125 @@
+ 	create_shell_seat(seat);
+ }
+ 
++static char *
++wet_shell_panel_position_name(enum weston_desktop_shell_panel_position panel_position)
++{
++        char str[32] = {0};
++
++        switch (panel_position) {
++        case WESTON_DESKTOP_SHELL_PANEL_POSITION_TOP:
++                return "top";
++        case WESTON_DESKTOP_SHELL_PANEL_POSITION_BOTTOM:
++                return "bottom";
++        case WESTON_DESKTOP_SHELL_PANEL_POSITION_LEFT:
++                return "left";
++        case WESTON_DESKTOP_SHELL_PANEL_POSITION_RIGHT:
++                return "right";
++        default:
++                snprintf(str, 32, "unknown(0x%x)", panel_position);
++                return strdup(str);
++        }
++}
++
++static void
++wet_shell_layer_dump(struct weston_layer *layer)
++{
++        struct weston_view *view;
++        struct shell_surface *shsurf;
++        char d[512];
++
++        wl_list_for_each(view, &layer->view_list.link, layer_link.link) {
++                fprintf(stderr, "    view:%p\n", view);
++                fprintf(stderr, "      parent:%p\n", view->parent_view);
++                fprintf(stderr, "      surface:%p\n", view->surface);
++                if (view->surface != NULL) {
++                        if (!view->surface->get_label || view->surface->get_label(view->surface, d, sizeof(d)) < 0)
++                                d[0] = '\0';
++                        if (d[0])
++                                fprintf(stderr, "        \"%s\"\n", d);
++                        shsurf = get_shell_surface(view->surface);
++                        fprintf(stderr, "      shell surface:%p\n", shsurf);
++                        if (shsurf != NULL) {
++                                fprintf(stderr, "        fullscreen:%s maximized:%s lowered:%s\n",
++                                        shsurf->state.fullscreen?"enable":"disable",
++                                        shsurf->state.maximized?"enable":"disable",
++                                        shsurf->state.lowered?"enable":"disable");
++                        }
++                }
++                fprintf(stderr, "      alpha:%f\n", view->alpha);
++                fprintf(stderr, "      x:%f\n", view->geometry.x);
++                fprintf(stderr, "      y:%f\n", view->geometry.y);
++        }
++}
++
++static void
++wet_shell_dump(struct weston_compositor *ec)
++{
++        fprintf(stderr, "weston dump shell backend.\n");
++        struct desktop_shell *shell = (struct desktop_shell*)(ec->shell);
++
++        fprintf(stderr, "  layer:%p, fullscreen\n", &shell->fullscreen_layer);
++        wet_shell_layer_dump(&shell->fullscreen_layer);
++
++        fprintf(stderr, "  layer:%p, panel\n", &shell->panel_layer);
++        fprintf(stderr, "    panel_position:%s\n", wet_shell_panel_position_name(shell->panel_position));
++        wet_shell_layer_dump(&shell->panel_layer);
++
++        fprintf(stderr, "  layer:%p, background\n", &shell->background_layer);
++        wet_shell_layer_dump(&shell->background_layer);
++
++        fprintf(stderr, "  layer:%p, lock\n", &shell->lock_layer);
++        wet_shell_layer_dump(&shell->lock_layer);
++
++        fprintf(stderr, "  layer:%p, input_panel\n", &shell->input_panel_layer);
++        if (shell->input_panel_dump) {
++                shell->input_panel_dump(shell);
++        }
++        wet_shell_layer_dump(&shell->input_panel_layer);
++
++        fprintf(stderr, "  layer:%p, minimized\n", &shell->minimized_layer);
++        wet_shell_layer_dump(&shell->minimized_layer);
++
++        fprintf(stderr, "  workspace total num:%u, current index:%u\n",
++                shell->workspaces.num, shell->workspaces.current);
++
++        struct workspace *ws;
++        for (unsigned int i = 0; i < shell->workspaces.num; i++) {
++                ws = get_workspace(shell, i);
++                fprintf(stderr, "  layer:%p (workspace index:%u)\n", &ws->layer, i);
++                wet_shell_layer_dump(&ws->layer);
++                if (ws->fsurf_front != NULL) {
++                        fprintf(stderr, "    front focus weston_surface:%p\n", ws->fsurf_front->surface);
++                        fprintf(stderr, "    front focus weston_view:%p\n", ws->fsurf_front->view);
++                } else {
++                        fprintf(stderr, "    front focus:%p\n", ws->fsurf_front);
++                }
++                if (ws->fsurf_back != NULL) {
++                        fprintf(stderr, "    back  focus weston_surface:%p\n", ws->fsurf_back->surface);
++                        fprintf(stderr, "    back  focus weston_view:%p\n", ws->fsurf_back->view);
++                } else {
++                        fprintf(stderr, "    back  focus:%p\n", ws->fsurf_back);
++                }
++
++                struct focus_state *state;
++                wl_list_for_each(state, &ws->focus_list, link) {
++                        if (state != NULL)
++                                fprintf(stderr, "      focus state: weston_seat:%p, keyboard_focus weston_surface:%p\n",
++                                        state->seat, state->keyboard_focus);
++                }
++        }
++
++        fprintf(stderr, "  grab_surface:%p\n", shell->grab_surface);
++        fprintf(stderr, "  text_input_surface:%p\n", shell->text_input.surface);
++
++        fprintf(stderr, "  desktop shell [%s] [%s] [%s]\n",
++                shell->locked?"locked":"unlock",
++                shell->showing_input_panels?"showing input panels":"hiding input panels",
++                shell->prepare_event_sent?"prepare event sent":"unprepare event sent");
++
++        fprintf(stderr, "\n");
++}
++
+ WL_EXPORT int
+ wet_shell_init(struct weston_compositor *ec,
+ 	       int *argc, char *argv[])
+@@ -4956,7 +5075,10 @@
+ 	if (shell == NULL)
+ 		return -1;
+ 
++	ec->shell_backend_dump = wet_shell_dump;
++
+ 	shell->compositor = ec;
++	ec->shell = shell;
+ 
+ 	shell->destroy_listener.notify = shell_destroy;
+ 	wl_signal_add(&ec->destroy_signal, &shell->destroy_listener);
+Index: weston-3.0.0/desktop-shell/shell.h
+===================================================================
+--- weston-3.0.0.orig/desktop-shell/shell.h	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/desktop-shell/shell.h	2017-10-20 15:45:47.832212020 +0800
+@@ -221,6 +221,8 @@
+ 	char *client;
+ 
+ 	struct timespec startup_time;
++
++        void (*input_panel_dump)(struct desktop_shell *shell);
+ };
+ 
+ struct weston_output *
+Index: weston-3.0.0/libweston/compositor-drm.c
+===================================================================
+--- weston-3.0.0.orig/libweston/compositor-drm.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/libweston/compositor-drm.c	2017-10-20 15:45:47.832212020 +0800
+@@ -3698,6 +3698,160 @@
+ {
+ }
+ 
++static void
++weston_backend_dump(struct weston_compositor *compositor)
++{
++        struct weston_output *output;
++        int i;
++
++        fprintf(stderr, "weston dump compositor backend.\n");
++        wl_list_for_each(output, &compositor->output_list, link) {
++                fprintf(stderr, "  output:%p, name:%s, state:%s\n", output, output->name, output->enabled?"enabled":"disabled");
++                struct drm_output *drmout = to_drm_output(output);
++               fprintf(stderr, "    position:        (%d, %d)\n", output->x, output->y);
++                fprintf(stderr, "    size:            (%d, %d)\n", output->width, output->height);
++                fprintf(stderr, "    scale:           %d\n", output->scale);
++               fprintf(stderr, "    crtc_id:         %u(pipe:%d)\n", drmout->crtc_id, drmout->pipe);
++                fprintf(stderr, "    connector_id:    %u\n", drmout->connector_id);
++                fprintf(stderr, "      connector_type:     %u\n", drmout->connector->connector_type);
++                fprintf(stderr, "      connector_type_id:  %u\n", drmout->connector->connector_type_id);
++                switch (drmout->connector->connection) {
++                        case DRM_MODE_CONNECTED:
++                                fprintf(stderr, "      connector_state:    connected\n");
++                                break;
++                        case DRM_MODE_DISCONNECTED:
++                                fprintf(stderr, "      connector_state:    disconnected\n");
++                                break;
++                        default:
++                                fprintf(stderr, "      connector_state:    unknown\n");
++                                break;
++                }
++                fprintf(stderr, "      count_modes:        %d\n", drmout->connector->count_modes);
++                fprintf(stderr, "        index name clock hdisplay hsync_start hsync_end htotal hskew"
++                        "vdisplay vsync_start vsync_end vtotal vscan vrefresh flags type\n");
++                for (i = 0; i < drmout->connector->count_modes; i++) {
++                        drmModeModeInfo *info = &drmout->connector->modes[i];
++                        fprintf(stderr, "        %d %s %u %d %d %d %d %d %d %d %d %d %d %u %u %u\n",
++                                i, info->name, info->clock,
++                                info->hdisplay, info->hsync_start, info->hsync_end, info->htotal, info->hskew,
++                                info->vdisplay, info->vsync_start, info->vsync_end, info->vtotal, info->vscan,
++                                info->vrefresh, info->flags, info->type);
++                }
++                if (output->native_mode != NULL) {
++                        fprintf(stderr, "      native mode info\n");
++                        fprintf(stderr, "        size:      (%d, %d)\n", output->native_mode->width, output->native_mode->height);
++                        fprintf(stderr, "        refresh:   %u\n", output->native_mode->refresh/1000);
++                        fprintf(stderr, "        flags:     %u\n", output->native_mode->flags);
++                        fprintf(stderr, "        scale:     %d\n", output->native_scale);
++                }
++                if (output->current_mode != NULL) {
++                        fprintf(stderr, "      current mode info\n");
++                        fprintf(stderr, "        size:      (%d, %d)\n", output->current_mode->width, output->current_mode->height);
++                        fprintf(stderr, "        refresh:   %u\n", output->current_mode->refresh/1000);
++                        fprintf(stderr, "        flags:     %u\n", output->current_mode->flags);
++                        fprintf(stderr, "        scale:     %d\n", output->current_scale);
++                }
++                if (output->original_mode != NULL) {
++                        fprintf(stderr, "      original mode info\n");
++                        fprintf(stderr, "        size:      (%d, %d)\n", output->original_mode->width, output->original_mode->height);
++                        fprintf(stderr, "        refresh:   %u\n", output->original_mode->refresh/1000);
++                        fprintf(stderr, "        flags:     %u\n", output->original_mode->flags);
++                        fprintf(stderr, "        scale:     %d\n", output->original_scale);
++                }
++
++                fprintf(stderr, "    encoder_id(connected):     %u\n", drmout->connector->encoder_id);
++                fprintf(stderr, "      count_encoders:          %d\n", drmout->connector->count_encoders);
++                for (i = 0; i < drmout->connector->count_encoders; i++) {
++                        fprintf(stderr, "         encoder_id:           %u\n", drmout->connector->encoders[i]);
++                }
++
++                fprintf(stderr, "    subpixel:       %d\n", drmout->connector->subpixel);
++                fprintf(stderr, "    edid data:      '%s', '%s', '%s'\n",
++                        drmout->edid.pnp_id,
++                        drmout->edid.monitor_name,
++                        drmout->edid.serial_number);
++                switch (drmout->dpms) {
++                        case WESTON_DPMS_ON:
++                                fprintf(stderr, "    dpms_state:     on\n");
++                                break;
++                        case WESTON_DPMS_STANDBY:
++                                fprintf(stderr, "    dpms_state:      standby\n");
++                                break;
++                        case WESTON_DPMS_SUSPEND:
++                                fprintf(stderr, "    dpms_state:      suspend\n");
++                                break;
++                        case WESTON_DPMS_OFF:
++                                fprintf(stderr, "    dpms_state:      off\n");
++                                break;
++                        default:
++                                fprintf(stderr, "    dpms_state:      unknown\n");
++                                break;
++                }
++
++                fprintf(stderr, "    gbm_surface:    %p\n", drmout->gbm_surface);
++                fprintf(stderr, "    gbm_format:     0x%x\n", drmout->gbm_format);
++
++                fprintf(stderr, "    current_cursor: %d\n", drmout->current_cursor);
++                fprintf(stderr, "    cursor_fb0:     %p\n", drmout->gbm_cursor_fb[0]);
++                fprintf(stderr, "    cursor_fb1:     %p\n", drmout->gbm_cursor_fb[1]);
++                fprintf(stderr, "    cursor_view:    %p\n", drmout->cursor_view);
++
++                fprintf(stderr, "    fb_plane:       %p\n", &drmout->fb_plane);
++                fprintf(stderr, "    cursor_plane:   %p\n", &drmout->cursor_plane);
++
++                fprintf(stderr, "    fb_current:     %p\n", drmout->fb_current);
++                if (drmout->fb_current) {
++                        fprintf(stderr, "      type:%d, fb_id:%u, stride:%u, handle:%u, size:%u\n",
++                                drmout->fb_current->type,
++                                drmout->fb_current->fb_id,
++                                drmout->fb_current->stride,
++                                drmout->fb_current->handle,
++                                drmout->fb_current->size);
++                        fprintf(stderr, "      width:%d, height:%d, fd:%d\n",
++                                drmout->fb_current->width,
++                                drmout->fb_current->height,
++                                drmout->fb_current->fd);
++                        fprintf(stderr, "      bo:%p, gbm_surface:%p\n",
++                                drmout->fb_current->bo,
++                                drmout->fb_current->gbm_surface);
++                }
++                fprintf(stderr, "    fb_last:        %p\n", drmout->fb_last);
++                if (drmout->fb_last) {
++                        fprintf(stderr, "      type:%d, fb_id:%u, stride:%u, handle:%u, size:%u\n",
++                                drmout->fb_last->type,
++                                drmout->fb_last->fb_id,
++                                drmout->fb_last->stride,
++                                drmout->fb_last->handle,
++                                drmout->fb_last->size);
++                        fprintf(stderr, "      width:%d, height:%d, fd:%d\n",
++                                drmout->fb_last->width,
++                                drmout->fb_last->height,
++                                drmout->fb_last->fd);
++                        fprintf(stderr, "      bo:%p, gbm_surface:%p\n",
++                                drmout->fb_last->bo,
++                                drmout->fb_last->gbm_surface);
++                }
++                fprintf(stderr, "    fb_pending:     %p\n", drmout->fb_pending);
++                if (drmout->fb_pending) {
++                        fprintf(stderr, "      type:%d, fb_id:%u, stride:%u, handle:%u, size:%u\n",
++                                drmout->fb_pending->type,
++                                drmout->fb_pending->fb_id,
++                                drmout->fb_pending->stride,
++                                drmout->fb_pending->handle,
++                                drmout->fb_pending->size);
++                        fprintf(stderr, "      width:%d, height:%d, fd:%d\n",
++                                drmout->fb_pending->width,
++                                drmout->fb_pending->height,
++                                drmout->fb_pending->fd);
++                        fprintf(stderr, "      bo:%p, gbm_surface:%p\n",
++                                drmout->fb_pending->bo,
++                                drmout->fb_pending->gbm_surface);
++                }
++        }
++        fprintf(stderr, "\n");
++        return;
++}
++
+ WL_EXPORT int
+ weston_backend_init(struct weston_compositor *compositor,
+ 		    struct weston_backend_config *config_base)
+@@ -3711,6 +3865,7 @@
+ 		weston_log("drm backend config structure is invalid\n");
+ 		return -1;
+ 	}
++        compositor->compositor_backend_dump = weston_backend_dump;
+ 
+ 	config_init_to_defaults(&config);
+ 	memcpy(&config, config_base, config_base->struct_size);
+Index: weston-3.0.0/libweston/compositor-fbdev.c
+===================================================================
+--- weston-3.0.0.orig/libweston/compositor-fbdev.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/libweston/compositor-fbdev.c	2017-10-20 15:45:47.832212020 +0800
+@@ -783,6 +783,31 @@
+ 	config->device = "/dev/fb0"; /* default frame buffer */
+ }
+ 
++static void
++weston_backend_dump(struct weston_compositor *compositor)
++{
++        fprintf(stderr, "weston dump compositor backend.\n");
++        struct weston_output *output;
++        wl_list_for_each(output, &compositor->output_list, link) {
++                fprintf(stderr, "  output:%p, name:%s, state:%s\n", output, output->name, output->enabled?"enabled":"disabled");
++                struct fbdev_output *fbout = to_fbdev_output(output);
++                fprintf(stderr, "    position:        (%d, %d)\n", output->x, output->y);
++                fprintf(stderr, "    size:            %dx%d\n", fbout->mode.width, fbout->mode.height);
++                fprintf(stderr, "    scale:           %d\n", output->scale);
++                fprintf(stderr, "    flags:           %u\n", fbout->mode.flags);
++                fprintf(stderr, "    refresh:         %u(HZ)\n", fbout->mode.refresh/1000);
++                fprintf(stderr, "    resolution:      %ux%u\n", fbout->fb_info.x_resolution, fbout->fb_info.y_resolution);
++                fprintf(stderr, "    mm:              %ux%u\n", fbout->fb_info.width_mm, fbout->fb_info.height_mm);
++                fprintf(stderr, "    bits_per_pixel:  %u\n", fbout->fb_info.bits_per_pixel);
++                //fprintf(stderr, "    refresh_rate:    %u(ms)\n", fbout->fb_info.refresh_rate/1000);
++                fprintf(stderr, "    buffer_length:   0x%x\n", fbout->fb_info.buffer_length);
++                fprintf(stderr, "    line_length:     0x%x\n", fbout->fb_info.line_length);
++                fprintf(stderr, "    pixel_format:    0x%x\n", fbout->fb_info.pixel_format);
++        }
++        fprintf(stderr, "\n");
++        return;
++}
++
+ WL_EXPORT int
+ weston_backend_init(struct weston_compositor *compositor,
+ 		    struct weston_backend_config *config_base)
+@@ -796,6 +821,7 @@
+ 		weston_log("fbdev backend config structure is invalid\n");
+ 		return -1;
+ 	}
++        compositor->compositor_backend_dump = weston_backend_dump;
+ 
+ 	config_init_to_defaults(&config);
+ 	memcpy(&config, config_base, config_base->struct_size);
+Index: weston-3.0.0/libweston/compositor.c
+===================================================================
+--- weston-3.0.0.orig/libweston/compositor.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/libweston/compositor.c	2017-10-20 15:50:50.284712943 +0800
+@@ -5646,3 +5646,130 @@
+ 		return -1;
+ 	return 0;
+ }
++
++static char *
++weston_compositor_layer_position_name(enum weston_layer_position position)
++{
++        char str[32] = {0};
++
++        switch (position) {
++        case WESTON_LAYER_POSITION_HIDDEN:
++                return "hidden";
++        case WESTON_LAYER_POSITION_BACKGROUND:
++                return "background";
++        case WESTON_LAYER_POSITION_BOTTOM_UI:
++                return "bottom_ui";
++        case WESTON_LAYER_POSITION_NORMAL:
++                return "normal";
++        case WESTON_LAYER_POSITION_UI:
++                return "ui";
++        case WESTON_LAYER_POSITION_FULLSCREEN:
++                return "fullscreen";
++        case WESTON_LAYER_POSITION_TOP_UI:
++                return "top_ui";
++        case WESTON_LAYER_POSITION_LOCK:
++                return "lock";
++        case WESTON_LAYER_POSITION_CURSOR:
++                return "cursor";
++        case WESTON_LAYER_POSITION_FADE:
++                return "fade";
++        default:
++                snprintf(str, 32, "unknown(0x%x)", position);
++                return strdup(str);
++        }
++}
++
++WL_EXPORT void
++weston_dump_all(struct weston_compositor *compositor)
++{
++        FILE *consoleFile = freopen("/dev/ttyS0", "w", stderr);
++
++        fprintf(stderr, "weston dump all layers.\n");
++        struct weston_view *view;
++        struct weston_layer *layer;
++        wl_list_for_each(layer, &compositor->layer_list, link) {
++                fprintf(stderr, "  layer:%p, position:%s\n", layer, weston_compositor_layer_position_name(layer->position));
++                wl_list_for_each(view, &layer->view_list.link, layer_link.link) {
++                        fprintf(stderr, "    view:%p (%4.1f,%4.1f)\n",
++                                view, view->geometry.x, view->geometry.y);
++                        fprintf(stderr, "    parent:%p\n", view->parent_view);
++                        fprintf(stderr, "    on plane:%p\n", view->plane);
++                        fprintf(stderr, "    surface:%p (%d,%d)\n",
++                                view->surface, view->surface->width, view->surface->height);
++                        fprintf(stderr, "    resource:%p\n", view->surface->resource);
++                }
++        }
++        fprintf(stderr, "\n");
++
++        fprintf(stderr, "weston dump all planes.\n");
++        struct weston_plane *plane;
++        wl_list_for_each(plane, &compositor->plane_list, link) {
++                fprintf(stderr, "  plane:%p %s\n", plane,
++                        (plane==(&compositor->primary_plane))?"primary":"");
++        }
++        fprintf(stderr, "\n");
++
++#if 0
++        struct weston_layer *cursor_layer = &compositor->cursor_layer;
++        fprintf(stderr, "cursor layer:%p\n", cursor_layer);
++        wl_list_for_each(view, &cursor_layer->view_list.link, layer_link.link) {
++                fprintf(stderr, "    view:%p (%4.1f,%4.1f), parent_view:%p\n",
++                        view, view->geometry.x, view->geometry.y, view->parent_view);
++                fprintf(stderr, "    surface:%p (%dx%d) , resource:%p\n",
++                        view->surface, view->surface->width, view->surface->height, view->surface->resource);
++        }
++        fprintf(stderr, "\n");
++#endif
++
++        fprintf(stderr, "weston dump all seats.\n");
++        struct weston_seat *seat;
++        wl_list_for_each(seat, &compositor->seat_list, link) {
++                struct weston_pointer *pointer = weston_seat_get_pointer(seat);
++                if (pointer == NULL) {
++                        fprintf(stderr, "  weston_pointer (null)\n");
++                } else {
++                        fprintf(stderr, "  weston_pointer:%p xy(%d %d)\n",
++                                pointer, pointer->x, pointer->y);
++                        fprintf(stderr, "    weston_view focus:%p sprite:%p\n", pointer->focus, pointer->sprite);
++                        struct weston_pointer_client *pointer_client;
++                        wl_list_for_each(pointer_client, &pointer->pointer_clients, link) {
++                                fprintf(stderr, "    pointer_client %p\n", pointer_client);
++                                if (pointer_client) {
++                                        struct wl_client *client = pointer_client->client;
++                                        fprintf(stderr, "    wl_client %p\n", client);
++                                        /*
++                                        if (client) {
++                                                struct wl_resource *resource = client->display_resource;
++                                                fprintf(stderr, "        wl_resource %p\n", resource);
++                                                if (resource) {
++                                                        struct weston_surface *surface = wl_resource_get_user_data(resource);
++                                                        fprintf(stderr, "         weston_surface %p\n", surface);
++                                                }
++                                        }*/
++                                }
++                        }
++                }
++                struct weston_keyboard *keyboard = weston_seat_get_keyboard(seat);
++                if (keyboard == NULL) {
++                        fprintf(stderr, "  weston_keyboard (null)\n");
++                } else {
++                        fprintf(stderr, "  weston_keyboard:%p\n", keyboard);
++                        fprintf(stderr, "    weston_surface focus:%p\n", keyboard->focus);
++                }
++                struct weston_touch *touch = weston_seat_get_touch(seat);
++                fprintf(stderr, "  weston_touch:%p\n", touch);
++                if (touch != NULL) {
++                        fprintf(stderr, "    weston_view focus:%p\n", touch->focus);
++                }
++        }
++        fprintf(stderr, "\n");
++
++        if (compositor->compositor_backend_dump)
++                compositor->compositor_backend_dump(compositor);
++
++        if (compositor->compositor_backend_dump)
++                compositor->shell_backend_dump(compositor);
++
++        fclose(consoleFile);
++        return;
++}
+Index: weston-3.0.0/libweston/compositor.h
+===================================================================
+--- weston-3.0.0.orig/libweston/compositor.h	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/libweston/compositor.h	2017-10-20 15:45:47.832212020 +0800
+@@ -944,6 +944,11 @@
+ 	/* Whether to let the compositor run without any input device. */
+ 	bool require_input;
+ 
++        void *shell;
++
++        void (*compositor_backend_dump)(struct weston_compositor *compositor);
++        void (*shell_backend_dump)(struct weston_compositor *compositor);
++        void (*renderer_backend_dump)(struct weston_compositor *compositor);
+ };
+ 
+ struct weston_buffer {
+@@ -1944,6 +1949,9 @@
+ struct weston_output *
+ weston_output_from_resource(struct wl_resource *resource);
+ 
++void
++weston_dump_all(struct weston_compositor *compositor);
++
+ #ifdef  __cplusplus
+ }
+ #endif
+Index: weston-3.0.0/libweston/libinput-seat.c
+===================================================================
+--- weston-3.0.0.orig/libweston/libinput-seat.c	2017-10-20 15:45:47.836212134 +0800
++++ weston-3.0.0/libweston/libinput-seat.c	2017-10-20 15:45:47.836212134 +0800
+@@ -149,6 +149,9 @@
+ 		libinput_event_get_device(event);
+ 	struct udev_input *input = libinput_get_user_data(libinput);
+ 	int handled = 1;
++        struct libinput_event_keyboard *keyboard_event;
++        uint32_t key;
++        int key_state;
+ 
+ 	switch (libinput_event_get_type(event)) {
+ 	case LIBINPUT_EVENT_DEVICE_ADDED:
+@@ -157,6 +160,15 @@
+ 	case LIBINPUT_EVENT_DEVICE_REMOVED:
+ 		device_removed(input, libinput_device);
+ 		break;
++        case LIBINPUT_EVENT_KEYBOARD_KEY:
++                keyboard_event = libinput_event_get_keyboard_event(event);
++                key = libinput_event_keyboard_get_key(keyboard_event);
++                key_state = libinput_event_keyboard_get_key_state(keyboard_event);
++                if ((key_state == LIBINPUT_KEY_STATE_RELEASED)
++                        && (key == KEY_F8)) {
++                        //weston_log("seat key:%d, state:%d\n", key, key_state);
++                        weston_dump_all(input->compositor);
++                }
+ 	default:
+ 		handled = 0;
+ 	}

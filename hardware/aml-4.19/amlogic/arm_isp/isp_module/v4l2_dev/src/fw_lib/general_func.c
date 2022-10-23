@@ -135,7 +135,7 @@ static void general_cac_memory_lut_reload( general_fsm_ptr_t p_fsm )
         break;
     }
 
-    LOG( LOG_INFO, "cfa_pattern: %d, plane_count: %d, cac_mem_len: %d", cfa_pattern, plane_count, cac_mem_len );
+    LOG( LOG_DEBUG, "cfa_pattern: %d, plane_count: %d, cac_mem_len: %d", cfa_pattern, plane_count, cac_mem_len );
 
     for ( component = 0; component < plane_count * 2; component++ ) {
         // Generate s15.0 ca_model (int32) from u16.0 ca_model_u (uint16)
@@ -302,7 +302,6 @@ void acamera_reload_isp_calibratons( general_fsm_ptr_t p_fsm )
     }
 #endif
 
-
     const uint16_t *gamma_lut = _GET_USHORT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA );
     const uint32_t gamma_lut_len = _GET_LEN( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA );
 
@@ -367,7 +366,6 @@ void acamera_reload_isp_calibratons( general_fsm_ptr_t p_fsm )
 #if defined( ACAMERA_CA_CORRECTION_FILTER_MEM_ARRAY_DATA_DEFAULT )
     uint32_t ca_filter_mem_len = _GET_LEN( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_CA_FILTER_MEM );
     const uint32_t *p_ca_filter_mem = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_CA_FILTER_MEM );
-    LOG( LOG_INFO, "ca_filter_mem_len: %d", ca_filter_mem_len );
     for ( i = 0; i < ca_filter_mem_len; i++ ) {
         acamera_ca_correction_filter_mem_array_data_write( p_fsm->cmn.isp_base, i, p_ca_filter_mem[i] );
     }
@@ -383,7 +381,6 @@ void acamera_reload_isp_calibratons( general_fsm_ptr_t p_fsm )
 #if defined( ACAMERA_LUT3D_MEM_ARRAY_DATA_DEFAULT )
         uint32_t lut3d_mem_len = _GET_LEN( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_LUT3D_MEM );
         const uint32_t *p_lut3d_mem = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_LUT3D_MEM );
-        LOG( LOG_INFO, "lut3d_mem_len: %d", lut3d_mem_len );
         for ( i = 0; i < lut3d_mem_len; i++ ) {
             acamera_lut3d_mem_array_data_write( p_fsm->cmn.isp_base, i, p_lut3d_mem[i] );
         }
@@ -423,6 +420,43 @@ void acamera_reload_isp_calibratons( general_fsm_ptr_t p_fsm )
     for ( i = 0; i < len; i++ ) {
         acamera_radial_shading_mem_array_data_write( p_fsm->cmn.isp_base, bank_offset + i, p_lut[i] );
     }
+#endif
+
+#if defined(CALIBRATION_SHADING_RADIAL_CENTRE_AND_MULT)
+    uint16_t len_cm = _GET_LEN( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_SHADING_RADIAL_CENTRE_AND_MULT );
+    uint16_t *radial_shading_lut_cm = _GET_USHORT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_SHADING_RADIAL_CENTRE_AND_MULT );
+
+    if ( len_cm == 16 ) {
+        //R
+        acamera_isp_radial_shading_centerr_x_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[0] );
+        acamera_isp_radial_shading_centerr_y_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[1] );
+        acamera_isp_radial_shading_off_center_multrx_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[2] );
+        acamera_isp_radial_shading_off_center_multry_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[3] );
+        //G
+        acamera_isp_radial_shading_centerg_x_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[4] );
+        acamera_isp_radial_shading_centerg_y_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[5] );
+        acamera_isp_radial_shading_off_center_multgx_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[6] );
+        acamera_isp_radial_shading_off_center_multgy_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[7] );
+        //B
+        acamera_isp_radial_shading_centerb_x_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[8] );
+        acamera_isp_radial_shading_centerb_y_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[9] );
+        acamera_isp_radial_shading_off_center_multbx_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[10] );
+        acamera_isp_radial_shading_off_center_multby_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[11] );
+        //IR
+        acamera_isp_radial_shading_centerir_x_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[12] );
+        acamera_isp_radial_shading_centerir_y_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[13] );
+        acamera_isp_radial_shading_off_center_multirx_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[14] );
+        acamera_isp_radial_shading_off_center_multiry_write( p_fsm->cmn.isp_base, radial_shading_lut_cm[15] );
+    } else {
+        LOG( LOG_ERR, "CALIBRATION_SHADING_RADIAL_CENTRE_AND_MULT has wrong size %d but expected 16", len_cm );
+    }
+#endif
+
+    p_fsm->gamma2_enable = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA_THRESHOLD )[0];
+#if FW_HAS_CUSTOM_SETTINGS
+    // the custom initialization may be required for a context
+    const acam_reg_t *p_custom_settings_context = (const acam_reg_t *)_GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_CUSTOM_SETTINGS_CONTEXT );
+    acamera_load_sw_sequence( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base, &p_custom_settings_context, 0 );
 #endif
 }
 
@@ -513,6 +547,8 @@ void general_initialize( general_fsm_ptr_t p_fsm )
     p_fsm->api_reg_source = SENSOR;
 #endif
 
+    p_fsm->gamma2_enable = 0;
+
     general_set_wdr_mode( p_fsm );
 
     p_fsm->mask.repeat_irq_mask = ACAMERA_IRQ_MASK( ACAMERA_IRQ_FRAME_START ) | ACAMERA_IRQ_MASK( ACAMERA_IRQ_FRAME_END );
@@ -564,8 +600,8 @@ void general_dynamic_gamma_update( general_fsm_ptr_t p_fsm)
         // get current exposure value
         acamera_fsm_mgr_get_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_AE_INFO, NULL, 0, &ae_info, sizeof( ae_info ) );
         uint32_t exposure_log2 = ae_info.exposure_log2;
-        uint32_t ev1_thresh = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA_THRESHOLD )[0] ;
-        uint32_t ev2_thresh = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA_THRESHOLD )[1] ;
+        uint32_t ev1_thresh = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA_THRESHOLD )[1] ;
+        uint32_t ev2_thresh = _GET_UINT_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_GAMMA_THRESHOLD )[2] ;
 
         modulation_entry_32_t p_table[2];
         p_table[0].x = ev1_thresh;
@@ -593,7 +629,9 @@ void general_dynamic_gamma_update( general_fsm_ptr_t p_fsm)
 
 void general_frame_start( general_fsm_ptr_t p_fsm )
 {
-    general_dynamic_gamma_update(p_fsm);
+    if ( p_fsm->gamma2_enable )
+        general_dynamic_gamma_update(p_fsm);
+
 #if ISP_WDR_SWITCH
 
     if ( p_fsm->wdr_auto_mode ) {

@@ -44,7 +44,7 @@ static void HandleEncHandlingIntEvent(Component com, CNMComListenerHandlingInt* 
     }
 }
 
-static void HandleEncFullEvent(Component com, CNMComListenerEncFull* param, EncListenerContext* ctx)
+void HandleEncFullEvent(Component com, CNMComListenerEncFull* param, EncListenerContext* ctx)
 {
 }
 

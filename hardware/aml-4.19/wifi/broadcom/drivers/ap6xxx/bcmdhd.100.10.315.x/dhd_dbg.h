@@ -1,7 +1,7 @@
 /*
  * Debug/trace/assert driver definitions for Dongle Host Driver.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,24 +24,16 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_dbg.h 759128 2018-04-24 03:48:17Z $
+ * $Id: dhd_dbg.h 798329 2019-01-08 05:40:39Z $
  */
 
 #ifndef _dhd_dbg_
 #define _dhd_dbg_
 
 #ifdef DHD_LOG_DUMP
-typedef enum {
-	DLD_BUF_TYPE_GENERAL = 0,
-	DLD_BUF_TYPE_PRESERVE,
-	DLD_BUF_TYPE_SPECIAL,
-	DLD_BUF_TYPE_ECNTRS,
-	DLD_BUF_TYPE_FILTER,
-	DLD_BUF_TYPE_ALL
-} log_dump_type_t;
 extern char *dhd_log_dump_get_timestamp(void);
 extern void dhd_log_dump_write(int type, char *binary_data,
-							   int binary_len, const char *fmt, ...);
+		int binary_len, const char *fmt, ...);
 #ifndef _DHD_LOG_DUMP_DEFINITIONS_
 #define _DHD_LOG_DUMP_DEFINITIONS_
 #define GENERAL_LOG_HDR "\n-------------------- General log ---------------------------\n"
@@ -62,6 +54,10 @@ extern void dhd_log_dump_write(int type, char *binary_data,
 #endif /* !_DHD_LOG_DUMP_DEFINITIONS_ */
 #define CONCISE_DUMP_BUFLEN 16 * 1024
 #define ECNTRS_LOG_HDR "\n-------------------- Ecounters log --------------------------\n"
+#ifdef DHD_STATUS_LOGGING
+#define STATUS_LOG_HDR "\n-------------------- Status log -----------------------\n"
+#endif /* DHD_STATUS_LOGGING */
+#define RTT_LOG_HDR "\n-------------------- RTT log --------------------------\n"
 #define COOKIE_LOG_HDR "\n-------------------- Cookie List ----------------------------\n"
 #endif /* DHD_LOG_DUMP */
 
@@ -74,7 +70,7 @@ extern void dhd_log_dump_write(int type, char *binary_data,
 do {	\
 	if (dhd_msg_level & DHD_ERROR_VAL) {	\
 		printf args;	\
-		DHD_LOG_DUMP_WRITE("[%s] %s: ", dhd_log_dump_get_timestamp(), __func__);	\
+		DHD_LOG_DUMP_WRITE("[%s]: ", dhd_log_dump_get_timestamp());	\
 		DHD_LOG_DUMP_WRITE args;	\
 	}	\
 } while (0)
@@ -198,6 +194,16 @@ do {	\
 #define DHD_PKT_MON(args)	do {if (dhd_msg_level & DHD_PKT_MON_VAL) printf args;} while (0)
 
 #if defined(DHD_LOG_DUMP)
+#if defined(DHD_LOG_PRINT_RATE_LIMIT)
+#define DHD_FWLOG(args)	\
+	do { \
+		if (dhd_msg_level & DHD_FWLOG_VAL) { \
+			if (!log_print_threshold) \
+				printf args; \
+			DHD_LOG_DUMP_WRITE args; \
+		} \
+	} while (0)
+#else
 #define DHD_FWLOG(args)	\
 	do { \
 		if (dhd_msg_level & DHD_FWLOG_VAL) { \
@@ -205,6 +211,7 @@ do {	\
 			DHD_LOG_DUMP_WRITE args; \
 		} \
 	} while (0)
+#endif // endif
 #else /* DHD_LOG_DUMP */
 #define DHD_FWLOG(args)		do {if (dhd_msg_level & DHD_FWLOG_VAL) printf args;} while (0)
 #endif /* DHD_LOG_DUMP */
@@ -346,6 +353,12 @@ do {	\
 
 #define DHD_NONE(args)
 extern int dhd_msg_level;
+#ifdef DHD_LOG_PRINT_RATE_LIMIT
+extern int log_print_threshold;
+#endif /* DHD_LOG_PRINT_RATE_LIMIT */
+
+#define DHD_RTT_MEM(args) DHD_LOG_MEM(args)
+#define DHD_RTT_ERR(args) DHD_ERROR(args)
 
 /* Defines msg bits */
 #include <dhdioctl.h>

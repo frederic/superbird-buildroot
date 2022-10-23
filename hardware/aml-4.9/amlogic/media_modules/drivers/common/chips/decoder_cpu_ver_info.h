@@ -52,4 +52,5 @@ enum AM_MESON_CPU_MAJOR_ID
 };
 
 enum AM_MESON_CPU_MAJOR_ID get_cpu_major_id(void);
+bool is_cpu_tm2_revb(void);
 #endif

@@ -27,8 +27,10 @@
 static void ge2d_calculate_buffer_size(const buffer_info_t* buffer,
                                        unsigned int* size_out)
 {
+    unsigned int mask = ~MATRIX_CUSTOM;
     unsigned int image_width = buffer->canvas_w;
-    switch (buffer->format) {
+
+    switch (buffer->format & mask) {
         case PIXEL_FORMAT_RGBA_8888:
         case PIXEL_FORMAT_BGRA_8888:
         case PIXEL_FORMAT_RGBX_8888:

@@ -26,12 +26,12 @@ define QUALCOMM_QCA9377_INSTALL_CMDS
 	mkdir -p $(QUALCOMM_MODULE_INSTALL_DIR)
 	$(INSTALL) -m 0666 $(@D)/qca9377/AIO/rootfs-x86-android.build/lib/modules/wlan.ko $(QUALCOMM_MODULE_INSTALL_DIR)
 	echo $(QUALCOMM_MODULE_DIR)/wlan.ko: >> $(TARGET_DIR)/lib/modules/$(LINUX_VERSION_PROBED)/modules.de
-	mkdir -p $(TARGET_DIR)/lib/firmware/qca
+	mkdir -p $(TARGET_DIR)/lib/firmware/qca_bt
 	mkdir -p $(TARGET_DIR)/lib/firmware/qca9377
 	mkdir -p $(TARGET_DIR)/lib/firmware/qca9377/wlan
 	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca9377/wifi_49/*.bin $(TARGET_DIR)/lib/firmware/qca9377/
 	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca9377/wifi_49/wlan/* $(TARGET_DIR)/lib/firmware/qca9377/wlan/
-	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca9377/bt_bluez/* $(TARGET_DIR)/lib/firmware/qca/
+	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca9377/bt_bluez/* $(TARGET_DIR)/lib/firmware/qca_bt/
 endef
 endif
 
@@ -45,12 +45,12 @@ define QUALCOMM_QCA6174_INSTALL_CMDS
 	mkdir -p $(QUALCOMM_MODULE_INSTALL_DIR)
 	$(INSTALL) -m 0666 $(@D)/qca6174/AIO/rootfs-x86-android.build/lib/modules/wlan.ko $(QUALCOMM_MODULE_INSTALL_DIR)
 	echo $(QUALCOMM_MODULE_DIR)/wlan.ko: >> $(TARGET_DIR)/lib/modules/$(LINUX_VERSION_PROBED)/modules.dep
-	mkdir -p $(TARGET_DIR)/lib/firmware/qca
+	mkdir -p $(TARGET_DIR)/lib/firmware/qca_bt
 	mkdir -p $(TARGET_DIR)/lib/firmware/qca6174
 	mkdir -p $(TARGET_DIR)/lib/firmware/qca6174/wlan
 	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca6174/wifi/*.bin $(TARGET_DIR)/lib/firmware/qca6174/
 	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca6174/wifi/wlan/* $(TARGET_DIR)/lib/firmware/qca6174/wlan/
-	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca6174/bt/* $(TARGET_DIR)/lib/firmware/qca/
+	$(INSTALL) -D -m 0644 $(WIFI_FW_SITE)/qcom/config/qca6174/bt_bluez/* $(TARGET_DIR)/lib/firmware/qca_bt/
 endef
 endif
 
@@ -60,7 +60,6 @@ define QUALCOMM_WIFI_BUILD_CMDS
 endef
 
 define QUALCOMM_WIFI_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 755 $(QUALCOMM_WIFI_PKGDIR)/S44bluetooth $(TARGET_DIR)/etc/init.d
 	$(QUALCOMM_QCA6174_INSTALL_CMDS)
 	$(QUALCOMM_QCA9377_INSTALL_CMDS)
 endef

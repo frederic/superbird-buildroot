@@ -239,7 +239,7 @@ static void* server_routine_start(void* arg) {
         count = ctx->max_fd + 1;
         set = ctx->socket_set;
         ret = select(count, &set, NULL, NULL, NULL);
-        if (ret == -1 || ret == 0) {
+        if (ret <= 0) {
             DEBUG_INFO("listening get error:%s", strerror(errno));
             continue;
         }
@@ -260,6 +260,7 @@ static void* server_routine_start(void* arg) {
                     //DEBUG_INFO("Get Event from:%d", i);
                     data_in = NULL;
                     ret = read_request(i, &data_in);
+                    int fd_closed = 0;
                     if (ret <= 0) {
                         //DEBUG_INFO("remove client:%d", i);
                         //the client maybe close when the read_request get 0
@@ -267,6 +268,7 @@ static void* server_routine_start(void* arg) {
                         int tmp;
                         FD_CLR(i, &ctx->socket_set);
                         close(i);
+                        fd_closed = 1;
                         for (tmp = 0; tmp < ctx->connector_count; tmp++) {
                             if (ctx->sfd[tmp] == i) {
                                 ctx->connector_count--;
@@ -287,8 +289,13 @@ static void* server_routine_start(void* arg) {
                         DEBUG_INFO("Receive msg:%s", json_object_to_json_string(data_in));
                         ctx->msg_handle(data_in, &data_out);
                         if (data_out != NULL) {
-                            DEBUG_INFO("Replay msg:%s", json_object_to_json_string(data_out));
-                            send_request(i, data_out);
+                            if (fd_closed) {
+                                DEBUG_INFO("No receiver msg:%s", json_object_to_json_string(data_out));
+                                json_object_put(data_out);
+                            } else {
+                                DEBUG_INFO("Replay msg:%s", json_object_to_json_string(data_out));
+                                send_request(i, data_out);
+                            }
                         }
                     } else {
                         json_object_put(data_in);

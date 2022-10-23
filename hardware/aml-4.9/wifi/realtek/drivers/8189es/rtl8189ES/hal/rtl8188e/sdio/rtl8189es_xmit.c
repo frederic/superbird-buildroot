@@ -243,6 +243,11 @@ void rtl8188es_fill_default_txdesc(
 
 		fill_txdesc_sectype(pattrib, ptxdesc);
 
+#if defined(CONFIG_CONCURRENT_MODE)
+		if (bmcst)
+			fill_txdesc_force_bmc_camid(pattrib, (struct tx_desc *)pbuf);
+#endif
+
 		ptxdesc->seq = pattrib->seqnum;
 
 		/* todo: qos_en */
@@ -296,7 +301,17 @@ void rtl8188es_fill_default_txdesc(
 
 			if (pmlmeinfo->preamble_mode == PREAMBLE_SHORT)
 				ptxdesc->data_short = 1;/* DATA_SHORT */
+#ifdef CONFIG_IP_R_MONITOR
+			if((pattrib->ether_type == ETH_P_ARP) &&
+				(IsSupportedTxOFDM(padapter->registrypriv.wireless_mode))) {
 
+				ptxdesc->datarate = MRateToHwRate(IEEE80211_OFDM_RATE_6MB);
+				#ifdef DBG_IP_R_MONITOR
+				RTW_INFO(FUNC_ADPT_FMT ": SP Packet(0x%04X) rate=0x%x SeqNum = %d\n",
+					FUNC_ADPT_ARG(padapter), pattrib->ether_type, MRateToHwRate(pmlmeext->tx_rate), pattrib->seqnum);
+				#endif/*DBG_IP_R_MONITOR*/
+			} else
+#endif/*CONFIG_IP_R_MONITOR*/
 			ptxdesc->datarate = MRateToHwRate(pmlmeext->tx_rate);
 		}
 
@@ -473,6 +488,10 @@ static u8 rtw_sdio_wait_enough_TxOQT_space(PADAPTER padapter, u8 agg_num)
 /* todo: static */
 s32 _dequeue_writeport(PADAPTER padapter)
 {
+
+#if defined(DBG_TX_FREE_PAGE) || defined(CONFIG_SDIO_TX_ENABLE_AVAL_INT)
+	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(padapter);
+#endif
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct dvobj_priv	*pdvobjpriv = adapter_to_dvobj(padapter);
@@ -514,6 +533,8 @@ query_free_page:
 			goto free_xmitbuf;
 #ifdef CONFIG_SDIO_TX_ENABLE_AVAL_INT
 		if (!bUpdatePageNum) {
+			rtw_hal_sdio_avail_page_threshold_en(padapter, PageIdx);
+
 			/* Total number of page is NOT available, so update current FIFO status */
 			HalQueryTxBufferStatus8189ESdio(padapter);
 			bUpdatePageNum = _TRUE;
@@ -521,14 +542,33 @@ query_free_page:
 		} else {
 			bUpdatePageNum = _FALSE;
 			enqueue_pending_xmitbuf_to_head(pxmitpriv, pxmitbuf);
+			#ifdef DBG_TX_FREE_PAGE
+			RTW_INFO("DQWP page not enough, len:%d, agg:%d, req %s:%u, cur H:%u, M:%u, L:%u, P:%u\n"
+				, pxmitbuf->len, pxmitbuf->agg_num
+				, sdio_tx_queue_str(PageIdx), pxmitbuf->pg_num
+				, hal_data->SdioTxFIFOFreePage[HI_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[MID_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[LOW_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[PUBLIC_QUEUE_IDX]
+			);
+			#endif
 			return _TRUE;
 		}
 #else /* CONFIG_SDIO_TX_ENABLE_AVAL_INT */
 		polling_num++;
 		if ((polling_num % 10) == 0) {/* or 80 */
-			/* RTW_INFO("%s: FIFO starvation!(%d) len=%d agg=%d page=(R)%d(A)%d\n", */
-			/*	__func__, n, pxmitbuf->len, pxmitbuf->agg_num, pframe->pg_num, freePage[PageIdx] + freePage[PUBLIC_QUEUE_IDX]); */
+
 			enqueue_pending_xmitbuf_to_head(pxmitpriv, pxmitbuf);
+			#ifdef DBG_TX_FREE_PAGE
+			RTW_INFO("DQWP FIFO starvation!(%d), len:%u, agg:%u, req %s:%u, cur H:%u, M:%u, L:%u, P:%u\n"
+				, polling_num, pxmitbuf->len, pxmitbuf->agg_num
+				, sdio_tx_queue_str(PageIdx), pxmitbuf->pg_num
+				, hal_data->SdioTxFIFOFreePage[HI_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[MID_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[LOW_QUEUE_IDX]
+				, hal_data->SdioTxFIFOFreePage[PUBLIC_QUEUE_IDX]
+			);
+			#endif
 			rtw_usleep_os(50);
 			return _FALSE;
 		}
@@ -542,15 +582,31 @@ query_free_page:
 	if (rtw_sdio_wait_enough_TxOQT_space(padapter, pxmitbuf->agg_num) == _FALSE)
 		goto free_xmitbuf;
 
+	#ifdef DBG_TX_FREE_PAGE
+	RTW_INFO("DQWP write, %s:%u\n", sdio_tx_queue_str(PageIdx), pxmitbuf->pg_num);
+	#endif
+
 	rtw_write_port(padapter, deviceId, pxmitbuf->len, (u8 *)pxmitbuf);
 
 	rtw_hal_sdio_update_tx_freepage(padapter, PageIdx, pxmitbuf->pg_num);
+
+	#ifdef DBG_TX_FREE_PAGE
+	RTW_INFO("DQWP write done, cur H:%u, M:%u, L:%u, P:%u\n"
+		, hal_data->SdioTxFIFOFreePage[HI_QUEUE_IDX]
+		, hal_data->SdioTxFIFOFreePage[MID_QUEUE_IDX]
+		, hal_data->SdioTxFIFOFreePage[LOW_QUEUE_IDX]
+		, hal_data->SdioTxFIFOFreePage[PUBLIC_QUEUE_IDX]
+	);
+	#endif
 
 free_xmitbuf:
 	/* rtw_free_xmitframe(pxmitpriv, pframe); */
 	/* pxmitbuf->priv_data = NULL; */
 	rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
-
+	#ifdef SDIO_FREE_XMIT_BUF_SEMA
+	if (pxmitbuf->buf_tag == XMITBUF_DATA)
+		rtw_sdio_free_xmitbuf_sema_up(pxmitpriv);
+	#endif
 #ifdef CONFIG_SDIO_TX_TASKLET
 	tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
 #endif
@@ -636,12 +692,12 @@ struct EMInfo {
 void
 InsertEMContent_8188E(
 	struct EMInfo *pEMInfo,
-	IN pu1Byte	VirtualAddress)
+	u8 *VirtualAddress)
 {
 
 #if RTL8188E_EARLY_MODE_PKT_NUM_10 == 1
-	u1Byte index = 0;
-	u4Byte	dwtmp = 0;
+	u8 index = 0;
+	u32	dwtmp = 0;
 #endif
 
 	_rtw_memset(VirtualAddress, 0, EARLY_MODE_INFO_SIZE);
@@ -993,6 +1049,9 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 	int inx[4];
 	u8 pre_qsel = 0xFF, next_qsel = 0xFF;
 	u8 single_sta_in_queue = _FALSE;
+	#ifdef SDIO_FREE_XMIT_BUF_SEMA
+	u32 consume;
+	#endif
 
 	err = 0;
 	hwxmits = pxmitpriv->hwxmits;
@@ -1017,10 +1076,13 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 	/* 0(VO), 1(VI), 2(BE), 3(BK) */
 	for (idx = 0; idx < hwentry; idx++) {
 		phwxmit = hwxmits + inx[idx];
+		#ifdef SDIO_FREE_XMIT_BUF_SEMA
+		consume = 0;
+		#endif
 
 		if ((check_pending_xmitbuf(pxmitpriv) == _TRUE) && (padapter->mlmepriv.LinkDetectInfo.bHigherBusyTxTraffic == _TRUE)) {
 			if ((phwxmit->accnt > 0) && (phwxmit->accnt < 5)) {
-				err = -2;
+				err = RTW_TX_WAIT_MORE_FRAME;
 				break;
 			}
 		}
@@ -1085,22 +1147,29 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 							if (single_sta_in_queue == _FALSE) {
 								/* break the loop in case there is more than one sta in this ac queue */
 								pxmitbuf = NULL;
-								err = -3;
+								err = RTW_TX_BALANCE;
 								break;
 							}
 
-						} else
+						} else {
 							rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
+							#ifdef SDIO_FREE_XMIT_BUF_SEMA
+							consume--;
+							#endif
+						}
 					}
 
 					pxmitbuf = rtw_alloc_xmitbuf(pxmitpriv);
 					if (pxmitbuf == NULL) {
-						err = -2;
-#ifdef CONFIG_SDIO_TX_ENABLE_AVAL_INT
-						_rtw_up_sema(&(GET_PRIMARY_ADAPTER(padapter)->xmitpriv.xmit_sema));
-#endif
+						err = RTW_XBUF_UNAVAIL;
+						#ifdef DBG_XMIT_BUF
+						RTW_ERR("%s: xmit_buf is not enough!\n", __FUNCTION__);
+						#endif
 						break;
 					}
+					#ifdef SDIO_FREE_XMIT_BUF_SEMA
+					consume++;
+					#endif
 					agg_num = 0;
 					pkt_index = 0;
 				}
@@ -1157,7 +1226,7 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 
 			if (_rtw_queue_empty(pframe_queue) == _TRUE)
 				rtw_list_delete(&ptxservq->tx_pending);
-			else if (err == -3) {
+			else if (err == RTW_TX_BALANCE) {
 				/* Re-arrange the order of stations in this ac queue to balance the service for these stations */
 				rtw_list_delete(&ptxservq->tx_pending);
 				rtw_list_insert_tail(&ptxservq->tx_pending, get_list_head(phwxmit->sta_queue));
@@ -1167,6 +1236,15 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 				break;
 		}
 		_exit_critical_bh(&pxmitpriv->lock, &irql);
+
+		#ifdef SDIO_FREE_XMIT_BUF_SEMA
+		#ifdef DBG_SDIO_FREE_XMIT_BUF_SEMA
+		if (consume)
+			RTW_INFO(FUNC_ADPT_FMT" acq[%u], consume:%u\n", FUNC_ADPT_ARG(padapter), inx[idx], consume);
+		#endif
+		while (consume--)
+			rtw_sdio_free_xmitbuf_sema_down(pxmitpriv);
+		#endif
 
 		/* dump xmit_buf to hw tx fifo */
 		if (pxmitbuf) {
@@ -1184,13 +1262,16 @@ static s32 xmit_xmitframes(PADAPTER padapter, struct xmit_priv *pxmitpriv)
 				pxmitbuf->priv_data = NULL;
 				enqueue_pending_xmitbuf(pxmitpriv, pxmitbuf);
 				rtw_yield_os();
-			} else
+			} else {
 				rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
-
+				#ifdef SDIO_FREE_XMIT_BUF_SEMA
+				rtw_sdio_free_xmitbuf_sema_up(pxmitpriv);
+				#endif
+			}
 			pxmitbuf = NULL;
 		}
 
-		if (err == -2)
+		if (err == RTW_XBUF_UNAVAIL)
 			break;
 	}
 
@@ -1212,7 +1293,6 @@ s32 rtl8188es_xmit_handler(PADAPTER padapter)
 	s32 ret;
 	_irqL irql;
 
-wait:
 	ret = _rtw_down_sema(&pxmitpriv->SdioXmitSema);
 	if (_FAIL == ret) {
 		return _FAIL;
@@ -1235,12 +1315,25 @@ next:
 	/* dequeue frame and write to hardware */
 
 	ret = xmit_xmitframes(padapter, pxmitpriv);
-	if (ret == -2) {
-#ifdef CONFIG_REDUCE_TX_CPU_LOADING
-		rtw_msleep_os(1);
-#else
-		rtw_yield_os();
-#endif
+	if (ret == RTW_XBUF_UNAVAIL
+		|| ret == RTW_TX_WAIT_MORE_FRAME) {
+		#ifdef SDIO_FREE_XMIT_BUF_SEMA
+		if (ret == RTW_XBUF_UNAVAIL) {
+			rtw_sdio_free_xmitbuf_sema_down(pxmitpriv);
+			rtw_sdio_free_xmitbuf_sema_up(pxmitpriv);
+			goto next;
+		}
+		#endif
+
+		if (padapter->registrypriv.wifi_spec)
+			rtw_msleep_os(1);
+		else {
+			#ifdef CONFIG_REDUCE_TX_CPU_LOADING
+			rtw_msleep_os(1);
+			#else
+			rtw_yield_os();
+			#endif
+		}
 		goto next;
 	}
 	_enter_critical_bh(&pxmitpriv->lock, &irql);
@@ -1416,6 +1509,9 @@ s32 rtl8188es_init_xmit_priv(PADAPTER padapter)
 #else /* CONFIG_SDIO_TX_TASKLET */
 
 	_rtw_init_sema(&pxmitpriv->SdioXmitSema, 0);
+	#ifdef SDIO_FREE_XMIT_BUF_SEMA
+	_rtw_init_sema(&pxmitpriv->sdio_free_xmitbuf_sema, pxmitpriv->free_xmitbuf_cnt);
+	#endif
 
 #endif /* CONFIG_SDIO_TX_TASKLET */
 
@@ -1430,7 +1526,44 @@ s32 rtl8188es_init_xmit_priv(PADAPTER padapter)
 
 void rtl8188es_free_xmit_priv(PADAPTER padapter)
 {
-	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+	PHAL_DATA_TYPE phal;
+	struct xmit_priv *pxmitpriv;
+	struct xmit_buf *pxmitbuf;
+	_queue *pqueue;
+	_list *plist, *phead;
+	_list tmplist;
+	_irqL irql;
 
-	_rtw_spinlock_free(&pHalData->SdioTxFIFOFreePageLock);
+
+	phal = GET_HAL_DATA(padapter);
+	pxmitpriv = &padapter->xmitpriv;
+	pqueue = &pxmitpriv->pending_xmitbuf_queue;
+	phead = get_list_head(pqueue);
+	_rtw_init_listhead(&tmplist);
+
+	_enter_critical_bh(&pqueue->lock, &irql);
+	if (_rtw_queue_empty(pqueue) == _FALSE) {
+		/* Insert tmplist to end of queue, and delete phead */
+		/* then tmplist become head of queue. */
+		rtw_list_insert_tail(&tmplist, phead);
+		rtw_list_delete(phead);
+	}
+	_exit_critical_bh(&pqueue->lock, &irql);
+
+	phead = &tmplist;
+	while (rtw_is_list_empty(phead) == _FALSE) {
+		plist = get_next(phead);
+		rtw_list_delete(plist);
+
+		pxmitbuf = LIST_CONTAINOR(plist, struct xmit_buf, list);
+		rtw_free_xmitframe(pxmitpriv, (struct xmit_frame *)pxmitbuf->priv_data);
+		pxmitbuf->priv_data = NULL;
+		rtw_free_xmitbuf(pxmitpriv, pxmitbuf);
+		#ifdef SDIO_FREE_XMIT_BUF_SEMA
+		if (pxmitbuf->buf_tag == XMITBUF_DATA)
+			rtw_sdio_free_xmitbuf_sema_up(pxmitpriv);
+		#endif
+	}
+
+	_rtw_spinlock_free(&phal->SdioTxFIFOFreePageLock);
 }

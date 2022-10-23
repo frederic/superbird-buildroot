@@ -65,6 +65,34 @@ enum digital_format {
     AUTO = 5
 };
 
+enum input_source {
+    LINEIN = 0,
+    ATV,
+    HDMIIN,
+    SPDIFIN,
+    ARCIN,
+};
+
+/* sync with tinymix after auge */
+enum auge_input_source {
+    TDMIN_A = 0,
+    TDMIN_B = 1,
+    TDMIN_C = 2,
+    SPDIFIN_AUGE = 3,
+    PDMIN = 4,
+    FRATV = 5,
+    TDMIN_LB    = 6,
+    LOOPBACK_A  = 7,
+    FRHDMIRX    = 8,
+    LOOPBACK_B  = 9,
+    SPDIFIN_LB  = 10,
+    EARCRX_DMAC = 11,
+    RESERVED_0  = 12,
+    RESERVED_1  = 13,
+    RESERVED_2  = 14,
+    VAD     = 15,
+};
+
 static inline bool is_main_write_usecase(stream_usecase_t usecase)
 {
     return usecase > 0;
@@ -78,6 +106,7 @@ static inline bool is_digital_raw_format(audio_format_t format)
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD:
     case AUDIO_FORMAT_DOLBY_TRUEHD:
+    case AUDIO_FORMAT_MAT:
     case AUDIO_FORMAT_IEC61937:
         return true;
     default:
@@ -500,6 +529,7 @@ bool is_hdmi_in_stable_sw(struct audio_stream_in *stream);
 /*@brief check the ATV audio stability by HW register */
 bool is_atv_in_stable_hw(struct audio_stream_in *stream);
 int set_audio_source(int audio_source);
+int set_audio_source_e(enum input_source audio_source, bool is_auge);
 int enable_HW_resample(int sr, int enable);
 int set_spdifin_pao(int enable);
 int get_hdmiin_samplerate(void);
@@ -518,6 +548,7 @@ int get_input_streaminfo(struct audio_stream_in *stream, aml_data_format_t *data
 
 int get_stream_parameters(struct audio_hw_device *dev, const char *keys, char *temp_buf, size_t temp_buf_size);
 int spdifhw_audio_format_detection();
+audio_format_t hdmiin_hw_audio_format_detection(void);
 
 int get_hdmiin_i2sclk(void);
 

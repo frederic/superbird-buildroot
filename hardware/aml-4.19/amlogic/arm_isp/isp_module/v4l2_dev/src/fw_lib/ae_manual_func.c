@@ -252,7 +252,7 @@ void ae_read_full_histogram_data( AE_fsm_ptr_t p_fsm )
     ae_flow.flow_state = MON_ALG_FLOW_STATE_INPUT_READY;
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_AE_FLOW, &ae_flow, sizeof( ae_flow ) );
 
-    LOG( LOG_INFO, "AE flow: INPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", ae_flow.frame_id_tracking, ae_flow.frame_id_current );
+    LOG( LOG_DEBUG, "AE flow: INPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", ae_flow.frame_id_tracking, ae_flow.frame_id_current );
 
 #if FW_ZONE_AE
     int j;
@@ -295,7 +295,7 @@ void ae_set_new_param( AE_fsm_ptr_t p_fsm, sbuf_ae_t *p_sbuf_ae )
         ae_flow.flow_state = MON_ALG_FLOW_STATE_OUTPUT_READY;
         acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_AE_FLOW, &ae_flow, sizeof( ae_flow ) );
 
-        LOG( LOG_INFO, "AE flow: OUTPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", ae_flow.frame_id_tracking, ae_flow.frame_id_current );
+        LOG( LOG_DEBUG, "AE flow: OUTPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", ae_flow.frame_id_tracking, ae_flow.frame_id_current );
     }
 
     fsm_raise_event( p_fsm, event_id_ae_result_ready );
@@ -323,7 +323,7 @@ int ae_calculate_exposure( AE_fsm_ptr_t p_fsm )
 
         LOG( LOG_INFO, "AE applied OK, exposure_log2 : %d, exposure_ratio: %u.", exp_target.exposure_log2, exp_target.exposure_ratio );
     } else {
-        LOG( LOG_INFO, "AE applied failed, exposure_log2 : %d, exposure_ratio: %u.", exp_target.exposure_log2, exp_target.exposure_ratio );
+        LOG( LOG_ERR, "AE applied failed, exposure_log2 : %d, exposure_ratio: %u.", exp_target.exposure_log2, exp_target.exposure_ratio );
     }
 
     return rc;

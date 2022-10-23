@@ -28,7 +28,7 @@ static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt)
 		end = (start + blkcnt - 1) * mmc->write_bl_len;
 		start *= mmc->write_bl_len;
 	}
-	printf("start = %lu,end = %lu\n",start,end);
+	printf("start = 0x%lx,end = 0x%lx\n",start,end);
 	if (IS_SD(mmc)) {
 		start_cmd = SD_CMD_ERASE_WR_BLK_START;
 		end_cmd = SD_CMD_ERASE_WR_BLK_END;
@@ -53,7 +53,7 @@ static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt)
 		goto err_out;
 
 	cmd.cmdidx = MMC_CMD_ERASE;
-	cmd.cmdarg = SECURE_ERASE;
+	cmd.cmdarg = NORMAL_ERASE;
 	cmd.resp_type = MMC_RSP_R1b;
 
 	err = mmc_send_cmd(mmc, &cmd, NULL);

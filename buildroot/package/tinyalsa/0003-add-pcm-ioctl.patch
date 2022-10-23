@@ -1,0 +1,54 @@
+diff --git a/include/tinyalsa/pcm.h b/include/tinyalsa/pcm.h
+index 01f8b9d..f24aae2 100644
+--- a/include/tinyalsa/pcm.h
++++ b/include/tinyalsa/pcm.h
+@@ -306,6 +306,8 @@ int pcm_start(struct pcm *pcm);
+ 
+ int pcm_stop(struct pcm *pcm);
+ 
++int pcm_ioctl(struct pcm *pcm, int request, ...);
++
+ int pcm_wait(struct pcm *pcm, int timeout);
+ 
+ long pcm_get_delay(struct pcm *pcm);
+diff --git a/src/pcm.c b/src/pcm.c
+index ef38c9c..5fcde93 100644
+--- a/src/pcm.c
++++ b/src/pcm.c
+@@ -686,7 +686,7 @@ int pcm_writei(struct pcm *pcm, const void *data, unsigned int frame_count)
+ 
+     x.buf = (void*)data;
+     x.frames = frame_count;
+-    x.result = 0;
++
+     for (;;) {
+         if (!pcm->running) {
+             int prepare_error = pcm_prepare(pcm);
+@@ -711,7 +711,7 @@ int pcm_writei(struct pcm *pcm, const void *data, unsigned int frame_count)
+             }
+             return oops(pcm, errno, "cannot write stream data");
+         }
+-        return x.result;
++        return 0;
+     }
+ }
+ 
+@@ -1478,3 +1478,18 @@ long pcm_get_delay(struct pcm *pcm)
+     return pcm->pcm_delay;
+ }
+ 
++int pcm_ioctl(struct pcm *pcm, int request, ...)
++{
++    va_list ap;
++    void * arg;
++
++    if (!pcm_is_ready(pcm))
++        return -1;
++
++    va_start(ap, request);
++    arg = va_arg(ap, void *);
++    va_end(ap);
++
++    return ioctl(pcm->fd, request, arg);
++}
++

@@ -48,7 +48,7 @@ typedef enum
     NONE=0, INFO, DEBUG, WARN, ERR, TRACE, MAX_LOG_LEVEL
 } debug_log_level_t;
 
-extern debug_log_level_t g_log_level;
+extern debug_log_level_t g_vp5_log_level;
 
 enum
 {
@@ -87,7 +87,7 @@ enum {
 #else
 #define VLOG(level, fmt , var...) \
     do { \
-        if (level >= g_log_level) { \
+        if (level >= g_vp5_log_level) { \
             printf("[%s:%d] " fmt "\n", __FUNCTION__, __LINE__, ##var);\
         } \
     }while(0)

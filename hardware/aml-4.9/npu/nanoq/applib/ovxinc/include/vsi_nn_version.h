@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -25,13 +25,15 @@
 #ifndef _VSI_NN_VERSION_H_
 #define _VSI_NN_VERSION_H_
 
+#include "vsi_nn_types.h"
+
 #if defined(__cplusplus)
 extern "C"{
 #endif
 
 #define VSI_NN_VERSION_MAJOR 1
 #define VSI_NN_VERSION_MINOR 1
-#define VSI_NN_VERSION_PATCH 12
+#define VSI_NN_VERSION_PATCH 21
 #define VSI_NN_VERSION \
     (VSI_NN_VERSION_MAJOR * 10000 + VSI_NN_VERSION_MINOR * 100 + VSI_NN_VERSION_PATCH)
 
@@ -47,6 +49,24 @@ extern "C"{
  * Get ovxlib version string.
  */
 OVXLIB_API const char *vsi_nn_GetVersion(void);
+
+/**
+ * Get ovxlib version major
+ * Get ovxlib version major, return integer value.
+ */
+OVXLIB_API uint32_t vsi_nn_GetVersionMajor(void);
+
+/**
+ * Get ovxlib version minor
+ * Get ovxlib version minor, return integer value.
+ */
+OVXLIB_API uint32_t vsi_nn_GetVersionMinor(void);
+
+/**
+ * Get ovxlib version patch
+ * Get ovxlib version patch, return integer value.
+ */
+OVXLIB_API uint32_t vsi_nn_GetVersionPatch(void);
 
 #if defined(__cplusplus)
 }

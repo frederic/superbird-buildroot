@@ -2,7 +2,7 @@
  * Common stats definitions for clients of dongle
  * ports
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -49,10 +49,7 @@ typedef struct {
 typedef int32 wifi_radio;
 typedef int32 wifi_channel;
 typedef int32 wifi_rssi;
-typedef struct {
-	uint16 version;
-	uint16 length;
-} ver_len;
+typedef struct { uint16 version; uint16 length; } ver_len;
 
 typedef enum wifi_channel_width {
 	WIFI_CHAN_WIDTH_20	  = 0,
@@ -109,7 +106,7 @@ typedef struct {
 	wifi_connection_state state;  /* connection state (valid for STA, CLI only) */
 	wifi_roam_state roaming;      /* roaming state */
 	uint32 capabilities;             /* WIFI_CAPABILITY_XXX (self) */
-	uint8 ssid[DOT11_MAX_SSID_LEN + 1]; /* null terminated SSID */
+	uint8 ssid[DOT11_MAX_SSID_LEN+1]; /* null terminated SSID */
 	uint8 bssid[ETHER_ADDR_LEN];     /* bssid */
 	uint8 PAD[1];
 	uint8 ap_country_str[3];         /* country string advertised by AP */
@@ -135,20 +132,20 @@ typedef struct {
 	uint32 rateMcsIdx; /* OFDM/CCK rate code would be as per ieee std
 			    * in the units of 0.5mbps
 			    */
-	/* HT/VHT it would be mcs index */
+			/* HT/VHT it would be mcs index */
 	uint32 reserved;   /* reserved */
 	uint32 bitrate;    /* units of 100 Kbps */
 } wifi_rate;
 
 typedef struct {
-	uint32 preamble   : 3;  /* 0: OFDM, 1:CCK, 2:HT 3:VHT 4..7 reserved */
-	uint32 nss        : 2;  /* 0:1x1, 1:2x2, 3:3x3, 4:4x4 */
-	uint32 bw         : 3;  /* 0:20MHz, 1:40Mhz, 2:80Mhz, 3:160Mhz */
-	uint32 rateMcsIdx : 8;   /* OFDM/CCK rate code would be as per ieee std
+	uint32 preamble   :3;   /* 0: OFDM, 1:CCK, 2:HT 3:VHT 4..7 reserved */
+	uint32 nss        :2;   /* 0:1x1, 1:2x2, 3:3x3, 4:4x4 */
+	uint32 bw         :3;   /* 0:20MHz, 1:40Mhz, 2:80Mhz, 3:160Mhz */
+	uint32 rateMcsIdx :8;   /* OFDM/CCK rate code would be as per ieee std
 					* in the units of 0.5mbps HT/VHT it would be
 					* mcs index
 					*/
-	uint32 reserved  : 16;  /* reserved */
+	uint32 reserved  :16;   /* reserved */
 	uint32 bitrate;         /* units of 100 Kbps */
 } wifi_rate_v1;
 
@@ -278,9 +275,9 @@ typedef struct {
 	uint32 tx_mcast;                   /* number of succesfully transmitted multicast
 					    * data packets
 					    */
-	/* STA case: implies ACK received from AP for the
-	 * unicast packet in which mcast pkt was sent
-	 */
+					   /* STA case: implies ACK received from AP for the
+					    * unicast packet in which mcast pkt was sent
+					    */
 	uint32 rx_mcast;                   /* number of received multicast data packets */
 	uint32 rx_ampdu;                   /* number of received unicast a-mpdus */
 	uint32 tx_ampdu;                   /* number of transmitted unicast a-mpdus */

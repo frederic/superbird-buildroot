@@ -14,4 +14,11 @@ make ARCH=arm txlx_t962e_r321.dtb
 make ARCH=arm txlx_t962x_r311_1g.dtb
 make ARCH=arm txlx_t962x_r311_2g.dtb
 make ARCH=arm tm2_pxp.dtb
-
+make ARCH=arm tm2_revb_pxp.dtb
+make ARCH=arm tm2_t962e2_ab311.dtb
+make ARCH=arm tm2_t962e2_ab319.dtb
+make ARCH=arm tm2_revb_t962e2_ab311.dtb
+make ARCH=arm tm2_revb_t962e2_ab319.dtb
+make ARCH=arm tm2_revb_t962x3_ab301.dtb
+make ARCH=arm tm2_revb_t962x3_ab309.dtb
+make ARCH=arm tm2_revb_t962x3_t312.dtb

@@ -15,9 +15,7 @@ source "package/amlogic/ipc/gst-plugin-amlvenc/Config.in"
 source "package/amlogic/ipc/gst-plugin-amlnn/Config.in"
 source "package/amlogic/ipc/ptz_control/Config.in"
 source "package/amlogic/ipc/gst-plugin-amlwebstreamserversink/Config.in"
-config BR2_LINUX_KERNEL_IRCUT
-	bool "amlogic ircut"
-	default n
-	help
-	  amlogic ircut control
+source "package/amlogic/ipc/ipc-sdk/Config.in"
+source "package/amlogic/ipc/ipc-refapp/Config.in"
+source "package/amlogic/ipc/ipc-system-service/Config.in"
 endmenu

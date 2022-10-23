@@ -3,7 +3,7 @@
  * Software-specific definitions shared between device and host side
  * Explains the shared area between host and dongle
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -26,7 +26,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmpcie.h 765083 2018-05-31 02:45:13Z $
+ * $Id: bcmpcie.h 821465 2019-05-23 19:50:00Z $
  */
 
 #ifndef	_bcmpcie_h_
@@ -81,13 +81,6 @@ typedef struct {
 #define PCIE_SHARED_IDLE_FLOW_RING		0x80000
 #define PCIE_SHARED_2BYTE_INDICES       0x100000
 
-#define PCIE_SHARED2_EXTENDED_TRAP_DATA	0x00000001	/* using flags2 in shared area */
-#define PCIE_SHARED2_TXSTATUS_METADATA	0x00000002
-#define PCIE_SHARED2_BT_LOGGING		0x00000004	/* BT logging support */
-#define PCIE_SHARED2_SNAPSHOT_UPLOAD	0x00000008	/* BT/WLAN snapshot upload support */
-#define PCIE_SHARED2_SUBMIT_COUNT_WAR	0x00000010	/* submission count WAR */
-#define PCIE_SHARED2_FW_SMALL_MEMDUMP	0x00000200      /* FW small memdump */
-#define PCIE_SHARED2_DEBUG_BUF_DEST	0x00002000	/* debug buf dest support */
 #define PCIE_SHARED_FAST_DELETE_RING	0x00000020      /* Fast Delete Ring */
 #define PCIE_SHARED_EVENT_BUF_POOL_MAX	0x000000c0      /* event buffer pool max bits */
 #define PCIE_SHARED_EVENT_BUF_POOL_MAX_POS     6       /* event buffer pool max bit position */
@@ -135,35 +128,39 @@ typedef struct {
  * field got added and the definition for these flags come here:
  */
 /* WAR: D11 txstatus through unused status field of PCIe completion header */
+#define PCIE_SHARED2_EXTENDED_TRAP_DATA	0x00000001	/* using flags2 in shared area */
+#define PCIE_SHARED2_TXSTATUS_METADATA	0x00000002
+#define PCIE_SHARED2_BT_LOGGING		0x00000004	/* BT logging support */
+#define PCIE_SHARED2_SNAPSHOT_UPLOAD	0x00000008	/* BT/WLAN snapshot upload support */
+#define PCIE_SHARED2_SUBMIT_COUNT_WAR	0x00000010	/* submission count WAR */
+#define PCIE_SHARED2_FAST_DELETE_RING	0x00000020	/* Fast Delete ring support */
+#define PCIE_SHARED2_EVTBUF_MAX_MASK	0x000000C0	/* 0:32, 1:64, 2:128, 3: 256 */
+
+/* using flags2 to indicate firmware support added to reuse timesync to update PKT txstatus */
+#define PCIE_SHARED2_PKT_TX_STATUS	0x00000100
+#define PCIE_SHARED2_FW_SMALL_MEMDUMP	0x00000200	/* FW small memdump */
+#define PCIE_SHARED2_FW_HC_ON_TRAP	0x00000400
+#define PCIE_SHARED2_HSCB		0x00000800	/* Host SCB support */
+
+#define PCIE_SHARED2_EDL_RING			0x00001000	/* Support Enhanced Debug Lane */
+#define PCIE_SHARED2_DEBUG_BUF_DEST		0x00002000	/* debug buf dest support */
+#define PCIE_SHARED2_PCIE_ENUM_RESET_FLR	0x00004000	/* BT producer index reset WAR */
+#define PCIE_SHARED2_PKT_TIMESTAMP		0x00008000	/* Timestamp in packet */
+
+#define PCIE_SHARED2_HP2P		0x00010000u	/* HP2P feature */
+#define PCIE_SHARED2_HWA		0x00020000u	/* HWA feature */
+#define PCIE_SHARED2_TRAP_ON_HOST_DB7	0x00040000u	/* can take a trap on DB7 from host */
+
+#define PCIE_SHARED2_DURATION_SCALE	0x00100000u
+
 #define PCIE_SHARED2_D2H_D11_TX_STATUS	0x40000000
 #define PCIE_SHARED2_H2D_D11_TX_STATUS	0x80000000
-
-#define PCIE_SHARED2_EXTENDED_TRAP_DATA	0x00000001
-
-#define PCIE_SHARED2_TXSTATUS_METADATA	0x00000002
-
-/* BT logging support */
-#define PCIE_SHARED2_BT_LOGGING		0x00000004
-/* BT/WLAN snapshot upload support */
-#define PCIE_SHARED2_SNAPSHOT_UPLOAD	0x00000008
-/* submission count WAR */
-#define PCIE_SHARED2_SUBMIT_COUNT_WAR	0x00000010
-
-/* Fast Delete ring support */
-#define PCIE_SHARED2_FAST_DELETE_RING	0x00000020
-
-/* Host SCB support */
-#define PCIE_SHARED2_HSCB		0x00000800
 
 #define PCIE_SHARED_D2H_MAGIC		0xFEDCBA09
 #define PCIE_SHARED_H2D_MAGIC		0x12345678
 
-#define PCIE_SHARED2_PKT_TX_STATUS	0x00000100		/* using flags2 to indicate
-							   firmware support added to reuse
-							   timesync to update PKT txstatus
-							   */
-/* Support Enhanced Debug Lane */
-#define PCIE_SHARED2_EDL_RING		0x00001000
+typedef uint16			pcie_hwa_db_index_t;	/* 16 bit HWA index (IPC Rev 7) */
+#define PCIE_HWA_DB_INDEX_SZ	(2u)			/* 2 bytes  sizeof(pcie_hwa_db_index_t) */
 
 /**
  * Message rings convey messages between host and device. They are unidirectional, and are located
@@ -198,8 +195,10 @@ typedef struct {
 #define BCMPCIE_D2H_RING_TYPE_RX_CPL			0x3
 #define BCMPCIE_D2H_RING_TYPE_DBGBUF_CPL		0x4
 #define BCMPCIE_D2H_RING_TYPE_AC_RX_COMPLETE		0x5
-#define BCMPCIE_D2H_RING_TYPE_BTLOG_CPL		0x6
+#define BCMPCIE_D2H_RING_TYPE_BTLOG_CPL			0x6
 #define BCMPCIE_D2H_RING_TYPE_EDL                       0x7
+#define BCMPCIE_D2H_RING_TYPE_HPP_TX_CPL		0x8
+#define BCMPCIE_D2H_RING_TYPE_HPP_RX_CPL		0x9
 
 /**
  * H2D and D2H, WR and RD index, are maintained in the following arrays:
@@ -317,6 +316,11 @@ typedef struct ring_info {
 	uint16		max_vdevs; /* max number of virtual interfaces supported */
 
 	sh_addr_t	ifrm_w_idx_hostaddr; /* Array of all H2D ring's WR indices for IFRM */
+
+	/* 32bit ptr to arrays of HWA DB indices for all rings in dongle memory */
+	uint32		h2d_hwa_db_idx_ptr; /* Array of all H2D ring's HWA DB indices */
+	uint32		d2h_hwa_db_idx_ptr; /* Array of all D2H ring's HWA DB indices */
+
 } ring_info_t;
 
 /**
@@ -385,6 +389,9 @@ typedef struct {
 
 	/* location in host memory for offloaded modules */
 	sh_addr_t	hoffload_addr;
+	uint32		flags3;
+	uint32		host_cap2;
+	uint32		host_cap3;
 } pciedev_shared_t;
 
 /* Device F/W provides the following access function:
@@ -414,6 +421,10 @@ typedef struct {
 #define HOSTCAP_EXT_TRAP_DBGBUF			0x04000000
 /* Host support for enhanced debug lane */
 #define HOSTCAP_EDL_RING			0x10000000
+#define HOSTCAP_PKT_TIMESTAMP			0x20000000
+#define HOSTCAP_PKT_HP2P			0x40000000
+#define HOSTCAP_HWA				0x80000000
+#define HOSTCAP2_DURATION_SCALE_MASK            0x0000003Fu
 
 /* extended trap debug buffer allocation sizes. Note that this buffer can be used for
  * other trap related purposes also.
@@ -450,31 +461,34 @@ typedef struct {
 
 /* D2H mail box Data */
 #define D2H_DEV_D3_ACK					0x00000001
-#define D2H_DEV_DS_ENTER_REQ			0x00000002
-#define D2H_DEV_DS_EXIT_NOTE			0x00000004
-#define D2HMB_DS_HOST_SLEEP_EXIT_ACK	0x00000008
+#define D2H_DEV_DS_ENTER_REQ				0x00000002
+#define D2H_DEV_DS_EXIT_NOTE				0x00000004
+#define D2HMB_DS_HOST_SLEEP_EXIT_ACK			0x00000008
 #define D2H_DEV_IDMA_INITED				0x00000010
-#define D2H_DEV_FWHALT					0x10000000
-#define D2H_DEV_TRAP_PING_HOST_FAILURE  0x08000000
-#define D2H_DEV_EXT_TRAP_DATA			0x20000000
-#define D2H_DEV_TRAP_IN_TRAP			0x40000000
-#define D2H_DEV_TRAP_DUE_TO_BT			0x01000000
-/* Indicates trap due to HMAP violation */
-#define D2H_DEV_TRAP_DUE_TO_HMAP		0x02000000
-/* Indicates whether HMAP violation was Write */
-#define D2H_DEV_TRAP_HMAP_WRITE			0x04000000
-
 #define D2HMB_DS_HOST_SLEEP_ACK         D2H_DEV_D3_ACK
 #define D2HMB_DS_DEVICE_SLEEP_ENTER_REQ D2H_DEV_DS_ENTER_REQ
 #define D2HMB_DS_DEVICE_SLEEP_EXIT      D2H_DEV_DS_EXIT_NOTE
+
+#define D2H_DEV_MB_MASK		(D2H_DEV_D3_ACK | D2H_DEV_DS_ENTER_REQ | \
+				D2H_DEV_DS_EXIT_NOTE | D2H_DEV_IDMA_INITED)
+#define D2H_DEV_MB_INVALIDATED(x)	((!x) || (x & ~D2H_DEV_MB_MASK))
+
+/* trap data codes */
+#define D2H_DEV_FWHALT					0x10000000
+#define D2H_DEV_EXT_TRAP_DATA				0x20000000
+#define D2H_DEV_TRAP_IN_TRAP				0x40000000
+#define D2H_DEV_TRAP_HOSTDB				0x80000000 /* trap as set by host DB */
+#define D2H_DEV_TRAP_DUE_TO_BT				0x01000000
+/* Indicates trap due to HMAP violation */
+#define D2H_DEV_TRAP_DUE_TO_HMAP			0x02000000
+/* Indicates whether HMAP violation was Write */
+#define D2H_DEV_TRAP_HMAP_WRITE				0x04000000
+#define D2H_DEV_TRAP_PING_HOST_FAILURE			0x08000000
+#define D2H_FWTRAP_MASK		0x0000001F	/* Adding maskbits for TRAP information */
+
 #define D2HMB_FWHALT                    D2H_DEV_FWHALT
 #define D2HMB_TRAP_IN_TRAP              D2H_DEV_TRAP_IN_TRAP
 #define D2HMB_EXT_TRAP_DATA             D2H_DEV_EXT_TRAP_DATA
-#define D2H_FWTRAP_MASK		0x0000001F	/* Adding maskbits for TRAP information */
-#define D2H_DEV_MB_MASK		(D2H_DEV_D3_ACK | D2H_DEV_DS_ENTER_REQ | \
-				D2H_DEV_DS_EXIT_NOTE | D2H_DEV_IDMA_INITED | D2H_DEV_FWHALT | \
-				D2H_FWTRAP_MASK | D2H_DEV_EXT_TRAP_DATA | D2H_DEV_TRAP_IN_TRAP)
-#define D2H_DEV_MB_INVALIDATED(x)	((!x) || (x & ~D2H_DEV_MB_MASK))
 
 /* Size of Extended Trap data Buffer */
 #define BCMPCIE_EXT_TRAP_DATA_MAXLEN  4096

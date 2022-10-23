@@ -2,7 +2,8 @@ M_PREFIX=$(AML_LIBS_NF_STAGING_DIR)/usr
 LIB_DIR?=$(M_PREFIX)/lib
 HEADERS_DIR?=$(M_PREFIX)/include
 
-TARGET_OBJS=amconfigutils.o amdisplayutils.o amsysfsutils.o Amvideoutils.o itemlist.o amdrmutils.o\
+TARGET_OBJS=amconfigutils.o amdisplayutils.o amsysfsutils.o Amvideoutils.o \
+	itemlist.o amdrmutils.o amthreadpool.o \
 
 TARGET=libamavutils_nfx.so
 

@@ -1,0 +1,29 @@
+[
+  {
+    type: filein,
+    param: {
+      path: "raw_video_nv12_1920_1080.dat"
+    }
+  },
+  {
+    type: rawvideoparse,
+    param: {
+      pixfmt: NV12,
+      width: 1920,
+      height: 1080,
+      fps: 30
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264
+    }
+  },
+  {
+    type: fileout,
+    param: {
+      path: "/data/rawvideoparse_nv12_1920_1080_vench264.dump"
+    }
+  }
+]

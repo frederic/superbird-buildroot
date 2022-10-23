@@ -18,6 +18,7 @@
 #ifndef AML_H264_PARSER_H
 #define AML_H264_PARSER_H
 
+#include "../aml_vcodec_drv.h"
 #include "../utils/pixfmt.h"
 
 #define QP_MAX_NUM (51 + 6 * 6)           // The maximum supported qp

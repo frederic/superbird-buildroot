@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-DNSMASQ_VERSION = 2.79
+DNSMASQ_VERSION = 2.80
 DNSMASQ_SOURCE = dnsmasq-$(DNSMASQ_VERSION).tar.xz
 DNSMASQ_SITE = http://thekelleys.org.uk/dnsmasq
 DNSMASQ_MAKE_ENV = $(TARGET_MAKE_ENV) CC="$(TARGET_CC)"
@@ -14,6 +14,9 @@ DNSMASQ_MAKE_OPTS += DESTDIR=$(TARGET_DIR) LDFLAGS="$(TARGET_LDFLAGS)" \
 DNSMASQ_DEPENDENCIES = host-pkgconf $(TARGET_NLS_DEPENDENCIES)
 DNSMASQ_LICENSE = GPL-2.0 or GPL-3.0
 DNSMASQ_LICENSE_FILES = COPYING COPYING-v3
+
+# 0004-Fix-memory-leak-in-helper-c.patch
+DNSMASQ_IGNORE_CVES += CVE-2019-14834
 
 DNSMASQ_I18N = $(if $(BR2_SYSTEM_ENABLE_NLS),-i18n)
 
@@ -34,8 +37,13 @@ DNSMASQ_COPTS += -DNO_TFTP
 endif
 
 ifeq ($(BR2_PACKAGE_DNSMASQ_IDN),y)
+ifeq ($(BR2_PACKAGE_LIBIDN2),y)
+DNSMASQ_DEPENDENCIES += libidn2
+DNSMASQ_COPTS += -DHAVE_LIBIDN2
+else
 DNSMASQ_DEPENDENCIES += libidn
 DNSMASQ_COPTS += -DHAVE_IDN
+endif
 endif
 
 ifeq ($(BR2_PACKAGE_DNSMASQ_CONNTRACK),y)
@@ -67,6 +75,11 @@ define DNSMASQ_INSTALL_DBUS
 endef
 endif
 
+ifeq ($(BR2_PACKAGE_UBUS),y)
+DNSMASQ_DEPENDENCIES += ubus
+DNSMASQ_COPTS += -DHAVE_UBUS
+endif
+
 define DNSMASQ_FIX_PKGCONFIG
 	$(SED) 's^PKG_CONFIG = pkg-config^PKG_CONFIG = $(PKG_CONFIG_HOST_BINARY)^' \
 		$(DNSMASQ_DIR)/Makefile
@@ -83,6 +96,11 @@ define DNSMASQ_INSTALL_TARGET_CMDS
 	mkdir -p $(TARGET_DIR)/var/lib/misc/
 	$(DNSMASQ_INSTALL_DBUS)
 	$(INSTALL) -D -m 0644 package/dnsmasq/dnsmasq.conf $(TARGET_DIR)/etc/
+endef
+
+define DNSMASQ_INSTALL_INIT_SYSV
+	$(INSTALL) -m 755 -D package/dnsmasq/S80dnsmasq \
+		$(TARGET_DIR)/etc/init.d/S80dnsmasq
 endef
 
 $(eval $(generic-package))

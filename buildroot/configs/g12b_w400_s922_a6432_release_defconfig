@@ -1,0 +1,7 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "g12b_w400_s922.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesong12b_w400/initramfs/ramfslist-32"
+

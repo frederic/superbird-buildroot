@@ -22,8 +22,8 @@
 #warning "|company_name| and |model_name| should be replaced in production."
 
 namespace {
-const char kCompanyName[] = "www";
-const char kModelName[] = "www";
+const char kCompanyName[] = "SDKTeam";
+const char kModelName[] = "Reference";
 }  // namespace
 
 SbDrmSystem SbDrmCreateSystem(

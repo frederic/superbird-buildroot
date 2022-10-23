@@ -39,7 +39,7 @@
 
 #include <string.h>
 
-const VpCfgInfo vpCfgInfo[MAX_CFG] = {
+const VpCfgInfo vpCfgInfo[] = {
     //name                          min            max              default
     {"InputFile",                   0,              0,                      0}, //0
     {"SourceWidth",                 0,              VP_MAX_ENC_PIC_WIDTH,   0},
@@ -147,7 +147,7 @@ const VpCfgInfo vpCfgInfo[MAX_CFG] = {
     {"CustomVpsLayerId0",           0,              INT_MAX,                0},
     {"CustomVpsLayerId1",           0,              INT_MAX,                0},
     {"CustomSpsLog2MaxPocMinus4",   0,              12,                     4},
-// newly added for VP520
+// newly added for VPU ENCODER
     {"EncMonochrome",               0,              1,                      0},
     {"StrongIntraSmoothing",        0,              1,                      1},
     {"RoiAvgQP",                    0,              63,                     0},
@@ -858,12 +858,13 @@ static int VP_GetValue(
     int iValue;
     int ret;
     char sValue[256] = {0, };
+    int maxCfg = sizeof(vpCfgInfo) / sizeof(VpCfgInfo);
 
-    for (i=0; i < MAX_CFG ;i++) {
+    for (i=0; i < maxCfg ;i++) {
         if ( strcmp(vpCfgInfo[i].name, cfgName) == 0)
             break;
     }
-    if ( i == MAX_CFG ) {
+    if ( i == maxCfg ) {
         VLOG(ERR, "CFG param error : %s\n", cfgName);
         return 0;
     }

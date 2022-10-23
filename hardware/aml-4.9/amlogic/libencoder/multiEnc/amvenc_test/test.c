@@ -56,6 +56,19 @@
 #define CHANGE_TARGET_RATE	0x2
 #define CHANGE_MIN_MAX_QP	0x4
 #define CHANGE_GOP_PERIOD	0x8
+#define LONGTERM_REF_SET	0x10
+
+// GOP mode strings
+static const char *Gop_string[] = {
+	"Default mode IP only",
+	"All I frame mode",
+	"IP only mode",
+	"IBBBP mode",
+	"IP only 1-frame SVC mode",
+	"IP only 2-frame SVC mode",
+	"IP only 3-frame SVC mode",
+	"IP only 4-frame SVC mode",
+};
 
 typedef struct {
 	int FrameNum; //change frame number
@@ -75,6 +88,8 @@ typedef struct {
 	//CHANGE_GOP_PERIOD
 	int intraQP;
 	int GOPPeriod;
+	//LONGTERM_REF_SET
+	int LTRFlags; //bit 0: UseCurSrcAsLongtermPic; bit 1: Use LTR frame
 } CfgChangeParam;
 
 static int ParseCfgUpdateFile(FILE *fp, CfgChangeParam *cfg_update);
@@ -90,8 +105,9 @@ int main(int argc, const char *argv[])
 	int datalen = 0;
 	int retry_cnt = 0;
 	int roi_enabled = 0;
+	int ltf_enabled = 0;
 	int cfg_upd_enabled = 0, has_cfg_update = 0;
-	int cfg_option = 0, frame_num = 0;
+	int cfg_option = 0, frame_num = 0, gop_pattern = 0;
 	vl_img_format_t fmt = IMG_FMT_NONE;
 	CfgChangeParam cfgChange;
 	vl_frame_type_t enc_frame_type;
@@ -117,7 +133,7 @@ int main(int argc, const char *argv[])
 		printf("Amlogic Encoder API \n");
 		printf(" usage: aml_enc_test "
 		       "[srcfile][outfile][width][height][gop][framerate][bitrate][num][fmt]["
-		       "buf type][num_planes][codec_id] [roifile] [cfg_opt] [cfg_file] \n");
+		       "buf type][num_planes][codec_id] [cfg_opt] [roifile] [cfg_file] \n");
 		printf("  options  \t:\n");
 		printf("  srcfile  \t: yuv data url in your root fs\n");
 		printf("  outfile  \t: stream url in your root fs\n");
@@ -131,9 +147,15 @@ int main(int argc, const char *argv[])
 		printf("  buf_type \t: 0:vmalloc, 3:dma buffer\n");
 		printf("  num_planes \t: used for dma buffer case. 2 : nv12/nv21, 3 : yuv420p(yv12/yu12)\n");
 		printf("  codec_id \t: 4 : h.264, 5 : h.265\n");
-		printf("  roifile  \t: optional, roi info url in your root fs, if no present roi disable \n");
-		printf("  cfg_opt  \t: optional, cfg update file option 0: roifile as cfg_file (no roi), 1:cfg_file follow \n");
-		printf("  cfg_file \t: optional, cfg update info url in your root fs\n");
+		printf("  cfg_opt  \t: optional, flags to control the encode feature settings\n");
+		printf("            \t\t  bit 0:roi control. 0: disabled (default) 1: enabled\n");
+		printf("            \t\t  bit 1: update control. 0: disabled (default) 1: enabled\n");
+		printf("            \t\t  bit 2 ~ bit 6 encode GOP patttern options:\n");
+		printf("            \t\t\t 0 default(IP) 1:I only    2:IP_only    3: IBBBP\n");
+		printf("            \t\t\t 4:IP_SVC1     5:IP_SVC2   6: IP_SVC3   7: IP_SVC4\n");
+		printf("            \t\t  bit 7:long term refereces. 0: disabled (default) 1: enabled\n");
+		printf("  roifile  \t: optional, roi info url in root fs, no present if roi is disabled\n");
+		printf("  cfg_file \t: optional, cfg update info url. no present if update is disabled\n");
 		return -1;
 	} else
 	{
@@ -229,30 +251,42 @@ int main(int argc, const char *argv[])
 	else
 		printf("codec is H264\n");
 	if (argc > 13) {
+		cfg_option = atoi(argv[13]);
+		gop_pattern = (cfg_option >>2) & 0x1f;
+		if (gop_pattern) {
+			if (gop_pattern > 7) {
+				printf("gop_pattern_is: %d invalid;\n",
+					gop_pattern);
+				return -1;
+			}
+			printf("gop_pattern_is \t: %d --> %s;\n",
+				gop_pattern, Gop_string[gop_pattern]);
+		}
+		if (cfg_option & 0x80) {
+			printf("longterm reference is enabled\n");
+			ltf_enabled = 1;
+		}
 		if (argc > 14)
 		{
-			cfg_option = atoi(argv[14]);
-			if (cfg_option == 1 && argc > 15)
+			if ((cfg_option & 0x3) == 0x1)
 			{
-				printf("cfg_upd_url is\t: %s ;\n", argv[15]);
-				cfg_upd_enabled = 1;
-				printf("roi_url is\t: %s ;\n", argv[13]);
+				printf("roi_url is\t: %s ;\n", argv[14]);
 				roi_enabled = 1;
-			} else if (cfg_option == 0) {
-				printf("cfg_upd_url is\t: %s ;\n", argv[13]);
+			} else if ((cfg_option & 0x3) == 0x2) {
+				printf("cfg_upd_url is\t: %s ;\n", argv[14]);
+				cfg_upd_enabled = 1;
+			} else if((cfg_option & 0x3) == 0x3 && argc > 15) {
+				printf("roi_url is\t: %s ;\n", argv[14]);
+				roi_enabled = 1;
+				printf("cfg_upd_url is\t: %s ;\n", argv[15]);
 				cfg_upd_enabled = 1;
 			} else {
 				printf("unknown options opt %d argc %d\n",
 					cfg_option ,argc);
-				printf("roi_url is\t: %s ;\n", argv[13]);
-				roi_enabled = 1;
+				return -1;
 			}
-		} else {
-			printf("roi_url is\t: %s ;\n", argv[13]);
-			roi_enabled = 1;
 		}
 	}
-
 
 	unsigned int framesize = width * height * 3 / 2;
 	unsigned ysize = width * height;
@@ -268,7 +302,6 @@ int main(int argc, const char *argv[])
 	vl_dma_info_t *dma_info = NULL;
 	unsigned char *roi_buffer = NULL;
 	unsigned int roi_size;
-
 
 	memset(&inbuf_info, 0, sizeof(vl_buffer_info_t));
 	inbuf_info.buf_type = (vl_buffer_type_t) buf_type;
@@ -291,7 +324,7 @@ int main(int argc, const char *argv[])
 	encode_info.img_format = fmt;
 	encode_info.qp_mode = qp_mode;
 	if (roi_enabled) {
-		encode_info.enc_feature_opts |= 0x1;
+		encode_info.enc_feature_opts |= ENABLE_ROI_FEATURE;
 		roi_size = ((width+15)/16)*((height+15)/16);
 		roi_buffer = (unsigned char *) malloc(roi_size + 1);
 		if (roi_buffer == NULL) {
@@ -300,8 +333,14 @@ int main(int argc, const char *argv[])
 		}
 	}
 	if (cfg_upd_enabled) {
-		encode_info.enc_feature_opts |= 0x2;
+		encode_info.enc_feature_opts |= ENABLE_PARA_UPDATE;
 		memset(&cfgChange, 0, sizeof(CfgChangeParam));
+	}
+	if (ltf_enabled) {
+		encode_info.enc_feature_opts |= ENABLE_LONG_TERM_REF;
+	}
+	if (gop_pattern) {
+		encode_info.enc_feature_opts |= ((gop_pattern<<2) & 0x7c);
 	}
 
 	if (inbuf_info.buf_type == DMA_TYPE)
@@ -433,8 +472,7 @@ int main(int argc, const char *argv[])
 		       dma_info->shared_fd[1], dma_info->shared_fd[2]);
 		printf("input[0] %p, input[1] %p,input[2] %p\n", input[0],
 		       input[1], input[2]);
-	} else
-	{
+	} else {
 		inputBuffer = (unsigned char *) malloc(framesize);
 		inbuf_info.buf_info.in_ptr[0] = (ulong) (inputBuffer);
 		inbuf_info.buf_info.in_ptr[1] =
@@ -451,7 +489,7 @@ int main(int argc, const char *argv[])
 	}
 
 	if (roi_enabled) {
-		fp_roi = fopen((argv[13]), "rb");
+		fp_roi = fopen((argv[14]), "rb");
 		if (fp_roi == NULL)
 		{
 			printf("open roi file error!\n");
@@ -459,8 +497,8 @@ int main(int argc, const char *argv[])
 		}
 	}
 	if (cfg_upd_enabled) {
-		if (cfg_option == 0)
-			fp_cfg = fopen((argv[13]), "r");
+		if ((cfg_option & 0x1) == 0)
+			fp_cfg = fopen((argv[14]), "r");
 		else
 			fp_cfg = fopen((argv[15]), "r");
 		if (fp_cfg == NULL)
@@ -616,6 +654,15 @@ retry:
 					    frame_num, cfgChange.intraQP,
 					    cfgChange.GOPPeriod);
 				}
+				if ((cfgChange.enable_option
+				    & LONGTERM_REF_SET) && ltf_enabled)
+				{
+					vl_video_encoder_longterm_ref(
+					    handle_enc,
+					    cfgChange.LTRFlags);
+					printf("Longterm Ref on %d flag 0x%x\n",
+					    frame_num, cfgChange.LTRFlags);
+				}
 			}
 			if (cfgChange.FrameNum <= frame_num) {
 				has_cfg_update =
@@ -693,14 +740,15 @@ static int ParseCfgUpdateFile(FILE *fp, CfgChangeParam *cfg_update)
 	static char lineStr[256] = {0, };
 	char valueStr[256] = {0, };
 	int has_update = 0;
-
 	while (1) {
 		if (lineStr[0] == 0x0) { //need a new line;
 			if (fgets(lineStr, 256, fp) == NULL ) {
 				if (cfg_update->enable_option && has_update)
 					return 1;
-				else
-					return 0;
+				else {
+					if (feof(fp)) return 0;
+					continue;
+				}
 			}
 		}
 		if ((lineStr[0] == '#')
@@ -727,8 +775,9 @@ static int ParseCfgUpdateFile(FILE *fp, CfgChangeParam *cfg_update)
 		{// done the currrent frame;
 			if (cfg_update->enable_option)
 				return 1;
-			else
-				return 0;
+			has_update = 0;
+			continue;
+
 		} else if (has_update ==0) {// clear the options
 			cfg_update->FrameNum = frameIdx;
 			cfg_update->enable_option = 0;
@@ -796,6 +845,17 @@ static int ParseCfgUpdateFile(FILE *fp, CfgChangeParam *cfg_update)
 				if (parsed_num == 2)
 					cfg_update->enable_option |=
 					    CHANGE_GOP_PERIOD;
+			}
+		} else if (strcasecmp("SetLongTermRef",token) == 0) {
+			token = strtok(NULL, ":\r\n");
+			while ( token && strlen(token) == 1
+			    && strncmp(token, " ", 1) == 0)
+				token = strtok(NULL, ":\r\n"); //check space
+			if (token) {
+				while ( *token == ' ' ) token++;//skip spaces;
+				cfg_update->LTRFlags = atoi(token);
+				cfg_update->enable_option |=
+				    LONGTERM_REF_SET;
 			}
 		}
 		lineStr[0] = 0x0;

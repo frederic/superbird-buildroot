@@ -168,7 +168,7 @@ void color_matrix_shading_mesh_reload( color_matrix_fsm_ptr_t p_fsm )
 
 
     //for mesh shading light switching
-    acamera_isp_top_bypass_mesh_shading_write( p_fsm->cmn.isp_base, 0 );
+    //acamera_isp_top_bypass_mesh_shading_write( p_fsm->cmn.isp_base, 0 );
     acamera_isp_mesh_shading_mesh_page_r_write( p_fsm->cmn.isp_base, 0x0 );
     acamera_isp_mesh_shading_mesh_page_g_write( p_fsm->cmn.isp_base, 0x1 );
     acamera_isp_mesh_shading_mesh_page_b_write( p_fsm->cmn.isp_base, 0x2 );

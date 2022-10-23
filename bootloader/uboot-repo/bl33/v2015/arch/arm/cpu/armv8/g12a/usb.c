@@ -22,7 +22,9 @@
 #include <asm/arch/usb-v2.h>
 #include <asm/arch/romboot.h>
 #include <asm/cpu_id.h>
+#include <amlogic/power_domain.h>
 
+#define USB2_PHY_PLL_OFFSET_c	(0x34)
 
 static struct amlogic_usb_config * g_usb_cfg[BOARD_USB_MODE_MAX][USB_PHY_PORT_MAX];
 static int Rev_flag = 0;
@@ -50,14 +52,8 @@ struct amlogic_usb_config * board_usb_start(int mode,int index)
 	printf("USB3.0 XHCI init start\n");
 	board_usb_check_sm1();
 
-	if (board_usb_get_sm1_type() == 1) {
-		writel((readl(P_AO_RTI_GEN_PWR_SLEEP0) & (~(0x1<<17))),
-			P_AO_RTI_GEN_PWR_SLEEP0);
-		writel((readl(HHI_MEM_PD_REG0) & (~(0x3<<30))), HHI_MEM_PD_REG0);
-		udelay(100);
-		writel((readl(P_AO_RTI_GEN_PWR_ISO0) & (~(0x1<<17))),
-			P_AO_RTI_GEN_PWR_ISO0);
-	}
+	if (board_usb_get_sm1_type() == 1)
+		power_domain_switch(PM_USB, PWR_ON);
 
 	if (mode < 0 || mode >= BOARD_USB_MODE_MAX||!g_usb_cfg[mode][index])
 		return 0;
@@ -99,31 +95,57 @@ int get_usb_count(void)
     return  usb_index;
 }
 
+static void set_pll_Calibration_default(uint32_t volatile *phy2_pll_base)
+{
+    u32 tmp;
+
+    tmp = (*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x8));
+    tmp &= 0xfff;
+    tmp |= (*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x10));
+    (*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x10))
+     = tmp;
+}
+
 void set_usb_pll(uint32_t volatile *phy2_pll_base)
 {
+    u32 parameter;
+
 	if (board_usb_get_sm1_type() == 1) {
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x40))
-			= (0x09400414 | USB_PHY2_RESET | USB_PHY2_ENABLE);
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x44)) =
-			0x927e0000;
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x48)) =
-			0xAC5F69E5;
-		udelay(100);
-		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x40))
-			= (((0x09400414) | (USB_PHY2_ENABLE))
-			& (~(USB_PHY2_RESET)));
+		parameter = 0xAC5F69E5;
 	} else {
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x40))
-			= (USB_PHY2_PLL_PARAMETER_1 | USB_PHY2_RESET | USB_PHY2_ENABLE);
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x44)) =
-			USB_PHY2_PLL_PARAMETER_2;
-		(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x48)) =
-			USB_PHY2_PLL_PARAMETER_3;
-		udelay(100);
-		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x40))
-			= (((USB_PHY2_PLL_PARAMETER_1) | (USB_PHY2_ENABLE))
-			& (~(USB_PHY2_RESET)));
+		parameter = USB_PHY2_PLL_PARAMETER_3;
 	}
+
+	(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x40))
+	 = (USB_PHY2_PLL_PARAMETER_1 | USB_PHY2_RESET | USB_PHY2_ENABLE);
+	(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x44))
+	 = USB_PHY2_PLL_PARAMETER_2;
+	(*(volatile uint32_t *)((unsigned long)phy2_pll_base + 0x48))
+	 = parameter;
+	udelay(100);
+	(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x40))
+	 = (((USB_PHY2_PLL_PARAMETER_1) | (USB_PHY2_ENABLE))
+	 & (~(USB_PHY2_RESET)));
+
+	(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0xC))
+	 = USB2_PHY_PLL_OFFSET_c;
+	if (board_usb_get_sm1_type() == 1) {
+		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x50))
+		 = 0xfe18;
+		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x54))
+		 = 0x2a;
+		set_pll_Calibration_default(phy2_pll_base);
+	} else {
+		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x10))
+		 = USB_G12x_PHY_PLL_SETTING_2;
+		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x50))
+		 = USB_G12x_PHY_PLL_SETTING_1;
+		(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x38))
+		 = 0x0;
+	}
+
+	(*(volatile uint32_t *)(unsigned long)((unsigned long)phy2_pll_base + 0x34))
+	 = USB_G12x_PHY_PLL_SETTING_3;
 }
 
 void board_usb_pll_disable(struct amlogic_usb_config *cfg)
@@ -160,16 +182,13 @@ void set_usb_phy_tuning_1(int port)
 		phy_reg_base = USB_REG_B;
 
 	if (board_usb_get_sm1_type() == 1) {
-		(*(volatile uint32_t *)(phy_reg_base + 0x54)) = 0x2a;
-		(*(volatile uint32_t *)(phy_reg_base + 0x50)) = USB_G12x_PHY_PLL_SETTING_1;
-		(*(volatile uint32_t *)(phy_reg_base + 0x34)) = USB_G12x_PHY_PLL_SETTING_3 & (0x1f << 16);
 		return;
 	}
 
-	(*(volatile uint32_t *)(phy_reg_base + 0x10)) = USB_G12x_PHY_PLL_SETTING_2;
-	(*(volatile uint32_t *)(phy_reg_base + 0x50)) = USB_G12x_PHY_PLL_SETTING_1;
-	(*(volatile uint32_t *)(phy_reg_base + 0x38)) = USB_G12x_PHY_PLL_SETTING_4;
-	(*(volatile uint32_t *)(phy_reg_base + 0x34)) = USB_G12x_PHY_PLL_SETTING_3;
+	(*(volatile uint32_t *)(unsigned long)((unsigned long)phy_reg_base + 0x38))
+		= USB_G12x_PHY_PLL_SETTING_4;
+	(*(volatile uint32_t *)(unsigned long)((unsigned long)phy_reg_base + 0x34))
+		= USB_G12x_PHY_PLL_SETTING_3;
 }
 #endif
 

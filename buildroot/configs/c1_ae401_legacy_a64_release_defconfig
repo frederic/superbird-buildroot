@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "c1_ae401_legacy.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc1_ae401/initramfs/ramfslist-64"
+

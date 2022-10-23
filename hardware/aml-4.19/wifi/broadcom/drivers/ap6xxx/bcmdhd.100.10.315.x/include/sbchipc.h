@@ -5,9 +5,9 @@
  * JTAG, 0/1/2 UARTs, clock frequency control, a watchdog interrupt timer,
  * GPIO interface, extbus, and support for serial and parallel flashes.
  *
- * $Id: sbchipc.h 763883 2018-05-22 17:57:56Z $
+ * $Id: sbchipc.h 825481 2019-06-14 10:06:03Z $
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -613,6 +613,8 @@ typedef volatile struct {
 #define PMU_PLL_CONTROL_DATA	0x664
 
 #define CC_SROM_CTRL		0x190
+#define CC_SROM_ADDRESS		0x194u
+#define CC_SROM_DATA		0x198u
 #ifdef SROM16K_4364_ADDRSPACE
 #define	CC_SROM_OTP		0xa000		/* SROM/OTP address space */
 #else
@@ -3135,42 +3137,6 @@ created for 4369
 #define PMU_4369_MACCORE_0_RES_REQ_MASK			0x3FCBF7FF
 #define PMU_4369_MACCORE_1_RES_REQ_MASK			0x7FFB3647
 
-/* 4367 related */
-#define RES4367_ABUCK			0
-#define RES4367_CBUCK			1
-#define RES4367_MISCLDO_PU		2
-#define RES4367_VBOOST			3
-#define RES4367_LDO3P3_PU		4
-#define RES4367_LAST_LPO_AVAIL		5
-#define RES4367_XTAL_PU			6
-#define RES4367_XTAL_STABLE		7
-#define RES4367_PWRSW_DIG		8
-#define RES4367_SR_DIG			9
-#define RES4367_SPARE10			10
-#define RES4367_PWRSW_AUX		11
-#define RES4367_SR_AUX			12
-#define RES4367_SPARE2			13
-#define RES4367_PWRSW_MAIN		14
-#define RES4367_SR_MAIN			15
-#define RES4367_ARMPLL_PWRUP		16
-#define RES4367_DIG_CORE_RDY		17
-#define RES4367_CORE_RDY_AUX		18
-#define RES4367_ALP_AVAIL		19
-#define RES4367_RADIO_AUX_PU		20
-#define RES4367_MINIPMU_AUX_PU		21
-#define RES4367_CORE_RDY_MAIN		22
-#define RES4367_RADIO_MAIN_PU		23
-#define RES4367_MINIPMU_MAIN_PU		24
-#define RES4367_PCIE_RET		25
-#define RES4367_COLD_START_WAIT		26
-#define RES4367_ARMPLL_HTAVAIL		27
-#define RES4367_HT_AVAIL		28
-#define RES4367_MACPHY_AUX_CLK_AVAIL	29
-#define RES4367_MACPHY_MAIN_CLK_AVAIL	30
-#define RES4367_RESERVED_31		31
-
-#define CST4367_SPROM_PRESENT		(1 << 17)
-
 /* 43430 PMU resources based on pmu_params.xls */
 #define RES43430_LPLDO_PU				0
 #define RES43430_BG_PU					1
@@ -3319,6 +3285,7 @@ created for 4369
 #define CR4_4369_RAM_BASE                    (0x170000)
 #define CR4_4377_RAM_BASE                    (0x170000)
 #define CR4_43751_RAM_BASE                   (0x170000)
+#define CR4_43752_RAM_BASE                   (0x170000)
 #define CA7_4367_RAM_BASE                    (0x200000)
 #define CR4_4378_RAM_BASE                    (0x352000)
 
@@ -4624,14 +4591,22 @@ created for 4369
 #define SRPWR_DMN3_MACMAIN		(3)				/* MAC/Phy Main */
 #define SRPWR_DMN3_MACMAIN_SHIFT	(SRPWR_DMN3_MACMAIN)	/* MAC/Phy Main */
 #define SRPWR_DMN3_MACMAIN_MASK		(1 << SRPWR_DMN3_MACMAIN_SHIFT)	/* MAC/Phy Main */
-#define SRPWR_DMN_ALL_MASK		(0xF)
+
+#define SRPWR_DMN4_MACSCAN		(4)				/* MAC/Phy Scan */
+#define SRPWR_DMN4_MACSCAN_SHIFT	(SRPWR_DMN4_MACSCAN)		/* MAC/Phy Scan */
+#define SRPWR_DMN4_MACSCAN_MASK		(1 << SRPWR_DMN4_MACSCAN_SHIFT)	/* MAC/Phy Scan */
+
+/* all power domain mask */
+#define SRPWR_DMN_ALL_MASK(sih)		si_srpwr_domain_all_mask(sih)
 
 #define SRPWR_REQON_SHIFT		(8)	/* PowerOnRequest[11:8] */
-#define SRPWR_REQON_MASK		(SRPWR_DMN_ALL_MASK << SRPWR_REQON_SHIFT)
+#define SRPWR_REQON_MASK(sih)		(SRPWR_DMN_ALL_MASK(sih) << SRPWR_REQON_SHIFT)
+
 #define SRPWR_STATUS_SHIFT		(16)	/* ExtPwrStatus[19:16], RO */
-#define SRPWR_STATUS_MASK		(SRPWR_DMN_ALL_MASK << SRPWR_STATUS_SHIFT)
-#define SRPWR_DMN_SHIFT			(28)	/* PowerDomain[31:28], RO */
-#define SRPWR_DMN_MASK			(SRPWR_DMN_ALL_MASK << SRPWR_DMN_SHIFT)
+#define SRPWR_STATUS_MASK(sih)		(SRPWR_DMN_ALL_MASK(sih) << SRPWR_STATUS_SHIFT)
+
+#define SRPWR_DMN_ID_SHIFT			(28)	/* PowerDomain[31:28], RO */
+#define SRPWR_DMN_ID_MASK			(0xF)
 
 /* PMU Precision Usec Timer */
 #define PMU_PREC_USEC_TIMER_ENABLE	0x1

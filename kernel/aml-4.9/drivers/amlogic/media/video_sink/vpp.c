@@ -3418,8 +3418,13 @@ void vpp_super_scaler_support(void)
 		sr->sr_reg_offt2 = 0x00;
 	} else if (is_meson_tl1_cpu()
 		|| is_meson_tm2_cpu()) {
-		sr->sr_reg_offt = 0xc00;
-		sr->sr_reg_offt2 = 0xc80;
+		if (is_meson_tm2_revb()) {
+			sr->sr_reg_offt = 0x1e00;
+			sr->sr_reg_offt2 = 0x1f80;
+		} else {
+			sr->sr_reg_offt = 0xc00;
+			sr->sr_reg_offt2 = 0xc80;
+		}
 	} else {
 		sr->sr_reg_offt = 0;
 		sr->sr_reg_offt2 = 0x00;

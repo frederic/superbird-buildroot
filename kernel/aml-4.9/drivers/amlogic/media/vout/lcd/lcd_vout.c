@@ -1163,10 +1163,30 @@ static int lcd_config_remove(struct device *dev)
 		LCDPR("invalid lcd mode\n");
 		break;
 	}
+	lcd_driver->lcd_info = NULL;
 
 	lcd_clk_config_remove();
 
 	return 0;
+}
+
+static void lcd_vout_server_remove(void)
+{
+	switch (lcd_driver->lcd_mode) {
+#ifdef CONFIG_AMLOGIC_LCD_TV
+	case LCD_MODE_TV:
+		lcd_tv_vout_server_remove();
+		break;
+#endif
+#ifdef CONFIG_AMLOGIC_LCD_TABLET
+	case LCD_MODE_TABLET:
+		lcd_tablet_vout_server_remove();
+		break;
+#endif
+	default:
+		LCDPR("%s: invalid lcd mode\n", __func__);
+		break;
+	}
 }
 
 static void lcd_config_probe_delayed(struct work_struct *work)
@@ -1185,6 +1205,7 @@ static void lcd_config_probe_delayed(struct work_struct *work)
 	LCDPR("key_init_flag=%d, i=%d\n", key_init_flag, i);
 
 	if (key_init_flag == 0) {
+		lcd_vout_server_remove();
 		kfree(lcd_driver);
 		lcd_driver = NULL;
 		LCDERR("key is not ready, probe exit\n");
@@ -1193,6 +1214,7 @@ static void lcd_config_probe_delayed(struct work_struct *work)
 
 	ret = lcd_mode_probe(lcd_driver->dev);
 	if (ret) {
+		lcd_vout_server_remove();
 		kfree(lcd_driver);
 		lcd_driver = NULL;
 		LCDERR("probe exit\n");
@@ -1321,6 +1343,17 @@ static int lcd_config_probe(struct platform_device *pdev)
 		LCDPR("detect lcd_auto_test: %d\n", lcd_driver->lcd_auto_test);
 	}
 
+	ret = of_property_read_u32(lcd_driver->dev->of_node,
+				   "resume_type", &val);
+	if (ret) {
+		if (lcd_debug_print_flag)
+			LCDPR("failed to get resume_type\n");
+		lcd_driver->lcd_resume_type = 1; /* default workqueue */
+	} else {
+		lcd_driver->lcd_resume_type = (unsigned char)val;
+		LCDPR("detect resume_type: %d\n", lcd_driver->lcd_resume_type);
+	}
+
 	lcd_driver->res_vsync_irq = platform_get_resource_byname(pdev,
 		IORESOURCE_IRQ, "vsync");
 	lcd_driver->res_vsync2_irq = platform_get_resource_byname(pdev,
@@ -1336,7 +1369,6 @@ static int lcd_config_probe(struct platform_device *pdev)
 	lcd_driver->lcd_test_flag = 0;
 	lcd_driver->lcd_mute_state = 0;
 	lcd_driver->lcd_mute_flag = 0;
-	lcd_driver->lcd_resume_type = 1; /* default workqueue */
 	lcd_driver->fr_mode = 0;
 	lcd_driver->viu_sel = LCD_VIU_SEL_NONE;
 	lcd_driver->vsync_none_timer_flag = 0;
@@ -1349,17 +1381,15 @@ static int lcd_config_probe(struct platform_device *pdev)
 
 	if (lcd_driver->lcd_key_valid) {
 		if (lcd_driver->workqueue) {
-			queue_delayed_work(lcd_driver->workqueue,
-				&lcd_driver->lcd_probe_delayed_work,
-				msecs_to_jiffies(2000));
+			queue_work(lcd_driver->workqueue,
+				&lcd_driver->lcd_probe_work);
 		} else {
-			schedule_delayed_work(
-				&lcd_driver->lcd_probe_delayed_work,
-				msecs_to_jiffies(2000));
+			schedule_work(&lcd_driver->lcd_probe_work);
 		}
 	} else {
 		ret = lcd_mode_probe(lcd_driver->dev);
 		if (ret) {
+			lcd_vout_server_remove();
 			kfree(lcd_driver);
 			lcd_driver = NULL;
 			LCDERR("probe exit\n");
@@ -1379,7 +1409,11 @@ static int lcd_config_probe(struct platform_device *pdev)
 			lcd_vbyone_pinmux_set(1);
 			break;
 		case LCD_MLVDS:
+			lcd_tcon_pinmux_set(1);
+			break;
 		case LCD_P2P:
+		lcd_driver->lcd_config->lcd_control.p2p_config->p2p_type =
+				lcd_boot_ctrl_config.advanced_flag;
 			lcd_tcon_pinmux_set(1);
 			break;
 		default:
@@ -1527,7 +1561,7 @@ static int lcd_probe(struct platform_device *pdev)
 	lcd_vout_serve_bypass = 0;
 
 	/* init workqueue */
-	INIT_DELAYED_WORK(&lcd_driver->lcd_probe_delayed_work,
+	INIT_WORK(&lcd_driver->lcd_probe_work,
 		lcd_config_probe_delayed);
 	INIT_DELAYED_WORK(&lcd_test_delayed_work, lcd_auto_test_delayed);
 	lcd_driver->workqueue = create_singlethread_workqueue("lcd_work_queue");
@@ -1549,7 +1583,7 @@ static int lcd_remove(struct platform_device *pdev)
 	if (lcd_driver == NULL)
 		return 0;
 
-	cancel_delayed_work(&lcd_driver->lcd_probe_delayed_work);
+	cancel_work(&lcd_driver->lcd_probe_work);
 	cancel_work_sync(&(lcd_driver->lcd_resume_work));
 	if (lcd_driver->workqueue)
 		destroy_workqueue(lcd_driver->workqueue);

@@ -1,7 +1,7 @@
 /*
  * TLV and XTLV support
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -85,6 +85,12 @@ typedef struct bcm_tlv_ext {
 /* find the next tlv */
 bcm_tlv_t *bcm_next_tlv(const  bcm_tlv_t *elt, uint *buflen);
 
+/* move buffer/buflen up to the given tlv, or set to NULL/0 on error */
+void bcm_tlv_buffer_advance_to(const bcm_tlv_t *elt, const uint8 **buffer, uint *buflen);
+
+/* move buffer/buflen past the given tlv, or set to NULL/0 on error */
+void bcm_tlv_buffer_advance_past(const bcm_tlv_t *elt, const uint8 **buffer, uint *buflen);
+
 /* find the tlv for a given id */
 bcm_tlv_t *bcm_parse_tlvs(const  void *buf, uint buflen, uint key);
 
@@ -139,6 +145,8 @@ typedef struct bcm_xtlv {
 #define BCM_XTLV_OPTION_ALIGN32	0x0001 /* 32bit alignment of type.len.data */
 #define BCM_XTLV_OPTION_IDU8	0x0002 /* shorter id */
 #define BCM_XTLV_OPTION_LENU8	0x0004 /* shorted length */
+#define BCM_XTLV_OPTION_IDBE	0x0008 /* big endian format id */
+#define BCM_XTLV_OPTION_LENBE	0x0010 /* big endian format length */
 typedef uint16 bcm_xtlv_opts_t;
 
 /* header size. depends on options. Macros names ending w/ _EX are where

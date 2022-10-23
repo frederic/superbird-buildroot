@@ -31,7 +31,10 @@
 #include "ldim_drv.h"
 #include "ldim_dev_drv.h"
 
+#define VSYNC_INFO_FREQUENT        300
+
 static int global_on_flag;
+static unsigned short vsync_cnt;
 
 struct global {
 	struct class cls;
@@ -74,14 +77,18 @@ static int global_smr(unsigned short *buf, unsigned char len)
 	unsigned int dim_max, dim_min;
 	unsigned int level, val;
 
+	if (vsync_cnt++ >= VSYNC_INFO_FREQUENT)
+		vsync_cnt = 0;
+
 	if (global_on_flag == 0) {
-		if (ldim_debug_print)
+		if (vsync_cnt == 0)
 			LDIMPR("%s: on_flag=%d\n", __func__, global_on_flag);
 		return 0;
 		}
 
 	if (len != 1) {
-		LDIMERR("%s: data len %d invalid\n", __func__, len);
+		if (vsync_cnt == 0)
+			LDIMERR("%s: data len %d invalid\n", __func__, len);
 		return -1;
 	}
 
@@ -115,6 +122,7 @@ static int global_power_on(void)
 
 	global_hw_init_on();
 	global_on_flag = 1;
+	vsync_cnt = 0;
 
 	LDIMPR("%s: ok\n", __func__);
 	return 0;
@@ -180,6 +188,7 @@ int ldim_dev_global_probe(struct aml_ldim_driver_s *ldim_drv)
 	int ret;
 
 	global_on_flag = 0;
+	vsync_cnt = 0;
 	bl_global = kzalloc(sizeof(struct global), GFP_KERNEL);
 	if (bl_global == NULL) {
 		pr_err("malloc bl_global failed\n");

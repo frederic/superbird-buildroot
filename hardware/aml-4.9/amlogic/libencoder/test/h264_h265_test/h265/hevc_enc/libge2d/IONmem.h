@@ -10,6 +10,7 @@
 #ifndef IONMEM_H
 #define IONMEM_H
 #include "ion.h"
+#include <stdbool.h>
 #if defined (__cplusplus)
 extern "C" {
 #endif

@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), RTT
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -38,10 +38,17 @@
 #define DEFAULT_RETRY_CNT 6
 #define DEFAULT_FTM_FREQ 5180
 #define DEFAULT_FTM_CNTR_FREQ0 5210
+#define RTT_MAX_GEOFENCE_TARGET_CNT 8
 
 #define TARGET_INFO_SIZE(count) (sizeof(rtt_target_info_t) * count)
 
 #define TARGET_TYPE(target) (target->type)
+
+#define RTT_IS_ENABLED(rtt_status) (rtt_status->status == RTT_ENABLED)
+#define RTT_IS_STOPPED(rtt_status) (rtt_status->status == RTT_STOPPED)
+
+#define GEOFENCE_RTT_LOCK(rtt_status) mutex_lock(&(rtt_status)->geofence_mutex)
+#define GEOFENCE_RTT_UNLOCK(rtt_status) mutex_unlock(&(rtt_status)->geofence_mutex)
 
 #ifndef BIT
 #define BIT(x) (1 << (x))
@@ -62,6 +69,13 @@
 #define WL_RATE_48M	96	/* in 500kbps units */
 #define WL_RATE_54M	108	/* in 500kbps units */
 #define GET_RTTSTATE(dhd) ((rtt_status_info_t *)dhd->rtt_state)
+
+#ifdef WL_NAN
+/* RTT Retry Timer Interval */
+#define DHD_RTT_RETRY_TIMER_INTERVAL_MS		3000u
+#endif /* WL_NAN */
+
+#define DHD_RTT_INVALID_TARGET_INDEX		-1
 
 enum rtt_role {
 	RTT_INITIATOR = 0,
@@ -109,8 +123,8 @@ typedef enum rtt_reason {
 	RTT_STATUS_FAIL_SCHEDULE       = 11,    // request could not be scheduled
 	RTT_STATUS_FAIL_BUSY_TRY_LATER = 12,    // responder cannot collaborate at time of request
 	RTT_STATUS_INVALID_REQ         = 13,    // bad request args
-	RTT_STATUS_NO_WIFI             = 14,    // WiFi not enabled
-	// Responder overrides param info, cannot range with new params
+	RTT_STATUS_NO_WIFI             = 14,    // WiFi not enabled Responder overrides param info
+						// cannot range with new params
 	RTT_STATUS_FAIL_FTM_PARAM_OVERRIDE = 15
 } rtt_reason_t;
 
@@ -149,6 +163,13 @@ enum rtt_rate_bw {
 	RTT_RATE_160M
 };
 
+typedef enum ranging_type {
+	RTT_TYPE_INVALID	=	0,
+	RTT_TYPE_LEGACY		=	1,
+	RTT_TYPE_NAN_DIRECTED	=	2,
+	RTT_TYPE_NAN_GEOFENCE	=	3
+} ranging_type_t;
+
 #define FTM_MAX_NUM_BURST_EXP	14
 #define HAS_11MC_CAP(cap) (cap & RTT_CAP_FTM_WAY)
 #define HAS_ONEWAY_CAP(cap) (cap & RTT_CAP_ONE_WAY)
@@ -162,14 +183,14 @@ typedef struct wifi_channel_info {
 } wifi_channel_info_t;
 
 typedef struct wifi_rate {
-	uint32 preamble : 3; /* 0: OFDM, 1: CCK, 2 : HT, 3: VHT, 4..7 reserved */
-	uint32 nss		: 2; /* 1 : 1x1, 2: 2x2, 3: 3x3, 4: 4x4 */
-	uint32 bw		: 3; /* 0: 20Mhz, 1: 40Mhz, 2: 80Mhz, 3: 160Mhz */
+	uint32 preamble :3; /* 0: OFDM, 1: CCK, 2 : HT, 3: VHT, 4..7 reserved */
+	uint32 nss		:2; /* 1 : 1x1, 2: 2x2, 3: 3x3, 4: 4x4 */
+	uint32 bw		:3; /* 0: 20Mhz, 1: 40Mhz, 2: 80Mhz, 3: 160Mhz */
 	/* OFDM/CCK rate code would be as per IEEE std in the unit of 0.5 mb
 	* HT/VHT it would be mcs index
 	*/
-	uint32 rateMcsIdx : 8;
-	uint32 reserved : 16; /* reserved */
+	uint32 rateMcsIdx :8;
+	uint32 reserved :16; /* reserved */
 	uint32 bitrate;	/* unit of 100 Kbps */
 } wifi_rate_t;
 
@@ -210,7 +231,8 @@ typedef struct rtt_target_info {
 	* in a single frame
 	*/
 	uint32 num_frames_per_burst;
-	/* num of frames in each RTT burst
+	/*
+	 * num of frames in each RTT burst
 	 * for single side, measurement result num = frame number
 	 * for 2 side RTT, measurement result num  = frame number - 1
 	 */
@@ -230,35 +252,86 @@ typedef struct rtt_target_info {
 	* at the end of the burst_duration it requested.
 	*/
 	uint32 burst_duration;
+	uint32 burst_timeout;
 	uint8  preamble; /* 1 - Legacy, 2 - HT, 4 - VHT */
 	uint8  bw;  /* 5, 10, 20, 40, 80, 160 */
 } rtt_target_info_t;
+
+typedef struct rtt_goefence_target_info {
+	bool valid;
+	struct ether_addr peer_addr;
+} rtt_geofence_target_info_t;
 
 typedef struct rtt_config_params {
 	int8 rtt_target_cnt;
 	rtt_target_info_t *target_info;
 } rtt_config_params_t;
 
+typedef struct rtt_geofence_cfg {
+	int8 geofence_target_cnt;
+	bool rtt_in_progress;
+	bool role_concurr_state;
+	int8 cur_target_idx;
+	rtt_geofence_target_info_t geofence_target_info[RTT_MAX_GEOFENCE_TARGET_CNT];
+	int geofence_rtt_interval;
+#ifdef RTT_GEOFENCE_CONT
+	bool geofence_cont;
+#endif /* RTT_GEOFENCE_CONT */
+} rtt_geofence_cfg_t;
+
+/*
+ * Keep Adding more reasons
+ * going forward if needed
+ */
+enum rtt_schedule_reason {
+	RTT_SCHED_HOST_TRIGGER			= 1, /* On host command for directed RTT */
+	RTT_SCHED_SUB_MATCH			= 2, /* on Sub Match for svc with range req */
+	RTT_SCHED_DIR_TRIGGER_FAIL		= 3, /* On failure of Directed RTT Trigger */
+	RTT_SCHED_DP_END			= 4, /* ON NDP End event from fw */
+	RTT_SCHED_DP_REJECTED			= 5, /* On receving reject dp event from fw */
+	RTT_SCHED_RNG_RPT_DIRECTED		= 6, /* On Ranging report for directed RTT */
+	RTT_SCHED_RNG_TERM			= 7, /* On Range Term Indicator */
+	RTT_SHCED_HOST_DIRECTED_TERM		= 8, /* On host terminating directed RTT sessions */
+	RTT_SCHED_RNG_RPT_GEOFENCE		= 9, /* On Ranging report for geofence RTT */
+	RTT_SCHED_RTT_RETRY_GEOFENCE		= 10, /* On Geofence Retry */
+	RTT_SCHED_RNG_TERM_PEND_ROLE_CHANGE	= 11 /* On Rng Term, while pending role change */
+};
+
+/*
+ * Keep Adding more invalid RTT states
+ * going forward if needed
+ */
+enum rtt_invalid_state {
+	RTT_STATE_VALID			= 0, /* RTT state is valid */
+	RTT_STATE_INV_REASON_NDP_EXIST	= 1 /* RTT state invalid as ndp exists */
+};
+
 typedef struct rtt_status_info {
-	dhd_pub_t *dhd;
-	int8 status;   /* current status for the current entry */
-	int8 txchain; /* current device tx chain */
-	int pm; /* to save current value of pm */
-	int8 pm_restore; /* flag to reset the old value of pm */
-	int8 cur_idx; /* current entry to do RTT */
-	bool all_cancel; /* cancel all request once we got the cancel requet */
-	uint32 flags; /* indicate whether device is configured as initiator or target */
+	dhd_pub_t	*dhd;
+	int8		status;   /* current status for the current entry */
+	int8		txchain; /* current device tx chain */
+	int		pm; /* to save current value of pm */
+	int8		pm_restore; /* flag to reset the old value of pm */
+	int8		cur_idx; /* current entry to do RTT */
+	bool		all_cancel; /* cancel all request once we got the cancel requet */
+	uint32		flags; /* indicate whether device is configured as initiator or target */
 	struct capability {
-		int32 proto     : 8;
-		int32 feature   : 8;
-		int32 preamble  : 8;
-		int32 bw        : 8;
+		int32 proto     :8;
+		int32 feature   :8;
+		int32 preamble  :8;
+		int32 bw        :8;
 	} rtt_capa; /* rtt capability */
-	struct mutex rtt_mutex;
-	rtt_config_params_t rtt_config;
-	struct work_struct work;
-	struct list_head noti_fn_list;
-	struct list_head rtt_results_cache; /* store results for RTT */
+	struct			mutex rtt_mutex;
+	struct			mutex rtt_work_mutex;
+	struct			mutex geofence_mutex;
+	rtt_config_params_t	rtt_config;
+	rtt_geofence_cfg_t	geofence_cfg;
+	struct work_struct	work;
+	struct list_head	noti_fn_list;
+	struct list_head	rtt_results_cache; /* store results for RTT */
+	int			rtt_sched_reason; /* rtt_schedule_reason: what scheduled RTT */
+	struct delayed_work	proxd_timeout; /* Proxd Timeout work */
+	struct delayed_work	rtt_retry_timer;   /* Timer for retry RTT after all targets done */
 } rtt_status_info_t;
 
 typedef struct rtt_report {
@@ -305,12 +378,17 @@ typedef struct rtt_results_header {
 	struct list_head list;
 	struct list_head result_list;
 } rtt_results_header_t;
-
+struct rtt_result_detail {
+	uint8 num_ota_meas;
+	uint32 result_flags;
+};
 /* rtt_result to link all of rtt_report */
 typedef struct rtt_result {
 	struct list_head list;
 	struct rtt_report report;
 	int32 report_len; /* total length of rtt_report */
+	struct rtt_result_detail rtt_detail;
+	int32 detail_len;
 } rtt_result_t;
 
 /* RTT Capabilities */
@@ -339,7 +417,7 @@ dhd_dev_rtt_cancel_cfg(struct net_device *dev, struct ether_addr *mac_list, int 
 
 int
 dhd_dev_rtt_register_noti_callback(struct net_device *dev, void *ctx,
-								   dhd_rtt_compl_noti_fn noti_fn);
+	dhd_rtt_compl_noti_fn noti_fn);
 
 int
 dhd_dev_rtt_unregister_noti_callback(struct net_device *dev, dhd_rtt_compl_noti_fn noti_fn);
@@ -364,6 +442,57 @@ dhd_rtt_idx_to_burst_duration(uint idx);
 
 int
 dhd_rtt_set_cfg(dhd_pub_t *dhd, rtt_config_params_t *params);
+
+#ifdef WL_NAN
+void dhd_rtt_initialize_geofence_cfg(dhd_pub_t *dhd);
+#ifdef RTT_GEOFENCE_CONT
+void dhd_rtt_set_geofence_cont_ind(dhd_pub_t *dhd, bool geofence_cont);
+
+void dhd_rtt_get_geofence_cont_ind(dhd_pub_t *dhd, bool* geofence_cont);
+#endif /* RTT_GEOFENCE_CONT */
+
+#ifdef RTT_GEOFENCE_INTERVAL
+void dhd_rtt_set_geofence_rtt_interval(dhd_pub_t *dhd, int interval);
+#endif /* RTT_GEOFENCE_INTERVAL */
+
+void dhd_rtt_set_role_concurrency_state(dhd_pub_t *dhd, bool state);
+
+bool dhd_rtt_get_role_concurrency_state(dhd_pub_t *dhd);
+
+int8 dhd_rtt_get_geofence_target_cnt(dhd_pub_t *dhd);
+
+void dhd_rtt_set_geofence_rtt_state(dhd_pub_t *dhd, bool state);
+
+bool dhd_rtt_get_geofence_rtt_state(dhd_pub_t *dhd);
+
+rtt_geofence_target_info_t*
+dhd_rtt_get_geofence_target_head(dhd_pub_t *dhd);
+
+rtt_geofence_target_info_t*
+dhd_rtt_get_geofence_current_target(dhd_pub_t *dhd);
+
+rtt_geofence_target_info_t*
+dhd_rtt_get_geofence_target(dhd_pub_t *dhd, struct ether_addr* peer_addr,
+	int8 *index);
+
+int
+dhd_rtt_add_geofence_target(dhd_pub_t *dhd, rtt_geofence_target_info_t  *target);
+
+int
+dhd_rtt_remove_geofence_target(dhd_pub_t *dhd, struct ether_addr *peer_addr);
+
+int
+dhd_rtt_delete_geofence_target_list(dhd_pub_t *dhd);
+
+int
+dhd_rtt_delete_nan_session(dhd_pub_t *dhd);
+#endif /* WL_NAN */
+
+uint8
+dhd_rtt_invalid_states(struct net_device *ndev, struct ether_addr *peer_addr);
+
+void
+dhd_rtt_schedule_rtt_work_thread(dhd_pub_t *dhd, int sched_reason);
 
 int
 dhd_rtt_stop(dhd_pub_t *dhd, struct ether_addr *mac_list, int mac_cnt);
@@ -394,4 +523,14 @@ dhd_rtt_init(dhd_pub_t *dhd);
 
 int
 dhd_rtt_deinit(dhd_pub_t *dhd);
+
+#ifdef WL_CFG80211
+int dhd_rtt_handle_nan_rtt_session_end(dhd_pub_t *dhd,
+	struct ether_addr *peer);
+
+void dhd_rtt_move_geofence_cur_target_idx_to_next(dhd_pub_t *dhd);
+
+int8 dhd_rtt_get_geofence_cur_target_idx(dhd_pub_t *dhd);
+#endif /* WL_CFG80211 */
+
 #endif /* __DHD_RTT_H__ */

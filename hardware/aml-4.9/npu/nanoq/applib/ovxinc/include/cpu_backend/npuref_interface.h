@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -47,6 +47,28 @@ void npuref_interface_quant_deconv2d(
     const int* pad, const int* strides, const int* dilation,
     const vsi_nn_tensor_attr_t* output_attr, void* output_buffer);
 
+
+/** npu reference for quant depthwise conv2d
+ */
+void npuref_interface_quant_depthwise_conv2d(
+    const void* input_buffer,
+    const void* kernel_buffer,
+    const void* bias_buffer,
+    const int32_t* input_shape, uint32_t input_dim,
+    const int32_t* kernel_shape, uint32_t kernel_dim,
+    const int32_t* output_shape, uint32_t output_dim,
+    float input_scale, int32_t input_zero_point,
+    float kernel_scale, int32_t kernel_zero_point,
+    float output_scale, int32_t output_zero_point,
+    int32_t pad_h_front, int32_t pad_h_end,
+    int32_t pad_w_front, int32_t pad_w_end,
+    int32_t stride_h, int32_t stride_w, int32_t dilation_h, int32_t dilation_w,
+    void* output_buffer);
+
 vsi_bool npuref_exists();
+
+void npuref_init();
+
+void npuref_shutdown();
 
 #endif

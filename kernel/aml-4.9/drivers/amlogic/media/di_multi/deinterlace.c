@@ -1270,8 +1270,8 @@ unsigned char dim_is_bypass(vframe_t *vf_in, unsigned int channel)
 	if (ppre->cur_prog_flag		&&
 	    ((ppre->cur_width > 1920)	||
 	    (ppre->cur_height > 1080)	||
-	    (ppre->cur_inp_type & VIDTYPE_VIU_444))
-	    )
+	    (ppre->cur_inp_type & VIDTYPE_VIU_444) ||
+	    (ppre->cur_inp_type & VIDTYPE_RGB_444)))
 		return 1;
 
 	if ((ppre->cur_width < 16) || (ppre->cur_height < 16))
@@ -7080,7 +7080,7 @@ static bool need_bypass(struct vframe_s *vf)
 	if (vf->source_type == VFRAME_SOURCE_TYPE_PPMGR)
 		return true;
 
-	if (vf->type & VIDTYPE_VIU_444)
+	if ((vf->type & VIDTYPE_VIU_444) || (vf->type & VIDTYPE_RGB_444))
 		return true;
 
 	if (vf->type & VIDTYPE_PIC)
@@ -8277,7 +8277,6 @@ void dim_get_vpu_clkb(struct device *dev, struct di_dev_s *pdev)
 	int ret = 0;
 	unsigned int tmp_clk[2] = {0, 0};
 	struct clk *vpu_clk = NULL;
-	struct clk *clkb_tmp_comp = NULL;
 
 	vpu_clk = clk_get(dev, "vpu_mux");
 	if (IS_ERR(vpu_clk))
@@ -8298,23 +8297,9 @@ void dim_get_vpu_clkb(struct device *dev, struct di_dev_s *pdev)
 		pdev->clkb_max_rate);
 	#ifdef CLK_TREE_SUPPORT
 	pdev->vpu_clkb = clk_get(dev, "vpu_clkb_composite");
-	if (is_meson_tl1_cpu()) {
-		clkb_tmp_comp = clk_get(dev, "vpu_clkb_tmp_composite");
-		if (IS_ERR(clkb_tmp_comp)) {
-			PR_ERR("clkb_tmp_comp error\n");
-		} else {
-			/*ary: this make clk from 500 to 666?*/
-			if (!IS_ERR(vpu_clk))
-				clk_set_parent(clkb_tmp_comp, vpu_clk);
-		}
-	}
 
-	if (IS_ERR(pdev->vpu_clkb)) {
+	if (IS_ERR(pdev->vpu_clkb))
 		PR_ERR("%s: get vpu clkb gate error.\n", __func__);
-	} else {
-		clk_set_rate(pdev->vpu_clkb, pdev->clkb_min_rate);
-		pr_info("get clkb rate:%ld\n", clk_get_rate(pdev->vpu_clkb));
-	}
 
 	#endif
 }

@@ -78,6 +78,7 @@ struct ldim_dev_config_s ldim_dev_config = {
 	.init_off = NULL,
 	.init_on_cnt = 0,
 	.init_off_cnt = 0,
+	.device_count = 0,
 	.ldim_pwm_config = {
 		.pwm_method = BL_PWM_POSITIVE,
 		.pwm_port = BL_PWM_MAX,
@@ -520,6 +521,7 @@ static void ldim_dev_config_print(void)
 		"en_gpio               = %d\n"
 		"en_gpio_on            = %d\n"
 		"en_gpio_off           = %d\n"
+		"device_cnt            = %d\n"
 		"dim_min               = 0x%03x\n"
 		"dim_max               = 0x%03x\n"
 		"region_num            = %d\n",
@@ -528,6 +530,7 @@ static void ldim_dev_config_print(void)
 		ldim_drv->ldev_conf->en_gpio,
 		ldim_drv->ldev_conf->en_gpio_on,
 		ldim_drv->ldev_conf->en_gpio_off,
+		ldim_drv->ldev_conf->device_count,
 		ldim_drv->ldev_conf->dim_min,
 		ldim_drv->ldev_conf->dim_max,
 		ldim_drv->ldev_conf->bl_regnum);
@@ -950,7 +953,7 @@ static int ldim_dev_table_init_save(struct ldim_dev_config_s *ldconf)
 			return -1;
 		}
 		memcpy(ldconf->init_off, table_init_off_dft,
-			ldconf->init_on_cnt*sizeof(unsigned char));
+		       ldconf->init_off_cnt * sizeof(unsigned char));
 	}
 
 	return 0;
@@ -1090,6 +1093,17 @@ static int ldim_dev_get_config_from_dts(struct device_node *np, int index)
 	} else {
 		ldim_dev_config.dim_max = temp[0];
 		ldim_dev_config.dim_min = temp[1];
+	}
+
+	ret = of_property_read_u32(child, "device_count", &val);
+	if (ret) {
+		LDIMERR("failed to get device_count\n");
+	} else {
+		ldim_dev_config.device_count = val;
+		if (ldim_debug_print) {
+			LDIMPR("device_count: %d\n",
+			       ldim_dev_config.device_count);
+		}
 	}
 
 	val = ldim_drv->ldim_conf->row * ldim_drv->ldim_conf->col;
@@ -1510,12 +1524,13 @@ static ssize_t ldim_dev_reg_show(struct class *class,
 	unsigned char data;
 	ssize_t len = 0;
 	int ret;
+	int dev_id = 0;
 
 	if (ldim_dev_config.dev_reg_read == NULL)
 		return sprintf(buf, "ldim dev_reg_read is null\n");
 
 	data = ldim_dev_reg;
-	ret = ldim_dev_config.dev_reg_read(&data, 1);
+	ret = ldim_dev_config.dev_reg_read(dev_id, &data, 1);
 	if (ret) {
 		len = sprintf(buf, "reg[0x%02x] read error\n", ldim_dev_reg);
 	} else {
@@ -1530,10 +1545,11 @@ static ssize_t ldim_dev_reg_store(struct class *class,
 	struct class_attribute *attr, const char *buf, size_t count)
 {
 	unsigned int reg = 0, val = 0;
+	unsigned int dev_id = 0;
 	unsigned char data[2];
 	unsigned int ret;
 
-	ret = sscanf(buf, "%x %x", &reg, &val);
+	ret = sscanf(buf, "%x %x %x", &reg, &val, &dev_id);
 	if (ret == 1) {
 		if (reg > 0xff) {
 			LDIMERR("invalid reg address: 0x%x\n", reg);
@@ -1552,8 +1568,23 @@ static ssize_t ldim_dev_reg_store(struct class *class,
 		ldim_dev_reg = (unsigned char)reg;
 		data[0] = ldim_dev_reg;
 		data[1] = (unsigned char)val;
-		ldim_dev_config.dev_reg_write(data, 2);
+		ldim_dev_config.dev_reg_write(dev_id, data, 2);
 		LDIMPR("write reg[0x%02x] = 0x%02x\n", data[0], data[1]);
+	} else if (ret == 3) {
+		if (!ldim_dev_config.dev_reg_write) {
+			LDIMERR("ldim dev_reg_write is null\n");
+			return count;
+		}
+		if (reg > 0xff) {
+			LDIMERR("invalid reg address: 0x%x\n", reg);
+			return count;
+		}
+		ldim_dev_reg = (unsigned char)reg;
+		data[0] = ldim_dev_reg;
+		data[1] = (unsigned char)val;
+		ldim_dev_config.dev_reg_write(dev_id, data, 2);
+		LDIMPR("write dev_id %dreg[0x%02x] = 0x%02x\n",
+		       dev_id, data[0], data[1]);
 	} else {
 		LDIMERR("invalid parameters\n");
 	}
@@ -1567,6 +1598,7 @@ static ssize_t ldim_dev_reg_dump_show(struct class *class,
 	unsigned char *data;
 	ssize_t len = 0;
 	int i, ret;
+	int dev_id = 0;
 
 	if (ldim_dev_config.dev_reg_read == NULL)
 		return sprintf(buf, "ldim dev_reg_read is null\n");
@@ -1576,7 +1608,7 @@ static ssize_t ldim_dev_reg_dump_show(struct class *class,
 
 	data = kcalloc(ldim_dev_reg_dump_cnt,
 		sizeof(unsigned char), GFP_KERNEL);
-	ret = ldim_dev_config.dev_reg_read(data, ldim_dev_reg_dump_cnt);
+	ret = ldim_dev_config.dev_reg_read(dev_id, data, ldim_dev_reg_dump_cnt);
 	if (ret) {
 		len = sprintf(buf, "reg[0x%02x] read error\n", ldim_dev_reg);
 	} else {
@@ -1662,13 +1694,21 @@ static int ldim_dev_add_driver(struct aml_ldim_driver_s *ldim_drv)
 		return ret;
 
 	ret = -1;
-	if (strcmp(ldev_conf->name, "iw7027") == 0)
+	if (strcmp(ldev_conf->name, "iw7027") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7027
 		ret = ldim_dev_iw7027_probe(ldim_drv);
-	else if (strcmp(ldev_conf->name, "ob3350") == 0)
-		ret = ldim_dev_ob3350_probe(ldim_drv);
-	else if (strcmp(ldev_conf->name, "global") == 0)
+#endif
+	} else if (strcmp(ldev_conf->name, "global") == 0) {
 		ret = ldim_dev_global_probe(ldim_drv);
-	else
+	} else if (strcmp(ldev_conf->name, "iw7027_he") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7027_HE
+		ret = ldim_dev_iw7027_he_probe(ldim_drv);
+#endif
+	} else if (strcmp(ldev_conf->name, "iw7038") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7038
+		ret = ldim_dev_iw7038_probe(ldim_drv);
+#endif
+	} else
 		LDIMERR("invalid device name: %s\n", ldev_conf->name);
 
 	if (ret) {
@@ -1689,13 +1729,21 @@ static int ldim_dev_remove_driver(struct aml_ldim_driver_s *ldim_drv)
 	int ret = -1;
 
 	if (ldim_dev_probe_flag) {
-		if (strcmp(ldev_conf->name, "iw7027") == 0)
+		if (strcmp(ldev_conf->name, "iw7027") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7027
 			ret = ldim_dev_iw7027_remove(ldim_drv);
-		else if (strcmp(ldev_conf->name, "ob3350") == 0)
-			ret = ldim_dev_ob3350_remove(ldim_drv);
-		else if (strcmp(ldev_conf->name, "global") == 0)
+#endif
+		} else if (strcmp(ldev_conf->name, "global") == 0) {
 			ret = ldim_dev_global_remove(ldim_drv);
-		else
+		} else if (strcmp(ldev_conf->name, "iw7027_he") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7027_HE
+			ret = ldim_dev_iw7027_he_remove(ldim_drv);
+#endif
+		} else if (strcmp(ldev_conf->name, "iw7038") == 0) {
+#ifdef CONFIG_AMLOGIC_LOCAL_DIMMING_IW7038
+			ret = ldim_dev_iw7038_remove(ldim_drv);
+#endif
+		} else
 			LDIMERR("invalid device name: %s\n", ldev_conf->name);
 
 		if (ret) {

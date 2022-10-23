@@ -2,7 +2,7 @@
  * Broadcom SDIO/PCMCIA
  * Software-specific definitions shared between device and host side
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -284,6 +284,7 @@ typedef volatile struct {
 #define SDPCM_SHARED_SET_BRPT      0x1000
 #define SDPCM_SHARED_PENDING_BRPT  0x2000
 #define SDPCM_SHARED_FATAL_LOGBUF_VALID	0x100000
+#define SDPCM_SHARED_RXLIM_POST    0x4000
 
 typedef struct {
 	uint32	flags;

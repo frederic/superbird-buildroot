@@ -1,7 +1,7 @@
 /*
  * OS Abstraction Layer
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: osl.h 768071 2018-06-18 09:23:56Z $
+ * $Id: osl.h 813810 2019-04-08 12:25:30Z $
  */
 
 #ifndef _osl_h_
@@ -89,6 +89,22 @@ typedef void  (*osl_wreg_fn_t)(void *ctx, volatile void *reg, unsigned int val, 
 #else
 #define OSL_SYSUPTIME_SUPPORT TRUE
 #endif /* OSL_SYSUPTIME */
+
+#ifndef OSL_GET_LOCALTIME
+#define OSL_GET_LOCALTIME(sec, usec)	\
+	do { \
+		BCM_REFERENCE(sec); \
+		BCM_REFERENCE(usec); \
+	} while (0)
+#endif /* OSL_GET_LOCALTIME */
+
+#ifndef OSL_LOCALTIME_NS
+#define OSL_LOCALTIME_NS()	(OSL_SYSUPTIME_US() * NSEC_PER_USEC)
+#endif /* OSL_LOCALTIME_NS */
+
+#ifndef OSL_SYSTZTIME_US
+#define OSL_SYSTZTIME_US()	OSL_SYSUPTIME_US()
+#endif /* OSL_GET_SYSTZTIME */
 
 #ifndef OSL_SYS_HALT
 #define OSL_SYS_HALT()	do {} while (0)

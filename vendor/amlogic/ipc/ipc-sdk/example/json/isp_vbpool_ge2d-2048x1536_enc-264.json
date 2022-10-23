@@ -1,0 +1,53 @@
+[
+  {
+    type: vbpool,
+    param:
+    {
+      pixfmt: NV12,
+      width: 2048,
+      height: 1536,
+      nbuf: 3
+    },
+    bind:
+    {
+      output: ge2d.ch1
+    }
+  },
+  {
+    type: isp,
+    param:
+    {
+      device: "/dev/video0",
+      fr:
+      {
+        pixfmt: NV12,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: ge2d,
+    param:
+    {
+      name: ge2d,
+      op: stretchblt-from,
+      rotate: 0,
+      pass-through: 0
+    }
+  },
+  {
+    type: venc,
+    param:
+    {
+      codec: h264,
+      width: 2048,
+      height: 1536,
+      pixfmt: NV12,
+      framerate: 30
+    }
+  }
+]
+

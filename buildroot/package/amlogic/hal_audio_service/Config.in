@@ -1,0 +1,9 @@
+config BR2_PACKAGE_HAL_AUDIO_SERVICE
+        bool "hal_audio_service"
+	select BR2_PACKAGE_GRPC
+	select BR2_PACKAGE_BOOST
+	select BR2_PACKAGE_BOOST_SYSTEM
+	select BR2_PACKAGE_BOOST_FILESYSTEM
+	select BR2_PACKAGE_LIBLOG
+        help
+          Audio HAL server and client API

@@ -8,7 +8,6 @@
 .*
 *.o
 *.o.*
-*.a
 *.s
 *.su
 *.mod.c
@@ -17,7 +16,6 @@
 *.order
 *.elf
 *.swp
-*.bin
 *.patch
 *.cfgtmp
 *.diff
@@ -73,3 +71,8 @@ cscope.*
 /ctags
 /etags
 /tags
+
+#linuxdriver is a git
+linuxdriver/
+ta_export/scripts/Crypto
+ta_export/keys

@@ -66,7 +66,8 @@ BOOL CNMAppRun(void)
     runningTask = appCtx.numTasks;
     for (i=0; i<appCtx.numTasks; i++) {
         task=(CNMTask)appCtx.taskList[i];
-        CNMTaskRun((CNMTask)task);
+        if ( FALSE == CNMTaskRun((CNMTask)task))
+            return FALSE;
     }
 
     while (0 < runningTask) {

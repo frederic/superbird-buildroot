@@ -1,0 +1,49 @@
+From fba3133c45d64eab26b0a69de7728d95951e0df7 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Thu, 5 Mar 2020 19:45:15 +0800
+Subject: [PATCH 4/7] punch video hole
+
+---
+ clients/desktop-shell.c    | 3 +++
+ libweston/compositor-drm.c | 5 +++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/clients/desktop-shell.c b/clients/desktop-shell.c
+index 4e4cd20..effd3b0 100644
+--- a/clients/desktop-shell.c
++++ b/clients/desktop-shell.c
+@@ -1301,10 +1301,13 @@ output_init(struct output *output, struct desktop *desktop)
+ 					       output->output, surface);
+ 	}
+ 
++#if 0
++    //disable background for show video layer
+ 	output->background = background_create(desktop, output);
+ 	surface = window_get_wl_surface(output->background->window);
+ 	weston_desktop_shell_set_background(desktop->shell,
+ 					    output->output, surface);
++#endif
+ }
+ 
+ static void
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index f1c5d73..e3a1353 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -2104,8 +2104,13 @@ drm_output_render_gl(struct drm_output_state *state, pixman_region32_t *damage)
+ 		return NULL;
+ 	}
+ 
++#if 0
+ 	/* The renderer always produces an opaque image. */
+ 	ret = drm_fb_get_from_bo(bo, b, true, BUFFER_GBM_SURFACE);
++#else
++	/* Renderer with alpha for display video layer. */
++	ret = drm_fb_get_from_bo(bo, b, false, BUFFER_GBM_SURFACE);
++#endif
+ 	if (!ret) {
+ 		weston_log("failed to get drm_fb for bo\n");
+ 		gbm_surface_release_buffer(output->gbm_surface, bo);
+-- 
+2.7.4
+

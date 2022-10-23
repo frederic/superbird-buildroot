@@ -12,49 +12,63 @@ def get_args():
 	from argparse import ArgumentParser
 
 	parser = ArgumentParser()
-	parser.add_argument('--in', required=True, dest='inf', \
-			help='Name of in file')
-	parser.add_argument('--out', required=True, help='Name of out file')
+	parser.add_argument('--in', dest = 'inf_elf', required = True, \
+			help = 'elf file, input file')
+	parser.add_argument('--out', dest = 'outf_unsigned_ta', required = True, \
+			help = 'unsigned ta, output file')
+
 	return parser.parse_args()
 
-def main():
-	from Crypto.Hash import SHA256
-	import struct
+class ta_hdr():
+	def __init__(self, payload):
+		self.__magic = 0x4f545348       # header magic, value = "OTSH"
+		self.__version = 0x00000300     # ta header version
+		self.__flags = 0
+		self.__algo = 0x70004830        # sign algorithm
+		self.__arb_cvn = 0              # anti-rollback cur version number
+		self.__img_type = 1             # img type, 1:ta unsigned, 2:ta signed
+		self.__img_size = len(payload)
+		self.__enc_type = 0             # encrypt type
+		self.__arb_type = 0   # anti-rollback type, 0:RPMB, 1:OTP, 2:Fixed Table
+		self.__rsv = [0] * 7            # 28bytes reserved
+		self.__nonce = [0] * 4          # 16bytes nonce
+		self.__ta_aes_key = [0] * 8     # 32bytes aes key
+		self.__ta_aes_iv = [0] * 4      # 16bytes aes iv
 
+	def serialize(self):
+		import struct
+		return struct.pack('<16I', self.__magic, self.__version, self.__flags, \
+				self.__algo, self.__arb_cvn, self.__img_type, self.__img_size, \
+				self.__enc_type, self.__arb_type, *self.__rsv) + \
+				struct.pack('<4I', *self.__nonce) + \
+				struct.pack('<8I', *self.__ta_aes_key) + \
+				struct.pack('<4I', *self.__ta_aes_iv)
+
+class unsigned_ta_hdr():
+	def __init__(self, payload):
+		from Crypto.Hash import SHA256
+
+		self.__ta_hdr = ta_hdr(payload)
+
+		# genarate payload digest
+		sha256 = SHA256.new()
+		sha256.update(payload)
+		self.__payload_digest = sha256.digest()
+
+	def serialize(self):
+		import struct
+		return self.__ta_hdr.serialize() + self.__payload_digest
+
+def main():
 	args = get_args()
 
-	f = open(args.inf, 'rb')
-	img = f.read()
+	f = open(args.inf_elf, 'rb')
+	payload = f.read()
 	f.close()
 
-	h = SHA256.new()
-
-	digest_len = h.digest_size
-	img_size = len(img)
-
-	magic = 0x4f545348	# SHDR_MAGIC
-	version = 0x02000204# VERSION
-	img_type = 1		# SHDR_TA
-	algo = 0x70004830	# TEE_ALG_RSASSA_PKCS1_V1_5_SHA256
-	shdr = struct.pack('<IIIIIIIIIIIIIIII', \
-		magic, version, 0, algo, 0, img_type, img_size, 0,\
-		0, 0, 0, 0, 0, 0, 0, 0)
-
-	nonce = struct.pack('<IIII', \
-		0, 0, 0, 0)
-	aes_key = struct.pack('<IIIIIIII', \
-		0, 0, 0, 0, 0, 0, 0, 0)
-	aes_iv = struct.pack('<IIII', \
-		0, 0, 0, 0)
-	h.update(img)
-
-	f = open(args.out, 'wb')
-	f.write(shdr)
-	f.write(nonce)
-	f.write(aes_key)
-	f.write(aes_iv)
-	f.write(h.digest())
-	f.write(img)
+	f = open(args.outf_unsigned_ta, 'wb')
+	f.write(unsigned_ta_hdr(payload).serialize())
+	f.write(payload)
 	f.close()
 
 if __name__ == "__main__":

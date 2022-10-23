@@ -136,6 +136,14 @@ int32_t TEE_MemCompare(const void *buffer1, const void *buffer2, uint32_t size);
 
 void *TEE_MemFill(void *buff, uint32_t x, uint32_t size);
 
+TEE_Result TEE_ReadReg(uint32_t reg, uint32_t *val);
+
+TEE_Result TEE_WriteReg(uint32_t reg, uint32_t val);
+
+TEE_Result TEE_UpdateMVN(uint32_t type, uint32_t flag, uint32_t check);
+
+TEE_Result TEE_ReadRngPool(uint8_t *out, uint32_t size);
+
 /* Data and Key Storage API  - Generic Object Functions */
 
 void TEE_GetObjectInfo(TEE_ObjectHandle object, TEE_ObjectInfo *objectInfo);
@@ -336,6 +344,12 @@ TEE_Result TEE_AsymmetricDecrypt(TEE_OperationHandle operation,
 				 uint32_t srcLen, void *destData,
 				 uint32_t *destLen);
 
+TEE_Result TEE_AsymmetricPubKeyDecrypt(TEE_OperationHandle operation,
+				 const TEE_Attribute *params,
+				 uint32_t paramCount, void *srcData,
+				 uint32_t srcLen, void *destData,
+				 uint32_t *destLen);
+
 TEE_Result TEE_AsymmetricSign(TEE_OperationHandle operation,
 				    TEE_Attribute *params,
 				    uint32_t paramCount, void *message,
@@ -375,6 +389,23 @@ TEE_Result TEE_ExportKey(TEE_ObjectHandle key, void *publibKeyBuffer,
 
 TEE_Result TEE_ImportKey(TEE_ObjectHandle key, void *keyBuffer,
 		uint32_t keyBufferLen);
+
+TEE_Result TEE_Crypto_Run_Ext(char *alg, uint8_t *srcaddr, uint32_t datalen,
+		   uint8_t *dstaddr, uint8_t *keyaddr, uint32_t keysize,
+		   uint8_t *ivaddr, uint8_t dir, uint8_t thread);
+
+TEE_Result TEE_Crypto_Run(char *alg, uint8_t *srcaddr, uint32_t datalen,
+		   uint8_t *dstaddr, uint8_t *keyaddr, uint32_t keysize,
+		   uint8_t *ivaddr, uint8_t dir);
+
+TEE_Result TEE_Crypto_Set_Key_IV(uint32_t threadidx, uint32_t *in,
+		uint32_t len, uint8_t swap, uint32_t from_kl, uint32_t dest_idx);
+
+TEE_Result TEE_CipherEncrypt_With_Kwrap(const uint8_t *iv, uint32_t iv_len,
+		const uint8_t *src, uint32_t src_len, uint8_t *dst, uint32_t *dst_len);
+
+TEE_Result TEE_CipherDecrypt_With_Kwrap(const uint8_t *iv, uint32_t iv_len,
+		const uint8_t *src, uint32_t src_len, uint8_t *dst, uint32_t *dst_len);
 
 /* Date & Time API */
 
@@ -500,23 +531,27 @@ typedef struct {
 	size_t size;
 } vdec_info_t;
 
+typedef struct {
+	uint32_t cfg;
+	vdec_info_t input;
+	vdec_info_t output[4];
+} tvp_channel_cfg_t;
+
 TEE_Result TEE_Vdec_Get_Info(vdec_info_t *info);
 
-TEE_Result TEE_Tvp_Init(vdec_info_t *info, size_t count);
+TEE_Tvp_Handle TEE_Tvp_Open_Channel(tvp_channel_cfg_t *cfg);
 
-TEE_Result TEE_Tvp_Enter(void);
+void TEE_Tvp_Close_Channel(TEE_Tvp_Handle handle);
 
-TEE_Result TEE_Tvp_Exit(void);
+TEE_Result TEE_Tvp_Bind_Channel(TEE_Tvp_Handle handle, TEE_UUID *uuid);
 
 TEE_Result TEE_Vdec_Mmap(paddr_t pa, size_t size, vaddr_t *va);
+
+TEE_Result TEE_Vdec_Mmap_Cached(paddr_t pa, size_t size, vaddr_t *va);
 
 TEE_Result TEE_Vdec_Munmap(paddr_t pa, size_t size);
 
 TEE_Result TEE_Protect_Mem(unsigned int startaddr, unsigned int size, int enable);
-
-TEE_Result TEE_Protect_Mem2(unsigned int startaddr, unsigned int size, int enable);
-
-TEE_Result TEE_Setting_Device(int device_number, int port, int enable);
 
 TEE_Result TEE_Unify_Read(uint8_t *keyname, uint32_t keynamelen,
 			uint8_t *keybuf, uint32_t keylen, uint32_t *readlen);
@@ -535,10 +570,18 @@ TEE_Result TEE_Efuse_Write_Block(uint8_t *inbuf, uint32_t block);
 /*
  * Get HDCP authentication state
  *     auth = 1, mode = 1, HDCP 1.4 authenticated
- *     auth = 0, mode = 2, HDCP 2.2 authenticated
+ *     auth = 1, mode = 2, HDCP 2.2 authenticated
  *     auth = 0, mode = 0, HDCP authentication failed
  */
 TEE_Result TEE_HDCP_Get_State(uint32_t *mode, uint32_t *auth);
+
+/**
+ * Get HDMI state.
+ * state = 1 plugged in
+ * state = 0 not plugged in
+ */
+TEE_Result TEE_HDMI_Get_State(uint32_t *state, uint32_t *reserved);
+
 /*
  * Get HDCP Streaming ID
  *     type = 0x00, Type 0 Content Stream
@@ -562,6 +605,13 @@ TEE_Result TEE_Tvp_Get_Display_Size(uint32_t *width, uint32_t *height);
 TEE_Result TEE_Tvp_Set_Video_Layer(uint32_t video_layer, uint32_t enable, uint32_t flags);
 TEE_Result TEE_Tvp_Get_Video_Layer(uint32_t video_layer, uint32_t *enable);
 
+/*
+ * Set Audio mute
+ *     mute = 0, unmute audio
+ *     mute = 1, mute audio
+ */
+TEE_Result TEE_Tvp_Set_Audio_Mute(uint32_t mute);
+
 TEE_Result TEE_Video_Load_FW(uint8_t *firmware, uint32_t fw_size,
 		uint8_t *info, uint32_t info_size);
 /*
@@ -578,19 +628,148 @@ TEE_Result TEE_Desc_FreeChannel(int dsc_no, int fd);
 
 TEE_Result TEE_Desc_Reset(int dsc_no, int all);
 
+TEE_Result TEE_Desc_Set_Algo(int dsc_no, int fd, int algo);
+
+TEE_Result TEE_Desc_Set_Mode(int dsc_no, int fd, int mode);
+
 TEE_Result TEE_Desc_Set_Pid(int dsc_no, int fd, int pid);
 
 TEE_Result TEE_Desc_Set_Key(int dsc_no, int fd, int parity, uint8_t *key,
 		uint32_t key_type);
 
-TEE_Result TEE_KL_Run(void *ra);
+/*
+ * @brief
+ * Key Ladder Challenge-Response Mechanism
+ *
+ * @rk_cfg_idx(input)
+ * root key config index, value: 0~10
+ *
+ * @ek[16](input)
+ * encrypted key, {n}-levels Key Ladder: ek[16] is ek{n - 1}, {n} value: 3~7,
+ * for example, 5-levels Key Ladder: ek[16] is ek4
+ *
+ * @nonce[16](input)
+ *
+ * @dnonce[16](output)
+ * decrypted nonce
+ */
+TEE_Result TEE_KL_GetResponseToChallenge(
+		uint8_t rk_cfg_idx,
+		const uint8_t ek[16],
+		const uint8_t nonce[16],
+		uint8_t dnonce[16]);
 
-TEE_Result TEE_KL_GetResponseToChallenge(void *cra);
+/*
+ * @brief
+ * run Key Ladder
+ *
+ * @levels(input)
+ * encrypted layer number, value: 3~7
+ *
+ * @rk_cfg_idx(input)
+ * root key config index, value: 0~10
+ *
+ * @eks[7][16](input)
+ * encrypted keys, eks[0] is ecw, eks[n] is ek{n}, {n} value: 1~6
+ */
+TEE_Result TEE_KL_Run(
+		uint8_t levels,
+		uint8_t rk_cfg_idx,
+		const uint8_t eks[7][16]);
+
+struct desc_info {
+	uint8_t no;//desc dev no: 0, 1
+	uint8_t ch_id;//channel ID: 0 ~ 7
+	uint8_t algo;//CSA, AES_ECB, AES_CBC
+	uint8_t type;//Even, Odd
+};
+
+struct req_ecw {
+	uint8_t kl_num;
+	uint8_t kl_layer;
+	uint8_t app_id;
+	uint8_t use_tf;
+	uint8_t ecwak[16];
+	uint8_t ecwsk[16];
+	uint8_t tecw[16];
+	uint8_t use_hw_kl;
+	struct desc_info desc;
+	uint8_t slot_id;
+};
+
+struct req_etask_lut {
+	uint8_t kl_num;
+	uint8_t reserved[3];
+	uint8_t etask[16];
+	uint32_t tf_len;
+	uint8_t tf[416];
+};
+TEE_Result TEE_KL_MSR_ecw_two_layer(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_ecw_two_layer_with_tf(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_ecw_three_layer(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_ecw_three_layer_with_tf(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_pvr_two_layer(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_pvr_three_layer(struct req_ecw *ecw);
+
+TEE_Result TEE_KL_MSR_lut(struct req_etask_lut *lut);
+
+TEE_Result TEE_KL_MSR_load_ccck(uint8_t ccck[16]);
+
 
 TEE_Result TEE_Desc_Exit(void);
 
 TEE_Result TEE_Desc_Init(void);
 
 TEE_Result TEE_Desc_Set_Output(int module, int output);
+
+TEE_Result TEE_Callback(uint32_t paramTypes,
+		TEE_Param params[TEE_NUM_PARAMS]);
+
+TEE_Result TEE_Mutex_Lock(void);
+TEE_Result TEE_Mutex_Unlock(void);
+
+TEE_Result TEE_Shm_Mmap(uint32_t va, uint32_t size);
+TEE_Result TEE_Shm_Munmap(uint32_t va, uint32_t size);
+
+TEE_Result TEE_Mailbox_Send_Cmd(uint32_t command, uint8_t *inbuf,
+		uint32_t inlen, uint8_t *outbuf, uint32_t *outlen, uint32_t *response);
+
+TEE_Result TEE_Km_Get_Boot_Params(uint32_t *locked, uint32_t *boot_state,
+		uint8_t *boot_key, uint32_t *boot_key_len,
+		uint8_t *boot_hash, uint32_t *boot_hash_len);
+
+#define TEE_SECURE_TIMER_FLAG_ONESHOT   0
+#define TEE_SECURE_TIMER_FLAG_PERIOD    1
+typedef void *TEE_TimerHandle;
+typedef void (*tee_timer_cb_t)(void *args);
+
+/*
+ * Create a timer for TA
+ *
+ * [in]  cb		Timer callback after timeout
+ * [in]  args		Arguments for callback
+ * [in]  timeout	Timeout
+ * [in]  flags		Flags
+ *
+ * Return NULL if any error, timer handle if success
+ */
+TEE_TimerHandle TEE_Timer_Create(tee_timer_cb_t cb, void *args,
+		uint32_t timeout, uint32_t flags);
+
+/*
+ * Destroy a timer for TA
+ *
+ * [in]  handle		Timer handle
+ *
+ * Note: The timer must be destoryed before closing TA session,
+ *       suggest that check and destory all TA timer
+ *       in TA_CloseSessionEntryPoint()
+ */
+void TEE_Timer_Destroy(TEE_TimerHandle handle);
 
 #endif /* TEE_API_H */

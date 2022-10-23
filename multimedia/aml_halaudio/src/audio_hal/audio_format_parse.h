@@ -25,6 +25,7 @@ enum audio_type {
     DTSCD,
     DTSHD,
     TRUEHD,
+    PURE_MLP,
     PAUSE,
     MUTE,
 };
@@ -44,13 +45,6 @@ enum audio_type {
 
 #define IEC61937_CHECK_SIZE 32768   // for 48K 2ch, it is about 170ms
 
-
-enum input_source {
-    LINEIN = 0,
-    ATV,
-    HDMIIN,
-    SPDIFIN,
-};
 
 typedef struct audio_type_parse {
     struct pcm_config config_in;

@@ -19,7 +19,7 @@
 #define FASTGX_AVC_IOC_GET_BUFFINFO        _IOW(FASTGX_AVC_IOC_MAGIC, 0x08, unsigned int)
 #define FASTGX_AVC_IOC_SUBMIT_ENCODE_DONE  _IOW(FASTGX_AVC_IOC_MAGIC, 0x09, unsigned int)
 #define FASTGX_AVC_IOC_READ_CANVAS         _IOW(FASTGX_AVC_IOC_MAGIC, 0x0a, unsigned int)
-
+#define FASTGX_AVC_IOC_QP_MODE             _IOW(FASTGX_AVC_IOC_MAGIC, 0x0b, unsigned int)
 #define TARGET_BITS_TABLE_SIZE 256
 
 typedef struct {
@@ -177,6 +177,10 @@ typedef struct {
     uint32_t block_mb_size[TARGET_BITS_TABLE_SIZE];
     uint32_t block_sad_size[TARGET_BITS_TABLE_SIZE];
     bool cbr_hw;
+    bool cabac_mode;
+    int bitrate_urgent_cnt;
+    bool bitrate_urgent_mode;
+    int qp_mode;
     uint32_t *qp_tbl;
 } gx_fast_enc_drv_t;
 
@@ -188,5 +192,5 @@ extern AMVEnc_Status GxFastEncodeSPS_PPS(void *dev, unsigned char* outptr, int* 
 extern AMVEnc_Status GxFastEncodeSlice(void *dev, unsigned char* outptr, int* datalen);
 extern AMVEnc_Status GxFastEncodeCommit(void* dev, bool IDR);
 extern void GxUnInitFastEncode(void *dev);
-
+bool isSVCandVBR(void);
 #endif

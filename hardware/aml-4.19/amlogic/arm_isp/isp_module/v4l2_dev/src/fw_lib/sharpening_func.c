@@ -33,6 +33,83 @@ void sharpening_initialize( sharpening_fsm_t *p_fsm )
 {
 }
 
+static void demosaic_rgb_ext_param_update(sharpening_fsm_t *p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct demosaic_rgb_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_DEMOSAIC_RGB_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to calculate demosaic rgb ext");
+        return;
+    }
+
+    acamera_isp_demosaic_rgb_lum_thresh_write(p_fsm->cmn.isp_base, p_result.lum_thresh);
+    acamera_isp_demosaic_rgb_sad_amp_write(p_fsm->cmn.isp_base, p_result.sad_amp);
+    acamera_isp_demosaic_rgb_uu_sh_slope_write(p_fsm->cmn.isp_base, p_result.uu_sh_slope);
+    acamera_isp_demosaic_rgb_uu_sh_thresh_write(p_fsm->cmn.isp_base, p_result.uu_sh_thresh);
+    acamera_isp_demosaic_rgb_luma_thresh_low_d_write(p_fsm->cmn.isp_base, p_result.luma_thresh_low_d);
+    acamera_isp_demosaic_rgb_luma_thresh_low_ud_write(p_fsm->cmn.isp_base, p_result.luma_thresh_low_ud);
+    acamera_isp_demosaic_rgb_luma_slope_low_d_write(p_fsm->cmn.isp_base, p_result.luma_slope_low_d);
+    acamera_isp_demosaic_rgb_luma_slope_low_ud_write(p_fsm->cmn.isp_base, p_result.luma_slope_low_ud);
+    acamera_isp_demosaic_rgb_luma_thresh_high_d_write(p_fsm->cmn.isp_base, p_result.luma_thresh_high_d);
+    acamera_isp_demosaic_rgb_luma_thresh_high_ud_write(p_fsm->cmn.isp_base, p_result.luma_thresh_high_ud);
+    acamera_isp_demosaic_rgb_luma_slope_high_d_write(p_fsm->cmn.isp_base, p_result.luma_slope_high_d);
+    acamera_isp_demosaic_rgb_luma_slope_high_ud_write(p_fsm->cmn.isp_base, p_result.luma_slope_high_ud);
+}
+
+static void sharpen_ext_param_update(sharpening_fsm_t *p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct sharpen_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_FR_SHARPEN_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to calculate fr ext sharpen");
+        return;
+    }
+
+    acamera_isp_fr_sharpen_alpha_undershoot_write(p_fsm->cmn.isp_base, p_result.alpha_undershoot);
+    acamera_isp_fr_sharpen_luma_thresh_low_write(p_fsm->cmn.isp_base, p_result.luma_thresh_low);
+    acamera_isp_fr_sharpen_luma_slope_low_write(p_fsm->cmn.isp_base, p_result.luma_slope_low);
+    acamera_isp_fr_sharpen_luma_thresh_high_write(p_fsm->cmn.isp_base, p_result.luma_thresh_high);
+    acamera_isp_fr_sharpen_luma_slope_high_write(p_fsm->cmn.isp_base, p_result.luma_slope_high);
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_DS_SHARPEN_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to calculate ds ext sharpen");
+        return;
+    }
+
+    acamera_isp_ds1_sharpen_alpha_undershoot_write(p_fsm->cmn.isp_base, p_result.alpha_undershoot);
+    acamera_isp_ds1_sharpen_luma_thresh_low_write(p_fsm->cmn.isp_base, p_result.luma_thresh_low);
+    acamera_isp_ds1_sharpen_luma_slope_low_write(p_fsm->cmn.isp_base, p_result.luma_slope_low);
+    acamera_isp_ds1_sharpen_luma_thresh_high_write(p_fsm->cmn.isp_base, p_result.luma_thresh_high);
+    acamera_isp_ds1_sharpen_luma_slope_high_write(p_fsm->cmn.isp_base, p_result.luma_slope_high);
+}
 
 void sharpening_update( sharpening_fsm_t *p_fsm )
 {
@@ -99,6 +176,8 @@ void sharpening_update( sharpening_fsm_t *p_fsm )
         acamera_isp_demosaic_rgb_sharp_alt_ldu_write( p_fsm->cmn.isp_base, alt_du );
 
         acamera_isp_demosaic_rgb_sharp_alt_lu_write( p_fsm->cmn.isp_base, alt_ud );
+
+        demosaic_rgb_ext_param_update(p_fsm);
     }
 
     if ( ACAMERA_FSM2CTX_PTR( p_fsm )->stab.global_manual_sharpen == 0 ) {
@@ -109,5 +188,6 @@ void sharpening_update( sharpening_fsm_t *p_fsm )
         const modulation_entry_t *sharpen_ds1_table = _GET_MOD_ENTRY16_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_SHARPEN_DS1 );
         acamera_isp_ds1_sharpen_strength_write( p_fsm->cmn.isp_base, acamera_calc_modulation_u16( log2_gain, sharpen_ds1_table, _GET_ROWS( ACAMERA_FSM2CTX_PTR( p_fsm ), CALIBRATION_SHARPEN_DS1 ) ) );
 #endif //ISP_HAS_DS1
+        sharpen_ext_param_update(p_fsm);
     }
 }

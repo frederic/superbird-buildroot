@@ -173,6 +173,8 @@ static void lcd_info_print_vbyone(struct lcd_config_s *pconf)
 		"bit_rate                   %uHz\n"
 		"phy_vswing                 0x%x\n"
 		"phy_preemphasis            0x%x\n"
+		"hw_filter_time             0x%x\n"
+		"hw_filter_cnt              0x%x\n"
 		"ctrl_flag                  0x%x\n\n",
 		pconf->lcd_control.vbyone_config->lane_count,
 		pconf->lcd_control.vbyone_config->region_num,
@@ -180,6 +182,8 @@ static void lcd_info_print_vbyone(struct lcd_config_s *pconf)
 		pconf->lcd_timing.bit_rate,
 		pconf->lcd_control.vbyone_config->phy_vswing,
 		pconf->lcd_control.vbyone_config->phy_preem,
+		pconf->lcd_control.vbyone_config->hw_filter_time,
+		pconf->lcd_control.vbyone_config->hw_filter_cnt,
 		pconf->lcd_control.vbyone_config->ctrl_flag);
 	if (pconf->lcd_control.vbyone_config->ctrl_flag & 0x1) {
 		printf("power_on_reset_en          %u\n"
@@ -920,6 +924,30 @@ void aml_lcd_reg_print(void)
 	} else {
 		LCDERR("%s: lcd_debug_info_if is null\n", __func__);
 	}
+}
+
+void aml_lcd_vbyone_rst(void)
+{
+	/* force PHY to 0 */
+	lcd_hiu_setb(HHI_LVDS_TX_PHY_CNTL0, 3, 8, 2);
+	lcd_vcbus_write(VBO_SOFT_RST, 0x1ff);
+	udelay(5);
+	/* realease PHY */
+	if (lcd_vcbus_read(VBO_INSGN_CTRL) & 0x1) {
+		LCDPR("clr force lockn input\n");
+		lcd_vcbus_setb(VBO_INSGN_CTRL, 0, 0, 1);
+	}
+	lcd_hiu_setb(HHI_LVDS_TX_PHY_CNTL0, 0, 8, 2);
+	lcd_vcbus_write(VBO_SOFT_RST, 0);
+	LCDPR("vybone reset\n");
+}
+
+void aml_lcd_vbyone_cdr(void)
+{
+	/*[5:0]: vx1 fsm status*/
+	lcd_vcbus_setb(VBO_INSGN_CTRL, 7, 0, 4);
+	mdelay(100);
+	LCDPR("vx1 fsm status: 0x%08x\n", lcd_vcbus_read(VBO_STATUS_L));
 }
 
 /* **********************************

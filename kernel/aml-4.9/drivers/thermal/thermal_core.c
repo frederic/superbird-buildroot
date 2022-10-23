@@ -484,6 +484,8 @@ static bool can_notify(struct thermal_zone_device *tz,
 			 tz->temperature, hyst, trip_temp, tz->hot_step);
 		return true;
 	}
+	if (tz->hot_step != 0)
+		return true;
 	return false;
 }
 #endif
@@ -717,6 +719,31 @@ static void thermal_zone_device_check(struct work_struct *work)
 						      poll_queue.work);
 	thermal_zone_device_update(tz, THERMAL_EVENT_UNSPECIFIED);
 }
+
+#ifdef CONFIG_AMLOGIC_TEMP_SENSOR
+int thermal_get_temp_by_index(int id)
+{
+	struct thermal_zone_device *pos = NULL;
+	int temperature, ret = 0;
+
+	list_for_each_entry(pos, &thermal_tz_list, node) {
+		if (pos->id == id) {
+			ret = 1;
+			break;
+		}
+	}
+
+	if (ret) {
+		ret = thermal_zone_get_temp(pos, &temperature);
+
+		if (ret)
+			return -1;
+		return temperature;
+	}
+
+	return -1;
+}
+#endif
 
 /* sys I/F for thermal zone */
 

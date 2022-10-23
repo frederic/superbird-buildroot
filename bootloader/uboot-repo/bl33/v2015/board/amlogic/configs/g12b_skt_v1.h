@@ -99,7 +99,7 @@
         "fb_width=1920\0" \
         "fb_height=1080\0" \
         "frac_rate_policy=1\0" \
-        "sdr2hdr=2\0" \
+        "hdr_policy=0\0" \
         "hdmi_read_edid=1\0" \
         "hdmichecksum=0x00000000\0" \
         "dolby_status=0\0" \
@@ -116,7 +116,7 @@
         "recovery_part=recovery\0"\
         "recovery_offset=0\0"\
         "cvbs_drv=0\0"\
-        "lock=10001000\0"\
+        "lock=10101000\0"\
         "osd_reverse=0\0"\
         "video_reverse=0\0"\
         "active_slot=_a\0"\
@@ -133,7 +133,7 @@
             "\0"\
         "storeargs="\
             "get_bootloaderversion;" \
-            "setenv bootargs ${initargs} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
+            "setenv bootargs ${initargs} hdr_policy=${hdr_policy}  hdr_priority=${hdr_priority} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
 	"setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
             "run cmdline_keys;"\
             "setenv bootargs ${bootargs} androidboot.slot_suffix=${active_slot};"\
@@ -254,6 +254,7 @@
 			"run update;\n" \
 			"fi;fi;" \
 		"fi;\0" \
+	"ddr_fast_boot_enable_flag=1\0" \
 
 
 #define CONFIG_PREBOOT  \
@@ -265,7 +266,12 @@
             "bcb uboot-command;"\
             "run switch_bootmode;"
 
-#define CONFIG_BOOTCOMMAND "run storeboot"
+#define CONFIG_BOOTCOMMAND \
+	"echo ddr_fast_boot_enable_flag = ${ddr_fast_boot_enable_flag};"\
+	"if itest ${ddr_fast_boot_enable_flag} == 1; then "\
+		"ddr_auto_fast_boot_check 4;"\
+	"fi;"\
+	"run storeboot"
 
 //#define CONFIG_ENV_IS_NOWHERE  1
 #define CONFIG_ENV_SIZE   (64*1024)

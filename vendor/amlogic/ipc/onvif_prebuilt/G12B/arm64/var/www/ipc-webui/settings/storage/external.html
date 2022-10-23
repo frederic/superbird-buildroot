@@ -1,0 +1,50 @@
+<?php
+require '../../common.php';
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+  <title>Storage-External</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <script src="/scripts/echarts.min.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+
+<body>
+<form class="layui-form layui-form-pane" id="form_sd_format" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item">
+        <label class="layui-form-label locale">Device</label>
+        <div class="layui-input-inline">
+            <select name="dev" lay-filter="dev" id="dev"></select>
+        </div>
+    </div>
+    <div class="layui-form-item" id="mp_div" hidden>
+        <label class="layui-form-label locale">Mount Point</label>
+        <div class="layui-input-inline">
+            <input type="text" name="mp" class="layui-input layui-disabled" autocomplete="off" id="mp">
+        </div>
+    </div>
+    <div class="layui-form-item" id="fs_div" hidden>
+        <label class="layui-form-label locale">File System</label>
+        <div class="layui-input-inline">
+            <select name="fs" lay-filter="fs" id="fs"></select>
+        </div>
+    </div>
+    <div id="sd_pie" lay-filter="sd_pie" style="width: 600px; height: 400px"></div>
+    <div class="layui-form-item" style="margin-left: 50px" id="sd_btn" hidden>
+        <div class="layui-input-inline">
+            <button class="layui-btn  layui-btn-warm locale" id="format">Formatting</button>
+        </div>
+    </div>
+</form>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="external.js" type="application/javascript"></script>
+<script> translate_html(); </script>
+</body>
+</html>

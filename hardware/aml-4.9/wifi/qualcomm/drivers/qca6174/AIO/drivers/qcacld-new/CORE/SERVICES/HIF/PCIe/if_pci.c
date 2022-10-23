@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -943,9 +943,9 @@ static int hif_pci_autopm_debugfs_show(struct seq_file *s, void *data)
 				msecs_age / 1000, msecs_age % 1000);
 	}
 
-	spin_lock_bh(&sc->runtime_lock);
+	adf_os_spin_lock_bh(&sc->runtime_lock);
 	if (list_empty(&sc->prevent_suspend_list)) {
-		spin_unlock_bh(&sc->runtime_lock);
+		adf_os_spin_unlock_bh(&sc->runtime_lock);
 		return 0;
 	}
 
@@ -957,7 +957,7 @@ static int hif_pci_autopm_debugfs_show(struct seq_file *s, void *data)
 		seq_puts(s, " ");
 	}
 	seq_puts(s, "\n");
-	spin_unlock_bh(&sc->runtime_lock);
+	adf_os_spin_unlock_bh(&sc->runtime_lock);
 
 	return 0;
 #undef HIF_PCI_AUTOPM_STATS
@@ -1431,7 +1431,7 @@ static inline void hif_pci_pm_debugfs(struct hif_pci_softc *sc, bool init)
 
 static void hif_pci_pm_runtime_pre_init(struct hif_pci_softc *sc)
 {
-	spin_lock_init(&sc->runtime_lock);
+	adf_os_spinlock_init(&sc->runtime_lock);
 	setup_timer(&sc->runtime_timer, hif_pci_runtime_pm_timeout_fn,
 			(unsigned long)sc);
 
@@ -1514,13 +1514,13 @@ static void hif_pci_pm_runtime_post_exit(struct hif_pci_softc *sc)
 	else
 		return;
 
-	spin_lock_bh(&sc->runtime_lock);
+	adf_os_spin_lock_bh(&sc->runtime_lock);
 	list_for_each_entry_safe(ctx, tmp, &sc->prevent_suspend_list, list) {
-		spin_unlock_bh(&sc->runtime_lock);
+		adf_os_spin_unlock_bh(&sc->runtime_lock);
 		hif_runtime_pm_prevent_suspend_deinit(ctx);
-		spin_lock_bh(&sc->runtime_lock);
+		adf_os_spin_lock_bh(&sc->runtime_lock);
 	}
-	spin_unlock_bh(&sc->runtime_lock);
+	adf_os_spin_unlock_bh(&sc->runtime_lock);
 	/*
 	 * This is totally a preventive measure to ensure Runtime PM
 	 * isn't disabled for life time.
@@ -1549,11 +1549,11 @@ static void hif_pci_pm_runtime_ssr_post_exit(struct hif_pci_softc *sc)
 {
 	struct hif_pm_runtime_context *ctx, *tmp;
 
-	spin_lock_bh(&sc->runtime_lock);
+	adf_os_spin_lock_bh(&sc->runtime_lock);
 	list_for_each_entry_safe(ctx, tmp, &sc->prevent_suspend_list, list) {
 		hif_pm_ssr_runtime_allow_suspend(sc, ctx);
 	}
-	spin_unlock_bh(&sc->runtime_lock);
+	adf_os_spin_unlock_bh(&sc->runtime_lock);
 }
 
 #else
@@ -1854,6 +1854,9 @@ again:
     if (ol_sc->ramdump_base == NULL || !ol_sc->ramdump_size) {
         pr_info("%s: Failed to get RAM dump memory address or size!\n",
                 __func__);
+    } else {
+        pr_info("%s: ramdump base 0x%p size %d\n", __func__,
+		ol_sc->ramdump_base, (int)ol_sc->ramdump_size);
     }
 
     adf_os_atomic_init(&sc->tasklet_from_intr);
@@ -2310,7 +2313,13 @@ hif_nointrs(struct hif_pci_softc *sc)
     if (sc->num_msi_intrs > 0) {
         /* MSI interrupt(s) */
         for (i = 0; i < sc->num_msi_intrs; i++) {
-            free_irq(sc->pdev->irq + i, sc);
+            free_irq(
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+                pci_irq_vector(sc->pdev, i),
+#else
+                sc->pdev->irq + i,
+#endif
+                sc);
         }
         sc->num_msi_intrs = 0;
     } else {
@@ -2357,28 +2366,47 @@ hif_pci_configure(struct hif_pci_softc *sc, hif_handle_t *hif_hdl)
         int i;
         int rv;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+        rv = pci_alloc_irq_vectors(sc->pdev, MSI_NUM_REQUEST, MSI_NUM_REQUEST, PCI_IRQ_ALL_TYPES);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
         rv = pci_enable_msi_range(sc->pdev, MSI_NUM_REQUEST, MSI_NUM_REQUEST);
 #else
         rv = pci_enable_msi_block(sc->pdev, MSI_NUM_REQUEST);
 #endif
 
-	if (rv == 0) { /* successfully allocated all MSI interrupts */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)) || defined(WITH_BACKPORTS)
+	if (rv == MSI_NUM_REQUEST) /* successfully allocated all MSI interrupts */
+#else
+	if (rv == 0) /* successfully allocated all MSI interrupts */
+#endif
+    {
 		/*
 		 * TBDXXX: This path not yet tested,
 		 * since Linux x86 does not currently
 		 * support "Multiple MSIs".
 		 */
 		sc->num_msi_intrs = MSI_NUM_REQUEST;
-		ret = request_irq(sc->pdev->irq+MSI_ASSIGN_FW, hif_pci_msi_fw_handler,
-				  IRQF_SHARED, "wlan_pci", sc);
+		ret = request_irq(
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+				pci_irq_vector(sc->pdev, MSI_ASSIGN_FW),
+#else
+				sc->pdev->irq+MSI_ASSIGN_FW,
+#endif
+				hif_pci_msi_fw_handler,
+				IRQF_SHARED, "wlan_pci", sc);
 		if(ret) {
 			dev_err(&sc->pdev->dev, "request_irq failed\n");
 			goto err_intr;
 		}
 		for (i=MSI_ASSIGN_CE_INITIAL; i<=MSI_ASSIGN_CE_MAX; i++) {
-			ret = request_irq(sc->pdev->irq+i, CE_per_engine_handler, IRQF_SHARED,
-					  "wlan_pci", sc);
+			ret = request_irq(
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+					pci_irq_vector(sc->pdev, i),
+#else
+					sc->pdev->irq+i,
+#endif
+					CE_per_engine_handler, IRQF_SHARED,
+					"wlan_pci", sc);
 			if(ret) {
 				dev_err(&sc->pdev->dev, "request_irq failed\n");
 				goto err_intr;
@@ -2530,7 +2558,11 @@ err_stalled:
     hif_nointrs(sc);
 err_intr:
     if (num_msi_desired) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+        pci_free_irq_vectors(sc->pdev);
+#else
         pci_disable_msi(sc->pdev);
+#endif
     }
     pci_set_drvdata(sc->pdev, NULL);
 
@@ -3331,6 +3363,13 @@ void hif_pci_save_htc_htt_config_endpoint(int htc_endpoint)
     }
 
     scn->hif_sc->htc_endpoint = htc_endpoint;
+}
+
+void hif_get_reg(void *ol_sc, u32 address, u32 *data)
+{
+	struct ol_softc *scn = (struct ol_softc *)ol_sc;
+
+	HIFDiagReadAccess(scn->hif_hdl, address, data);
 }
 
 void hif_get_hw_info(void *ol_sc, u32 *version, u32 *revision)

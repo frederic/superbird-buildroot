@@ -36,6 +36,7 @@ struct mali_dma_buf_attachment {
 int mali_dma_buf_get_size(struct mali_session_data *session, _mali_uk_dma_buf_get_size_s __user *arg);
 
 void mali_mem_unbind_dma_buf(mali_mem_backend *mem_backend);
+_mali_osk_errcode_t meson_update_video_texture(struct  mali_session_data *session, int fd);
 
 _mali_osk_errcode_t mali_mem_bind_dma_buf(mali_mem_allocation *alloc,
 		mali_mem_backend *mem_backend,

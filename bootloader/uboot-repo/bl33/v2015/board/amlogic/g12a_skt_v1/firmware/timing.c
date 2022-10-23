@@ -58,7 +58,7 @@
  *
  */
 
-ddr_set_t __ddr_setting[] = {
+ddr_set_t __ddr_setting[] __attribute__ ((section(".ddr_settings"))) = {
 {
 	/* g12a skt (u209) ddr4 */
 	.board_id				= CONFIG_BOARD_ID_MASK,
@@ -642,7 +642,14 @@ ddr_reg_t __ddr_reg[] = {
 };
 
 #define VCCK_VAL				CONFIG_VCCK_INIT_VOLTAGE
+/*
+ * sm1 socket board share BSP code with g12a_skt_v1
+ */
+#ifdef CONFIG_SM1_SKT_V1
+#define VDDEE_VAL				CONFIG_VDDEE_INIT_VOLTAGE_SM1
+#else
 #define VDDEE_VAL				CONFIG_VDDEE_INIT_VOLTAGE
+#endif
 /* VCCK PWM table */
 #if   (VCCK_VAL == 800)
 	#define VCCK_VAL_REG	0x00150007

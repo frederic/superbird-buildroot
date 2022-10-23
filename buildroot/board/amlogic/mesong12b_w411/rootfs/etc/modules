@@ -10,6 +10,7 @@ firmware
 decoder_common
 encoder
 vpu
+jpegenc
 
 #ISP
 iv009_isp_iq

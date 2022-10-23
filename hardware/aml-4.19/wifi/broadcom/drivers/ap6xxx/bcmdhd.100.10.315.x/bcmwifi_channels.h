@@ -3,7 +3,7 @@
  * This header file housing the define and function prototype use by
  * both the wl driver, tools & Apps.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -26,7 +26,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmwifi_channels.h 695288 2017-04-19 17:20:39Z $
+ * $Id: bcmwifi_channels.h 806092 2019-02-21 08:19:13Z $
  */
 
 #ifndef	_bcmwifi_channels_h_
@@ -34,6 +34,9 @@
 
 /* A chanspec holds the channel number, band, bandwidth and primary 20MHz sideband */
 typedef uint16 chanspec_t;
+typedef uint16 chanspec_band_t;
+typedef uint16 chanspec_bw_t;
+typedef uint16 chanspec_subband_t;
 
 /* channel defines */
 #define CH_80MHZ_APART			16
@@ -41,7 +44,11 @@ typedef uint16 chanspec_t;
 #define CH_20MHZ_APART			4
 #define CH_10MHZ_APART			2
 #define CH_5MHZ_APART			1	/* 2G band channels are 5 Mhz apart */
-#define CH_MAX_2G_CHANNEL		14	/* Max channel in 2G band */
+
+#define CH_MIN_2G_CHANNEL                 1u    /* Min channel in 2G band */
+#define CH_MAX_2G_CHANNEL                14u    /* Max channel in 2G band */
+#define CH_MIN_2G_40M_CHANNEL             3u    /* Min 40MHz center channel in 2G band */
+#define CH_MAX_2G_40M_CHANNEL            11u    /* Max 40MHz center channel in 2G band */
 
 /* maximum # channels the s/w supports */
 #define MAXCHANNEL		224	/* max # supported channels. The max channel no is above,
@@ -54,7 +61,7 @@ typedef uint16 chanspec_t;
 
 /* channel bitvec */
 typedef struct {
-	uint8   vec[MAXCHANNEL / 8]; /* bitvec of channels */
+	uint8   vec[MAXCHANNEL/8];   /* bitvec of channels */
 } chanvec_t;
 
 /* make sure channel num is within valid range */
@@ -94,24 +101,24 @@ typedef struct {
 #define WL_CHANSPEC_CTL_SB_UPPER	WL_CHANSPEC_CTL_SB_LLU
 #define WL_CHANSPEC_CTL_SB_NONE		WL_CHANSPEC_CTL_SB_LLL
 
-#define WL_CHANSPEC_BW_MASK		0x3800
-#define WL_CHANSPEC_BW_SHIFT		11
-#define WL_CHANSPEC_BW_5		0x0000
-#define WL_CHANSPEC_BW_10		0x0800
-#define WL_CHANSPEC_BW_20		0x1000
-#define WL_CHANSPEC_BW_40		0x1800
-#define WL_CHANSPEC_BW_80		0x2000
-#define WL_CHANSPEC_BW_160		0x2800
-#define WL_CHANSPEC_BW_8080		0x3000
+#define WL_CHANSPEC_BW_MASK		0x3800u
+#define WL_CHANSPEC_BW_SHIFT		11u
+#define WL_CHANSPEC_BW_5		0x0000u
+#define WL_CHANSPEC_BW_10		0x0800u
+#define WL_CHANSPEC_BW_20		0x1000u
+#define WL_CHANSPEC_BW_40		0x1800u
+#define WL_CHANSPEC_BW_80		0x2000u
+#define WL_CHANSPEC_BW_160		0x2800u
+#define WL_CHANSPEC_BW_8080		0x3000u
 
-#define WL_CHANSPEC_BAND_MASK		0xc000
-#define WL_CHANSPEC_BAND_SHIFT		14
-#define WL_CHANSPEC_BAND_2G		0x0000
-#define WL_CHANSPEC_BAND_3G		0x4000
-#define WL_CHANSPEC_BAND_4G		0x8000
-#define WL_CHANSPEC_BAND_5G		0xc000
-#define INVCHANSPEC			255
-#define MAX_CHANSPEC				0xFFFF
+#define WL_CHANSPEC_BAND_MASK		0xc000u
+#define WL_CHANSPEC_BAND_SHIFT		14u
+#define WL_CHANSPEC_BAND_2G		0x0000u
+#define WL_CHANSPEC_BAND_3G		0x4000u
+#define WL_CHANSPEC_BAND_4G		0x8000u
+#define WL_CHANSPEC_BAND_5G		0xc000u
+#define INVCHANSPEC			255u
+#define MAX_CHANSPEC			0xFFFFu
 
 #define WL_CHANNEL_BAND(ch) (((ch) <= CH_MAX_2G_CHANNEL) ? \
 	WL_CHANSPEC_BAND_2G : WL_CHANSPEC_BAND_5G)
@@ -596,6 +603,11 @@ extern uint8 wf_chspec_primary20_chan(chanspec_t chspec);
 extern const char *wf_chspec_to_bw_str(chanspec_t chspec);
 
 /**
+ * Create a 20MHz chanspec for the given band.
+ */
+chanspec_t wf_create_20MHz_chspec(uint channel, chanspec_band_t band);
+
+/**
  * Return the primary 20MHz chanspec.
  *
  * This function returns the chanspec of the primary 20MHz channel. For 20MHz
@@ -720,7 +732,7 @@ extern uint wf_freq2channel(uint freq);
  * Refer to 802.11-2016 section 22.3.14 "Channelization".
  */
 extern chanspec_t wf_chspec_get8080_chspec(uint8 primary_20mhz,
-		uint8 chan0_80Mhz, uint8 chan1_80Mhz);
+	uint8 chan0_80Mhz, uint8 chan1_80Mhz);
 
 /**
  * Returns the center channel of the primary 80 MHz sub-band of the provided chanspec

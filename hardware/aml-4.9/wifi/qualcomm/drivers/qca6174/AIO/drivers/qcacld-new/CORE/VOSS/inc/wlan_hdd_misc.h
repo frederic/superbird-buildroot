@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016,2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,9 +43,17 @@
 #define WLAN_CFG_FILE              "wlan/qca_cld/" PREFIX "WCNSS_cfg.dat"
 #define WLAN_MAC_FILE              "wlan/qca_cld/" PREFIX "wlan_mac.bin"
 #else
+
+#ifndef FEATURE_LARGE_PREALLOC
 #define WLAN_INI_FILE              "wlan/" PREFIX "qcom_cfg.ini"
 #define WLAN_CFG_FILE              "wlan/" PREFIX "cfg.dat"
 #define WLAN_MAC_FILE              "wlan/" PREFIX "wlan_mac.bin"
+#else
+#define WLAN_INI_FILE              "wlan/qcom_cfg.ini"
+#define WLAN_CFG_FILE              "wlan/cfg.dat"
+#define WLAN_MAC_FILE              "wlan/wlan_mac.bin"
+#endif
+
 #endif // MSM_PLATFORM
 
 VOS_STATUS hdd_get_cfg_file_size(v_VOID_t *pCtx, char *pFileName, v_SIZE_t *pBufSize);

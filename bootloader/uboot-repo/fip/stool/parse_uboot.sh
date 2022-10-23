@@ -27,19 +27,20 @@ ddrfw=("ddr4_1d.fw" "ddr4_2d.fw" "ddr3_1d.fw" "piei.fw" "lpddr4_1d.fw"
 		"lpddr4_2d.fw" "diag_lpddr4.fw" "aml_ddr.fw" "lpddr3_1d.fw")
 
 #tmp files and variables
-TMP=`date +%Y%m%d%H%M%S`
+TMP="${script_dir}/`date +%Y%m%d%H%M%S%N`"
 uboot_no_bl2="$TMP/uboot_no_bl2.bin"
 fip="$TMP/fip.bin"
 fip_info="$TMP/fip_info.txt"
 
-bl31_hdr="bl31.hdr"
-bl32_hdr="bl32.hdr"
+bl31_hdr="$TMP/bl31.hdr"
+bl32_hdr="$TMP/bl32.hdr"
 bl30_bin="$TMP/bl30.bin"
 bl31_bin="$TMP/bl31.bin"
 bl32_bin="$TMP/bl32.bin"
 bl33_bin="$TMP/bl33.bin"
-ddrhdr=("ddr1.hdr" "ddr2.hdr" "ddr3.hdr" "ddr4.hdr" "ddr5.hdr" "ddr6.hdr"
-		"ddr7.hdr" "ddr8.hdr" "ddr9.hdr")
+ddrhdr=("$TMP/ddr1.hdr" "$TMP/ddr2.hdr" "$TMP/ddr3.hdr" "$TMP/ddr4.hdr"
+		"$TMP/ddr5.hdr" "$TMP/ddr6.hdr" "$TMP/ddr7.hdr" "$TMP/ddr8.hdr"
+		"$TMP/ddr9.hdr")
 ddrbin=("$TMP/ddr1.bin" "$TMP/ddr2.bin" "$TMP/ddr3.bin" "$TMP/ddr4.bin"
 		"$TMP/ddr5.bin" "$TMP/ddr6.bin" "$TMP/ddr7.bin" "$TMP/ddr8.bin"
 		"$TMP/ddr9.bin")
@@ -84,11 +85,6 @@ cleanup() {
 		echo "Failed to parse unsigned uboot!"
 	fi
 	if [ -d $TMP ]; then rm -rf $TMP; fi
-	local tmpfiles="bl31.hdr bl32.hdr ddr1.hdr ddr2.hdr ddr3.hdr ddr4.hdr
-		ddr5.hdr ddr6.hdr ddr7.hdr ddr8.hdr ddr9.hdr"
-	for i in $tmpfiles ; do
-		rm -f $i
-	done
 }
 
 check_file() {
@@ -134,7 +130,7 @@ parse_fip() {
 
 	echo -n "generate $fip_info, bl31.hdr,bl32.hdr,ddr*.hdr..."
 	check_file "input" $input
-	${fip_parser_tool} $input $fip_info_out
+	${fip_parser_tool} $input $TMP
 
 	# parse $fip_info
 	if [[ -s $fip_info_out ]]; then

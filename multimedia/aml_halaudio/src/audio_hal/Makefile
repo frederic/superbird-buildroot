@@ -40,7 +40,8 @@ CC_OBJS=audio_hw.o \
 	audio_trace.o \
 	audio_speex_resample_api.o \
 	audio_simple_resample_api.o \
-	aml_audio_resample_manager.o
+	aml_audio_resample_manager.o \
+	aml_external_process.o
 
 
 

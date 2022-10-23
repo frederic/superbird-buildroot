@@ -22,4 +22,9 @@ config BR2_PACKAGE_WIDEVINE_BIN_VERSION_14
         help
           widevine prebuilt version v14 for 2019.
 
+config BR2_PACKAGE_WIDEVINE_BIN_VERSION_15
+        bool "widevine v15"
+        help
+          widevine prebuilt version v15 for 2020.
+
 endchoice

@@ -18,6 +18,7 @@ old_state=$hpdstate
 
 echo $outputmode > /sys/class/display/mode
 
+# just work for fbdev(legacy)
 echo 0 > /sys/class/ppmgr/ppscaler
 echo 0 > /sys/class/graphics/fb0/free_scale
 echo 1 > /sys/class/graphics/fb0/freescale_mode
@@ -26,34 +27,28 @@ echo 1 > /sys/class/graphics/fb0/freescale_mode
 	case $outputmode in
 
 		480*)
-		echo 0 0 1279 719 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1279 719 > /sys/class/graphics/fb0/window_axis 
 		;;
 
 		576*)
-		echo 0 0 1279 719 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1279 719 > /sys/class/graphics/fb0/window_axis
 		;;
 
 		720*)
-		echo 0 0 1279 719 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1279 719 > /sys/class/graphics/fb0/window_axis
 		;;
 
 		1080*)
-		echo 0 0 1919 1079 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1919 1079 > /sys/class/graphics/fb0/window_axis
 		;;
 
 		4k2k*)
-		echo 0 0 1919 1079 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1919 1079 > /sys/class/graphics/fb0/window_axis
 		;;
  
 		*)
 		#outputmode= 720p60hz
 		echo 720p60hz > /sys/class/display/mode  
-		echo 0 0 1279 719 > /sys/class/graphics/fb0/free_scale_axis
 		echo 0 0 1279 719 > /sys/class/graphics/fb0/window_axis
 
 esac

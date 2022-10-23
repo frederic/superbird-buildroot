@@ -220,6 +220,8 @@ static int debug_pts_checkin;
 static int debug_pts_checkout;
 static int debug_vpts;
 static int debug_apts;
+static int apts_error_num;
+static int vpts_error_num;
 
 #define M_HIGH_DIFF    2
 #define M_LOW_DIFF     2
@@ -590,6 +592,11 @@ static int tsync_mode_switch(int mode, unsigned long diff_pts, int jump_pts)
 	int old_tsync_av_mode = tsync_av_mode;
 	char VA[] = "VA--";
 	unsigned long oldtimeout = tsync_av_dynamic_timeout_ms;
+	u32 pcr, vpts, apts;
+
+	pcr = timestamp_pcrscr_get();
+	vpts = timestamp_vpts_get();
+	apts = timestamp_apts_get();
 
 	if (tsync_mode == TSYNC_MODE_PCRMASTER) {
 		pr_info
@@ -627,6 +634,21 @@ static int tsync_mode_switch(int mode, unsigned long diff_pts, int jump_pts)
 			tsync_av_dynamic_duration_ms = 0;
 		} else {
 			/* / */
+			if (abs(vpts-apts) < tsync_av_threshold_min ||
+			diff_pts < tsync_av_threshold_min) {
+				pr_info("-wcs-< tsync_av_threshold_min--\n");
+				tsync_av_mode = TSYNC_STATE_S;
+				tsync_mode = TSYNC_MODE_AMASTER;
+				tsync_av_latest_switch_time_ms = jiffies_ms;
+				tsync_av_dynamic_duration_ms = 0;
+			} else if (abs(vpts-apts) < tsync_av_threshold_max ||
+			diff_pts < tsync_av_threshold_max) {
+				pr_info("-wcs-< tsync_av_threshold_max--\n");
+				tsync_av_mode = TSYNC_STATE_D;
+				tsync_mode = TSYNC_MODE_VMASTER;
+				tsync_av_latest_switch_time_ms = jiffies_ms;
+				tsync_av_dynamic_duration_ms = 20*1000;
+			}
 		}
 		if (tsync_mode != old_tsync_mode
 			|| tsync_av_mode != old_tsync_av_mode)
@@ -806,6 +828,7 @@ void tsync_avevent_locked(enum avevent_e event, u32 param)
 		tsync_stat = TSYNC_STAT_PCRSCR_SETUP_NONE;
 		tsync_set_av_state(0, 3);
 		timestamp_vpts_set(0);
+		timestamp_vpts_set_u64(0);
 		timestamp_pcrscr_set(0);
 		timestamp_pcrscr_enable(0);
 		timestamp_firstvpts_set(0);
@@ -854,6 +877,8 @@ void tsync_avevent_locked(enum avevent_e event, u32 param)
 				}
 			}
 			timestamp_vpts_set(param);
+
+			vpts_error_num++;
 			break;
 		}
 		/*
@@ -869,6 +894,8 @@ void tsync_avevent_locked(enum avevent_e event, u32 param)
 		}
 
 		timestamp_vpts_set(param);
+
+		vpts_error_num++;
 		if (tsync_mode == TSYNC_MODE_VMASTER) {
 			timestamp_pcrscr_set(param);
 			set_pts_realign();
@@ -908,9 +935,13 @@ void tsync_avevent_locked(enum avevent_e event, u32 param)
 				}
 			}
 			timestamp_apts_set(param);
+
+			apts_error_num++;
 			break;
 		}
 		timestamp_apts_set(param);
+
+		apts_error_num++;
 		if (!tsync_enable) {
 			timestamp_apts_set(param);
 			break;
@@ -1476,6 +1507,18 @@ bool tsync_check_vpts_discontinuity(unsigned int vpts)
 }
 EXPORT_SYMBOL(tsync_check_vpts_discontinuity);
 
+int tsync_get_vpts_error_num(void)
+{
+	return vpts_error_num;
+}
+EXPORT_SYMBOL(tsync_get_vpts_error_num);
+
+int tsync_get_apts_error_num(void)
+{
+	return apts_error_num;
+}
+EXPORT_SYMBOL(tsync_get_apts_error_num);
+
 static ssize_t store_pcr_recover(struct class *class,
 		struct class_attribute *attr,
 		const char *buf, size_t size)
@@ -1547,6 +1590,15 @@ static ssize_t show_vpts(struct class *class,
 	return sprintf(buf, "0x%x\n", timestamp_vpts_get());
 }
 
+static ssize_t show_vpts_u64(struct class *class,
+			     struct class_attribute *attr, char *buf)
+{
+	u64 pts_val;
+
+	pts_val = div64_u64(timestamp_vpts_get_u64() * 9, 100);
+	return sprintf(buf, "0x%llx\n", pts_val);
+}
+
 static ssize_t store_vpts(struct class *class,
 		struct class_attribute *attr,
 		const char *buf, size_t size)
@@ -1574,6 +1626,15 @@ static ssize_t show_apts(struct class *class,
 		struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "0x%x\n", timestamp_apts_get());
+}
+
+static ssize_t show_apts_u64(struct class *class,
+			     struct class_attribute *attr, char *buf)
+{
+	u64 pts_val;
+
+	pts_val = div64_u64(timestamp_apts_get_u64() * 9, 100);
+	return sprintf(buf, "0x%llx\n", pts_val);
 }
 
 static ssize_t store_apts(struct class *class,
@@ -1627,6 +1688,15 @@ static ssize_t show_pcrscr(struct class *class,
 	return sprintf(buf, "0x%x\n", timestamp_pcrscr_get());
 }
 
+static ssize_t show_pcrscr_u64(struct class *class,
+			       struct class_attribute *attr, char *buf)
+{
+	u64 pts_val;
+
+	pts_val = div64_u64(timestamp_pcrscr_get_u64() * 9, 100);
+	return sprintf(buf, "0x%llx\n", pts_val);
+}
+
 static ssize_t show_aptscheckin_flag(struct class *class,
 		struct class_attribute *attr, char *buf)
 {
@@ -1641,7 +1711,7 @@ static ssize_t store_pcrscr(struct class *class,
 	ssize_t r;
 
 	/*r = sscanf(buf, "0x%x", &pts);*/
-	r = kstrtoint(buf, 0, &pts);
+	r = kstrtouint(buf, 0, &pts);
 
 	if (r != 0)
 		return -EINVAL;
@@ -2105,11 +2175,14 @@ static ssize_t store_startsync_mode(struct class *class,
 
 static struct class_attribute tsync_class_attrs[] = {
 	__ATTR(pts_video, 0664, show_vpts, store_vpts),
+	__ATTR(pts_video_u64, 0664, show_vpts_u64, NULL),
 	__ATTR(pts_audio, 0664, show_apts, store_apts),
+	__ATTR(pts_audio_u64, 0664, show_apts_u64, NULL),
 	__ATTR(dobly_av_sync, 0664, dobly_show_sync,
 	dobly_store_sync),
 	__ATTR(pts_pcrscr, 0664, show_pcrscr,
 	store_pcrscr),
+	__ATTR(pts_pcrscr_u64, 0664, show_pcrscr_u64, NULL),
 	__ATTR(apts_checkin_flag, 0664, show_aptscheckin_flag, NULL),
 	__ATTR(event, 0664, NULL, store_event),
 	__ATTR(mode, 0664, show_mode, store_mode),
@@ -2186,6 +2259,7 @@ int tsync_store_fun(const char *trigger, int id, const char *buf, int size)
 	case 19:return store_startsync_mode(NULL, NULL, buf, size);
 	case 20:return store_firstapts(NULL, NULL, buf, size);
 	case 21:return -1;
+	case 22:return -1;
 	default:
 		ret = -1;
 	}
@@ -2272,6 +2346,15 @@ int tsync_show_fun(const char *trigger, int id, char *sbuf, int size)
 	case 21:
 		ret = show_checkin_firstvpts(NULL, NULL, buf);
 		break;
+	case 22:
+		ret = show_vpts_u64(NULL, NULL, buf);
+		break;
+	case 23:
+		ret = show_apts_u64(NULL, NULL, buf);
+		break;
+	case 24:
+		ret = show_pcrscr_u64(NULL, NULL, buf);
+		break;
 	default:
 		ret = -1;
 	}
@@ -2308,6 +2391,9 @@ static struct mconfig tsync_configs[] = {
 	MC_FUN_ID("startsync_mode", tsync_show_fun, tsync_store_fun, 19),
 	MC_FUN_ID("firstapts", tsync_show_fun, tsync_store_fun, 20),
 	MC_FUN_ID("checkin_firstvpts", tsync_show_fun, NULL, 21),
+	MC_FUN_ID("pts_video_u64", tsync_show_fun, NULL, 22),
+	MC_FUN_ID("pts_audio_u64", tsync_show_fun, NULL, 23),
+	MC_FUN_ID("pts_pcrscr_u64", tsync_show_fun, NULL, 24),
 };
 
 
@@ -2325,6 +2411,7 @@ static int __init tsync_module_init(void)
 	/* init audio pts to -1, others to 0 */
 	timestamp_apts_set(-1);
 	timestamp_vpts_set(0);
+	timestamp_vpts_set_u64(0);
 	timestamp_pcrscr_set(0);
 
 	init_timer(&tsync_pcr_recover_timer);
@@ -2333,6 +2420,9 @@ static int __init tsync_module_init(void)
 	tsync_pcr_recover_timer.expires = jiffies + PCR_CHECK_INTERVAL;
 	pcr_sync_stat = PCR_SYNC_UNSET;
 	pcr_recover_trigger = 0;
+
+	apts_error_num = 0;
+	vpts_error_num = 0;
 
 	add_timer(&tsync_pcr_recover_timer);
 

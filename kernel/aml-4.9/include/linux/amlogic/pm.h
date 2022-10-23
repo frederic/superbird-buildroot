@@ -87,5 +87,11 @@ extern unsigned int is_pm_freeze_mode(void);
 #define HHI_MPEG_CLK_CNTL 0x105d
 
 #endif //CONFIG_AMLOGIC_M8B_SUSPEND
-
+#ifdef CONFIG_PM_SLEEP_DEBUG
+extern bool pm_print_times_enabled;
+#else
+#define pm_print_times_enabled	(false)
+#endif
+ktime_t callback_debug_start(void);
+void callback_debug_report(ktime_t calltime, void *callback);
 #endif //__AML_PM_H__

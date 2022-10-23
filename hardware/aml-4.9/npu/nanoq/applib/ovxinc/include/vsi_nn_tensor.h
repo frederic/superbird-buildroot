@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -77,7 +77,7 @@ typedef enum
     /** affine asymmetric */
     VSI_NN_QNT_TYPE_AFFINE_ASYMMETRIC = VX_QUANT_AFFINE_SCALE,
     /** affine perchannel symmetric */
-    VSI_NN_QNT_TYPE_AFFINE_PERCHANNEL_SYMMETRIC = 0xfe,
+    VSI_NN_QNT_TYPE_AFFINE_PERCHANNEL_SYMMETRIC = 0x3,/*VX_QUANT_AFFINE_SCALE_PER_CHANNEL*/
     /** undefined type */
     VSI_NN_QNT_TYPE_NA = 0xff,
 } vsi_nn_qnt_type_e;
@@ -105,18 +105,18 @@ typedef struct vsi_nn_dtype
             /** Meanful in affine asymmetric */
             struct
             {
-                uint32_t  zero_point;
+                int32_t   zero_point;
                 float     scale;
             };
 #ifdef VSI_PERCHANNEL_QUANTIZATION_SUPPORT
             /** Meanful in AFFINE_PERCHANNEL_SYMMETRIC */
             struct
             {
-                float* scales;
-                int    scale_dim;
-                int    channel_dim;
-                float* zero_points;
-                int    zero_points_dim;
+                float      *scales;
+                int32_t    scale_dim;
+                int32_t    channel_dim;
+                int32_t    *zero_points;
+                int32_t    zero_points_dim;
             };
 #endif
         };
@@ -157,6 +157,8 @@ struct _vsi_nn_tensor
     vx_tensor t;
     /** Optimized weight bias tensor */
     vx_weights_biases_parameter wb;
+    /** Mark tensor swapped by vxSwapTensor */
+    int8_t  is_swapped;
 };
 
 /**

@@ -1,7 +1,7 @@
 /*
  * Linux roam cache
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_roam.c 729257 2017-10-31 05:37:07Z $
+ * $Id: wl_roam.c 798173 2019-01-07 09:23:21Z $
  */
 
 #include <typedefs.h>
@@ -36,6 +36,7 @@
 #include <wl_cfg80211.h>
 #endif // endif
 #include <wldev_common.h>
+#include <bcmstdlib_s.h>
 
 #ifdef ESCAN_CHANNEL_CACHE
 #define MAX_ROAM_CACHE		200
@@ -136,7 +137,7 @@ void add_roam_cache(struct bcm_cfg80211 *cfg, wl_bss_info_t *bi)
 	WL_DBG(("CHSPEC  = %s, CTL %d\n", wf_chspec_ntoa_ex(bi->chanspec, chanbuf), channel));
 	roam_cache[n_roam_cache].chanspec =
 		(channel <= CH_MAX_2G_CHANNEL ? band2G : band5G) | band_bw | channel;
-	memcpy(roam_cache[n_roam_cache].ssid, bi->SSID, bi->SSID_len);
+	(void)memcpy_s(roam_cache[n_roam_cache].ssid, bi->SSID_len, bi->SSID, bi->SSID_len);
 
 	n_roam_cache++;
 }

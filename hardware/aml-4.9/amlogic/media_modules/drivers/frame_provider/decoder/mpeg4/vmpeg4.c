@@ -41,7 +41,7 @@
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 #include <linux/amlogic/media/codec_mm/configs.h>
 #include <linux/amlogic/tee.h>
-
+#include "../../../common/chips/decoder_cpu_ver_info.h"
 
 
 /* #define CONFIG_AM_VDEC_MPEG4_LOG */
@@ -1198,7 +1198,8 @@ static int amvdec_mpeg4_remove(struct platform_device *pdev)
 	cancel_work_sync(&set_clk_work);
 
 	amvdec_disable();
-
+	if (get_cpu_major_id() >= AM_MESON_CPU_MAJOR_ID_TM2)
+		vdec_reset_core(NULL);
 	if (mm_blk_handle) {
 		decoder_bmmu_box_free(mm_blk_handle);
 		mm_blk_handle = NULL;

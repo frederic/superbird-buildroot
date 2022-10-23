@@ -259,16 +259,16 @@ int oo_y_lut_hlg_hdr[149] = {
 };
 
 int oo_y_lut_sdr_hdr[149] = {
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-	38, 38, 38, 38, 38
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	16, 16, 16, 16, 16
 };
 
 int oo_y_lut_hlg_sdr[149] = {
@@ -633,8 +633,10 @@ void set_hdr_matrix(
 					adpscl_shift[i] = adp_scal_shift;
 				else
 					adpscl_shift[i] = adp_scal_shift - 2;
-			} else
-				adpscl_shift[i] = adp_scal_shift;
+			} else {
+				/* shift value keep consistent with kernel */
+				adpscl_shift[i] = adp_scal_shift - 1;
+			}
 
 			adpscl_ys_coef[i] =
 					1 << adp_scal_shift;
@@ -645,7 +647,7 @@ void set_hdr_matrix(
 		/*gamut mode: 1->gamut before ootf*/
 					/*2->gamut after ootf*/
 					/*other->disable gamut*/
-		vpp_reg_setb(hdr_ctrl, 2, 6, 2);
+		vpp_reg_setb(hdr_ctrl, 1, 6, 2);
 
 	    vpp_reg_write(GMUT_CTRL, gmut_shift);
 	    vpp_reg_write(GMUT_COEF0,
@@ -667,7 +669,7 @@ void set_hdr_matrix(
 			c_gain_lim_coef[1] << 16 |
 			c_gain_lim_coef[0]);
 	    vpp_reg_write(CGAIN_COEF1, c_gain_lim_coef[2] |
-			0x400 << 16);
+			0x1000 << 16);
 
 	    vpp_reg_write(ADPS_CTRL, adpscl_enable[2] << 6 |
 							adpscl_enable[1] << 5 |
@@ -864,7 +866,7 @@ void set_c_gain(
 
 	/*cgain mode: 0->y domin*/
 	/*cgain mode: 1->rgb domin, use r/g/b max*/
-	vpp_reg_setb(hdr_ctrl, hdr_lut_param->cgain_en, 12, 1);
+	vpp_reg_setb(hdr_ctrl, 0, 12, 1);
 	vpp_reg_setb(hdr_ctrl, hdr_lut_param->cgain_en, 0, 1);
 
 	if (!hdr_lut_param->cgain_en)
@@ -956,8 +958,7 @@ void hdr_func(enum hdr_module_sel module_sel,
 		hdr_lut_param.lut_on = LUT_ON;
 		hdr_lut_param.bitdepth = bit_depth;
 		/*for g12a/g12b osd blend shift rtl bug*/
-		if (((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12A) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B)) &&
+		if ((get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12A) &&
 			(module_sel & OSD1_HDR))
 			hdr_lut_param.cgain_en = LUT_ON;
 		else
@@ -1065,8 +1066,7 @@ void hdr_func(enum hdr_module_sel module_sel,
 			}
 			hdr_mtx_param.mtx_on = MTX_ON;
 			hdr_mtx_param.p_sel = HDR_BYPASS;
-		} else if (((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_SM1) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_TL1) ||
+		} else if (((get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_SM1) ||
 			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B &&
 			 get_cpu_id().chip_rev == MESON_CPU_CHIP_REVISION_B)) &&
 			(module_sel & OSD1_HDR)) {
@@ -1141,13 +1141,9 @@ void hdr_func(enum hdr_module_sel module_sel,
 			hdr_mtx_param.p_sel = HDR_SDR;
 		else if (hdr_process_select & HLG_SDR)
 			hdr_mtx_param.p_sel = HLG_SDR;
-
 	} else if (hdr_process_select & SDR_HDR) {
 		hdr_mtx_param.mtx_only = HDR_ONLY;
-		if (((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_SM1) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_TL1) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12A)) &&
+		if ((get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12A) &&
 			(module_sel & OSD1_HDR)) {
 			for (i = 0; i < 15; i++) {
 				hdr_mtx_param.mtx_in[i] = bypass_coeff[i];
@@ -1207,10 +1203,7 @@ void hdr_func(enum hdr_module_sel module_sel,
 		hdr_mtx_param.p_sel = HLG_HDR;
 	}  else if (hdr_process_select & SDR_HLG) {
 		hdr_mtx_param.mtx_only = HDR_ONLY;
-		if (((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_SM1) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_TL1) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12A)) &&
+		if ((get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12A) &&
 			(module_sel & OSD1_HDR)) {
 			for (i = 0; i < 15; i++) {
 				hdr_mtx_param.mtx_in[i] = bypass_coeff[i];

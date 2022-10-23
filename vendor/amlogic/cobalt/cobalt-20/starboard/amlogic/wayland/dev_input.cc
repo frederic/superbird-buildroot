@@ -328,6 +328,20 @@ SbKey KeyCodeToSbKey(uint16_t code) {
 
     case KEY_INFO_BUTTON:
       return kSbKeyF1;
+    case KEY_RED:
+      return kSbKeyRed;
+    case KEY_GREEN:
+      return kSbKeyGreen;
+    case KEY_YELLOW:
+      return kSbKeyYellow;
+    case KEY_BLUE:
+      return kSbKeyBlue;
+    case KEY_CHANNELUP:
+      return kSbKeyChannelUp;
+    case KEY_CHANNELDOWN:
+      return kSbKeyChannelDown;
+    case KEY_INFO:
+      return kSbKeyInfo;
   }
   SB_DLOG(WARNING) << "Unknown code: 0x" << std::hex << code;
   return kSbKeyUnknown;
@@ -497,7 +511,7 @@ void DevInput::OnKeyboardHandleKey(struct wl_keyboard* keyboard,
                                    uint32_t key,
                                    uint32_t state) {
   bool repeatable =
-      (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN);
+      (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN || key == KEY_TAB);
   SB_DLOG(INFO) << "[Key] Key :" << key << ", state:" << state << " repeatable "
                 << repeatable << " key_repeat_key_ " << key_repeat_key_
                 << " key_repeat_state_ " << key_repeat_state_;

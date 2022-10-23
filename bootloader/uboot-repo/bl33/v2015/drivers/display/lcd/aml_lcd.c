@@ -291,7 +291,7 @@ static void lcd_module_enable(char *mode)
 	unsigned int sync_duration;
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 	struct lcd_config_s *pconf = lcd_drv->lcd_config;
-	int ret, ret_vac = 0, ret_demura = 0;
+	int ret;
 
 	ret = lcd_drv->config_check(mode);
 	if (ret) {
@@ -314,7 +314,7 @@ static void lcd_module_enable(char *mode)
 			lcd_interface_on();
 			lcd_backlight_enable();
 		} else {
-			lcd_tcon_data_load(&ret_vac, &ret_demura);
+			lcd_tcon_data_probe();
 		}
 	}
 	if (!lcd_debug_test)
@@ -995,6 +995,20 @@ static void aml_lcd_reg(void)
 	aml_lcd_reg_print();
 }
 
+static void lcd_vbyone_rst(void)
+{
+	if (lcd_check_valid())
+		return;
+	aml_lcd_vbyone_rst();
+}
+
+static void lcd_vbyone_cdr(void)
+{
+	if (lcd_check_valid())
+		return;
+	aml_lcd_vbyone_cdr();
+}
+
 static void aml_set_backlight_level(int level)
 {
 	aml_bl_set_level(level);
@@ -1035,18 +1049,26 @@ static void aml_lcd_key_tcon_test(void)
 	}
 }
 
-static void aml_lcd_key_dump(void)
+static void aml_lcd_key_dump(unsigned int flag)
 {
-	int flag = LCD_UKEY_DEBUG_NORMAL;
+	unsigned int key_flag = LCD_UKEY_DEBUG_NORMAL;
 
-	switch (aml_lcd_driver.chip_type) {
-	case LCD_CHIP_TXHD:
-		flag |= LCD_UKEY_DEBUG_TCON;
-		break;
-	default:
-		break;
+	if (flag & (1 << 0)) {
+		key_flag = LCD_UKEY_DEBUG_NORMAL;
+	} else if (flag & (1 << 1)) {
+		switch (aml_lcd_driver.chip_type) {
+		case LCD_CHIP_TXHD:
+			key_flag = (LCD_UKEY_DEBUG_TCON | LCD_UKEY_TCON_SIZE);
+			break;
+		case LCD_CHIP_TL1:
+		case LCD_CHIP_TM2:
+			key_flag = (LCD_UKEY_DEBUG_TCON | LCD_UKEY_TCON_SIZE_NEW);
+			break;
+		default:
+			break;
+		}
 	}
-	aml_lcd_unifykey_dump(flag);
+	aml_lcd_unifykey_dump(key_flag);
 }
 
 static void aml_lcd_extern_info(void)
@@ -1083,6 +1105,8 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.lcd_tcon_table_print = NULL,
 	.lcd_tcon_reg_read = NULL,
 	.lcd_tcon_reg_write = NULL,
+	.lcd_vbyone_rst = lcd_vbyone_rst,
+	.lcd_vbyone_cdr = lcd_vbyone_cdr,
 	.bl_on = aml_backlight_power_on,
 	.bl_off = aml_backlight_power_off,
 	.set_bl_level = aml_set_backlight_level,

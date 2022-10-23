@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a32_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "tm2_ab301_rdk.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesontm2_ab301/initramfs/ramfslist-32"

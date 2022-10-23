@@ -3386,12 +3386,14 @@ struct mod_initfree {
 	void *module_init;
 };
 
+#ifndef CONFIG_AMLOGIC_KASAN32
 static void do_free_init(struct rcu_head *head)
 {
 	struct mod_initfree *m = container_of(head, struct mod_initfree, rcu);
 	module_memfree(m->module_init);
 	kfree(m);
 }
+#endif /* CONFIG_AMLOGIC_KASAN32 */
 
 /*
  * This is where the real work happens.
@@ -3480,7 +3482,19 @@ static noinline int do_init_module(struct module *mod)
 	 * call synchronize_sched(), but we don't want to slow down the success
 	 * path, so use actual RCU here.
 	 */
+#ifndef CONFIG_AMLOGIC_KASAN32
 	call_rcu_sched(&freeinit->rcu, do_free_init);
+#else
+	/*
+	 * for 32bit KASAN, lazy free init section of modules will cause lots of
+	 * hole of in address space after async free of init section in each
+	 * module, which makes low usage ratio of address space. So we force the
+	 * init section freed before module load successfully.
+	 */
+	module_memfree(freeinit->module_init);
+	vm_unmap_aliases();
+	kfree(freeinit);
+#endif /* CONFIG_AMLOGIC_KASAN32 */
 	mutex_unlock(&module_mutex);
 	wake_up_all(&module_wq);
 

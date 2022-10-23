@@ -91,7 +91,14 @@ public:
   const static int PREROLL_NUM_FRAMES = 100;
 
 #if defined(COBALT_WIDEVINE_OPTEE)
-  uint8_t * GetSecMem(int size) { has_fed_encrypt_data=true; return sec_drm_mem; }
+  uint8_t * GetSecMem(int size)
+  {
+    has_fed_encrypt_data=true;
+#if defined(SECMEM_V2)
+   return (uint8_t*)secmem_handle;
+#endif
+    return sec_drm_mem;
+  }
   bool IsTvpMode() { return (codec_param && codec_param->drmmode); }
   void CopyClearBufferToSecure(InputBuffer *input_buffer);
   bool IsSampleInSecureBuffer(InputBuffer *input_buffer);
@@ -137,6 +144,10 @@ protected:
   static int sec_mem_size;
   static int sec_mem_pos;
   bool has_fed_encrypt_data;
+#if defined(SECMEM_V2)
+  static void  * secmem_session;
+  static unsigned int  secmem_handle;
+#endif
 #endif
 };
 

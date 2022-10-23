@@ -1,7 +1,7 @@
 /*
  * HND generic pktq operation primitives
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -727,7 +727,7 @@ done:
 
 static void
 _pktq_pfilter(struct pktq *pq, int prec, pktq_filter_t fltr, void* fltr_ctx,
-			  defer_free_pkt_fn_t defer, void *defer_ctx)
+              defer_free_pkt_fn_t defer, void *defer_ctx)
 {
 	struct pktq_prec wq;
 	struct pktq_prec *q;
@@ -796,7 +796,7 @@ _pktq_pfilter(struct pktq *pq, int prec, pktq_filter_t fltr, void* fltr_ctx,
 
 void
 pktq_pfilter(struct pktq *pq, int prec, pktq_filter_t fltr, void* fltr_ctx,
-			 defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
+	defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
 {
 	_pktq_pfilter(pq, prec, fltr, fltr_ctx, defer, defer_ctx);
 
@@ -806,7 +806,7 @@ pktq_pfilter(struct pktq *pq, int prec, pktq_filter_t fltr, void* fltr_ctx,
 
 void
 pktq_filter(struct pktq *pq, pktq_filter_t fltr, void* fltr_ctx,
-			defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
+	defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
 {
 	bool filter = FALSE;
 
@@ -839,7 +839,7 @@ pktq_filter(struct pktq *pq, pktq_filter_t fltr, void* fltr_ctx,
 
 void
 spktq_filter(struct spktq *spq, pktq_filter_t fltr, void* fltr_ctx,
-			 defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
+	defer_free_pkt_fn_t defer, void *defer_ctx, flush_free_pkt_fn_t flush, void *flush_ctx)
 {
 	struct pktq_prec wq;
 	struct pktq_prec *q;

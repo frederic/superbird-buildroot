@@ -156,6 +156,7 @@ typedef struct PortContainerES {
     PhysicalAddress wrPtr;
     PhysicalAddress paBsBufStart;
     PhysicalAddress paBsBufEnd;
+    vpu_buffer_t    newBsBuf;
 } PortContainerES;
 
 typedef struct PortContainerDisplay {
@@ -164,6 +165,7 @@ typedef struct PortContainerDisplay {
     BOOL            reuse;
     BOOL            last;
     Uint32          type;
+    Int32           chromaIDCFlag;
     /* ---- DO NOT TOUCH THE ABOVE FIELDS ---- */
     DecOutputInfo   decInfo;
 } PortContainerDisplay;
@@ -364,6 +366,7 @@ typedef struct CNMComListenerStartDecOneFrame {
 typedef struct CNMComListenerDecInt {
     DecHandle       handle;
     Int32           flag;
+    Uint32          decIndex;
 } CNMComListenerDecInt;
 
 typedef struct CNMComListenerDecDone {
@@ -374,6 +377,9 @@ typedef struct CNMComListenerDecDone {
     Uint32          numDecoded;
     vpu_buffer_t    vbUser;
     CodStd          bitstreamFormat;    /* codec */
+#if defined(SUPPORT_VCPU_FPGA) || defined(SUPPORT_VCORE_FPGA)
+    VcoreTestData*  vcoreData;
+#endif /* SUPPORT_VCPU_FPGA || SUPPORT_VCORE_FPGA */
 } CNMComListenerDecDone;
 
 typedef struct CNMComListenerDecClose {

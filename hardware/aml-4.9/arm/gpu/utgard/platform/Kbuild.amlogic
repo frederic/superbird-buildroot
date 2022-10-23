@@ -128,32 +128,12 @@ ifndef CONFIG_DMA_SHARED_BUFFER
     ccflags-y += -DCONFIG_DMA_SHARED_BUFFER=y
 endif
 
-ifndef CONFIG_MALI_DMA_BUF_MAP_ON_ATTACH
-    ccflags-y += -DCONFIG_MALI_DMA_BUF_MAP_ON_ATTACH=y
-endif
-
 ccflags-y += -I$(src)/platform/$(TARGET_PLATFORM)
 ccflags-y += -DMALI_FAKE_PLATFORM_DEVICE=1
-#$(warning r7p0/Kbuild.plat ccflags-y is $(ccflags-y))
+$(warning r7p0/Kbuild.plat ccflags-y is $(ccflags-y))
 
-
-#####################################################
-ifeq (true,false)
+ifndef CONFIG_MALI_DMA_BUF_LAZY_MAP
 ifndef CONFIG_MALI_DMA_BUF_MAP_ON_ATTACH
     ccflags-y += -DCONFIG_MALI_DMA_BUF_MAP_ON_ATTACH=y
 endif
-
-ccflags-y += -DCONFIG_MALI_DT=y
-ccflags-y += -DMESON_CPU_TYPE=0x80
-ccflags-y += -DMESON_CPU_TYPE_MESON6=0x60
-ccflags-y += -DMESON_CPU_TYPE_MESON6TVD=0x75
-ccflags-y += -DMESON_CPU_TYPE_MESON8=0x80
-ccflags-y += -DMESON_CPU_TYPE_MESON8B=0x8B
-
-USE_GPPLL?=0
-ifdef CONFIG_AM_VIDEO
-    USE_GPPLL:=1
-endif
-
-ccflags-y += -DAMLOGIC_GPU_USE_GPPLL=$(USE_GPPLL)
 endif

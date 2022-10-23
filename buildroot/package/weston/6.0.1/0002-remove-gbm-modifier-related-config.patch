@@ -1,0 +1,32 @@
+From f332b5f82e24145a6d090c0ce505e99b858ce37e Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Wed, 22 Jan 2020 14:25:24 +0800
+Subject: [PATCH 2/7] remove-gbm-modifier-related-config
+
+Mali gbm library not support gbm modifiers relate api.
+---
+ configure.ac | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 68cdc86..4e0ff9b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -231,10 +231,10 @@ if test x$enable_drm_compositor = xyes; then
+   PKG_CHECK_MODULES(DRM_COMPOSITOR_FORMATS_BLOB, [libdrm >= 2.4.83],
+ 		    [AC_DEFINE([HAVE_DRM_FORMATS_BLOB], 1, [libdrm supports modifier advertisement])],
+ 		    [AC_MSG_WARN([libdrm does not support modifier advertisement])])
+-  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM_MODIFIERS, [gbm >= 17.1],
+-		    [AC_DEFINE([HAVE_GBM_MODIFIERS], 1, [GBM supports modifiers])],
+-		    [AC_MSG_WARN([GBM does not support modifiers])])
+-  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM, [gbm >= 17.2],
++#  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM_MODIFIERS, [gbm >= 17.1],
++#		    [AC_DEFINE([HAVE_GBM_MODIFIERS], 1, [GBM supports modifiers])],
++#		    [AC_MSG_WARN([GBM does not support modifiers])])
++  PKG_CHECK_MODULES(DRM_COMPOSITOR_GBM, [gbm],
+ 		    [AC_DEFINE([HAVE_GBM_FD_IMPORT], 1, [gbm supports import with modifiers])],
+ 		    [AC_MSG_WARN([GBM does not support dmabuf import, will omit that capability])])
+ fi
+-- 
+2.7.4
+

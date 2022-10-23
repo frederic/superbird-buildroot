@@ -76,6 +76,12 @@ void ClearEncListenerContext(
     EncListenerContext* ctx
     );
 
+void HandleEncFullEvent(
+    Component com,
+    CNMComListenerEncFull* param,
+    EncListenerContext* ctx
+    );
+
 void HandleEncGetOutputEvent(
     Component               com,
     CNMComListenerEncDone*  param,

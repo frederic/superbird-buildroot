@@ -1,0 +1,25 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      codec: ulaw,
+      source: file,
+      device:"/data/ain_g711_ulaw.dump"
+    }
+  },
+  {
+    type: ACodecG711,
+    param:
+    {
+      codec: s16le
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

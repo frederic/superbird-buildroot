@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a32_armv8_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "a1_ad401.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/common/initramfs/initramfs-419/ramfslist-32-ubi-release"

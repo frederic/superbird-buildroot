@@ -107,6 +107,7 @@ struct af_info {
 };
 
 struct sensor_info {
+    uint32_t cur_mode;
     uint32_t modes_num;
     sensor_mode_t modes[ISP_MAX_SENSOR_MODES];
 };

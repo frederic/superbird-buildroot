@@ -367,7 +367,7 @@ static void dump_vmalloc(void)
 
 	spin_lock(&vmap_area_lock);
 	list_for_each_entry_safe(va, next, &vmap_area_list, list) {
-		pr_info("%s, va:%lx-%lx, size:%08ld KB, alloc:%pf\n",
+		pr_info("%s, va:%lx-%lx, size:%8ld KB, alloc:%pf\n",
 			__func__, va->va_start, va->va_end,
 			(va->va_end - va->va_start) >> 10, va->vm->caller);
 	}

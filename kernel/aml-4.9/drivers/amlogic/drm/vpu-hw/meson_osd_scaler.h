@@ -88,20 +88,20 @@ enum scaler_coef_e {
 	COEFS_4POINT_TRIANGLE
 };
 
-enum f2v_vphase_type_e {
-	F2V_IT2IT = 0,
-	F2V_IB2IB,
-	F2V_IT2IB,
-	F2V_IB2IT,
-	F2V_P2IT,
-	F2V_P2IB,
-	F2V_IT2P,
-	F2V_IB2P,
-	F2V_P2P,
-	F2V_TYPE_MAX
+enum osd_scaler_f2v_vphase_type_e {
+	OSD_SCALER_F2V_IT2IT = 0,
+	OSD_SCALER_F2V_IB2IB,
+	OSD_SCALER_F2V_IT2IB,
+	OSD_SCALER_F2V_IB2IT,
+	OSD_SCALER_F2V_P2IT,
+	OSD_SCALER_F2V_P2IB,
+	OSD_SCALER_F2V_IT2P,
+	OSD_SCALER_F2V_IB2P,
+	OSD_SCALER_F2V_P2P,
+	OSD_SCALER_F2V_TYPE_MAX
 };
 
-struct f2v_vphase_s {
+struct osd_scaler_f2v_vphase_s {
 	u8 rcv_num;
 	u8 rpt_num;
 	u16 phase;

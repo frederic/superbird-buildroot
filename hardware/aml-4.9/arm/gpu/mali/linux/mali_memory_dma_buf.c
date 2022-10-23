@@ -401,3 +401,39 @@ void mali_mem_unbind_dma_buf(mali_mem_backend *mem_backend)
 	_mali_osk_free(mem);
 	mali_session_memory_unlock(session);
 }
+
+_mali_osk_errcode_t meson_update_video_texture(struct  mali_session_data *session, int fd)
+{
+	struct dma_buf *buf;
+	struct dma_buf_attachment *attachment;
+	struct sg_table *sgt;
+	_mali_osk_errcode_t ret = _MALI_OSK_ERR_OK;
+
+	/* get dma buffer */
+	buf = dma_buf_get(fd);
+	if (IS_ERR_OR_NULL(buf)) {
+		return _MALI_OSK_ERR_FAULT;
+	}
+
+	attachment = dma_buf_attach(buf, &mali_platform_device->dev);
+	if (NULL == attachment) {
+		ret = _MALI_OSK_ERR_FAULT;
+		goto failed_dma_attach;
+	}
+
+	sgt = dma_buf_map_attachment(attachment, DMA_BIDIRECTIONAL);
+	if (IS_ERR_OR_NULL(sgt)) {
+		MALI_DEBUG_PRINT_ERROR(("Failed to map dma-buf attachment\n"));
+		ret = _MALI_OSK_ERR_FAULT;
+		return -EFAULT;
+	}
+
+	dma_buf_unmap_attachment(attachment, sgt, DMA_BIDIRECTIONAL);
+	sgt = NULL;
+
+	dma_buf_detach(buf, attachment);
+failed_dma_attach:
+	dma_buf_put(buf);
+
+    return ret;
+}

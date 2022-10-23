@@ -51,7 +51,7 @@ install:$(TARGET)
 	install $(INSTALL_FLAGS) $(TARGET) $(TARGET_DIR)/bin
 	cp $(RAWDATAYUV) $(TARGET_DIR)/bin
 
-$(OBJ): test_main.c
+$(OBJ): test_main.cpp
 	$(CC) -c $(CFLAGS) $<  -o $@
 
 

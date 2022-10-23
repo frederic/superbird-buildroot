@@ -77,6 +77,29 @@ int ldim_spi_read(struct spi_device *spi, unsigned char *tbuf, int tlen,
 	return ret;
 }
 
+/* send and read buf at the same time, read data is start in rbuf[8]*/
+int ldim_spi_read_sync(struct spi_device *spi, unsigned char *tbuf,
+		       unsigned char *rbuf, int len)
+{
+	struct spi_transfer xfer;
+	struct spi_message msg;
+	int ret;
+
+	if (cs_hold_delay)
+		udelay(cs_hold_delay);
+
+	spi_message_init(&msg);
+	memset(&xfer, 0, sizeof(xfer));
+	xfer.tx_buf = (void *)tbuf;
+	xfer.rx_buf = (void *)rbuf;
+	xfer.len = len;
+	spi_message_add_tail(&xfer, &msg);
+
+	ret = spi_sync(spi, &msg);
+
+	return ret;
+}
+
 static int ldim_spi_dev_probe(struct spi_device *spi)
 {
 	struct aml_ldim_driver_s *ldim_drv = aml_ldim_get_driver();

@@ -69,7 +69,8 @@ struct shdr {
 	uint32_t img_type;
 	uint32_t img_size;
 	uint32_t key_type;
-	uint32_t rsv[8];
+	uint32_t marketid;
+	uint32_t rsv[7];
 
 	uint8_t nonce[TA_ENC_AES_IV_SIZE];
 	uint8_t aes_key[TA_ENC_AES_KEY_SIZE];

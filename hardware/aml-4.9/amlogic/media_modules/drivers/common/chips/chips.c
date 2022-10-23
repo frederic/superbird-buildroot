@@ -71,6 +71,7 @@ static const struct type_name cpu_type_name[] = {
 	{AM_MESON_CPU_MAJOR_ID_GXM, "gxm"},
 	{AM_MESON_CPU_MAJOR_ID_TXL, "txl"},
 	{AM_MESON_CPU_MAJOR_ID_TXLX, "txlx"},
+	{AM_MESON_CPU_MAJOR_ID_GXLX, "gxlx"},
 	{AM_MESON_CPU_MAJOR_ID_G12A, "g12a"},
 	{AM_MESON_CPU_MAJOR_ID_G12B, "g12b"},
 	{AM_MESON_CPU_MAJOR_ID_SM1, "sm1"},
@@ -145,6 +146,7 @@ static const struct type_name vformat_type_name[] = {
 	{VFORMAT_JPEG_ENC, "jpeg_enc"},
 	{VFORMAT_VP9, "vp9"},
 	{VFORMAT_AVS2, "avs2"},
+	{VFORMAT_AV1, "av1"},
 	{VFORMAT_YUV, "yuv"},
 	{0, NULL},
 };

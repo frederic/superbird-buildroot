@@ -182,7 +182,9 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 	for (i = 0; i < controller->chip_num; i++) {
 		/* if (aml_chip->valid_chip[i]) { */
 		for (read_cnt = 0; read_cnt < 2; read_cnt++) {
-			if (aml_chip->mfr_type  == NAND_MFR_SANDISK) {
+			if ((aml_chip->mfr_type  == NAND_MFR_SANDISK) ||
+			    (aml_chip->mfr_type  == 0xc8) ||
+			    (aml_chip->mfr_type  == 0xc2)) {
 				addr = (loff_t)offset + read_cnt*mtd->writesize;
 			} else
 				addr = (loff_t)offset +
@@ -295,8 +297,9 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 				/* pr_info("col0_oob =%x\n",col0_oob); */
 			}
 
-	if ((aml_chip->mfr_type  == 0xC8)) {
-		if ((col0_oob != 0xFF) || (col0_data != 0xFF)) {
+	if ((aml_chip->mfr_type  == 0xC8) ||
+	    (aml_chip->mfr_type  == 0xc2)) {
+		if (col0_oob != 0xFF) {
 			pr_info("detect factory Bad blk:%llx blk:%d chip:%d\n",
 				(uint64_t)addr, start_blk, i);
 			aml_chip->nand_bbt_info->nand_bbt[bad_blk_cnt++] =
@@ -311,17 +314,6 @@ int aml_nand_scan_shipped_bbt(struct mtd_info *mtd)
 
 	if (col0_oob != 0xFF) {
 		pr_info("%s:%d factory ship bbt found\n", __func__, __LINE__);
-		if (aml_chip->mfr_type  == 0xc2) {
-			if (col0_oob != 0xFF) {
-				pr_info("factory Bad blk:%llx blk=%d chip=%d\n",
-					(uint64_t)addr, start_blk, i);
-			aml_chip->nand_bbt_info->nand_bbt[bad_blk_cnt++] =
-				start_blk|0x8000;
-			aml_chip->block_status[start_blk] = NAND_FACTORY_BAD;
-				break;
-			}
-		}
-
 		if (aml_chip->mfr_type  == NAND_MFR_DOSILICON ||
 		    aml_chip->mfr_type  == NAND_MFR_ATO ||
 			aml_chip->mfr_type  == NAND_MFR_HYNIX ||
@@ -427,7 +419,7 @@ READ_RSV_AGAIN:
 	addr = nandrsv_info->valid_node->phy_blk_addr;
 	addr *= mtd->erasesize;
 	addr += nandrsv_info->valid_node->phy_page_addr * mtd->writesize;
-	pr_info("%s:%d,read %s info to %llx\n", __func__, __LINE__,
+	pr_info("%s:%d,read %s info at %llx\n", __func__, __LINE__,
 		nandrsv_info->name, addr);
 
 	data_buf = aml_chip->rsv_data_buf;
@@ -456,12 +448,12 @@ READ_RSV_AGAIN:
 			goto READ_RSV_AGAIN;
 		}
 
-		memcpy(oob_buf, chip->oob_poi, mtd->oobavail);
+		memcpy(oob_buf, chip->oob_poi, sizeof(struct oobinfo_t));
 		if (memcmp(oobinfo->name, nandrsv_info->name, 4))
 			pr_info("invalid nand info %s magic: %llx\n",
 				nandrsv_info->name, (uint64_t)addr);
+
 		addr += mtd->writesize;
-		page++;
 		len = min_t(uint32_t, mtd->writesize,
 			(nandrsv_info->size - amount_loaded));
 		memcpy(buf + amount_loaded, data_buf, len);
@@ -520,6 +512,7 @@ int aml_nand_read_key(struct mtd_info *mtd, size_t offset, u_char *buf)
 	if (aml_nand_read_rsv_info(mtd,
 		aml_chip->aml_nandkey_info, offset, (u_char *)buf))
 		return 1;
+
 	return 0;
 }
 
@@ -1059,9 +1052,10 @@ RE_RSV_INFO:
 		goto RE_RSV_INFO;
 	}
 
-	memcpy(oob_buf, chip->oob_poi, mtd->oobavail);
+	memcpy(oob_buf, chip->oob_poi, sizeof(struct oobinfo_t));
 	nandrsv_info->init = 1;
 	nandrsv_info->valid_node->status = 0;
+
 	if (!memcmp(oobinfo->name, nandrsv_info->name, 4)) {
 		nandrsv_info->valid = 1;
 		if (nandrsv_info->valid_node->phy_blk_addr >= 0) {
@@ -1147,8 +1141,6 @@ RE_RSV_INFO:
 	pr_info("%s %d: page_num=%d\n", __func__, __LINE__, page_num);
 
 	if (nandrsv_info->valid == 1) {
-		pr_info("%s %d\n", __func__, __LINE__);
-
 	for (i = 0; i < pages_per_blk; i++) {
 		memset((unsigned char *)data_buf,
 			0x0, mtd->writesize);
@@ -1163,6 +1155,7 @@ RE_RSV_INFO:
 		page = realpage & chip->pagemask;
 		chipnr = (int)(offset >> chip->chip_shift);
 		chip->select_chip(mtd, chipnr);
+
 		chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 		error = chip->ecc.read_page(mtd, chip, data_buf,
 							  1, page);
@@ -1175,7 +1168,7 @@ RE_RSV_INFO:
 			continue;
 		}
 
-		memcpy(oob_buf, chip->oob_poi, mtd->oobavail);
+		memcpy(oob_buf, chip->oob_poi, sizeof(struct oobinfo_t));
 		if (!memcmp(oobinfo->name, nandrsv_info->name, 4)) {
 			good_addr[i] = 1;
 			nandrsv_info->valid_node->phy_page_addr = i;
@@ -1285,7 +1278,7 @@ int aml_nand_ddr_check(struct mtd_info *mtd)
 		pr_info("%s %d\n", __func__, __LINE__);
 
 	if (aml_chip->aml_nandddr_info->valid == 0)
-		pr_info("%s %d NO dtb exist\n", __func__, __LINE__);
+		pr_info("%s %d NO ddr exist\n", __func__, __LINE__);
 
 	return ret;
 }

@@ -1,7 +1,7 @@
 /*
  * Broadcom SPI Host Controller Driver - Linux Per-port
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -73,9 +73,9 @@ struct sdos_info {
 static irqreturn_t
 sdspi_isr(int irq, void *dev_id
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 20)
-		  , struct pt_regs *ptregs
+, struct pt_regs *ptregs
 #endif // endif
-		 )
+)
 {
 	sdioh_info_t *sd;
 	struct sdos_info *sdos;
@@ -124,7 +124,7 @@ static int bcmsdh_spi_probe(struct spi_device *spi_dev)
 		sd_err(("bcmsdh_spi_probe: spi_setup fail with %d\n", ret));
 	}
 	sd_err(("bcmsdh_spi_probe: spi_setup with %d, bits_per_word=%d\n",
-			ret, spi_dev->bits_per_word));
+		ret, spi_dev->bits_per_word));
 	ret = bcmsdh_probe(&spi_dev->dev);
 
 	return ret;
@@ -147,7 +147,7 @@ static struct spi_driver bcmsdh_spi_driver = {
 		.name = "wlan_spi",
 		.bus    = &spi_bus_type,
 		.owner  = THIS_MODULE,
-	},
+		},
 };
 
 /*
@@ -337,7 +337,7 @@ void spi_waitbits(sdioh_info_t *sd, bool yield)
 	ASSERT(!yield);
 #endif // endif
 	sd_trace(("%s: yield %d canblock %d\n",
-			  __FUNCTION__, yield, BLOCKABLE()));
+	          __FUNCTION__, yield, BLOCKABLE()));
 
 	/* Clear the "interrupt happened" flag and last intrstatus */
 	sd->got_hcint = FALSE;
@@ -392,7 +392,7 @@ spi_sendrecv(sdioh_info_t *sd, uint8 *msg_out, uint8 *msg_in, int msglen)
 	struct spi_transfer t[2];
 
 	spi_message_init(&msg);
-	memset(t, 0, 2 * sizeof(struct spi_transfer));
+	memset(t, 0, 2*sizeof(struct spi_transfer));
 
 	if (sd->wordlen == 2)
 #if !(defined(SPI_PIO_RW_BIGENDIAN) && defined(SPI_PIO_32BIT_RW))
@@ -411,11 +411,11 @@ spi_sendrecv(sdioh_info_t *sd, uint8 *msg_out, uint8 *msg_in, int msglen)
 		hexdump(" OUT: ", msg_out, msglen);
 	}
 
-	tx_len = write ? msglen - 4 : 4;
+	tx_len = write ? msglen-4 : 4;
 
 	sd_trace(("spi_sendrecv: %s, wordlen %d, cmd : 0x%02x 0x%02x 0x%02x 0x%02x\n",
-			  write ? "WR" : "RD", sd->wordlen,
-			  msg_out[0], msg_out[1], msg_out[2], msg_out[3]));
+		write ? "WR" : "RD", sd->wordlen,
+		msg_out[0], msg_out[1], msg_out[2], msg_out[3]));
 
 	t[0].tx_buf = (char *)&msg_out[0];
 	t[0].rx_buf = 0;
@@ -425,7 +425,7 @@ spi_sendrecv(sdioh_info_t *sd, uint8 *msg_out, uint8 *msg_in, int msglen)
 
 	t[1].rx_buf = (char *)&msg_in[tx_len];
 	t[1].tx_buf = 0;
-	t[1].len = msglen - tx_len;
+	t[1].len = msglen-tx_len;
 
 	spi_message_add_tail(&t[1], &msg);
 	spi_sync(gBCMSPI, &msg);

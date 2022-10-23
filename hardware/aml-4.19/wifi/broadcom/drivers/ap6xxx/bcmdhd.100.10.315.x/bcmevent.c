@@ -1,7 +1,7 @@
 /*
  * bcmevent read-only data shared by kernel or app layers
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmevent.c 755881 2018-04-05 06:32:32Z $
+ * $Id: bcmevent.c 807989 2019-03-05 07:57:42Z $
  */
 
 #include <typedefs.h>
@@ -149,7 +149,7 @@ static const bcmevent_name_str_t bcmevent_names[] = {
 #ifdef WLWNM
 	BCMEVENT_NAME(WLC_E_WNM_STA_SLEEP),
 #endif /* WLWNM */
-#if defined(WL_PROXDETECT)
+#if defined(WL_PROXDETECT) || defined(RTT_SUPPORT)
 	BCMEVENT_NAME(WLC_E_PROXD),
 #endif // endif
 	BCMEVENT_NAME(WLC_E_CCA_CHAN_QUAL),
@@ -198,6 +198,7 @@ static const bcmevent_name_str_t bcmevent_names[] = {
 #endif /* WL_NAN */
 	BCMEVENT_NAME(WLC_E_RPSNOA),
 	BCMEVENT_NAME(WLC_E_PHY_CAL),
+	BCMEVENT_NAME(WLC_E_WA_LQM),
 };
 
 const char *bcmevent_get_name(uint event_type)
@@ -265,7 +266,7 @@ wl_event_to_network_order(wl_event_msg_t * evt)
  */
 int
 is_wlc_event_frame(void *pktdata, uint pktlen, uint16 exp_usr_subtype,
-				   bcm_event_msg_u_t *out_event)
+	bcm_event_msg_u_t *out_event)
 {
 	uint16 evlen = 0;	/* length in bcmeth_hdr */
 	uint16 subtype;
@@ -325,7 +326,7 @@ is_wlc_event_frame(void *pktdata, uint pktlen, uint16 exp_usr_subtype,
 	case BCMILCP_BCM_SUBTYPE_EVENT:
 		/* check that header length and pkt length are sufficient */
 		if ((pktlen < sizeof(bcm_event_t)) ||
-				(evend < ((uint8 *)bcm_event + sizeof(bcm_event_t)))) {
+			(evend < ((uint8 *)bcm_event + sizeof(bcm_event_t)))) {
 			err = BCME_BADLEN;
 			goto done;
 		}
@@ -333,7 +334,7 @@ is_wlc_event_frame(void *pktdata, uint pktlen, uint16 exp_usr_subtype,
 		/* ensure data length in event is not beyond the packet. */
 		data_len = ntoh32_ua((void *)&bcm_event->event.datalen);
 		if ((sizeof(bcm_event_t) + data_len +
-				BCMILCP_BCM_SUBTYPE_EVENT_DATA_PAD) != pktlen) {
+			BCMILCP_BCM_SUBTYPE_EVENT_DATA_PAD) != pktlen) {
 			err = BCME_BADLEN;
 			goto done;
 		}
@@ -353,15 +354,15 @@ is_wlc_event_frame(void *pktdata, uint pktlen, uint16 exp_usr_subtype,
 	case BCMILCP_BCM_SUBTYPE_DNGLEVENT:
 #if defined(DNGL_EVENT_SUPPORT)
 		if ((pktlen < sizeof(bcm_dngl_event_t)) ||
-				(evend < ((uint8 *)bcm_event + sizeof(bcm_dngl_event_t)))) {
+			(evend < ((uint8 *)bcm_event + sizeof(bcm_dngl_event_t)))) {
 			err = BCME_BADLEN;
 			goto done;
 		}
 
 		/* ensure data length in event is not beyond the packet. */
-		data_len = ntoh16_ua((void *) & ((bcm_dngl_event_t *)pktdata)->dngl_event.datalen);
+		data_len = ntoh16_ua((void *)&((bcm_dngl_event_t *)pktdata)->dngl_event.datalen);
 		if ((sizeof(bcm_dngl_event_t) + data_len +
-				BCMILCP_BCM_SUBTYPE_EVENT_DATA_PAD) != pktlen) {
+			BCMILCP_BCM_SUBTYPE_EVENT_DATA_PAD) != pktlen) {
 			err = BCME_BADLEN;
 			goto done;
 		}
@@ -374,7 +375,7 @@ is_wlc_event_frame(void *pktdata, uint pktlen, uint16 exp_usr_subtype,
 		if (out_event) {
 			/* ensure BRCM dngl event pkt aligned */
 			memcpy(&out_event->dngl_event, &((bcm_dngl_event_t *)pktdata)->dngl_event,
-				   sizeof(bcm_dngl_event_msg_t));
+				sizeof(bcm_dngl_event_msg_t));
 		}
 
 		break;

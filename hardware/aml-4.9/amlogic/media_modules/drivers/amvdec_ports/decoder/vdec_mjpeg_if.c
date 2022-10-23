@@ -93,6 +93,7 @@ struct vdec_mjpeg_vsi {
 	int head_offset;
 	struct vdec_mjpeg_dec_info dec;
 	struct vdec_pic_info pic;
+	struct vdec_pic_info cur_pic;
 	struct v4l2_rect crop;
 	bool is_combine;
 	int nalu_pos;
@@ -111,6 +112,7 @@ struct vdec_mjpeg_inst {
 	struct aml_vdec_adapt vdec;
 	struct vdec_mjpeg_vsi *vsi;
 	struct vcodec_vfm_s vfm;
+	struct completion comp;
 };
 
 static void get_pic_info(struct vdec_mjpeg_inst *inst,
@@ -118,11 +120,14 @@ static void get_pic_info(struct vdec_mjpeg_inst *inst,
 {
 	*pic = inst->vsi->pic;
 
-	aml_vcodec_debug(inst, "pic(%d, %d), buf(%d, %d)",
-			 pic->visible_width, pic->visible_height,
-			 pic->coded_width, pic->coded_height);
-	aml_vcodec_debug(inst, "Y(%d, %d), C(%d, %d)", pic->y_bs_sz,
-			 pic->y_len_sz, pic->c_bs_sz, pic->c_len_sz);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"pic(%d, %d), buf(%d, %d)\n",
+		 pic->visible_width, pic->visible_height,
+		 pic->coded_width, pic->coded_height);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"Y(%d, %d), C(%d, %d)\n",
+		pic->y_bs_sz, pic->y_len_sz,
+		pic->c_bs_sz, pic->c_len_sz);
 }
 
 static void get_crop_info(struct vdec_mjpeg_inst *inst, struct v4l2_rect *cr)
@@ -132,14 +137,16 @@ static void get_crop_info(struct vdec_mjpeg_inst *inst, struct v4l2_rect *cr)
 	cr->width = inst->vsi->crop.width;
 	cr->height = inst->vsi->crop.height;
 
-	aml_vcodec_debug(inst, "l=%d, t=%d, w=%d, h=%d",
-			 cr->left, cr->top, cr->width, cr->height);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"l=%d, t=%d, w=%d, h=%d\n",
+		 cr->left, cr->top, cr->width, cr->height);
 }
 
 static void get_dpb_size(struct vdec_mjpeg_inst *inst, unsigned int *dpb_sz)
 {
 	*dpb_sz = 20;//inst->vsi->dec.dpb_sz;
-	aml_vcodec_debug(inst, "sz=%d", *dpb_sz);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"sz=%d\n", *dpb_sz);
 }
 
 static int vdec_mjpeg_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
@@ -168,26 +175,32 @@ static int vdec_mjpeg_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 	/* init vfm */
 	inst->vfm.ctx	= ctx;
 	inst->vfm.ada_ctx = &inst->vdec;
-	vcodec_vfm_init(&inst->vfm);
+	ret = vcodec_vfm_init(&inst->vfm);
+	if (ret) {
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"init vfm failed.\n");
+		goto err;
+	}
 
 	ret = video_decoder_init(&inst->vdec);
 	if (ret) {
-		aml_vcodec_err(inst, "vdec_mjpeg init err=%d", ret);
-		goto error_free_inst;
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"vdec_mjpeg init err=%d\n", ret);
+		goto err;
 	}
 
 	/* probe info from the stream */
 	inst->vsi = kzalloc(sizeof(struct vdec_mjpeg_vsi), GFP_KERNEL);
 	if (!inst->vsi) {
 		ret = -ENOMEM;
-		goto error_free_inst;
+		goto err;
 	}
 
 	/* alloc the header buffer to be used cache sps or spp etc.*/
 	inst->vsi->header_buf = kzalloc(HEADER_BUFFER_SIZE, GFP_KERNEL);
-	if (!inst->vsi) {
+	if (!inst->vsi->header_buf) {
 		ret = -ENOMEM;
-		goto error_free_vsi;
+		goto err;
 	}
 
 	inst->vsi->pic.visible_width	= 1920;
@@ -199,7 +212,8 @@ static int vdec_mjpeg_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 	inst->vsi->pic.c_bs_sz		= 0;
 	inst->vsi->pic.c_len_sz		= (1920 * 1088 / 2);
 
-	aml_vcodec_debug(inst, "mjpeg Instance >> %p", inst);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+		"mjpeg Instance >> %lx\n", (ulong) inst);
 
 	ctx->ada_ctx	= &inst->vdec;
 	*h_vdec		= (unsigned long)inst;
@@ -208,10 +222,15 @@ static int vdec_mjpeg_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 
 	return 0;
 
-error_free_vsi:
-	kfree(inst->vsi);
-error_free_inst:
-	kfree(inst);
+err:
+	if (inst)
+		vcodec_vfm_release(&inst->vfm);
+	if (inst && inst->vsi && inst->vsi->header_buf)
+		kfree(inst->vsi->header_buf);
+	if (inst && inst->vsi)
+		kfree(inst->vsi);
+	if (inst)
+		kfree(inst);
 	*h_vdec = 0;
 
 	return ret;
@@ -252,12 +271,52 @@ static void fill_vdec_params(struct vdec_mjpeg_inst *inst,
 	/* calc DPB size */
 	dec->dpb_sz = 9;//refer_buffer_num(sps->level_idc, poc_cnt, mb_w, mb_h);
 
-	pr_info("[%d] The stream infos, coded:(%d x %d), visible:(%d x %d), DPB: %d\n",
-		inst->ctx->id, pic->coded_width, pic->coded_height,
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_BUFMGR,
+		"The stream infos, coded:(%d x %d), visible:(%d x %d), DPB: %d\n",
+		pic->coded_width, pic->coded_height,
 		pic->visible_width, pic->visible_height, dec->dpb_sz);
 }
 
-static int stream_parse(struct vdec_mjpeg_inst *inst, u8 *buf, u32 size)
+static int parse_stream_ucode(struct vdec_mjpeg_inst *inst, u8 *buf, u32 size)
+{
+	int ret = 0;
+	struct aml_vdec_adapt *vdec = &inst->vdec;
+
+	ret = vdec_vframe_write(vdec, buf, size, 0);
+	if (ret < 0) {
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"write frame data failed. err: %d\n", ret);
+		return ret;
+	}
+
+	/* wait ucode parse ending. */
+	wait_for_completion_timeout(&inst->comp,
+		msecs_to_jiffies(1000));
+
+	return inst->vsi->dec.dpb_sz ? 0 : -1;
+}
+
+static int parse_stream_ucode_dma(struct vdec_mjpeg_inst *inst,
+	ulong buf, u32 size, u32 handle)
+{
+	int ret = 0;
+	struct aml_vdec_adapt *vdec = &inst->vdec;
+
+	ret = vdec_vframe_write_with_dma(vdec, buf, size, 0, handle);
+	if (ret < 0) {
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"write frame data failed. err: %d\n", ret);
+		return ret;
+	}
+
+	/* wait ucode parse ending. */
+	wait_for_completion_timeout(&inst->comp,
+		msecs_to_jiffies(1000));
+
+	return inst->vsi->dec.dpb_sz ? 0 : -1;
+}
+
+static int parse_stream_cpu(struct vdec_mjpeg_inst *inst, u8 *buf, u32 size)
 {
 	int ret = 0;
 	struct mjpeg_param_sets *ps = NULL;
@@ -268,7 +327,8 @@ static int stream_parse(struct vdec_mjpeg_inst *inst, u8 *buf, u32 size)
 
 	ret = mjpeg_decode_extradata_ps(buf, size, ps);
 	if (ret) {
-		pr_err("parse extra data failed. err: %d\n", ret);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"parse extra data failed. err: %d\n", ret);
 		goto out;
 	}
 
@@ -287,19 +347,38 @@ static int vdec_mjpeg_probe(unsigned long h_vdec,
 {
 	struct vdec_mjpeg_inst *inst =
 		(struct vdec_mjpeg_inst *)h_vdec;
-	struct stream_info *st;
 	u8 *buf = (u8 *)bs->vaddr;
 	u32 size = bs->size;
 	int ret = 0;
 
-	st = (struct stream_info *)buf;
-	if (inst->ctx->is_drm_mode && (st->magic == DRMe || st->magic == DRMn))
-		return 0;
+	if (inst->ctx->is_drm_mode) {
+		if (bs->model == VB2_MEMORY_MMAP) {
+			struct aml_video_stream *s =
+				(struct aml_video_stream *) buf;
 
-	if (st->magic == NORe || st->magic == NORn)
-		ret = stream_parse(inst, st->data, st->length);
-	else
-		ret = stream_parse(inst, buf, size);
+			if ((s->magic != AML_VIDEO_MAGIC) &&
+				(s->type != V4L_STREAM_TYPE_MATEDATA))
+				return -1;
+
+			if (inst->ctx->param_sets_from_ucode) {
+				ret = parse_stream_ucode(inst, s->data, s->len);
+			} else {
+				ret = parse_stream_cpu(inst, s->data, s->len);
+			}
+		} else if (bs->model == VB2_MEMORY_DMABUF ||
+			bs->model == VB2_MEMORY_USERPTR) {
+			ret = parse_stream_ucode_dma(inst, bs->addr, size,
+				BUFF_IDX(bs, bs->index));
+		}
+	} else {
+		if (inst->ctx->param_sets_from_ucode) {
+			ret = parse_stream_ucode(inst, buf, size);
+		} else {
+			ret = parse_stream_cpu(inst, buf, size);
+		}
+	}
+
+	inst->vsi->cur_pic = inst->vsi->pic;
 
 	return ret;
 }
@@ -310,8 +389,6 @@ static void vdec_mjpeg_deinit(unsigned long h_vdec)
 
 	if (!inst)
 		return;
-
-	aml_vcodec_debug_enter(inst);
 
 	video_decoder_release(&inst->vdec);
 
@@ -340,14 +417,16 @@ static void vdec_mjpeg_get_vf(struct vdec_mjpeg_inst *inst, struct vdec_v4l2_buf
 
 	vf = peek_video_frame(&inst->vfm);
 	if (!vf) {
-		aml_vcodec_debug(inst, "there is no vframe.");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"there is no vframe.\n");
 		*out = NULL;
 		return;
 	}
 
 	vf = get_video_frame(&inst->vfm);
 	if (!vf) {
-		aml_vcodec_debug(inst, "the vframe is avalid.");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the vframe is avalid.\n");
 		*out = NULL;
 		return;
 	}
@@ -384,29 +463,34 @@ static int vdec_mjpeg_decode(unsigned long h_vdec, struct aml_vcodec_mem *bs,
 {
 	struct vdec_mjpeg_inst *inst = (struct vdec_mjpeg_inst *)h_vdec;
 	struct aml_vdec_adapt *vdec = &inst->vdec;
-	struct stream_info *st;
-	u8 *buf;
-	u32 size;
-	int ret = 0;
+	u8 *buf = (u8 *) bs->vaddr;
+	u32 size = bs->size;
+	int ret = -1;
 
-	/* bs NULL means flush decoder */
-	if (bs == NULL)
-		return 0;
+	if (vdec_input_full(vdec))
+		return -EAGAIN;
 
-	buf = (u8 *)bs->vaddr;
-	size = bs->size;
-	st = (struct stream_info *)buf;
+	if (inst->ctx->is_drm_mode) {
+		if (bs->model == VB2_MEMORY_MMAP) {
+			struct aml_video_stream *s =
+				(struct aml_video_stream *) buf;
 
-	if (inst->ctx->is_drm_mode && (st->magic == DRMe || st->magic == DRMn))
-		ret = vdec_vbuf_write(vdec, st->m.buf, sizeof(st->m.drm));
-	else if (st->magic == NORe)
-		ret = vdec_vbuf_write(vdec, st->data, st->length);
-	else if (st->magic == NORn)
-		ret = vdec_write_nalu(inst, st->data, st->length, timestamp);
-	else if (inst->ctx->is_stream_mode)
-		ret = vdec_vbuf_write(vdec, buf, size);
-	else
+			if (s->magic != AML_VIDEO_MAGIC)
+				return -1;
+
+			ret = vdec_vframe_write(vdec,
+				s->data,
+				s->len,
+				timestamp);
+		} else if (bs->model == VB2_MEMORY_DMABUF ||
+			bs->model == VB2_MEMORY_USERPTR) {
+			ret = vdec_vframe_write_with_dma(vdec,
+				bs->addr, size, timestamp,
+				BUFF_IDX(bs, bs->index));
+		}
+	} else {
 		ret = vdec_write_nalu(inst, buf, size, timestamp);
+	}
 
 	return ret;
 }
@@ -418,7 +502,8 @@ static int vdec_mjpeg_get_param(unsigned long h_vdec,
 	struct vdec_mjpeg_inst *inst = (struct vdec_mjpeg_inst *)h_vdec;
 
 	if (!inst) {
-		pr_err("the mjpeg inst of dec is invalid.\n");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the mjpeg inst of dec is invalid.\n");
 		return -1;
 	}
 
@@ -444,7 +529,8 @@ static int vdec_mjpeg_get_param(unsigned long h_vdec,
 		break;
 
 	default:
-		aml_vcodec_err(inst, "invalid get parameter type=%d", type);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"invalid get parameter type=%d\n", type);
 		ret = -EINVAL;
 	}
 
@@ -454,7 +540,7 @@ static int vdec_mjpeg_get_param(unsigned long h_vdec,
 static void set_param_ps_info(struct vdec_mjpeg_inst *inst,
 	struct aml_vdec_ps_infos *ps)
 {
-	pr_info("---%s, %d\n", __func__, __LINE__);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO, "\n");
 }
 
 static int vdec_mjpeg_set_param(unsigned long h_vdec,
@@ -464,7 +550,8 @@ static int vdec_mjpeg_set_param(unsigned long h_vdec,
 	struct vdec_mjpeg_inst *inst = (struct vdec_mjpeg_inst *)h_vdec;
 
 	if (!inst) {
-		pr_err("the mjpeg inst of dec is invalid.\n");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the mjpeg inst of dec is invalid.\n");
 		return -1;
 	}
 
@@ -474,7 +561,8 @@ static int vdec_mjpeg_set_param(unsigned long h_vdec,
 		break;
 
 	default:
-		aml_vcodec_err(inst, "invalid set parameter type=%d", type);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"invalid set parameter type=%d\n", type);
 		ret = -EINVAL;
 	}
 

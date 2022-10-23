@@ -1,0 +1,26 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: ACodecG726,
+    param:
+    {
+      codec: g726,
+      bitrate: 16k,
+      endian: le
+    }
+  },
+  {
+    type: fileout,
+    param:
+    {
+      path: "/data/ain_g726-16k-le.dump"
+    }
+  }
+]

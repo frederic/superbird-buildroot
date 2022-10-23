@@ -12,7 +12,7 @@ EXT2_MKFS_OPTS = $(call qstrip,$(BR2_TARGET_ROOTFS_EXT2_MKFS_OPTIONS))
 
 # qstrip results in stripping consecutive spaces into a single one. So the
 # variable is not qstrip-ed to preserve the integrity of the string value.
-EXT2_LABEL := $(subst ",,$(BR2_TARGET_ROOTFS_EXT2_LABEL))
+EXT2_LABEL = $(subst ",,$(BR2_TARGET_ROOTFS_EXT2_LABEL))
 #" Syntax highlighting... :-/ )
 
 EXT2_OPTS = \
@@ -59,8 +59,8 @@ ifeq ($(BR2_TARGET_USBTOOL_AMLOGIC),y)
 ifeq ($(filter y,$(BR2_TARGET_UBOOT_AMLOGIC_2015) $(BR2_TARGET_UBOOT_AMLOGIC_REPO)),y)
 ifneq ($(UPGRADE_DIR_OVERLAY),)
 define ROOTFS-USB-IMAGE-PACK
-	cp -rf $(UPGRADE_DIR)/* $(BINARIES_DIR)
-	cp -rf $(UPGRADE_DIR_OVERLAY)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR_OVERLAY)/* $(BINARIES_DIR)
 	BINARIES_DIR=$(BINARIES_DIR) \
 	TOOL_DIR=$(HOST_DIR)/bin \
 	$(HOST_DIR)/bin/aml_upgrade_pkg_gen.sh \
@@ -68,7 +68,7 @@ define ROOTFS-USB-IMAGE-PACK
 endef
 else
 define ROOTFS-USB-IMAGE-PACK
-	cp -rf $(UPGRADE_DIR)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR)/* $(BINARIES_DIR)
 	BINARIES_DIR=$(BINARIES_DIR) \
 	TOOL_DIR=$(HOST_DIR)/bin \
 	$(HOST_DIR)/bin/aml_upgrade_pkg_gen.sh \
@@ -78,7 +78,7 @@ endif
 
 else #BR2_TARGET_UBOOT_AMLOGIC_2015
 define ROOTFS-USB-IMAGE-PACK
-	cp -rf $(UPGRADE_DIR)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR)/* $(BINARIES_DIR)
 	$(HOST_DIR)/bin/aml_image_v2_packer_new -r $(BINARIES_DIR)/aml_upgrade_package.conf $(BINARIES_DIR)/ $(BINARIES_DIR)/aml_upgrade_package.img
 endef
 endif #BR2_TARGET_UBOOT_AMLOGIC_2015

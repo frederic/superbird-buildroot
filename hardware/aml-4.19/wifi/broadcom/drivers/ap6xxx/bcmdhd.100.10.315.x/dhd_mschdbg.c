@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -135,8 +135,7 @@ dhd_mschdbg_req_param_profiler_event_data(int sp, int ver, char *data, uint16 pt
 	type = p->req_type;
 	if (type < 4) {
 		char *req_type[] = {"fixed", "start-flexible", "duration-flexible",
-							"both-flexible"
-						   };
+			"both-flexible"};
 		MSCH_EVENT(("%s", req_type[type]));
 	}
 	else
@@ -157,8 +156,8 @@ dhd_mschdbg_req_param_profiler_event_data(int sp, int ver, char *data, uint16 pt
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("start-time: %s, duration: %d(us), interval: %d(us)\n",
-				dhd_mschdbg_display_time(p->start_time_h, p->start_time_l),
-				ntoh32(p->duration), ntoh32(p->interval)));
+		dhd_mschdbg_display_time(p->start_time_h, p->start_time_l),
+		ntoh32(p->duration), ntoh32(p->interval)));
 
 	if (type == WL_MSCH_RT_DUR_FLEX) {
 		MSCH_EVENT_HEAD(sn);
@@ -166,26 +165,25 @@ dhd_mschdbg_req_param_profiler_event_data(int sp, int ver, char *data, uint16 pt
 	} else if (type == WL_MSCH_RT_BOTH_FLEX) {
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("min_dur: %d(us), max_away_dur: %d(us)\n",
-					ntoh32(p->flex.bf.min_dur), ntoh32(p->flex.bf.max_away_dur)));
+			ntoh32(p->flex.bf.min_dur), ntoh32(p->flex.bf.max_away_dur)));
 
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("hi_prio_time: %s, hi_prio_interval: %d(us)\n",
-					dhd_mschdbg_display_time(p->flex.bf.hi_prio_time_h,
-											 p->flex.bf.hi_prio_time_l),
-					ntoh32(p->flex.bf.hi_prio_interval)));
+			dhd_mschdbg_display_time(p->flex.bf.hi_prio_time_h,
+			p->flex.bf.hi_prio_time_l),
+			ntoh32(p->flex.bf.hi_prio_interval)));
 	}
 }
 
 static void
 dhd_mschdbg_timeslot_profiler_event_data(int sp, int ver, char *title, char *data,
-		uint16 ptr, bool empty)
+	uint16 ptr, bool empty)
 {
 	int s, sn = sp + 4;
 	msch_timeslot_profiler_event_data_t *p =
 		(msch_timeslot_profiler_event_data_t *)(data + ntoh16(ptr));
 	char *state[] = {"NONE", "CHN_SW", "ONCHAN_FIRE", "OFF_CHN_PREP",
-					 "OFF_CHN_DONE", "TS_COMPLETE"
-					};
+		"OFF_CHN_DONE", "TS_COMPLETE"};
 
 	MSCH_EVENT_HEAD(sp);
 	MSCH_EVENT(("<%s timeslot>: ", title));
@@ -201,25 +199,25 @@ dhd_mschdbg_timeslot_profiler_event_data(int sp, int ver, char *title, char *dat
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("id: %d, state[%d]: %s, chan_ctxt: [0x%08x]\n",
-				ntoh32(p->timeslot_id), ntoh32(p->state), state[s], ntoh32(p->p_chan_ctxt)));
+		ntoh32(p->timeslot_id), ntoh32(p->state), state[s], ntoh32(p->p_chan_ctxt)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("fire_time: %s",
-				dhd_mschdbg_display_time(p->fire_time_h, p->fire_time_l)));
+		dhd_mschdbg_display_time(p->fire_time_h, p->fire_time_l)));
 
 	MSCH_EVENT((", pre_start_time: %s",
-				dhd_mschdbg_display_time(p->pre_start_time_h, p->pre_start_time_l)));
+		dhd_mschdbg_display_time(p->pre_start_time_h, p->pre_start_time_l)));
 
 	MSCH_EVENT((", end_time: %s",
-				dhd_mschdbg_display_time(p->end_time_h, p->end_time_l)));
+		dhd_mschdbg_display_time(p->end_time_h, p->end_time_l)));
 
 	MSCH_EVENT((", sch_dur: %s\n",
-				dhd_mschdbg_display_time(p->sch_dur_h, p->sch_dur_l)));
+		dhd_mschdbg_display_time(p->sch_dur_h, p->sch_dur_l)));
 }
 
 static void
 dhd_mschdbg_req_timing_profiler_event_data(int sp, int ver, char *title, char *data,
-		uint16 ptr, bool empty)
+	uint16 ptr, bool empty)
 {
 	int sn = sp + 4;
 	msch_req_timing_profiler_event_data_t *p =
@@ -234,7 +232,7 @@ dhd_mschdbg_req_timing_profiler_event_data(int sp, int ver, char *title, char *d
 	}
 	else
 		MSCH_EVENT(("0x%08x (prev 0x%08x, next 0x%08x)\n",
-					ntoh32(p->p_req_timing), ntoh32(p->p_prev), ntoh32(p->p_next)));
+			ntoh32(p->p_req_timing), ntoh32(p->p_prev), ntoh32(p->p_next)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("flags:"));
@@ -261,20 +259,20 @@ dhd_mschdbg_req_timing_profiler_event_data(int sp, int ver, char *title, char *d
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("pre_start_time: %s",
-				dhd_mschdbg_display_time(p->pre_start_time_h, p->pre_start_time_l)));
+		dhd_mschdbg_display_time(p->pre_start_time_h, p->pre_start_time_l)));
 
 	MSCH_EVENT((", start_time: %s",
-				dhd_mschdbg_display_time(p->start_time_h, p->start_time_l)));
+		dhd_mschdbg_display_time(p->start_time_h, p->start_time_l)));
 
 	MSCH_EVENT((", end_time: %s\n",
-				dhd_mschdbg_display_time(p->end_time_h, p->end_time_l)));
+		dhd_mschdbg_display_time(p->end_time_h, p->end_time_l)));
 
 	if (p->p_timeslot && (p->timeslot_ptr == 0)) {
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("<%s timeslot>: 0x%08x\n", title, ntoh32(p->p_timeslot)));
 	} else
 		dhd_mschdbg_timeslot_profiler_event_data(sn, ver, title, data, p->timeslot_ptr,
-				(p->timeslot_ptr == 0));
+			(p->timeslot_ptr == 0));
 }
 
 static void
@@ -294,31 +292,31 @@ dhd_mschdbg_chan_ctxt_profiler_event_data(int sp, int ver, char *data, uint16 pt
 	}
 	else
 		MSCH_EVENT(("0x%08x (prev 0x%08x, next 0x%08x)\n",
-					ntoh32(p->p_chan_ctxt), ntoh32(p->p_prev), ntoh32(p->p_next)));
+			ntoh32(p->p_chan_ctxt), ntoh32(p->p_prev), ntoh32(p->p_next)));
 
 	c = (chanspec_t)ntoh16(p->chanspec);
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("channel: %s, bf_sch_pending: %s, bf_skipped: %d\n",
-				wf_chspec_ntoa(c, buf), p->bf_sch_pending ? "TRUE" : "FALSE",
-				ntoh32(p->bf_skipped_count)));
+		wf_chspec_ntoa(c, buf), p->bf_sch_pending? "TRUE" : "FALSE",
+		ntoh32(p->bf_skipped_count)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("bf_link: prev 0x%08x, next 0x%08x\n",
-				ntoh32(p->bf_link_prev), ntoh32(p->bf_link_next)));
+		ntoh32(p->bf_link_prev), ntoh32(p->bf_link_next)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("onchan_time: %s",
-				dhd_mschdbg_display_time(p->onchan_time_h, p->onchan_time_l)));
+		dhd_mschdbg_display_time(p->onchan_time_h, p->onchan_time_l)));
 	MSCH_EVENT((", actual_onchan_dur: %s",
-				dhd_mschdbg_display_time(p->actual_onchan_dur_h, p->actual_onchan_dur_l)));
+		dhd_mschdbg_display_time(p->actual_onchan_dur_h, p->actual_onchan_dur_l)));
 	MSCH_EVENT((", pend_onchan_dur: %s\n",
-				dhd_mschdbg_display_time(p->pend_onchan_dur_h, p->pend_onchan_dur_l)));
+		dhd_mschdbg_display_time(p->pend_onchan_dur_h, p->pend_onchan_dur_l)));
 
 	dhd_mschdbg_elem_list(sn, "req_entity", data, p->req_entity_list_ptr,
-						  p->req_entity_list_cnt);
+		p->req_entity_list_cnt);
 	dhd_mschdbg_elem_list(sn, "bf_entity", data, p->bf_entity_list_ptr,
-						  p->bf_entity_list_cnt);
+		p->bf_entity_list_cnt);
 }
 
 static void
@@ -339,31 +337,31 @@ dhd_mschdbg_req_entity_profiler_event_data(int sp, int ver, char *data, uint16 p
 	}
 	else
 		MSCH_EVENT(("0x%08x (prev 0x%08x, next 0x%08x)\n",
-					ntoh32(p->p_req_entity), ntoh32(p->req_hdl_link_prev),
-					ntoh32(p->req_hdl_link_next)));
+			ntoh32(p->p_req_entity), ntoh32(p->req_hdl_link_prev),
+			ntoh32(p->req_hdl_link_next)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("req_hdl: [0x%08x]\n", ntoh32(p->p_req_hdl)));
 
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("chan_ctxt_link: prev 0x%08x, next 0x%08x\n",
-				ntoh32(p->chan_ctxt_link_prev), ntoh32(p->chan_ctxt_link_next)));
+		ntoh32(p->chan_ctxt_link_prev), ntoh32(p->chan_ctxt_link_next)));
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("rt_specific_link: prev 0x%08x, next 0x%08x\n",
-				ntoh32(p->rt_specific_link_prev), ntoh32(p->rt_specific_link_next)));
+		ntoh32(p->rt_specific_link_prev), ntoh32(p->rt_specific_link_next)));
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("start_fixed_link: prev 0x%08x, next 0x%08x\n",
-				ntoh32(p->start_fixed_link_prev), ntoh32(p->start_fixed_link_next)));
+		ntoh32(p->start_fixed_link_prev), ntoh32(p->start_fixed_link_next)));
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("both_flex_list: prev 0x%08x, next 0x%08x\n",
-				ntoh32(p->both_flex_list_prev), ntoh32(p->both_flex_list_next)));
+		ntoh32(p->both_flex_list_prev), ntoh32(p->both_flex_list_next)));
 
 	c = (chanspec_t)ntoh16(p->chanspec);
 	MSCH_EVENT_HEAD(sn);
 	if (ver >= 2) {
 		MSCH_EVENT(("channel: %s, onchan Id %d, current chan Id %d, priority %d",
-					wf_chspec_ntoa(c, buf), ntoh16(p->onchan_chn_idx), ntoh16(p->cur_chn_idx),
-					ntoh16(p->priority)));
+			wf_chspec_ntoa(c, buf), ntoh16(p->onchan_chn_idx), ntoh16(p->cur_chn_idx),
+			ntoh16(p->priority)));
 		flags = ntoh32(p->flags);
 		if (flags & WL_MSCH_ENTITY_FLAG_MULTI_INSTANCE)
 			MSCH_EVENT((" : MULTI_INSTANCE\n"));
@@ -371,20 +369,20 @@ dhd_mschdbg_req_entity_profiler_event_data(int sp, int ver, char *data, uint16 p
 			MSCH_EVENT(("\n"));
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("actual_start_time: %s, ",
-					dhd_mschdbg_display_time(p->actual_start_time_h, p->actual_start_time_l)));
+			dhd_mschdbg_display_time(p->actual_start_time_h, p->actual_start_time_l)));
 		MSCH_EVENT(("curts_fire_time: %s, ",
-					dhd_mschdbg_display_time(p->curts_fire_time_h, p->curts_fire_time_l)));
+			dhd_mschdbg_display_time(p->curts_fire_time_h, p->curts_fire_time_l)));
 	} else {
 		MSCH_EVENT(("channel: %s, priority %d, ", wf_chspec_ntoa(c, buf),
-					ntoh16(p->priority)));
+			ntoh16(p->priority)));
 	}
 	MSCH_EVENT(("bf_last_serv_time: %s\n",
-				dhd_mschdbg_display_time(p->bf_last_serv_time_h, p->bf_last_serv_time_l)));
+		dhd_mschdbg_display_time(p->bf_last_serv_time_h, p->bf_last_serv_time_l)));
 
 	dhd_mschdbg_req_timing_profiler_event_data(sn, ver, "current", data, p->cur_slot_ptr,
-			(p->cur_slot_ptr == 0));
+		(p->cur_slot_ptr == 0));
 	dhd_mschdbg_req_timing_profiler_event_data(sn, ver, "pending", data, p->pend_slot_ptr,
-			(p->pend_slot_ptr == 0));
+		(p->pend_slot_ptr == 0));
 
 	if (p->p_chan_ctxt && (p->chan_ctxt_ptr == 0)) {
 		MSCH_EVENT_HEAD(sn);
@@ -392,7 +390,7 @@ dhd_mschdbg_req_entity_profiler_event_data(int sp, int ver, char *data, uint16 p
 	}
 	else
 		dhd_mschdbg_chan_ctxt_profiler_event_data(sn, ver, data, p->chan_ctxt_ptr,
-				(p->chan_ctxt_ptr == 0));
+			(p->chan_ctxt_ptr == 0));
 }
 
 static void
@@ -411,13 +409,13 @@ dhd_mschdbg_req_handle_profiler_event_data(int sp, int ver, char *data, uint16 p
 	}
 	else
 		MSCH_EVENT(("0x%08x (prev 0x%08x, next 0x%08x)\n",
-					ntoh32(p->p_req_handle), ntoh32(p->p_prev), ntoh32(p->p_next)));
+			ntoh32(p->p_req_handle), ntoh32(p->p_prev), ntoh32(p->p_next)));
 
 	dhd_mschdbg_elem_list(sn, "req_entity", data, p->req_entity_list_ptr,
-						  p->req_entity_list_cnt);
+		p->req_entity_list_cnt);
 	MSCH_EVENT_HEAD(sn);
 	MSCH_EVENT(("cb_func: [0x%08x], cb_func: [0x%08x]",
-				ntoh32(p->cb_func), ntoh32(p->cb_ctxt)));
+		ntoh32(p->cb_func), ntoh32(p->cb_ctxt)));
 	if (ver < 2) {
 		MSCH_EVENT((", chan_cnt: %d", ntoh16(p->chan_cnt)));
 	}
@@ -431,10 +429,10 @@ dhd_mschdbg_req_handle_profiler_event_data(int sp, int ver, char *data, uint16 p
 	if (ver >= 2) {
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("req_time: %s\n",
-					dhd_mschdbg_display_time(p->req_time_h, p->req_time_l)));
+			dhd_mschdbg_display_time(p->req_time_h, p->req_time_l)));
 		MSCH_EVENT_HEAD(sn);
 		MSCH_EVENT(("chan_cnt: %d, chan idx %d, last chan idx %d\n",
-					ntoh16(p->chan_cnt), ntoh16(p->chan_idx), ntoh16(p->last_chan_idx)));
+			ntoh16(p->chan_cnt), ntoh16(p->chan_idx), ntoh16(p->last_chan_idx)));
 		if (p->chanspec_list && p->chanspec_cnt) {
 			dhd_mschdbg_chanspec_list(sn, data, p->chanspec_list, p->chanspec_cnt);
 		}
@@ -450,48 +448,48 @@ dhd_mschdbg_profiler_profiler_event_data(int sp, int ver, char *data, uint16 ptr
 
 	MSCH_EVENT_HEAD(sp);
 	MSCH_EVENT(("free list: req_hdl 0x%08x, req_entity 0x%08x,"
-				" chan_ctxt 0x%08x, chanspec 0x%08x\n",
-				ntoh32(p->free_req_hdl_list), ntoh32(p->free_req_entity_list),
-				ntoh32(p->free_chan_ctxt_list), ntoh32(p->free_chanspec_list)));
+		" chan_ctxt 0x%08x, chanspec 0x%08x\n",
+		ntoh32(p->free_req_hdl_list), ntoh32(p->free_req_entity_list),
+		ntoh32(p->free_chan_ctxt_list), ntoh32(p->free_chanspec_list)));
 
 	MSCH_EVENT_HEAD(sp);
 	MSCH_EVENT(("alloc count: chanspec %d, req_entity %d, req_hdl %d, "
-				"chan_ctxt %d, timeslot %d\n",
-				ntoh16(p->msch_chanspec_alloc_cnt), ntoh16(p->msch_req_entity_alloc_cnt),
-				ntoh16(p->msch_req_hdl_alloc_cnt), ntoh16(p->msch_chan_ctxt_alloc_cnt),
-				ntoh16(p->msch_timeslot_alloc_cnt)));
+		"chan_ctxt %d, timeslot %d\n",
+		ntoh16(p->msch_chanspec_alloc_cnt), ntoh16(p->msch_req_entity_alloc_cnt),
+		ntoh16(p->msch_req_hdl_alloc_cnt), ntoh16(p->msch_chan_ctxt_alloc_cnt),
+		ntoh16(p->msch_timeslot_alloc_cnt)));
 
 	dhd_mschdbg_elem_list(sp, "req_hdl", data, p->msch_req_hdl_list_ptr,
-						  p->msch_req_hdl_list_cnt);
+		p->msch_req_hdl_list_cnt);
 	dhd_mschdbg_elem_list(sp, "chan_ctxt", data, p->msch_chan_ctxt_list_ptr,
-						  p->msch_chan_ctxt_list_cnt);
+		p->msch_chan_ctxt_list_cnt);
 	dhd_mschdbg_elem_list(sp, "req_timing", data, p->msch_req_timing_list_ptr,
-						  p->msch_req_timing_list_cnt);
+		p->msch_req_timing_list_cnt);
 	dhd_mschdbg_elem_list(sp, "start_fixed", data, p->msch_start_fixed_list_ptr,
-						  p->msch_start_fixed_list_cnt);
+		p->msch_start_fixed_list_cnt);
 	dhd_mschdbg_elem_list(sp, "both_flex_req_entity", data,
-						  p->msch_both_flex_req_entity_list_ptr,
-						  p->msch_both_flex_req_entity_list_cnt);
+		p->msch_both_flex_req_entity_list_ptr,
+		p->msch_both_flex_req_entity_list_cnt);
 	dhd_mschdbg_elem_list(sp, "start_flex", data, p->msch_start_flex_list_ptr,
-						  p->msch_start_flex_list_cnt);
+		p->msch_start_flex_list_cnt);
 	dhd_mschdbg_elem_list(sp, "both_flex", data, p->msch_both_flex_list_ptr,
-						  p->msch_both_flex_list_cnt);
+		p->msch_both_flex_list_cnt);
 
 	if (p->p_cur_msch_timeslot && (p->cur_msch_timeslot_ptr == 0)) {
 		MSCH_EVENT_HEAD(sp);
 		MSCH_EVENT(("<cur_msch timeslot>: 0x%08x\n",
-					ntoh32(p->p_cur_msch_timeslot)));
+			ntoh32(p->p_cur_msch_timeslot)));
 	} else
 		dhd_mschdbg_timeslot_profiler_event_data(sp, ver, "cur_msch", data,
-				p->cur_msch_timeslot_ptr, (p->cur_msch_timeslot_ptr == 0));
+			p->cur_msch_timeslot_ptr, (p->cur_msch_timeslot_ptr == 0));
 
 	if (p->p_next_timeslot && (p->next_timeslot_ptr == 0)) {
 		MSCH_EVENT_HEAD(sp);
 		MSCH_EVENT(("<next timeslot>: 0x%08x\n",
-					ntoh32(p->p_next_timeslot)));
+			ntoh32(p->p_next_timeslot)));
 	} else
 		dhd_mschdbg_timeslot_profiler_event_data(sp, ver, "next", data,
-				p->next_timeslot_ptr, (p->next_timeslot_ptr == 0));
+			p->next_timeslot_ptr, (p->next_timeslot_ptr == 0));
 
 	MSCH_EVENT_HEAD(sp);
 	MSCH_EVENT(("ts_id: %d, ", ntoh32(p->ts_id)));
@@ -501,16 +499,16 @@ dhd_mschdbg_profiler_profiler_event_data(int sp, int ver, char *data, uint16 ptr
 	if (flags & WL_MSCH_STATE_SCHD_PENDING)
 		MSCH_EVENT(("SCHD_PENDING, "));
 	MSCH_EVENT(("slotskip_flags: %d, cur_armed_timeslot: 0x%08x\n",
-				(ver >= 2) ? ntoh32(p->slotskip_flag) : 0, ntoh32(p->cur_armed_timeslot)));
+		(ver >= 2)? ntoh32(p->slotskip_flag) : 0, ntoh32(p->cur_armed_timeslot)));
 	MSCH_EVENT_HEAD(sp);
 	MSCH_EVENT(("flex_list_cnt: %d, service_interval: %d, "
-				"max_lo_prio_interval: %d\n",
-				ntoh16(p->flex_list_cnt), ntoh32(p->service_interval),
-				ntoh32(p->max_lo_prio_interval)));
+		"max_lo_prio_interval: %d\n",
+		ntoh16(p->flex_list_cnt), ntoh32(p->service_interval),
+		ntoh32(p->max_lo_prio_interval)));
 }
 
 static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type,
-								  char *data, int len)
+	char *data, int len)
 {
 	uint64 t = 0, tt = 0;
 	uint32 s = 0, ss = 0;
@@ -529,7 +527,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 	}
 
 	if (lastMessages && (type != WL_MSCH_PROFILER_MESSAGE) &&
-			(type != WL_MSCH_PROFILER_EVENT_LOG)) {
+		(type != WL_MSCH_PROFILER_EVENT_LOG)) {
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("\n"));
 		lastMessages = FALSE;
@@ -562,7 +560,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("\n"));
 	}
-	break;
+		break;
 
 	case WL_MSCH_PROFILER_CALLBACK:
 	{
@@ -576,7 +574,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 		MSCH_EVENT(("%06d.%06d [wl%d] CALLBACK: ", s, ss, wlc_index));
 		chanspec = (chanspec_t)ntoh16(p->chanspec);
 		MSCH_EVENT(("req_hdl[0x%08x], channel %s --",
-					ntoh32(p->p_req_hdl), wf_chspec_ntoa(chanspec, buf)));
+			ntoh32(p->p_req_hdl), wf_chspec_ntoa(chanspec, buf)));
 
 		cbtype = ntoh16(p->type);
 		if (cbtype & WL_MSCH_CT_ON_CHAN)
@@ -608,7 +606,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 		} else if (cbtype & WL_MSCH_CT_REQ_END) {
 			if (req_start[wlc_index]) {
 				MSCH_EVENT((" : REQ duration %d",
-							(uint32)(tt - req_start_time[wlc_index])));
+					(uint32)(tt - req_start_time[wlc_index])));
 				req_start[wlc_index] = 0;
 			}
 		}
@@ -619,7 +617,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 		} else if (cbtype & WL_MSCH_CT_SLOT_END) {
 			if (p->chanspec == solt_chanspec[wlc_index]) {
 				MSCH_EVENT((" : SLOT duration %d",
-							(uint32)(tt - solt_start_time[wlc_index])));
+					(uint32)(tt - solt_start_time[wlc_index])));
 				solt_chanspec[wlc_index] = 0;
 			}
 		}
@@ -629,24 +627,24 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 			MSCH_EVENT_HEAD(4);
 			if (cbtype & WL_MSCH_CT_ON_CHAN) {
 				MSCH_EVENT(("ID %d onchan idx %d cur_chan_seq_start %s ",
-							ntoh32(p->timeslot_id), ntoh32(p->onchan_idx),
-							dhd_mschdbg_display_time(p->cur_chan_seq_start_time_h,
-													 p->cur_chan_seq_start_time_l)));
+					ntoh32(p->timeslot_id), ntoh32(p->onchan_idx),
+					dhd_mschdbg_display_time(p->cur_chan_seq_start_time_h,
+					p->cur_chan_seq_start_time_l)));
 			}
 			t = ((uint64)(ntoh32(p->start_time_h)) << 32) |
 				ntoh32(p->start_time_l);
 			MSCH_EVENT(("start %s ",
-						dhd_mschdbg_display_time(p->start_time_h,
-												 p->start_time_l)));
+				dhd_mschdbg_display_time(p->start_time_h,
+				p->start_time_l)));
 			tt = ((uint64)(ntoh32(p->end_time_h)) << 32) | ntoh32(p->end_time_l);
 			MSCH_EVENT(("end %s duration %d\n",
-						dhd_mschdbg_display_time(p->end_time_h, p->end_time_l),
-						(p->end_time_h == 0xffffffff && p->end_time_l == 0xffffffff) ?
-						-1 : (int)(tt - t)));
+				dhd_mschdbg_display_time(p->end_time_h, p->end_time_l),
+				(p->end_time_h == 0xffffffff && p->end_time_l == 0xffffffff)?
+				-1 : (int)(tt - t)));
 		}
 
 	}
-	break;
+		break;
 
 	case WL_MSCH_PROFILER_EVENT_LOG:
 	{
@@ -664,10 +662,15 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 			dhd_mschdbg_us_to_sec(p->time_hi, p->time_lo, &s, &ss);
 			MSCH_EVENT_HEAD(0);
 			MSCH_EVENT(("%06d.%06d [wl%d]: ", s, ss, p->hdr.tag));
+			bzero(&hdr, sizeof(hdr));
 			hdr.tag = EVENT_LOG_TAG_MSCHPROFILE;
 			hdr.count = p->hdr.count + 1;
 			/* exclude LSB 2 bits which indicate binary/non-binary data */
 			hdr.fmt_num = ntoh16(p->hdr.fmt_num) >> 2;
+			hdr.fmt_num_raw = ntoh16(p->hdr.fmt_num);
+			if (ntoh16(p->hdr.fmt_num) == DHD_OW_BI_RAW_EVENT_LOG_FMT) {
+				hdr.binary_payload = TRUE;
+			}
 			dhd_dbg_verboselog_printf(dhdp, &hdr, raw_event_ptr, p->data, 0, 0);
 		}
 		lastMessages = TRUE;
@@ -695,7 +698,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 	case WL_MSCH_PROFILER_PROFILE_END:
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("%06d.%06d [wl%d] PROFILE END: take time %d\n", s, ss,
-					wlc_index, (uint32)(tt - profiler_start_time[wlc_index])));
+			wlc_index, (uint32)(tt - profiler_start_time[wlc_index])));
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("-------------------------------\n"));
 		MSCH_EVENT_HEAD(0);
@@ -721,7 +724,7 @@ static void dhd_mschdbg_dump_data(dhd_pub_t *dhdp, void *raw_event_ptr, int type
 	default:
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("[wl%d] ERROR: unsupported EVENT reason code:%d; ",
-					wlc_index, type));
+			wlc_index, type));
 		break;
 	}
 }
@@ -735,7 +738,7 @@ wl_mschdbg_event_handler(dhd_pub_t *dhdp, void *raw_event_ptr, int type, void *d
 
 void
 wl_mschdbg_verboselog_handler(dhd_pub_t *dhdp, void *raw_event_ptr, prcd_event_log_hdr_t *plog_hdr,
-							  uint32 *log_ptr)
+	uint32 *log_ptr)
 {
 	uint32 log_pyld_len;
 	head_log = "CONSOLE";
@@ -753,17 +756,22 @@ wl_mschdbg_verboselog_handler(dhd_pub_t *dhdp, void *raw_event_ptr, prcd_event_l
 		uint32 s, ss;
 
 		if (log_pyld_len < OFFSETOF(msch_event_log_profiler_event_data_t, data) ||
-				log_pyld_len > sizeof(msch_event_log_profiler_event_data_t)) {
+			log_pyld_len > sizeof(msch_event_log_profiler_event_data_t)) {
 			return;
 		}
 
 		dhd_mschdbg_us_to_sec(p->time_hi, p->time_lo, &s, &ss);
 		MSCH_EVENT_HEAD(0);
 		MSCH_EVENT(("%06d.%06d [wl%d]: ", s, ss, p->hdr.tag));
+		bzero(&hdr, sizeof(hdr));
 		hdr.tag = EVENT_LOG_TAG_MSCHPROFILE;
 		hdr.count = p->hdr.count + 1;
 		/* exclude LSB 2 bits which indicate binary/non-binary data */
 		hdr.fmt_num = ntoh16(p->hdr.fmt_num) >> 2;
+		hdr.fmt_num_raw = ntoh16(p->hdr.fmt_num);
+		if (ntoh16(p->hdr.fmt_num) == DHD_OW_BI_RAW_EVENT_LOG_FMT) {
+			hdr.binary_payload = TRUE;
+		}
 		dhd_dbg_verboselog_printf(dhdp, &hdr, raw_event_ptr, p->data, 0, 0);
 	} else {
 		msch_collect_tlv_t *p = (msch_collect_tlv_t *)log_ptr;

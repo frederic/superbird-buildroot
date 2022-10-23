@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -638,7 +638,6 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_UPDATE_STARATEINFO_RSP     SIR_HAL_UPDATE_STARATEINFO_RSP
 
 #define WDA_UPDATE_BEACON_IND          SIR_HAL_UPDATE_BEACON_IND
-#define WDA_UPDATE_CF_IND              SIR_HAL_UPDATE_CF_IND
 #define WDA_CHNL_SWITCH_REQ            SIR_HAL_CHNL_SWITCH_REQ
 #define WDA_ADD_TS_REQ                 SIR_HAL_ADD_TS_REQ
 #define WDA_DEL_TS_REQ                 SIR_HAL_DEL_TS_REQ
@@ -924,6 +923,7 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_RATE_UPDATE_IND         SIR_HAL_RATE_UPDATE_IND
 
 #define WDA_INIT_THERMAL_INFO_CMD   SIR_HAL_INIT_THERMAL_INFO_CMD
+#define WDA_INIT_DPD_RECAL_INFO_CMD   SIR_HAL_INIT_DPD_RECAL_INFO_CMD
 #define WDA_SET_THERMAL_LEVEL       SIR_HAL_SET_THERMAL_LEVEL
 
 #define WDA_RMC_ENABLE_IND          SIR_HAL_RMC_ENABLE_IND
@@ -1068,7 +1068,6 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_UPDATE_Q2Q_IE_IND                 SIR_HAL_UPDATE_Q2Q_IE_IND
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
-#define WDA_FW_MEM_DUMP_REQ                   SIR_HAL_FW_MEM_DUMP_REQ
 #define WDA_TSF_GPIO_PIN                      SIR_HAL_TSF_GPIO_PIN_REQ
 #define WDA_SET_RSSI_MONITOR_REQ              SIR_HAL_SET_RSSI_MONITOR_REQ
 
@@ -1100,10 +1099,31 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_UPDATE_SHORT_RETRY_LIMIT_CNT      SIR_HAL_SHORT_RETRY_LIMIT_CNT
 #define WDA_UPDATE_LONG_RETRY_LIMIT_CNT       SIR_HAL_LONG_RETRY_LIMIT_CNT
 
+#define WDA_PEER_FLUSH_PENDING                SIR_HAL_PEER_FLUSH_PENDING
 
 #define WDA_UPDATE_STA_INACTIVITY_TIMEOUT     SIR_HAL_STA_INACTIVITY_TIMEOUT
 #define WDA_ACTION_FRAME_RANDOM_MAC           SIR_HAL_ACTION_FRAME_RANDOM_MAC
 
+#define WDA_SET_AC_TXQ_OPTIMIZE               SIR_HAL_SET_AC_TXQ_OPTIMIZE
+#define WDA_MNT_FILTER_TYPE_CMD               SIR_HAL_MNT_FILTER_TYPE_CMD
+#define WDA_THERM_THROT_SET_CONF_CMD          SIR_HAL_THERM_THROT_SET_CONF_CMD
+#define WDA_THERMAL_MGMT_CMD                  SIR_HAL_THERM_MGMT_CMD
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+#define WDA_SET_MOTION_DET_CONFIG             SIR_HAL_SET_MOTION_DET_CONFIG
+#define WDA_SET_MOTION_DET_ENABLE             SIR_HAL_SET_MOTION_DET_ENABLE
+#define WDA_SET_MOTION_DET_BASE_LINE_CONFIG   SIR_HAL_SET_MOTION_DET_BASE_LINE_CONFIG
+#define WDA_SET_MOTION_DET_BASE_LINE_ENABLE   SIR_HAL_SET_MOTION_DET_BASE_LINE_ENABLE
+#endif
+
+#define WDA_PEER_CFR_CAPTURE_CONF_CMD         SIR_HAL_PEER_CFR_CAPTURE_CONF_CMD
+#define WDA_PERIODIC_CFR_ENABLE_CMD           SIR_HAL_PERIODIC_CFR_ENABLE_CMD
+
+#define WDA_SET_HPCS_PULSE_PARAMS             SIR_HAL_SET_HPCS_PULSE_PARMAS
+#ifdef AUDIO_MULTICAST_AGGR_SUPPORT
+#define WDA_ADD_MULTICAST_GROUP              SIR_HAL_ADD_MULTICAST_GROUP
+#define WDA_SET_MULTICAST_RATE              SIR_HAL_SET_MULTICAST_RATE
+#endif
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames

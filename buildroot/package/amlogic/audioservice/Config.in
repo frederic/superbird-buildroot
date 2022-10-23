@@ -82,3 +82,10 @@ config BR2_PACKAGE_AUDIOSERVICE_AMLUART
 	bool  "Enable AMLUART client in homeapp"
 	default n
 endif
+
+config BR2_PACKAGE_DOLBY_ATMOS_VERSION_1_7
+    bool "dolby atmos version v1.7"
+    default n
+    select BR2_PACKAGE_DOLBY_ATMOS_RELEASE
+    help
+        dolby atmos version v1.7

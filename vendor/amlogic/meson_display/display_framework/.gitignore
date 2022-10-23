@@ -3,3 +3,17 @@
 *.libs/
 *.deps/
 *.dirstamp
+Makefile
+autom4te.cache/
+config.h
+config.log
+config.status
+*.la
+configure
+configure.scan
+libtool
+releases
+stamp-h
+stamp-h1
+stamp-h.in
+src/samples/weston/protocol/

@@ -37,6 +37,15 @@
 ./lib/libnss_dns.so.2
 ./lib/libnss_files-2.23.so
 ./lib/libnss_files.so.2
+./lib/libpam.so
+./lib/libpam.so.0
+./lib/libpam.so.0.84.2
+./lib/libpam_misc.so
+./lib/libpam_misc.so.0
+./lib/libpam_misc.so.0.82.1
+./lib/libpamc.so
+./lib/libpamc.so.0
+./lib/libpamc.so.0.82.1
 ./lib/libpthread-2.23.so
 ./lib/libpthread.so.0
 ./lib/libresolv-2.23.so

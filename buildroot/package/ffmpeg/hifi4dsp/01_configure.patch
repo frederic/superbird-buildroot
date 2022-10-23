@@ -10,7 +10,7 @@ Index: ffmpeg-3.4.5/configure
  opus_decoder_select="mdct15"
  opus_encoder_select="audio_frame_queue mdct15"
 +mpegaudio_extralibs="-lhifi4rpc_client -lhifi4rpc"
- png_decoder_select="zlib"
- png_encoder_select="llvidencdsp zlib"
- prores_decoder_select="blockdsp idctdsp"
+ png_decoder_deps="zlib"
+ png_encoder_deps="zlib"
+ png_encoder_select="llvidencdsp"
 

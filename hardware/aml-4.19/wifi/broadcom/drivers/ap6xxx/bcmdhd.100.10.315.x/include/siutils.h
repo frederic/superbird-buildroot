@@ -2,7 +2,7 @@
  * Misc utility routines for accessing the SOC Interconnects
  * of Broadcom HNBU chips.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: siutils.h 769534 2018-06-26 21:19:11Z $
+ * $Id: siutils.h 798061 2019-01-04 23:27:15Z $
  */
 
 #ifndef	_siutils_h_
@@ -209,8 +209,10 @@ typedef void (*gci_gpio_handler_t)(uint32 stat, void *arg);
 #define	ARMCR4_TCBANB_SHIFT	0
 
 #define	SICF_CPUHALT		(0x0020)
-#define	ARMCR4_BSZ_MASK		0x3f
-#define	ARMCR4_BSZ_MULT		8192
+#define	ARMCR4_BSZ_MASK		0x7f
+#define	ARMCR4_BUNITSZ_MASK	0x200
+#define	ARMCR4_BSZ_8K		8192
+#define	ARMCR4_BSZ_1K		1024
 #define	SI_BPIND_1BYTE		0x1
 #define	SI_BPIND_2BYTE		0x3
 #define	SI_BPIND_4BYTE		0xF
@@ -261,6 +263,7 @@ extern uint si_numd11coreunits(si_t *sih);
 extern uint si_findcoreidx(si_t *sih, uint coreid, uint coreunit);
 extern volatile void *si_setcoreidx(si_t *sih, uint coreidx);
 extern volatile void *si_setcore(si_t *sih, uint coreid, uint coreunit);
+extern uint32 si_oobr_baseaddr(si_t *sih, bool second);
 extern volatile void *si_switch_core(si_t *sih, uint coreid, uint *origidx, uint *intr_val);
 extern void si_restore_core(si_t *sih, uint coreid, uint intr_val);
 extern int si_numaddrspaces(si_t *sih);
@@ -759,6 +762,7 @@ extern uint32 si_srpwr_request(si_t *sih, uint32 mask, uint32 val);
 extern uint32 si_srpwr_stat_spinwait(si_t *sih, uint32 mask, uint32 val);
 extern uint32 si_srpwr_stat(si_t *sih);
 extern uint32 si_srpwr_domain(si_t *sih);
+extern uint32 si_srpwr_domain_all_mask(si_t *sih);
 
 /* SR Power Control */
 	/* No capabilities bit so using chipid for now */
@@ -786,6 +790,7 @@ extern uint32 si_srpwr_domain(si_t *sih);
  *      ARM, TCM, Main, Aux
  *      Host needs to power up
  */
+#define MULTIBP_CAP(sih)	(FALSE)
 #define MULTIBP_ENAB(sih)      ((sih) && (sih)->_multibp_enable)
 
 uint32 si_enum_base(uint devid);
@@ -797,5 +802,8 @@ void ai_dump_APB_Bridge_registers(si_t *sih);
 #endif /* UART_TRAP_DBG */
 
 void si_clrirq_idx(si_t *sih, uint core_idx);
+
+/* return if scan core is present */
+bool si_scan_core_present(si_t *sih);
 
 #endif	/* _siutils_h_ */

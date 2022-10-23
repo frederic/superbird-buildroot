@@ -1,0 +1,93 @@
+From 740d1ccfc86fc5e4066868a4de7b8db802eaf025 Mon Sep 17 00:00:00 2001
+From: Nanxin Qin <nanxin.qin@amlogic.com>
+Date: Mon, 28 Sep 2020 15:57:06 +0800
+Subject: [PATCH] v4l2-uvm-test: supports mjpeg and av1 playback. [1/1]
+
+PD#OTT-13688
+PD#SWPL-30860
+
+Problem:
+[Buildroot 4.9] v4l2-uvm-test can support MJPEG decoding
+[V4l2][AV1] Support AV1 on RDK
+
+Solution:
+supports mjpeg and av1 playback.
+
+Verify:
+ab311
+
+Change-Id: Ic7152e9b4e9420b6582825eeda1c6e57ddb75449
+Signed-off-by: Nanxin Qin <nanxin.qin@amlogic.com>
+
+Signed-off-by: Nanxin Qin <nanxin.qin@amlogic.com>
+Change-Id: Ice8669040fbe2df22874859e36456a67df199723
+---
+
+diff --git a/v4l2-uvm-test/src/demux.c b/v4l2-uvm-test/src/demux.c
+index 5e1de97..45f291d 100644
+--- a/v4l2-uvm-test/src/demux.c
++++ b/v4l2-uvm-test/src/demux.c
+@@ -454,6 +454,8 @@
+             v_data.type = VIDEO_TYPE_VP9;
+         else if (dec_ctx->codec_id == AV_CODEC_ID_AV1)
+             v_data.type = VIDEO_TYPE_AV1;
++        else if (dec_ctx->codec_id == AV_CODEC_ID_MJPEG)
++            v_data.type = VIDEO_TYPE_MJPEG;
+         else {
+             printf("format not supported %d\n", dec_ctx->codec_id);
+             ret = 3;
+diff --git a/v4l2-uvm-test/src/demux.h b/v4l2-uvm-test/src/demux.h
+index 529414d..9278ba4 100644
+--- a/v4l2-uvm-test/src/demux.h
++++ b/v4l2-uvm-test/src/demux.h
+@@ -19,6 +19,7 @@
+     VIDEO_TYPE_H265,
+     VIDEO_TYPE_VP9,
+     VIDEO_TYPE_AV1,
++    VIDEO_TYPE_MJPEG,
+     VIDEO_TYPE_MAX
+ };
+ 
+diff --git a/v4l2-uvm-test/src/v4l2-dec.c b/v4l2-uvm-test/src/v4l2-dec.c
+index 4917a8f..d834439 100644
+--- a/v4l2-uvm-test/src/v4l2-dec.c
++++ b/v4l2-uvm-test/src/v4l2-dec.c
+@@ -109,6 +109,10 @@
+             return VIDEO_TYPE_VP9;
+         case V4L2_PIX_FMT_MPEG2:
+             return VIDEO_TYPE_MPEG2;
++        case V4L2_PIX_FMT_MJPEG:
++            return VIDEO_TYPE_MJPEG;
++        case V4L2_PIX_FMT_AV1:
++            return VIDEO_TYPE_AV1;
+     }
+     return VIDEO_TYPE_MAX;
+ }
+@@ -246,16 +250,23 @@
+     coded_h = capture_p.sfmt.fmt.pix_mp.height;
+     printf("capture port (%dx%d)\n", coded_w, coded_h);
+ 
+-    if (g_dw_mode != VDEC_DW_AFBC_ONLY)
+-        capture_p.sfmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12M;
+-    else
+-        capture_p.sfmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
++    if (g_dw_mode != VDEC_DW_AFBC_ONLY) {
++        capture_p.sfmt.fmt.pix_mp.pixelformat =
++            (output_p.pixelformat == V4L2_PIX_FMT_MJPEG) ?
++            V4L2_PIX_FMT_YUV420M : V4L2_PIX_FMT_NV12M;
++    } else {
++        capture_p.sfmt.fmt.pix_mp.pixelformat =
++            (output_p.pixelformat == V4L2_PIX_FMT_MJPEG) ?
++            V4L2_PIX_FMT_YUV420 : V4L2_PIX_FMT_NV12;
++    }
+     ret = ioctl(video_fd, VIDIOC_S_FMT, &capture_p.sfmt);
+     if (ret) {
+         printf("VIDIOC_S_FMT fail %d\n", ret);
+         return -1;
+     }
+     printf("set capture port to %s\n",
++            (output_p.pixelformat == V4L2_PIX_FMT_MJPEG) ?
++            (g_dw_mode == VDEC_DW_AFBC_ONLY)?"I420":"I420M" :
+             (g_dw_mode == VDEC_DW_AFBC_ONLY)?"NV12":"NV12M");
+     capture_p.plane_num = capture_p.sfmt.fmt.pix_mp.num_planes;
+     printf("number of capture plane: %d\n", capture_p.plane_num);

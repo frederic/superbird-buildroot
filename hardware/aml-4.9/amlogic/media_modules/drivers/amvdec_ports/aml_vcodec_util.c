@@ -21,17 +21,6 @@
 
 #include "aml_vcodec_drv.h"
 #include "aml_vcodec_util.h"
-//#include "aml_vpu.h"
-
-/* For encoder, this will enable logs in venc/*/
-bool aml_vcodec_dbg;
-EXPORT_SYMBOL(aml_vcodec_dbg);
-
-/* The log level of v4l2 encoder or decoder driver.
- * That is, files under aml-vcodec/.
- */
-int aml_v4l2_dbg_level;
-EXPORT_SYMBOL(aml_v4l2_dbg_level);
 
 void __iomem *aml_vcodec_get_reg_addr(struct aml_vcodec_ctx *data,
 					unsigned int reg_idx)
@@ -39,7 +28,8 @@ void __iomem *aml_vcodec_get_reg_addr(struct aml_vcodec_ctx *data,
 	struct aml_vcodec_ctx *ctx = (struct aml_vcodec_ctx *)data;
 
 	if (!data || reg_idx >= NUM_MAX_VCODEC_REG_BASE) {
-		aml_v4l2_err("Invalid arguments, reg_idx=%d", reg_idx);
+		v4l_dbg(ctx, V4L_DEBUG_CODEC_ERROR,
+			"Invalid arguments, reg_idx=%d\n", reg_idx);
 		return NULL;
 	}
 	return ctx->dev->reg_base[reg_idx];
@@ -57,17 +47,17 @@ int aml_vcodec_mem_alloc(struct aml_vcodec_ctx *data,
 	mem->vaddr = codec_mm_dma_alloc_coherent(dev_name(dev), size,
 			&mem->dma_addr, GFP_KERNEL, 0);
 	if (!mem->vaddr) {
-		aml_v4l2_err("%s dma_alloc size=%ld failed!", dev_name(dev),
+		v4l_dbg(ctx, V4L_DEBUG_CODEC_ERROR,
+			"%s dma_alloc size=%ld failed!\n", dev_name(dev),
 			     size);
 		return -ENOMEM;
 	}
 
 	memset(mem->vaddr, 0, size);
 
-	aml_v4l2_debug(4, "[%d]  - va      = %p", ctx->id, mem->vaddr);
-	aml_v4l2_debug(4, "[%d]  - dma     = 0x%lx", ctx->id,
-		       (unsigned long)mem->dma_addr);
-	aml_v4l2_debug(4, "[%d]    size = 0x%lx", ctx->id, size);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "va: %p\n", mem->vaddr);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "dma: 0x%lx\n", (ulong) mem->dma_addr);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "size: 0x%lx\n", size);
 
 	return 0;
 }
@@ -81,15 +71,15 @@ void aml_vcodec_mem_free(struct aml_vcodec_ctx *data,
 	struct device *dev = &ctx->dev->plat_dev->dev;
 
 	if (!mem->vaddr) {
-		aml_v4l2_err("%s dma_free size=%ld failed!", dev_name(dev),
+		v4l_dbg(ctx, V4L_DEBUG_CODEC_ERROR,
+			"%s dma_free size=%ld failed!\n", dev_name(dev),
 			     size);
 		return;
 	}
 
-	aml_v4l2_debug(4, "[%d]  - va      = %p", ctx->id, mem->vaddr);
-	aml_v4l2_debug(4, "[%d]  - dma     = 0x%lx", ctx->id,
-		       (unsigned long)mem->dma_addr);
-	aml_v4l2_debug(4, "[%d]    size = 0x%lx", ctx->id, size);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "va: %p\n", mem->vaddr);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "dma: 0x%lx\n", (ulong) mem->dma_addr);
+	v4l_dbg(ctx, V4L_DEBUG_CODEC_PRINFO, "size: 0x%lx\n", size);
 
 	dma_free_coherent(dev, size, mem->vaddr, mem->dma_addr);
 	mem->vaddr = NULL;

@@ -65,6 +65,9 @@ void set_hpll_od1_g12a(unsigned int div);
 void set_hpll_od2_g12a(unsigned int div);
 void set_hpll_od3_g12a(unsigned int div);
 
+void set_tm2b_phy_para(unsigned int mode);
+void set_tm2b_phy_reset(int chip_type);
+
 int hdmitx_hpd_hw_op_txlx(enum hpd_op cmd);
 int hdmitx_hpd_hw_op_g12a(enum hpd_op cmd);
 int read_hpd_gpio_txlx(void);

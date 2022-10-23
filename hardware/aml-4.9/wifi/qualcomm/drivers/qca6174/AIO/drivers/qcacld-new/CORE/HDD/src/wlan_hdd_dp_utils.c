@@ -270,8 +270,13 @@ void hdd_dp_util_send_rps_ind(hdd_adapter_t *adapter)
 			i, rps_data.cpu_map_list[i]);
 	}
 
+#ifdef SUPPORT_IFTYPE_P2P_DEVICE_VIF
+	strlcpy(rps_data.ifname, adapter->ifname,
+		sizeof(rps_data.ifname));
+#else
 	strlcpy(rps_data.ifname, adapter->dev->name,
 		sizeof(rps_data.ifname));
+#endif
 	wlan_hdd_send_svc_nlink_msg(hdd_ctxt->radio_index,
 			WLAN_SVC_RPS_ENABLE_IND,
 			&rps_data, sizeof(rps_data));

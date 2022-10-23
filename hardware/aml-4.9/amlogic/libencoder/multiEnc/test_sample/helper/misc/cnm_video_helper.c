@@ -32,7 +32,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "main_helper.h"
-#include <libavformat/avformat.h>
+//#include <libavformat/avformat.h>
 // include in the ffmpeg header
 typedef struct {
     CodStd      codStd;
@@ -46,6 +46,7 @@ typedef struct {
 #endif
 
 static const CodStdTab codstd_tab[] = {
+#if 0
     { STD_AVC,          0, AV_CODEC_ID_H264,            MKTAG('H', '2', '6', '4') },
     { STD_AVC,          0, AV_CODEC_ID_H264,            MKTAG('X', '2', '6', '4') },
     { STD_AVC,          0, AV_CODEC_ID_H264,            MKTAG('A', 'V', 'C', '1') },
@@ -152,6 +153,7 @@ static const CodStdTab codstd_tab[] = {
     { STD_HEVC,         0, AV_CODEC_ID_HEVC,            MKTAG('h', 'e', 'v', 'c') },
     { STD_HEVC,         0, AV_CODEC_ID_HEVC,            MKTAG('h', 'e', 'v', '1') },
     { STD_HEVC,         0, AV_CODEC_ID_HEVC,            MKTAG('h', 'v', 'c', '1') }
+#endif
 };
 
 
@@ -263,11 +265,13 @@ BOOL LoadYuvImageByYCbCrLine(
     size_t      picWidth,
     size_t      picHeight,
     FrameBuffer* fb,
+    void        *arg,
     Uint32      srcFbIndex
     )
 {
-    Int32                y, nY, nCb;
+    Int32                mem_y, YUV_y, nY, nCb;
     PhysicalAddress      addrY, addrCb, addrCr;
+    PhysicalAddress      nextWriteAddrY, nextWriteAddrCb, nextWriteAddrCr;
     size_t               lumaSize, chromaSize=0, chromaStride = 0, chromaWidth=0;
     Uint8                *srcY, *srcCb, *srcCr;
     size_t               stride      = fb->stride;
@@ -278,37 +282,34 @@ BOOL LoadYuvImageByYCbCrLine(
     int                  cnt=0;
     Uint32               YStartPos=0;
 
+    nY = picHeight;
+    UNREFERENCED_PARAMETER(arg);
     switch (format) {
     case FORMAT_420:
-        nY = picHeight;
         nCb = picHeight / 2;
         chromaSize = picWidth * picHeight / 4;
         chromaStride = stride / 2;
         chromaWidth = picWidth / 2;
         break;
     case FORMAT_224:
-        nY = picHeight;
         nCb = picHeight / 2;
         chromaSize = picWidth * picHeight / 2;
         chromaStride = stride;
         chromaWidth = picWidth;
         break;
     case FORMAT_422:
-        nY = picHeight;
         nCb = picHeight;
         chromaSize = picWidth * picHeight / 2;
         chromaStride = stride / 2;
         chromaWidth = picWidth / 2;
         break;
     case FORMAT_444:
-        nY = picHeight;
         nCb = picHeight;
         chromaSize = picWidth * picHeight;
         chromaStride = stride;
         chromaWidth = picWidth;
         break;
     case FORMAT_400:
-        nY = picHeight;
         nCb = 0;
         chromaSize = picWidth * picHeight / 4;
         chromaStride = stride / 2;
@@ -334,12 +335,10 @@ BOOL LoadYuvImageByYCbCrLine(
     case FORMAT_VYUY_P10_16BIT_LSB:
     case FORMAT_VYUY_P10_32BIT_MSB:
     case FORMAT_VYUY_P10_32BIT_LSB:
-        nY = picHeight;
         nCb = 0;
         break;
     case FORMAT_420_P10_16BIT_LSB:
     case FORMAT_420_P10_16BIT_MSB:
-        nY = picHeight;
         nCb = picHeight/2;
         chromaSize = picWidth * picHeight/2;
         chromaStride = stride / 2;
@@ -348,7 +347,6 @@ BOOL LoadYuvImageByYCbCrLine(
         break;
     case FORMAT_420_P10_32BIT_LSB:
     case FORMAT_420_P10_32BIT_MSB:
-        nY = picHeight;
         nCb = picHeight/2;
         picWidth = VPU_ALIGN32(picWidth);
         chromaWidth = ((VPU_ALIGN16(picWidth/2*twice)+2)/3*4);
@@ -359,7 +357,6 @@ BOOL LoadYuvImageByYCbCrLine(
         picWidth   = ((VPU_ALIGN16(picWidth)+2)/3)*4;
         break;
     default:
-        nY = picHeight;
         nCb = picHeight / 2;
         chromaSize = picWidth * picHeight / 4;
         chromaStride = stride / 2;
@@ -378,11 +375,14 @@ BOOL LoadYuvImageByYCbCrLine(
     addrCr = fb->bufCr;
 
     if ( nCb )
-        cnt = nY / nCb;
+        cnt = picHeight / nCb;
+
+    YUV_y = mem_y = YStartPos;
 
 
-    for (y = YStartPos; y < nY; ++y) {
-        vdi_write_memory(coreIdx, addrY + stride * y, (Uint8 *)(srcY + y * picWidth), picWidth, endian);
+    for (  ; YUV_y < nY; ++mem_y, ++YUV_y) {
+        nextWriteAddrY = addrY + stride * mem_y;
+        vdi_write_memory(coreIdx, nextWriteAddrY, (Uint8 *)(srcY + YUV_y * picWidth), picWidth, endian);
         if (format == FORMAT_400) {
             continue;
         }
@@ -390,13 +390,17 @@ BOOL LoadYuvImageByYCbCrLine(
             continue;
         }
         if (interLeave == TRUE) {
-            if (cnt == 2 && ((y%2)==0))
-                vdi_write_memory(coreIdx, addrCb + stride * y/cnt, (Uint8 *)(srcCb+ y/cnt * picWidth), picWidth, endian);
+            if (cnt == 2 && ((YUV_y%2) == 0)) {
+                nextWriteAddrCb = addrCb + stride * mem_y/cnt;
+                vdi_write_memory(coreIdx, nextWriteAddrCb, (Uint8 *)(srcCb+ YUV_y/cnt * picWidth), picWidth, endian);
+            }
         }
         else {
-            if (cnt == 2 && ((y%2)==0)) {
-                vdi_write_memory(coreIdx, addrCb + chromaStride * y/cnt, (Uint8 *)(srcCb + y/cnt * chromaWidth), chromaWidth, endian);
-                vdi_write_memory(coreIdx, addrCr + chromaStride * y/cnt, (Uint8 *)(srcCr + y/cnt * chromaWidth), chromaWidth, endian);
+            if (cnt == 2 && ((YUV_y%2) == 0)) {
+                nextWriteAddrCb = addrCb + chromaStride * mem_y/cnt;
+                nextWriteAddrCr = addrCr + chromaStride * mem_y/cnt;
+                vdi_write_memory(coreIdx, nextWriteAddrCb, (Uint8 *)(srcCb + YUV_y/cnt * chromaWidth), chromaWidth, endian);
+                vdi_write_memory(coreIdx, nextWriteAddrCr, (Uint8 *)(srcCr + YUV_y/cnt * chromaWidth), chromaWidth, endian);
             }
         }
     }
@@ -930,6 +934,8 @@ Uint32 StoreYuvImageBurstLinear(
         bpp = 16;
         dstChromaWidth  = dstWidth / div_x;
         dstChromaHeight = dstHeight / div_y;
+        if (dstChromaWidth & 0x01) dstChromaWidth+=1;
+        if (dstChromaHeight & 0x01) dstChromaHeight+=1;
         chromaHeight    = height / div_y;
         chroma_stride = (stride / div_x);
         break;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -75,21 +75,10 @@ enum
     GRUCELL_GATE_COUNT
 };
 
-typedef enum _vsi_nn_grucell_activation_e
-{
-    VSI_NN_GRU_ACT_NONE    = 0,
-    VSI_NN_GRU_ACT_RELU    = 1,
-    VSI_NN_GRU_ACT_RELU6   = 3,
-    VSI_NN_GRU_ACT_TANH    = 4,
-    VSI_NN_GRU_ACT_SIGMOID = 6,
-
-    VSI_NN_GRU_ACT_HARD_SIGMOID = 31 /* temporary use 31*/
-} vsi_nn_grucell_activation_e;
-
 typedef struct _vsi_nn_grucell_ovxlib_lcl_data_t
 {
-    vsi_nn_grucell_activation_e gate_activation;
-    vsi_nn_grucell_activation_e candidate_activation;
+    vsi_nn_activation_e gate_activation;
+    vsi_nn_activation_e candidate_activation;
     vsi_bool multi_batch;
 } vsi_nn_grucell_ovxlib_lcl_data_t;
 
@@ -97,9 +86,8 @@ typedef struct _vsi_nn_grucell_ovxlib_param
 {
     vsi_nn_grucell_ovxlib_lcl_data_t local;
 
-    vsi_nn_grucell_activation_e activation;
+    vsi_nn_activation_e activation;
     vsi_nn_dtype_t internal_dtype[GRUCELL_QUANTIZE_PARAM_COUNT];
 } vsi_nn_grucell_ovxlib_param;
 
 #endif
-

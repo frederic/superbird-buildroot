@@ -1,0 +1,313 @@
+{
+    "ipc": {
+        "audio": {
+            "enabled": true,
+            "device": "default",
+            "device-options": "",
+            "channels": 2,
+            "format": "S16LE",
+            "codec": "mulaw",
+            "samplerate": 8000,
+            "bitrate": 64
+        },
+        "video": {
+            "multi-channel": false,
+            "ts": {
+                "main": {
+                    "device": "/dev/video0",
+                    "bitrate": 2000,
+                    "codec": "h265",
+                    "framerate": 30,
+                    "gop": 30,
+                    "resolution": "1920x1080",
+                    "bitrate-type": "CBR",
+                    "video-quality-level": 6
+                },
+                "sub": {
+                    "enabled": false,
+                    "device": "/dev/video0",
+                    "bitrate": 2000,
+                    "codec": "h265",
+                    "framerate": 30,
+                    "gop": 30,
+                    "resolution": "704x576",
+                    "bitrate-type": "CBR",
+                    "video-quality-level": 6
+                },
+                "sub1": {
+                    "enabled": false,
+                    "device": "/dev/video0",
+                    "bitrate": 2000,
+                    "codec": "h265",
+                    "framerate": 30,
+                    "gop": 30,
+                    "resolution": "704x576",
+                    "bitrate-type": "CBR",
+                    "video-quality-level": 6
+                },
+                "web": {
+                    "port": 8082
+                },
+                "gdc": {
+                    "enabled": false,
+                    "config-file": "",
+                    "input-resolution": "1920x1080",
+                    "output-resolution": "1920x1080"
+                }
+            },
+            "vr": {
+                "device": "/dev/video0",
+                "bitrate": 2000,
+                "codec": "h265",
+                "framerate": 30,
+                "gop": 30,
+                "resolution": "1920x1080",
+                "bitrate-type": "CBR",
+                "video-quality-level": 6,
+                "gdc": {
+                    "enabled": false,
+                    "config-file": "",
+                    "input-resolution": "1920x1080",
+                    "output-resolution": "1920x1080"
+                }
+            }
+        },
+        "day-night-switch": {
+            "mode": "day",
+            "schedule": {
+                "begin": "6:00:00",
+                "end": "18:00:00"
+            },
+            "delay": 5,
+            "hardware": {
+                "ircut": {
+                    "gpio": {
+                        "chip": "",
+                        "line": [],
+                        "active-low": []
+                    },
+                    "sequence": {
+                        "init": "",
+                        "enable": "",
+                        "disable": ""
+                    }
+                },
+                "irled": {
+                    "gpio": {
+                        "chip": "",
+                        "line": [],
+                        "active-low": []
+                    },
+                    "sequence": {
+                        "init": "",
+                        "enable": "",
+                        "disable": ""
+                    }
+                },
+                "ldr": {
+                    "gpio": {
+                        "chip": "",
+                        "line": [],
+                        "active-low": []
+                    },
+                    "sequence": {
+                        "init": "",
+                        "enable": "",
+                        "disable": ""
+                    }
+                }
+            }
+        },
+        "isp": {
+            "wdr": {
+                "enabled": false
+            },
+            "brightness": 128,
+            "contrast": 128,
+            "saturation": 128,
+            "hue": 180,
+            "sharpness": 128,
+            "exposure": {
+                "auto": true,
+                "absolute": 0
+            },
+            "whitebalance": {
+                "auto": true,
+                "crgain": 128,
+                "cbgain": 128,
+                "crgain_default": 0,
+                "cbgain_default": 0
+            },
+            "anti-banding": 60,
+            "mirroring": "NONE",
+            "compensation": {
+                "action": "disable",
+                "hlc": 0,
+                "blc": 0
+            },
+            "nr": {
+                "action": "disable",
+                "space-normal": 0,
+                "space-expert": 0,
+                "time": 0
+            },
+            "gain": {
+                "auto": true,
+                "manual": 100
+            },
+            "defog": {
+                "action": "disable",
+                "auto": 0,
+                "manual": 0
+            }
+        },
+        "backchannel": {
+            "enabled": true,
+            "clock-rate": 8000,
+            "encoding": "PCMU",
+            "device": "dmixer_auto"
+        },
+        "nn": {
+            "enabled": true,
+            "detection": {
+                "model": "aml_face_detection"
+            },
+            "recognition": {
+                "model": "aml_face_recognition",
+                "db-path": "",
+                "info-string": "name",
+                "threshold": 1.0
+            }
+        },
+        "overlay": {
+            "datetime": {
+                "enabled": true,
+                "position": "top-right",
+                "font": {
+                    "color": "0xffffffff",
+                    "background-color": "0x00000000",
+                    "font-file": "",
+                    "size": 48
+                }
+            },
+            "pts": {
+                "enabled": false,
+                "position": "bot-right",
+                "font": {
+                    "color": "0xffffffff",
+                    "background-color": "0x00000000",
+                    "font-file": "",
+                    "size": 32
+                }
+            },
+            "watermark": {
+                "image": [
+                    {
+                        "file": "",
+                        "position": {
+                            "left": 0,
+                            "top": 0,
+                            "width": 0,
+                            "height": 0
+                        }
+                    }
+                ],
+                "text": [
+                    {
+                        "font": {
+                            "color": "0xffffffff",
+                            "background-color": "0x00000000",
+                            "font-file": "",
+                            "size": 30
+                        },
+                        "position": {
+                            "left": 0,
+                            "top": 0
+                        },
+                        "text": ""
+                    }
+                ]
+            },
+            "nn": {
+                "show": true,
+                "font": {
+                    "color": "0xffff00ff",
+                    "font-file": "",
+                    "size": 24
+                },
+                "rect-color": "0xf0f0f0ff"
+            }
+        },
+        "recording": {
+            "enabled": false,
+            "location": "",
+            "chunk-duration": 5,
+            "reserved-space-size": 200
+        },
+        "image-capture": {
+            "enabled": true,
+            "quality": 80,
+            "location": "/tmp",
+            "trigger": false,
+            "imagefile": "",
+            "use-hw-encoder": false
+        }
+    },
+    "onvif": {
+        "device": {
+            "firmware-ver": "1.0",
+            "hardware-id": "111",
+            "manufacturer": "amlogic",
+            "model": "0",
+            "serial-number": "10101010"
+        },
+        "discover": {
+            "enabled": true
+        },
+        "imaging": {
+            "forcepersist": true
+        },
+        "media": {
+            "profiles": []
+        },
+        "network": {
+            "interface": "eth0",
+            "port": "1000"
+        },
+        "scopes": [
+            "onvif://www.onvif.org/name/TestDev",
+            "onvif://www.onvif.org/location/Unknown",
+            "onvif://www.onvif.org/hardware/w411",
+            "onvif://www.onvif.org/Profile/Streaming",
+            "onvif://www.onvif.org/type/video_encoder",
+            "onvif://www.onvif.org/type/audio_encoder",
+            "onvif://www.onvif.org/type/NetworkVideoTransmitter",
+            "onvif://www.onvif.org/Profile/S",
+            "onvif://www.onvif.org/Profile/G",
+            "onvif://www.onvif.org/Profile/T"
+        ],
+        "users": [
+            {
+                "name": "admin",
+                "password": "admin",
+                "level": "Administrator"
+            }
+        ],
+        "wsdl": {
+            "path": "/etc/onvif/wsdl"
+        }
+    },
+    "rtsp": {
+        "network": {
+            "address": "0.0.0.0",
+            "port": 554,
+            "route": "/live.sdp",
+            "subroute": "/sub.sdp",
+            "sub1route": "/sub1.sdp"
+        },
+        "auth": {
+            "username": "",
+            "password": ""
+        }
+    }
+}

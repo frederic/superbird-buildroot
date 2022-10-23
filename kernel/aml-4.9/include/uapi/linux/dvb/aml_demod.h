@@ -191,13 +191,14 @@ struct aml_demod_para {
 #define AML_DBG_DEMOD_MODUL		11
 
 
-#define AML_DEMOD_SET_SYS        _IOW('D',  0, struct aml_demod_sys)
-#define AML_DEMOD_GET_SYS        _IOR('D',  1, struct aml_demod_sys)
-#define AML_DEMOD_TEST           _IOR('D',  2, u32_t)
-#define AML_DEMOD_TURN_ON        _IOR('D',  3, u32_t)
-#define AML_DEMOD_TURN_OFF       _IOR('D',  4, u32_t)
-#define AML_DEMOD_SET_TUNER      _IOW('D',  5, struct aml_tuner_sys)
-#define AML_DEMOD_GET_RSSI       _IOR('D',  6, struct aml_tuner_sys)
+#define AML_DEMOD_SET_SYS	_IOW('D',  0, struct aml_demod_sys)
+#define AML_DEMOD_GET_SYS	_IOR('D',  1, struct aml_demod_sys)
+#define AML_DEMOD_TEST		_IOR('D',  2, u32_t)
+#define AML_DEMOD_TURN_ON	_IOR('D',  3, u32_t)
+#define AML_DEMOD_TURN_OFF	_IOR('D',  4, u32_t)
+#define AML_DEMOD_SET_TUNER	_IOW('D',  5, struct aml_tuner_sys)
+#define AML_DEMOD_GET_RSSI	_IOR('D',  6, struct aml_tuner_sys)
+#define AML_DEMOD_GET_PLL_INIT	_IOR('D',  7, u32_t)
 
 #define AML_DEMOD_DVBC_SET_CH    _IOW('D', 10, struct aml_demod_dvbc)
 #define AML_DEMOD_DVBC_GET_CH    _IOR('D', 11, struct aml_demod_dvbc)

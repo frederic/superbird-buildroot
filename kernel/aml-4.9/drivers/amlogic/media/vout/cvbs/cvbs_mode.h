@@ -27,6 +27,4 @@ enum cvbs_mode_e {
 	MODE_MAX,
 };
 
-extern enum cvbs_mode_e get_local_cvbs_mode(void);
-
 #endif

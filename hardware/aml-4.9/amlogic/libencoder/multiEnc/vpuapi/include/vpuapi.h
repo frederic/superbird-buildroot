@@ -62,12 +62,12 @@
 #define VP5_DEC_VP9_MVCOL_BUF_SIZE(_w, _h)        (((VPU_ALIGN64(_w)*VPU_ALIGN64(_h))>>2))
 #define VP5_DEC_AVS2_MVCOL_BUF_SIZE(_w, _h)       (((VPU_ALIGN64(_w)*VPU_ALIGN64(_h))>>5))    // 1 CTU16 = 8bytes, VPU_ALIGN64(w)/16*VPU_ALIGN64(h)/16 * 8 = VPU_ALIGN64(w)*VPU_ALIGN64(h)/32
 // AV1 MVCOL BUF SIZE : MFMV + Segment ID + CDF probs table + Film grain param Y + Film graim param C
-#define VP5_DEC_AV1_MVCOL_BUF_SIZE(_w, _h)        (((VPU_ALIGN64(_w)/64)*256 + (VPU_ALIGN256(_w)/64)*128)*(VPU_ALIGN64(_h)/64) + ((VPU_ALIGN64(_w)/64)*(VPU_ALIGN64(_h)/64)*96) + 41984 + 8192 + 4864)
+#define VP5_DEC_AV1_MVCOL_BUF_SIZE(_w, _h)        (((VPU_ALIGN64(_w)/64)*256 + (VPU_ALIGN256(_w)/64)*128)*(VPU_ALIGN64(_h)/64) + ((VPU_ALIGN64(_w)/64)*(VPU_ALIGN64(_h)/64)*512) + 41984 + 8192 + 4864)
 #define VP5_DEC_SVAC_MVCOL_BUF_SIZE(_w, _h)       (((VPU_ALIGN128(_w)*VPU_ALIGN128(_h))>>2))
 
 
-#define VP5_FBC_LUMA_TABLE_SIZE(_w, _h)           (VPU_ALIGN16(_h)*VPU_ALIGN256(_w)/32)
-#define VP5_FBC_CHROMA_TABLE_SIZE(_w, _h)         (VPU_ALIGN16(_h)*VPU_ALIGN256(_w/2)/32)
+#define VP5_FBC_LUMA_TABLE_SIZE(_w, _h)           (VPU_ALIGN64(_h)*VPU_ALIGN256(_w)/32)
+#define VP5_FBC_CHROMA_TABLE_SIZE(_w, _h)         (VPU_ALIGN64(_h)*VPU_ALIGN256(_w/2)/32)
 #define VP5_ENC_AVC_MVCOL_BUF_SIZE(_w, _h)        (VPU_ALIGN64(_w)*VPU_ALIGN64(_h)/32)
 #define VP5_ENC_HEVC_MVCOL_BUF_SIZE(_w, _h)       (VPU_ALIGN64(_w)/64*VPU_ALIGN64(_h)/64*128)
 #define VP5_ENC_SVAC_MVCOL_0_BUF_SIZE(_w, _h)     (VPU_ALIGN64(_w)/64*VPU_ALIGN64(_h)/64*128)   // same as hevc enc.
@@ -226,6 +226,8 @@ typedef enum {
 #define H264_USERDATA_FLAG_FILM_GRAIN_CHARACTERISTICS_INFO  (14) /* SEI : film_grain_characteristics_info */
 #define H264_USERDATA_FLAG_RESERVED_15                      (15) /* SEI RESERVED */
 #define H264_USERDATA_FLAG_COLOUR_REMAPPING_INFO            (16) /* SEI : colour_remapping_info */
+#define H264_USERDATA_FLAG_ITU_T_T35_1                      (28) /* SEI : user_data_registered_itu_t_t35_1 */
+#define H264_USERDATA_FLAG_ITU_T_T35_2                      (29) /* SEI : user_data_registered_itu_t_t35_2 */
 
 /************************************************************************/
 /* Error codes                                                          */
@@ -296,12 +298,14 @@ typedef enum {
 /**
  * \brief   parameters of DEC_SET_SEQ_CHANGE_MASK
  */
-#define SEQ_CHANGE_ENABLE_PROFILE   (1<<5)
-#define SEQ_CHANGE_ENABLE_SIZE      (1<<16)
-#define SEQ_CHANGE_ENABLE_BITDEPTH  (1<<18)
-#define SEQ_CHANGE_ENABLE_DPB_COUNT (1<<19)
+#define SEQ_CHANGE_ENABLE_PROFILE    (1<<5)
+#define SEQ_CHANGE_CHROMA_FORMAT_IDC (1<<15)         /* AV1 */
+#define SEQ_CHANGE_ENABLE_SIZE       (1<<16)
+#define SEQ_CHANGE_INTER_RES_CHANGE  (1<<17)         /* VP9 */
+#define SEQ_CHANGE_ENABLE_BITDEPTH   (1<<18)
+#define SEQ_CHANGE_ENABLE_DPB_COUNT  (1<<19)
 
-#define SEQ_CHANGE_INTER_RES_CHANGE (1<<17)         /* VP9 */
+
 #define SEQ_CHANGE_ENABLE_ALL_VP9      (SEQ_CHANGE_ENABLE_PROFILE    | \
                                         SEQ_CHANGE_ENABLE_SIZE       | \
                                         SEQ_CHANGE_INTER_RES_CHANGE | \
@@ -323,12 +327,12 @@ typedef enum {
                                         SEQ_CHANGE_ENABLE_BITDEPTH   | \
                                         SEQ_CHANGE_ENABLE_DPB_COUNT)
 
-
 #define SEQ_CHANGE_ENABLE_ALL_AVC      (SEQ_CHANGE_ENABLE_SIZE       | \
                                         SEQ_CHANGE_ENABLE_BITDEPTH   | \
                                         SEQ_CHANGE_ENABLE_DPB_COUNT)
 
 #define SEQ_CHANGE_ENABLE_ALL_AV1      (SEQ_CHANGE_ENABLE_PROFILE    | \
+                                        SEQ_CHANGE_CHROMA_FORMAT_IDC | \
                                         SEQ_CHANGE_ENABLE_SIZE       | \
                                         SEQ_CHANGE_ENABLE_BITDEPTH   | \
                                         SEQ_CHANGE_ENABLE_DPB_COUNT)
@@ -1197,7 +1201,7 @@ typedef enum {
     INT_VP5_INIT_VPU          = 0,
     INT_VP5_WAKEUP_VPU        = 1,
     INT_VP5_SLEEP_VPU         = 2,
-    INT_VP5_CREATE_INSTANCE   = 3, 
+    INT_VP5_CREATE_INSTANCE   = 3,
     INT_VP5_FLUSH_INSTANCE    = 4,
     INT_VP5_DESTORY_INSTANCE  = 5,
     INT_VP5_INIT_SEQ          = 6,
@@ -1205,6 +1209,9 @@ typedef enum {
     INT_VP5_DEC_PIC           = 8,
     INT_VP5_ENC_PIC           = 8,
     INT_VP5_ENC_SET_PARAM     = 9,
+#ifdef SUPPORT_SOURCE_RELEASE_INTERRUPT
+    INT_VP5_ENC_SRC_RELEASE   = 10,
+#endif
     INT_VP5_ENC_LOW_LATENCY   = 13,
     INT_VP5_DEC_QUERY         = 14,
     INT_VP5_BSBUF_EMPTY       = 15,
@@ -1325,6 +1332,10 @@ NOTE: Products earlier can only set this linear map type.
     COMPRESSED_FRAME_MAP_SVAC_SVC_BL            = 18, /**< Compressed frame map type for base layer in SVAC encoder */
     COMPRESSED_FRAME_MAP_DUAL_CORE_8BIT         = 19, /**< 8bit compressed frame map type for dual core */
     COMPRESSED_FRAME_MAP_DUAL_CORE_10BIT        = 20, /**< 10bit compressed frame map type for dual core */
+    PVRIC_COMPRESSED_FRAME_LOSSLESS_MAP         = 21, /**< PVRIC compressed frame map type for lossless mode*/
+    PVRIC_COMPRESSED_FRAME_LOSSY_MAP            = 22, /**< PVRIC compressed frame map type for lossy mode */
+    COMPRESSED_FRAME_MAP_DUAL_CORE_MCTS_8BIT    = 23, /**< 8bit compressed frame map type for dual core mcts mode*/
+    COMPRESSED_FRAME_MAP_DUAL_CORE_MCTS_10BIT   = 24, /**< 10bit compressed frame map type for dual core mcts mode*/
     TILED_MAP_TYPE_MAX
 } TiledMapType;
 
@@ -1445,11 +1456,14 @@ bufYBot, bufCbBot and bufCrBot should be set separately.
 */
 typedef struct {
     PhysicalAddress bufY;       /**< It indicates the base address for Y component in the physical address space when linear map is used. It is the RAS base address for Y component when tiled map is used (Non VP9). It is also compressed Y buffer or ARM compressed framebuffer (VPU). */
-    PhysicalAddress bufCb;      /**< It indicates the base address for Cb component in the physical address space when linear map is used. It is the RAS base address for Cb component when tiled map is used (Non VP9). It is also compressed CbCr buffer (VPU) */
+    PhysicalAddress bufCb;      /**< It indicates the base address for Cb component in the physical address space when linear map is used. It is the RAS base address for Cb component when tiled map is used (Non VP9). It is also compressed CbCr buffer (VPU). */
     PhysicalAddress bufCr;      /**< It indicates the base address for Cr component in the physical address space when linear map is used. It is the RAS base address for Cr component when tiled map is used (Non VP9). */
     PhysicalAddress bufYBot;    /**< It indicates the base address for Y bottom field component in the physical address space when linear map is used. It is the RAS base address for Y bottom field component when tiled map is used (Non VP only). */
     PhysicalAddress bufCbBot;   /**< It indicates the base address for Cb bottom field component in the physical address space when linear map is used. It is the RAS base address for Cb bottom field component when tiled map is used (Non VP only). */
     PhysicalAddress bufCrBot;   /**< It indicates the base address for Cr bottom field component in the physical address space when linear map is used. It is the RAS base address for Cr bottom field component when tiled map is used (Non VP only). */
+    Uint32          bufYSize;   /**< It indicates the size for Y component in the physical address space when linear map is used. It is the size for Y component when tiled map is used (Non VP9). It is also compressed Y buffer size or ARM compressed framebuffer size (VPU). */
+    Uint32          bufCbSize;  /**< It indicates the size for Cb component in the physical address space when linear map is used. It is the size for Cb component when tiled map is used (Non VP9). It is also compressed CbCr buffer size (VPU). */
+    Uint32          bufCrSize;  /**< It indicates the size for Cr component in the physical address space when linear map is used. It is the size for Cr component when tiled map is used (Non VP9). */
 /**
 @verbatim
 It specifies a chroma interleave mode of frame buffer.
@@ -1502,7 +1516,7 @@ It enables source frame data with long burst length to be loaded for reducing DM
     int sourceLBurstEn;
     int sequenceNo;     /**< A sequence number that the frame belongs to. It increases by 1 every time a sequence changes in decoder.  */
 
-    BOOL updateFbInfo; /**< If this is TRUE, VPU updates API-internal framebuffer information when any of the information is changed. */
+    BOOL updateFbInfo;  /**< If this is TRUE, VPU updates API-internal framebuffer information when any of the information is changed. */
     int dma_buf_planes; /* buffer use dma_buf instead of no zero 1-2 */
     int dma_shared_fd[3]; /* file handle for dma buf planes */
 } FrameBuffer;
@@ -2057,7 +2071,6 @@ when VPU_DecOpen() is executed.
     vpu_buffer_t    vbWork;
     Uint32          virtAxiID; /**< AXI_ID to distinguish guest OS. For virtualization only. Set this value in highest bit order.*/
     BOOL            bwOptimization; /**< Bandwidth optimization feature which allows WTL(Write to Linear)-enabled VPU to skip writing compressed format of non-reference pictures or linear format of non-display pictures to the frame buffer for BW saving reason. */
-
 /**
 @verbatim
 It sets the selection mode of temporal ID.
@@ -2074,6 +2087,17 @@ It sets the selection mode of temporal ID.
 @endverbatim
 */
     BOOL            tempIdSelectMode;
+/**
+@verbatim
+
+@* 0: AV1_STREAM_IVF  AV1 bistream contained by IVF format
+@* 1: AV1_STREAM_OBU  OBU syntax bitstream
+@* 2: AV1_STREAM_ANNEXB  Length delimited bitstream format
+
+NOTE: This variable is only valid when decoding AV1 stream.
+@endverbatim
+*/
+    int             av1Format;
 } DecOpenParam;
 
 /**
@@ -2581,7 +2605,6 @@ This is a flag to indicate whether H.265/HEVC Recovery Point SEI exists or not.
     int recoveryPocCnt;         /**< recovery_poc_cnt */
     int exactMatchFlag;         /**< exact_match_flag */
     int brokenLinkFlag;         /**< broken_link_flag */
-
 } H265RpSei;
 
 
@@ -2617,6 +2640,14 @@ typedef struct {
     int decodedPOI;  /**< A POI value of picture that has currently been decoded and with decoded index. When indexFrameDecoded is -1, it returns -1. */
     int displayPOI;  /**< A POI value of picture with display index. When indexFrameDisplay is -1, it returns -1. */
 } Avs2Info;
+
+/**
+* @brief    This is a data structure for AV1 specific picture information.
+*/
+typedef struct {
+    int enableScreenContents; /**< It indicates whether screen content tool is enabled. */
+    int enableIntraBlockCopy; /**< It indicates whether intra block copy is enabled. */
+} Av1Info;
 
 /**
 * @brief    The data structure to get result information from decoding a frame.
@@ -2712,6 +2743,7 @@ In that case after decoding P frame, this flag is set to 1. HOST application sho
     AvcVuiInfo avcVuiInfo;          /**< This is H.264/AVC VUI information. Refer to <<vpuapi_h_AvcVuiInfo>>. */
     SvacInfo svacInfo;              /**< This field reports the information of SVC stream. Refer to <<vpuapi_h_SvacInfo>>. */
     Avs2Info avs2Info;              /**< This is AVS2 picture information. Refer to <<vpuapi_h_Avs2Info>>. */
+    Av1Info  av1Info;               /**< This is AVS1 picture information. Refer to <<vpuapi_h_Av1Info>>. */
     int decodedPOC;                 /**< A POC value of picture that has currently been decoded and with decoded index. When indexFrameDecoded is -1, it returns -1. */
     int displayPOC;                 /**< A POC value of picture with display index. When indexFrameDisplay is -1, it returns -1. */
     int temporalId;                 /**< A temporal ID of the picture */
@@ -3296,8 +3328,6 @@ the fixed bit ratio 2:1:1. This is only valid when BitAllocMode is 2.
     int chromaDcQpOffset;           /**< A delta quantization parameter for chroma DC coefficients (SVAC encoder only) */
     int chromaAcQpOffset;           /**< A delta quantization parameter for chroma AC coefficients (SVAC encoder only) */
 
-
-
     // for H.264 on VPU
     int avcIdrPeriod;				/**< A period of IDR picture (0 ~ 1024). 0 - implies an infinite period */
     int rdoSkip;					/**< It skips RDO(rate distortion optimization). */
@@ -3354,6 +3384,13 @@ It selects the entropy coding mode used in encoding process.
     Uint32 rcWeightParam;           /**< Adjusts the speed of updating parameters to the rate control model. If RcWeightFactor is set with a large value, the RC parameters are updated slowly. (Min: 1, Max: 31)*/
     Uint32 rcWeightBuf;             /**< It is the smoothing factor in the estimation. (Min: 1, Max: 255) This parameter indicates the speed of adjusting bitrate toward fullness of buffer as a reaction parameter. As it becomess larger, the bit-rate error promptly affects the target bit allocation of the following picture. */
     HevcVuiParam vuiParam;          /**< <<vpuapi_h_HevcVuiParam>> */
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+    BOOL            enReportMvHisto;         /**< It enables MV histogram count report. */
+    Uint32          reportMvHistoThreshold0; /**< The value of MV threshold 0. (1 ~ 16)*/
+    Uint32          reportMvHistoThreshold1; /**< The value of MV threshold 1. (1 ~ 16)*/
+    Uint32          reportMvHistoThreshold2; /**< The value of MV threshold 2. (1 ~ 16)*/
+    Uint32          reportMvHistoThreshold3; /**< The value of MV threshold 3. (1 ~ 16)*/
+#endif
 }EncVpParam;
 
 /**
@@ -3378,7 +3415,6 @@ typedef enum {
     ENC_SET_CHANGE_PARAM_CUSTOM_LAMBDA       = (1<<22),
     ENC_SET_CHANGE_PARAM_VUI_HRD_PARAM       = (1<<23),
 } Vp5ChangeParam;
-
 /**
 * @brief This is a data structure for encoding parameters that have changed.
 */
@@ -4140,7 +4176,6 @@ typedef struct {
     Uint32          paramBufSize; /**< The size of task buffer */
 } EncInitialInfo;
 
-
 /**
 * @brief    This is a data structure for setting NAL unit coding options.
  */
@@ -4319,9 +4354,9 @@ identical with the specified picture stream buffer address by HOST.
     int rdPtr;              /**<  A read pointer in bitstream buffer, which is where HOST has read encoded bitstream from the buffer */
     int wrPtr;              /**<  A write pointer in bitstream buffer, which is where VPU has written encoded bitstream into the buffer  */
     int picSkipped;         /**< A flag which represents whether the current encoding has been skipped or not. (VP5 only) */
-    int numOfIntra;         /**< The number of intra coded block (VP5 only) */
-    int numOfMerge;         /**< The number of merge block in 8x8 (VP5 only) */
-    int numOfSkipBlock;     /**< The number of skip block in 8x8 (VP5 only) */
+    int numOfIntra;         /**< The number of intra coded block (VP5 HEVC only) */
+    int numOfMerge;         /**< The number of merge block in 8x8 (VP5 HEVC only) */
+    int numOfSkipBlock;     /**< The number of skip block in 8x8 (VP5 HEVC only) */
     int avgCtuQp;           /**< The average value of CTU QPs (VP5 only) */
     int encPicByte;         /**< The number of encoded picture bytes (VP5 only)  */
     int encGopPicIdx;       /**< The GOP index of the currently encoded picture (VP5 only) */
@@ -4334,9 +4369,9 @@ identical with the specified picture stream buffer address by HOST.
     int errorReason;        /**< The error reason of the currently encoded picture (VP5 only) */
     int warnInfo;           /**< The warning information of the currently encoded picture (VP5 only) */
     // Report Information
-    EncReportInfo mbInfo;   /**<  The parameter for reporting MB data . Please refer to <<vpuapi_h_EncReportInfo>> structure. */
-    EncReportInfo mvInfo;   /**<  The parameter for reporting motion vector. Please refer to <<vpuapi_h_EncReportInfo>> structure. */
-    EncReportInfo sliceInfo;/**<  The parameter for reporting slice information. Please refer to <<vpuapi_h_EncReportInfo>> structure. */
+    EncReportInfo mbInfo;   /**<  The parameter for reporting MB data(Non VPU only) . Please refer to <<vpuapi_h_EncReportInfo>> structure. */
+    EncReportInfo mvInfo;   /**<  The parameter for reporting motion vector(Non VPU only). Please refer to <<vpuapi_h_EncReportInfo>> structure. */
+    EncReportInfo sliceInfo;/**<  The parameter for reporting slice information(Non VPU only). Please refer to <<vpuapi_h_EncReportInfo>> structure. */
     int frameCycle;         /**<  The parameter for reporting the cycle number of encoding one frame.*/
 
     Uint64 pts;             /**< The PTS(Presentation Timestamp) of the encoded picture which is retrieved and managed from VPU API */
@@ -4367,6 +4402,13 @@ SVC layer type of the encoded picture
 @endverbatim
 */
     Uint32  isSvcLayerEL;
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+    Uint32 reportMvHistoCnt0; /**< The number of MV histogram count*/
+    Uint32 reportMvHistoCnt1; /**< The number of MV histogram count*/
+    Uint32 reportMvHistoCnt2; /**< The number of MV histogram count*/
+    Uint32 reportMvHistoCnt3; /**< The number of MV histogram count*/
+    Uint32 reportMvHistoCnt4; /**< The number of MV histogram count*/
+#endif
     RetCode result;  /**< The return value of VPU_EncGetOutputInfo() */
 } EncOutputInfo;
 
@@ -4434,6 +4476,7 @@ typedef enum {
     PRESET_IDX_IPPPP            = 6,    /**< Consecutive P, cyclic gopsize = 4 */
     PRESET_IDX_IBBBB            = 7,    /**< Consecutive B, cyclic gopsize = 4 */
     PRESET_IDX_RA_IB            = 8,    /**< Random Access, cyclic gopsize = 8 */
+    PRESET_IDX_IPP_SINGLE       = 9,    /**< Consecutive P, cyclic gopsize = 1, with single reference  */
 } GOP_PRESET_IDX;
 
 

@@ -556,7 +556,8 @@ ifdef BUILD_TAG
 KBUILD_CFLAGS += -DBUILD_TAG='"$(BUILD_TAG)"'
 endif
 
-KBUILD_CFLAGS += $(call cc-option,-fno-stack-protector)
+STACK_CFLAGS  := $(call cc-option,-fstack-protector-strong)
+KBUILD_CFLAGS += $(STACK_CFLAGS)
 
 KBUILD_CFLAGS	+= -g
 # $(KBUILD_AFLAGS) sets -g, which causes gcc to pass a suitable -g<format>
@@ -673,6 +674,19 @@ u-boot-init := $(head-y)
 u-boot-main := $(libs-y)
 
 
+ifeq ($(CONFIG_AML_DOLBY), y)
+PLATFORM_CPPFLAGS += -I$(srctree)/drivers/display/osd/dv
+PLATFORM_LIBS += $(srctree)/drivers/display/osd/dv/dovi.a
+endif
+
+ifneq ($(CONFIG_AVB2_KPUB_FROM_FIP),)
+PLATFORM_CPPFLAGS += -DCONFIG_AVB2_KPUB_FROM_FIP
+endif
+
+ifeq ($(CONFIG_AVB2),avb2) #Android Verified bootloader
+	PLATFORM_CPPFLAGS += -DCONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+endif# ifeq ($(CONFIG_AVB2),avb2)
+
 # Add GCC lib
 ifeq ($(CONFIG_USE_PRIVATE_LIBGCC),y)
 PLATFORM_LIBGCC = arch/$(ARCH)/lib/lib.a
@@ -727,7 +741,6 @@ ALL-y += u-boot.hex
 ifeq ($(CONFIG_NEED_BL301), y)
 ALL-y += bl301.bin
 endif
-ALL-$(CONFIG_AML_DOLBY) += dovi
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
 ALL-$(CONFIG_RAMBOOT_PBL) += u-boot-with-spl-pbl.bin
@@ -871,12 +884,6 @@ acs.bin: tools prepare u-boot.bin
 .PHONY : bl21.bin
 bl21.bin: tools prepare u-boot.bin acs.bin
 	$(Q)$(MAKE) -C $(srctree)/$(CPUDIR)/${SOC}/firmware/bl21 all FIRMWARE=$@
-
-.PHONY : dovi
-dovi: tools prepare
-ifeq ($(CONFIG_AML_DOLBY), y)
-	$(Q)$(MAKE) -C $(srctree)/drivers/display/osd/dv dovi.o
-endif
 
 #
 # U-Boot entry point, needed for booting of full-blown U-Boot
@@ -1115,7 +1122,7 @@ cmd_smap = \
 	$(CC) $(c_flags) -DSYSTEM_MAP="\"$${smap}\"" \
 		-c $(srctree)/common/system_map.c -o common/system_map.o
 
-u-boot:	dovi $(u-boot-init) $(u-boot-main) u-boot.lds
+u-boot: $(u-boot-init) $(u-boot-main) u-boot.lds
 	$(call if_changed,u-boot__)
 ifeq ($(CONFIG_KALLSYMS),y)
 	$(call cmd,smap)

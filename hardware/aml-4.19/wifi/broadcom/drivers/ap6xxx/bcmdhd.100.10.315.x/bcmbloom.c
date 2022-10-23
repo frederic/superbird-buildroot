@@ -1,7 +1,7 @@
 /*
  * Bloom filter support
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmbloom.c 714397 2017-08-04 08:24:38Z $
+ * $Id: bcmbloom.c 788740 2018-11-13 21:45:01Z $
  */
 
 #include <typedefs.h>
@@ -59,8 +59,8 @@ struct bcm_bloom_filter {
 /* public interface */
 int
 bcm_bloom_create(bcm_bloom_alloc_t alloc_cb,
-				 bcm_bloom_free_t free_cb, void *cb_ctx, uint max_hash,
-				 uint filter_size, bcm_bloom_filter_t **bloom)
+	bcm_bloom_free_t free_cb, void *cb_ctx, uint max_hash,
+	uint filter_size, bcm_bloom_filter_t **bloom)
 {
 	int err = BCME_OK;
 	bcm_bloom_filter_t *bp = NULL;
@@ -122,7 +122,7 @@ bcm_bloom_destroy(bcm_bloom_filter_t **bloom, bcm_bloom_free_t free_cb)
 		(*free_cb)(bp->cb_ctx, bp->filter, bp->filter_size);
 	if (bp->hash)
 		(*free_cb)(bp->cb_ctx, bp->hash,
-				   sizeof(*bp->hash) * bp->max_hash);
+			sizeof(*bp->hash) * bp->max_hash);
 	(*free_cb)(bp->cb_ctx, bp, sizeof(*bp));
 
 done:
@@ -165,7 +165,7 @@ bcm_bloom_remove_hash(bcm_bloom_filter_t *bp, uint idx)
 
 bool
 bcm_bloom_is_member(bcm_bloom_filter_t *bp,
-					const uint8 *tag, uint tag_len, const uint8 *buf, uint buf_len)
+	const uint8 *tag, uint tag_len, const uint8 *buf, uint buf_len)
 {
 	uint i;
 	int err = BCME_OK;
@@ -189,7 +189,9 @@ bcm_bloom_is_member(bcm_bloom_filter_t *bp,
 		pos = (*bp->hash[i])(bp->cb_ctx, i, tag, tag_len);
 
 		/* all bits must be set for a match */
+		CLANG_DIAGNOSTIC_PUSH_SUPPRESS_CAST()
 		if (isclr(buf, pos % BLOOM_BIT_LEN(buf_len))) {
+		CLANG_DIAGNOSTIC_POP()
 			err = BCME_NOTFOUND;
 			break;
 		}
@@ -222,7 +224,7 @@ bcm_bloom_add_member(bcm_bloom_filter_t *bp, const uint8 *tag, uint tag_len)
 }
 
 int bcm_bloom_get_filter_data(bcm_bloom_filter_t *bp,
-							  uint buf_size, uint8 *buf, uint *buf_len)
+	uint buf_size, uint8 *buf, uint *buf_len)
 {
 	if (!bp)
 		return BCME_BADARG;

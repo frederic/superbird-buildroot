@@ -14,6 +14,16 @@
 //#include <cutils/properties.h>
 
 #define IDR_SCALER_RATIO 4
+#define BITRATE_URGENT_TH 20
+#define BITRATE_URGENT_MID 10
+#define BITRATE_URGENT_INC_STEP3 5
+#define BITRATE_URGENT_INC_STEP2 2
+#define BITRATE_URGENT_INC_STEP1 1
+#define BITRATE_URGENT_DEC_STEP3 3
+#define BITRATE_URGENT_DEC_STEP2 2
+#define BITRATE_URGENT_DEC_STEP1 1
+
+#define PROPERTY_VALUE_MAX 96
 
 static void BitrateScale(GxFastEncRateControl *rateCtrl) {
     int bitsPerframe = (int) (rateCtrl->bitRate / rateCtrl->frame_rate);
@@ -101,7 +111,7 @@ AMVEnc_Status GxFastRCUpdateFrame(void *dev, void *rc, bool IDR, int* skip_num, 
 
             /* compression ratio large than 1.5M 720p and result is large than 1.7 times target */
                 if ((rateCtrl->bitsPerFrame / p->src.mb_width / p->src.mb_height > 14)
-                        && (numFrameBits > p->target * 17 / 10)) {
+                        && ((uint32_t)numFrameBits > p->target * 17 / 10)) {
                     status = AMVENC_REENCODE_PICTURE;
                     if ((uint32_t)(p->src.mb_width * p->src.mb_height) < 3 * p->qp_stic.i_count)
                         p->quant += 6 * numFrameBits / p->target;
@@ -111,21 +121,50 @@ AMVEnc_Status GxFastRCUpdateFrame(void *dev, void *rc, bool IDR, int* skip_num, 
                 qp_max = 48;
         }
 
+        if (!rateCtrl->BitrateScale && !p->cabac_mode) {
+            if (p->bitrate_urgent_mode) {
+                qp_max = 51;
+            } else if (p->bitrate_urgent_cnt > BITRATE_URGENT_MID) {
+                int temp = p->bitrate_urgent_cnt - BITRATE_URGENT_MID;
+                if ((temp * 3) >= BITRATE_URGENT_MID)
+                    qp_max += 2;
+                else if ((temp * 2) >= BITRATE_URGENT_MID)
+                    qp_max += 3;
+                else if (((temp * 10) /7) >= BITRATE_URGENT_MID)
+                    qp_max += 4;
+                if (qp_max > 51)
+                    qp_max = 51;
+            }
+        }
+        if (isSVCandVBR()) {
+
+            int qpbase = 43;
+
+            if (qpbase > 0) {
+                qp_max = qpbase;
+            }
+        }
         if ((unsigned int) numFrameBits > p->target * 3) {
             LOGAPI("base qp + 10:%d", p->quant);
             p->quant += 10;
             if (p->quant > qp_max)
                 p->quant = qp_max;
+            if (!p->bitrate_urgent_mode)
+                p->bitrate_urgent_cnt += BITRATE_URGENT_INC_STEP3;
         } else if ((unsigned int) numFrameBits > p->target * 2) {
             LOGAPI("base qp + 6:%d", p->quant);
             p->quant += 6;
             if (p->quant > qp_max)
                 p->quant = qp_max;
+            if (!p->bitrate_urgent_mode)
+                p->bitrate_urgent_cnt += BITRATE_URGENT_INC_STEP2;
         } else if ((unsigned int) numFrameBits > p->target * 3 / 2) {
             LOGAPI("base qp + 3:%d", p->quant);
             p->quant += 3;
             if (p->quant > qp_max)
                 p->quant = qp_max;
+            if (!p->bitrate_urgent_mode)
+                p->bitrate_urgent_cnt += BITRATE_URGENT_INC_STEP1;
         } else if ((unsigned int) numFrameBits > p->target * 11 / 10) {
             LOGAPI("base qp++:%d", p->quant);
             p->quant++;
@@ -136,18 +175,47 @@ AMVEnc_Status GxFastRCUpdateFrame(void *dev, void *rc, bool IDR, int* skip_num, 
             p->quant -= 4;
             if (p->quant < ADJ_QP_MIN)
                 p->quant = ADJ_QP_MIN;
+            if (p->bitrate_urgent_cnt > BITRATE_URGENT_MID)
+                p->bitrate_urgent_cnt = BITRATE_URGENT_MID;
+            else if (p->bitrate_urgent_cnt >= BITRATE_URGENT_DEC_STEP3)
+                p->bitrate_urgent_cnt -= BITRATE_URGENT_DEC_STEP3;
+            else if (p->bitrate_urgent_cnt < BITRATE_URGENT_DEC_STEP3)
+                p->bitrate_urgent_cnt = 0;
         } else if ((unsigned int) numFrameBits < p->target * 2 / 3) {
             LOGAPI("base qp - 2:%d", p->quant);
             p->quant -= 2;
             if (p->quant < ADJ_QP_MIN)
                 p->quant = ADJ_QP_MIN;
+            if (p->bitrate_urgent_cnt > BITRATE_URGENT_MID)
+                p->bitrate_urgent_cnt = BITRATE_URGENT_MID;
+            else if (p->bitrate_urgent_cnt >= BITRATE_URGENT_DEC_STEP2)
+                p->bitrate_urgent_cnt -= BITRATE_URGENT_DEC_STEP2;
+            else if (p->bitrate_urgent_cnt < BITRATE_URGENT_DEC_STEP2)
+                p->bitrate_urgent_cnt = 0;
         } else if ((unsigned int) numFrameBits < p->target * 9 / 10) {
             LOGAPI("base qp--:%d", p->quant);
             p->quant--;
             if (p->quant < ADJ_QP_MIN)
                 p->quant = ADJ_QP_MIN;
+            if (p->bitrate_urgent_cnt > BITRATE_URGENT_MID)
+                p->bitrate_urgent_cnt = BITRATE_URGENT_MID;
+            else if (p->bitrate_urgent_cnt >= BITRATE_URGENT_DEC_STEP1)
+                p->bitrate_urgent_cnt -= BITRATE_URGENT_DEC_STEP1;
+            else if (p->bitrate_urgent_cnt < BITRATE_URGENT_DEC_STEP1)
+                p->bitrate_urgent_cnt = 0;
+        } else if (!p->bitrate_urgent_mode) {
+            LOGAPI("base qp:%d, bu_cnt:%d", p->quant, p->bitrate_urgent_cnt);
+            if (p->bitrate_urgent_cnt > BITRATE_URGENT_DEC_STEP1)
+                p->bitrate_urgent_cnt -= BITRATE_URGENT_DEC_STEP1;
         }
 
+        if (p->bitrate_urgent_cnt >= BITRATE_URGENT_TH) {
+            p->bitrate_urgent_mode = true;
+            p->bitrate_urgent_cnt = BITRATE_URGENT_TH;
+        } else if (p->bitrate_urgent_mode &&
+            (p->bitrate_urgent_cnt < BITRATE_URGENT_MID)) {
+            p->bitrate_urgent_mode = false;
+        }
         if (p->quant >= qp_max - 5)
             p->max_qp_count++;
         else
@@ -226,6 +294,17 @@ AMVEnc_Status GxFastRCInitFrameQP(void *dev, void *rc, bool IDR, int bitrate, fl
     GxFastEncRateControl *rateCtrl = (GxFastEncRateControl *) rc;
     int fps = (int) (rateCtrl->estimate_fps + 0.5);
     int frame_duration_ms = 0;
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
+
     if (rateCtrl->rcEnable == true) {
         /* frame layer rate control */
         if (rateCtrl->encoded_frames == 0) {
@@ -238,7 +317,7 @@ AMVEnc_Status GxFastRCInitFrameQP(void *dev, void *rc, bool IDR, int bitrate, fl
                 rateCtrl->bitRate = bitrate;
                 rateCtrl->frame_rate = frame_rate;
                 BitrateScale(rateCtrl);
-                LOGAPI("we got new config, frame_rate:%f, bitrate:%d, force_IDR:%d rateCtrl->frame_rate%d", frame_rate, bitrate, rateCtrl->force_IDR, rateCtrl->frame_rate);
+                LOGAPI("we got new config, frame_rate:%f, bitrate:%d, force_IDR:%d rateCtrl->frame_rate%3.3f", frame_rate, bitrate, rateCtrl->force_IDR, rateCtrl->frame_rate);
             } else {
                 rateCtrl->refresh = false;
             }
@@ -250,12 +329,16 @@ AMVEnc_Status GxFastRCInitFrameQP(void *dev, void *rc, bool IDR, int bitrate, fl
                 rateCtrl->target = rateCtrl->bitsPerFrame;
                 if (p->cbr_hw)
                     calculate_fix_qp(p, rateCtrl);
-                LOGAPI("new: 1 buffer_fullness:%lld frame_rate:%f estimate_fps:%f", rateCtrl->buffer_fullness, rateCtrl->frame_rate, rateCtrl->estimate_fps);
+                if (IDR == 1)
+                    rateCtrl->target = rateCtrl->bitsPerFrame*IDR_SCALER_RATIO;
+                LOGAPI("new: 1 buffer_fullness:%lld frame_rate:%f estimate_fps:%f target=%d", rateCtrl->buffer_fullness, rateCtrl->frame_rate, rateCtrl->estimate_fps, rateCtrl->target);
             } else {
                 unsigned int bitsPerFrame = 0;
                 frame_duration_ms = 1000 / fps;
                 if ((unsigned int)rateCtrl->timecode > (unsigned int) rateCtrl->last_timecode)
-                    bitsPerFrame = (rateCtrl->bitsPerFrame * ((unsigned int) rateCtrl->timecode - (unsigned int) rateCtrl->last_timecode) / frame_duration_ms);
+                    bitsPerFrame = (rateCtrl->bitsPerFrame *
+                    		((unsigned int) rateCtrl->timecode - (unsigned int) rateCtrl->last_timecode)
+							/ frame_duration_ms);
                 else
                     bitsPerFrame = rateCtrl->bitsPerFrame;
 
@@ -328,7 +411,7 @@ AMVEnc_Status GxFastRCInitFrameQP(void *dev, void *rc, bool IDR, int bitrate, fl
                             p->quant = p->pre_quant;
                     }
                 }
-                LOGAPI("new: target :%d, bitsPerFrame:%d, cur_ratio:%d, IDR:%d buffer_fullness:%ld ",
+                LOGAPI("new: target :%d, bitsPerFrame:%d, cur_ratio:%d, IDR:%d buffer_fullness:%lld ",
                         rateCtrl->target,
                         bitsPerFrame,
                         cur_ratio,
@@ -338,7 +421,15 @@ AMVEnc_Status GxFastRCInitFrameQP(void *dev, void *rc, bool IDR, int bitrate, fl
             p->target = rateCtrl->target;
         }
     } else {
+	if (media_custom > 0) {
+            if (IDR) {
+                p->quant = 26;
+            } else {
+                p->quant = 26;
+            }	   
+	} else {	
         p->quant = rateCtrl->initQP;
+	}
     }
     return AMVENC_SUCCESS;
 }
@@ -369,7 +460,7 @@ void* GxFastInitRateControlModule(amvenc_initpara_t* init_para) {
         return NULL;
 
     memset(rateCtrl, 0, sizeof(GxFastEncRateControl));
-
+    LOGAPI("rateCtrl=%p, init_para=%p", rateCtrl, init_para);
     rateCtrl->rcEnable = init_para->rcEnable;
     rateCtrl->initQP = init_para->initQP;
     rateCtrl->frame_rate = (float) init_para->frame_rate;
@@ -380,6 +471,7 @@ void* GxFastInitRateControlModule(amvenc_initpara_t* init_para) {
 
     if (rateCtrl->rcEnable == true) {
         rateCtrl->bitsPerFrame = (int32) (rateCtrl->bitRate / rateCtrl->frame_rate);
+        LOGAPI("GxFastInitRateControlModule: bitsPerFrame=%d", rateCtrl->bitsPerFrame);
         rateCtrl->skip_next_frame = 0; /* must be initialized */
         rateCtrl->encoded_frames = 0;
 

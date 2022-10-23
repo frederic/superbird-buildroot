@@ -53,6 +53,7 @@ static char *vpu_mod_table[] = {
 	"dolby0",
 	"dolby_1a",
 	"dolby_1b",
+	"dolby_2",
 	"vpu_arb",
 	"afbc_dec0",
 	"osd_afbcd",

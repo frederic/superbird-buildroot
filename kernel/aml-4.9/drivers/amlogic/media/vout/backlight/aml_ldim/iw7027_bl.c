@@ -116,7 +116,8 @@ static int iw7027_wregs(struct spi_device *spi, unsigned char addr,
 	return ret;
 }
 
-static int iw7027_reg_write(unsigned char *buf, unsigned int len)
+static int iw7027_reg_write(unsigned int dev_id, unsigned char *buf,
+			    unsigned int len)
 {
 	int ret;
 
@@ -133,7 +134,8 @@ static int iw7027_reg_write(unsigned char *buf, unsigned int len)
 	return ret;
 }
 
-static int iw7027_reg_read(unsigned char *buf, unsigned int len)
+static int iw7027_reg_read(unsigned int dev_id, unsigned char *buf,
+			   unsigned int len)
 {
 	int ret;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -175,6 +175,7 @@ typedef enum eLimMlmStates
     eLIM_MLM_WT_FT_REASSOC_RSP_STATE,
 #endif
     eLIM_MLM_P2P_LISTEN_STATE,
+    eLIM_MLM_WT_SAE_AUTH_STATE,
 } tLimMlmStates;
 
 // 11h channel quiet states
@@ -261,6 +262,11 @@ typedef struct sLimMlmJoinReq
     tSirMacRateSet         operationalRateSet;
     tANI_U8                 sessionId;
     tSirBssDescription     bssDescription;
+    /*
+     * WARNING: Pls make bssDescription as last variable in struct
+     * tLimMlmJoinReq as it has ieFields followed after this bss
+     * description. Adding a variable after this corrupts the ieFields
+     */
 } tLimMlmJoinReq, *tpLimMlmJoinReq;
 
 typedef struct sLimMlmScanReq
@@ -329,6 +335,31 @@ typedef struct sLimMlmOemDataRsp
 } tLimMlmOemDataRsp, *tpLimMlmOemDataRsp;
 #endif
 
+/* Forward declarations */
+struct sSirAssocReq;
+struct sDphHashNode;
+
+/* struct lim_assoc_data - Assoc data to be cached to defer association
+ *				indication to SME
+ * @present: Indicates whether assoc data is present or not
+ * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
+ *			Request(=1) frame
+ * @hdr: MAC header
+ * @assoc_req: pointer to parsed ASSOC/REASSOC Request frame
+ * @pmf_connection: flag indicating pmf connection
+ * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
+ * @sta_ds: station dph entry
+ */
+struct lim_assoc_data {
+	bool present;
+	uint8_t sub_type;
+	tSirMacMgmtHdr hdr;
+	struct sSirAssocReq *assoc_req;
+	bool pmf_connection;
+	bool assoc_req_copied;
+	struct sDphHashNode *sta_ds;
+};
+
 // Pre-authentication structure definition
 typedef struct tLimPreAuthNode
 {
@@ -345,6 +376,10 @@ typedef struct tLimPreAuthNode
     TX_TIMER            timer;
     tANI_U16            seqNum;
     v_TIME_t            timestamp;
+    /* keeping copy of association request received, this is
+     * to defer the association request processing
+     */
+    struct lim_assoc_data assoc_req;
 }tLimPreAuthNode, *tpLimPreAuthNode;
 
 // Pre-authentication table definition
@@ -358,7 +393,8 @@ typedef struct tLimPreAuthTable
 typedef struct sLimMlmStaContext
 {
     tLimMlmStates           mlmState;
-    tAniAuthType            authType;
+    tAniAuthType            authType;   /* auth algo in auth frame */
+    enum ani_akm_type       akm_type;	/* akm in rsn/wpa ie */
     tANI_U16                listenInterval;
     tSirMacCapabilityInfo   capabilityInfo;
     tSirMacPropRateSet      propRateSet;
@@ -376,6 +412,8 @@ typedef struct sLimMlmStaContext
 #ifdef WLAN_FEATURE_11AC
     tANI_U8                 vhtCapability:1;
 #endif
+    uint8_t *owe_ie;
+    uint32_t owe_ie_len;
 } tLimMlmStaContext, *tpLimMlmStaContext;
 
 // Structure definition to hold deferred messages queue parameters

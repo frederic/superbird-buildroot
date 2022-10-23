@@ -698,5 +698,36 @@ void sensor_init_imx224( void **ctx, sensor_control_t *ctrl, void* sbp)
     sensor_hw_reset_disable();
     system_timer_usleep( 1000 );
 }
+
+int sensor_detect_imx224( void* sbp)
+{
+    static sensor_context_t s_ctx;
+    int ret = 0;
+    //sensor_bringup_t* sensor_bp = (sensor_bringup_t*) sbp;
+    s_ctx.sbp = sbp;
+
+#if 0//NEED_CONFIG_BSP
+    ret = reset_am_enable(sensor_bp,"reset", 1);
+    if (ret < 0 )
+        pr_info("set reset fail\n");
+#endif
+
+    s_ctx.sbus.mask = SBUS_MASK_SAMPLE_8BITS | SBUS_MASK_ADDR_16BITS | SBUS_MASK_ADDR_SWAP_BYTES;
+    s_ctx.sbus.control = 0;
+    s_ctx.sbus.bus = 0;
+    s_ctx.sbus.device = SENSOR_DEV_ADDRESS;
+    acamera_sbus_init( &s_ctx.sbus, sbus_i2c );
+
+    ret = 0;
+    if (sensor_get_id(&s_ctx) == 0xFFFF)
+        ret = -1;
+    else
+        pr_info("sensor_detect_imx224:%d\n", ret);
+
+    acamera_sbus_deinit(&s_ctx.sbus,  sbus_i2c);
+
+    return ret;
+}
+
 //********************CONSTANT SECTION END*********************************************
 //*************************************************************************************

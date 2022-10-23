@@ -47,6 +47,7 @@ extern unsigned int lcd_debug_print_flag;
 
 /* ******** clk_ctrl ******** */
 #define CLK_CTRL_LEVEL              28 /* [30:28] */
+#define CLK_CTRL_FRAC_SHIFT         24 /* [24] */
 #define CLK_CTRL_FRAC               0  /* [18:0] */
 
 
@@ -238,6 +239,9 @@ struct vbyone_config_s {
 	unsigned int vx1_sw_cdr_detect_time; /* us base * 100 times, must cover tcon lockn pulse */
 	unsigned int vx1_sw_cdr_detect_cnt;
 	unsigned int vx1_sw_cdr_timeout_cnt;
+	/* hw filter */
+	unsigned int hw_filter_time;
+	unsigned int hw_filter_cnt;
 };
 
 /* mipi-dsi config */
@@ -544,8 +548,13 @@ struct aml_lcd_drv_s {
 	void (*lcd_reg)(void);
 	void (*lcd_tcon_reg_print)(void);
 	void (*lcd_tcon_table_print)(void);
+	void (*lcd_tcon_vac_print)(void);
+	void (*lcd_tcon_demura_print)(void);
+	void (*lcd_tcon_acc_print)(void);
 	unsigned int (*lcd_tcon_reg_read)(unsigned int addr, unsigned int flag);
 	void (*lcd_tcon_reg_write)(unsigned int addr, unsigned int val, unsigned int flag);
+	void (*lcd_vbyone_rst)(void);
+	void (*lcd_vbyone_cdr)(void);
 	void (*bl_on)(void);
 	void (*bl_off)(void);
 	void (*set_bl_level)(int level);
@@ -554,7 +563,7 @@ struct aml_lcd_drv_s {
 	int unifykey_test_flag;
 	void (*unifykey_test)(void);
 	void (*unifykey_tcon_test)(void);
-	void (*unifykey_dump)(void);
+	void (*unifykey_dump)(unsigned int);
 	void (*lcd_extern_info)(void);
 
 	/* for factory test */

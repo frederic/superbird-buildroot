@@ -1,0 +1,4 @@
+config BR2_PACKAGE_FOTA
+    bool "aml ota package"
+    help
+        aml ota process.

@@ -26,7 +26,7 @@ endif
 
 #NOSTDINC_FLAGS := -I${WLAN_DRIVER_TOPDIR}/cfg80211/include/
 
-KBUILD_OPTIONS := WLAN_ROOT=$(PWD)/$(FW_WLAN_NAME)
+KBUILD_OPTIONS := WLAN_ROOT=$(QCA_DRIVER_TOPDIR)/$(FW_WLAN_NAME)
 ifdef CONFIG_ANDROID_APQ8084_PLATFORM_TUFELLO
 KBUILD_OPTIONS += MODNAME=Tuffelo_wlan
 else
@@ -47,11 +47,10 @@ endif
 KBUILD_OPTIONS += CONFIG_LINUX_QCMBR=$(CONFIG_LINUX_QCMBR)
 KBUILD_OPTIONS += $(KBUILD_EXTRA) # Extra config if any
 
-        NOSTDINC_FLAGS +=-fno-pic
-        TARGET_ALL := qcacld_build
-        TARGET_CLEAN :=  qcacld_clean
-        MODULE_SYMBOL_DIR :=${CONFIG_KERNEL_SYMBOL_DIR}
-
+NOSTDINC_FLAGS +=-fno-pic
+TARGET_ALL := qcacld_build
+TARGET_CLEAN :=  qcacld_clean
+MODULE_SYMBOL_DIR :=${CONFIG_KERNEL_SYMBOL_DIR}
 
 #################################################################################################################################
 all: $(TARGET_ALL)
@@ -62,7 +61,7 @@ clean: $(TARGET_CLEAN)
 # qcacld driver build
 #
 qcacld_build:
-	${MAKEARCH} -C $(KERNELPATH) SUBDIRS=$(ATH_QCACLD_TOPDIR) KBUILD_EXTRA_SYMBOLS=$(MODULE_SYMBOL_DIR)/Module.symvers modules  $(KBUILD_OPTIONS) -j32
+	${MAKEARCH} -C $(KERNELPATH) SUBDIRS=$(ATH_QCACLD_TOPDIR) KBUILD_EXTRA_SYMBOLS=$(MODULE_SYMBOL_DIR)/Module.symvers modules  $(KBUILD_OPTIONS)
 
 qcacld_clean:
 	${MAKEARCH} -C $(KERNELPATH) SUBDIRS=$(ATH_QCACLD_TOPDIR) clean

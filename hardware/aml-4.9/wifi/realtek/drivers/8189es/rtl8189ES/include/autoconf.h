@@ -83,9 +83,6 @@
 	/* #define CONFIG_FIND_BEST_CHANNEL */
 #endif
 
-#define CONFIG_TX_MCAST2UNI		/* Support IP multicast->unicast */
-/* #define CONFIG_CHECK_AC_LIFETIME */	/* Check packet lifetime of 4 ACs. */
-
 #define CONFIG_P2P
 #ifdef CONFIG_P2P
 	/* The CONFIG_WFD is for supporting the Wi-Fi display */
@@ -137,8 +134,8 @@
 #define CONFIG_TX_AGGREGATION
 /* #define CONFIG_SDIO_TX_TASKLET */
 #define CONFIG_SDIO_RX_COPY
-/* #define CONFIG_SDIO_TX_ENABLE_AVAL_INT */
-
+#define CONFIG_SDIO_TX_ENABLE_AVAL_INT
+#define SDIO_FREE_XMIT_BUF_SEMA
 /*
  * Others
  */
@@ -219,8 +216,6 @@
 #endif
 /* #endif */
 
-#define CONFIG_ATTEMPT_TO_FIX_AP_BEACON_ERROR
-
 /*
  * HAL	Related Config
  */
@@ -245,8 +240,6 @@
  */
 #define DBG	1
 
-#define CONFIG_PROC_DEBUG
-
 #define DBG_CONFIG_ERROR_DETECT
 #define DBG_CONFIG_ERROR_RESET
 
@@ -264,6 +257,7 @@
 /* #define DBG_RX_SEQ */
 /* #define DBG_RX_SIGNAL_DISPLAY_PROCESSING */
 /* #define DBG_RX_SIGNAL_DISPLAY_SSID_MONITORED "jeff-ap" */
+/*#define DBG_IP_R_MONITOR*//*Android IpReachabilityMonitor*/
 
 
 /* #define DOWNLOAD_FW_TO_TXPKT_BUF 0 */

@@ -2,7 +2,7 @@
  * Misc utility routines for accessing lhl specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -73,7 +73,7 @@ si_lhl_setup(si_t *sih, osl_t *osh)
 		LHL_REG(sih, lhl_top_pwrup_ctl_adr, LHL_PWRUP_CTL_MASK, LHL_PWRUP_CTL_4347);
 		LHL_REG(sih, lhl_top_pwrup2_ctl_adr, LHL_PWRUP2_CTL_MASK, LHL_PWRUP2_CTL);
 		LHL_REG(sih, lhl_top_pwrdn_ctl_adr,
-				LHL_PWRDN_CTL_MASK, LHL_PWRDN_SLEEP_CNT);
+			LHL_PWRDN_CTL_MASK, LHL_PWRDN_SLEEP_CNT);
 		LHL_REG(sih, lhl_top_pwrdn2_ctl_adr, LHL_PWRDN2_CTL_MASK, LHL_PWRDN2_CTL);
 
 		/*
@@ -86,40 +86,40 @@ si_lhl_setup(si_t *sih, osl_t *osh)
 		/* GPIO1 */
 		/* Clear any old interrupt status */
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
+			1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
 		/* active high level trigger */
 		LHL_REG(sih, gpio_ctrl_iocfg_p_adr[PCIE_GPIO1_GPIO_PIN], ~0,
-				1 << GCI_GPIO_STS_WL_DIN_SELECT);
+			1 << GCI_GPIO_STS_WL_DIN_SELECT);
 		LHL_REG(sih, gpio_int_en_port_adr[0],
-				1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
+			1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
+			1 << PCIE_GPIO1_GPIO_PIN, 1 << PCIE_GPIO1_GPIO_PIN);
 #if !defined(_CFEZ_)
 		si_gci_set_functionsel(sih, 1, CC4347_FNSEL_SAMEASPIN);
 #endif // endif
 
 		/* PCIE perst */
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
+			1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
 		LHL_REG(sih, gpio_ctrl_iocfg_p_adr[PCIE_PERST_GPIO_PIN], ~0,
-				(1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
-				 1 << GCI_GPIO_STS_WL_DIN_SELECT));
+			(1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
+			1 << GCI_GPIO_STS_WL_DIN_SELECT));
 		LHL_REG(sih, gpio_int_en_port_adr[0],
-				1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
+			1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
+			1 << PCIE_PERST_GPIO_PIN, 1 << PCIE_PERST_GPIO_PIN);
 
 		/* PCIE clkreq */
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
+			1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
 		LHL_REG(sih, gpio_ctrl_iocfg_p_adr[PCIE_CLKREQ_GPIO_PIN], ~0,
-				(1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
-				 1 << GCI_GPIO_STS_NEG_EDGE_TRIG_BIT |
-				 1 << GCI_GPIO_STS_WL_DIN_SELECT));
+			(1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
+			1 << GCI_GPIO_STS_NEG_EDGE_TRIG_BIT |
+			1 << GCI_GPIO_STS_WL_DIN_SELECT));
 		LHL_REG(sih, gpio_int_en_port_adr[0],
-				1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
+			1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
 		LHL_REG(sih, gpio_int_st_port_adr[0],
-				1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
+			1 << PCIE_CLKREQ_GPIO_PIN, 1 << PCIE_CLKREQ_GPIO_PIN);
 	}
 }
 
@@ -145,47 +145,47 @@ si_lhl_set_lpoclk(si_t *sih, osl_t *osh, uint32 lpo_force)
 
 	/* Power up the desired LPO */
 	switch (lpo) {
-	case LHL_EXT_LPO_ENAB:
-		LHL_REG(sih, lhl_main_ctl_adr, EXTLPO_BUF_PD, 0);
-		lhl_wlclk_sel = LHL_EXT_SEL;
-		break;
+		case LHL_EXT_LPO_ENAB:
+			LHL_REG(sih, lhl_main_ctl_adr, EXTLPO_BUF_PD, 0);
+			lhl_wlclk_sel = LHL_EXT_SEL;
+			break;
 
-	case LHL_LPO1_ENAB:
-		LHL_REG(sih, lhl_main_ctl_adr, LPO1_PD_EN, 0);
-		lhl_wlclk_sel = LHL_LPO1_SEL;
-		break;
+		case LHL_LPO1_ENAB:
+			LHL_REG(sih, lhl_main_ctl_adr, LPO1_PD_EN, 0);
+			lhl_wlclk_sel = LHL_LPO1_SEL;
+			break;
 
-	case LHL_LPO2_ENAB:
-		LHL_REG(sih, lhl_main_ctl_adr, LPO2_PD_EN, 0);
-		lhl_wlclk_sel = LHL_LPO2_SEL;
-		break;
+		case LHL_LPO2_ENAB:
+			LHL_REG(sih, lhl_main_ctl_adr, LPO2_PD_EN, 0);
+			lhl_wlclk_sel = LHL_LPO2_SEL;
+			break;
 
-	case LHL_OSC_32k_ENAB:
-		LHL_REG(sih, lhl_main_ctl_adr, OSC_32k_PD, 0);
-		lhl_wlclk_sel = LHL_32k_SEL;
-		break;
+		case LHL_OSC_32k_ENAB:
+			LHL_REG(sih, lhl_main_ctl_adr, OSC_32k_PD, 0);
+			lhl_wlclk_sel = LHL_32k_SEL;
+			break;
 
-	default:
-		goto done;
+		default:
+			goto done;
 	}
 
 	LHL_REG(sih, lhl_clk_det_ctl_adr,
-			LHL_CLK_DET_CTL_AD_CNTR_CLK_SEL, lhl_wlclk_sel);
+		LHL_CLK_DET_CTL_AD_CNTR_CLK_SEL, lhl_wlclk_sel);
 
 	/* Detect the desired LPO */
 
 	LHL_REG(sih, lhl_clk_det_ctl_adr, LHL_CLK_DET_CTL_ADR_LHL_CNTR_EN, 0);
 	LHL_REG(sih, lhl_clk_det_ctl_adr,
-			LHL_CLK_DET_CTL_ADR_LHL_CNTR_CLR, LHL_CLK_DET_CTL_ADR_LHL_CNTR_CLR);
+		LHL_CLK_DET_CTL_ADR_LHL_CNTR_CLR, LHL_CLK_DET_CTL_ADR_LHL_CNTR_CLR);
 	timeout = 0;
 	clk_det_cnt =
 		((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
-		 LHL_CLK_DET_CNT_SHIFT);
+		LHL_CLK_DET_CNT_SHIFT);
 	while (clk_det_cnt != 0 && timeout <= LPO_SEL_TIMEOUT) {
 		OSL_DELAY(10);
 		clk_det_cnt =
-			((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
-			 LHL_CLK_DET_CNT_SHIFT);
+		((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
+		LHL_CLK_DET_CNT_SHIFT);
 		timeout++;
 	}
 
@@ -195,17 +195,17 @@ si_lhl_set_lpoclk(si_t *sih, osl_t *osh, uint32 lpo_force)
 	}
 	LHL_REG(sih, lhl_clk_det_ctl_adr, LHL_CLK_DET_CTL_ADR_LHL_CNTR_CLR, 0);
 	LHL_REG(sih, lhl_clk_det_ctl_adr, LHL_CLK_DET_CTL_ADR_LHL_CNTR_EN,
-			LHL_CLK_DET_CTL_ADR_LHL_CNTR_EN);
+		LHL_CLK_DET_CTL_ADR_LHL_CNTR_EN);
 	clk_det_cnt =
 		((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
-		 LHL_CLK_DET_CNT_SHIFT);
+		LHL_CLK_DET_CNT_SHIFT);
 	timeout = 0;
 
 	while (clk_det_cnt <= CLK_DET_CNT_THRESH && timeout <= LPO_SEL_TIMEOUT) {
 		OSL_DELAY(10);
 		clk_det_cnt =
-			((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
-			 LHL_CLK_DET_CNT_SHIFT);
+		((R_REG(osh, &gciregs->lhl_clk_det_ctl_adr) & LHL_CLK_DET_CNT) >>
+		LHL_CLK_DET_CNT_SHIFT);
 		timeout++;
 	}
 
@@ -217,16 +217,16 @@ si_lhl_set_lpoclk(si_t *sih, osl_t *osh, uint32 lpo_force)
 	/* Select the desired LPO */
 
 	LHL_REG(sih, lhl_main_ctl_adr,
-			LHL_MAIN_CTL_ADR_LHL_WLCLK_SEL, (lhl_wlclk_sel) << LPO_SEL_SHIFT);
+		LHL_MAIN_CTL_ADR_LHL_WLCLK_SEL, (lhl_wlclk_sel) << LPO_SEL_SHIFT);
 
 	status = ((R_REG(osh, &gciregs->lhl_clk_status_adr) & LHL_MAIN_CTL_ADR_FINAL_CLK_SEL) ==
-			  (unsigned)(((1 << lhl_wlclk_sel) << LPO_FINAL_SEL_SHIFT))) ? 1 : 0;
+		(unsigned)(((1 << lhl_wlclk_sel) << LPO_FINAL_SEL_SHIFT))) ? 1 : 0;
 	timeout = 0;
 	while (!status && timeout <= LPO_SEL_TIMEOUT) {
 		OSL_DELAY(10);
 		status =
-			((R_REG(osh, &gciregs->lhl_clk_status_adr) & LHL_MAIN_CTL_ADR_FINAL_CLK_SEL) ==
-			 (unsigned)(((1 << lhl_wlclk_sel) << LPO_FINAL_SEL_SHIFT))) ? 1 : 0;
+		((R_REG(osh, &gciregs->lhl_clk_status_adr) & LHL_MAIN_CTL_ADR_FINAL_CLK_SEL) ==
+		(unsigned)(((1 << lhl_wlclk_sel) << LPO_FINAL_SEL_SHIFT))) ? 1 : 0;
 		timeout++;
 	}
 
@@ -281,8 +281,8 @@ si_lhl_timer_config(si_t *sih, osl_t *osh, int timer_type)
 	case LHL_MAC_TIMER:
 		/* Enable MAC Timer interrupt */
 		LHL_REG(sih, lhl_wl_mactim0_intrp_adr,
-				(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER),
-				(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER));
+			(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER),
+			(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER));
 
 		/* Programs bits for MACPHY_CLK_AVAIL and all its dependent bits in
 		 * MacResourceReqMask0.
@@ -291,20 +291,20 @@ si_lhl_timer_config(si_t *sih, osl_t *osh, int timer_type)
 
 		/* One time init of mac_res_req_timer to enable interrupt and clock request */
 		HND_PMU_SYNC_WR(sih, pmu, pmu, osh,
-						PMUREGADDR(sih, pmu, pmu, mac_res_req_timer),
-						((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
+				PMUREGADDR(sih, pmu, pmu, mac_res_req_timer),
+				((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
 
 		if (si_numd11coreunits(sih) > 1) {
 			LHL_REG(sih, lhl_wl_mactim1_intrp_adr,
-					(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER),
-					(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER));
+				(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER),
+				(LHL_WL_MACTIM0_INTRP_EN | LHL_WL_MACTIM0_INTRP_EDGE_TRIGGER));
 
 			PMU_REG(sih, mac_res_req_mask1, ~0,
-					si_pmu_rsrc_macphy_clk_deps(sih, osh, 1));
+				si_pmu_rsrc_macphy_clk_deps(sih, osh, 1));
 
 			HND_PMU_SYNC_WR(sih, pmu, pmu, osh,
-							PMUREGADDR(sih, pmu, pmu, mac_res_req_timer1),
-							((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
+					PMUREGADDR(sih, pmu, pmu, mac_res_req_timer1),
+					((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
 		}
 
 		break;
@@ -322,8 +322,8 @@ si_lhl_timer_config(si_t *sih, osl_t *osh, int timer_type)
 		 * For low power request only ALP (HT_AVAIL is anyway requested by res_req_mask)
 		 */
 		HND_PMU_SYNC_WR(sih, pmu, pmu, osh,
-						PMUREGADDR(sih, pmu, pmu, res_req_timer),
-						((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
+				PMUREGADDR(sih, pmu, pmu, res_req_timer),
+				((PRRT_ALP_REQ | PRRT_HQ_REQ | PRRT_INTEN) << FLAGS_SHIFT));
 		break;
 	}
 
@@ -345,12 +345,12 @@ si_lhl_timer_enable(si_t *sih)
 void
 si_lhl_ilp_config(si_t *sih, osl_t *osh, uint32 ilp_period)
 {
-	gciregs_t *gciregs;
-	if (CHIPID(sih->chip) == BCM43012_CHIP_ID) {
+	 gciregs_t *gciregs;
+	 if (CHIPID(sih->chip) == BCM43012_CHIP_ID) {
 		gciregs = si_setcore(sih, GCI_CORE_ID, 0);
 		ASSERT(gciregs != NULL);
 		W_REG(osh, &gciregs->lhl_wl_ilp_val_adr, ilp_period);
-	}
+	 }
 }
 
 #ifdef BCMULP
@@ -379,9 +379,9 @@ si_lhl_enable_sdio_wakeup(si_t *sih, osl_t *osh)
 		  * 6 -> din from wl side enable
 		  */
 		OR_REG(osh, &gciregs->gpio_ctrl_iocfg_p_adr[ULP_SDIO_CMD_PIN],
-			   (1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
-				1 << GCI_GPIO_STS_NEG_EDGE_TRIG_BIT |
-				1 << GCI_GPIO_STS_WL_DIN_SELECT));
+			(1 << GCI_GPIO_STS_EDGE_TRIG_BIT |
+			1 << GCI_GPIO_STS_NEG_EDGE_TRIG_BIT |
+			1 << GCI_GPIO_STS_WL_DIN_SELECT));
 		/* Clear any old interrupt status */
 		OR_REG(osh, &gciregs->gpio_int_st_port_adr[0], 1 << ULP_SDIO_CMD_PIN);
 
@@ -435,56 +435,48 @@ lhl_reg_set_t lv_sleep_mode_4369_lhl_reg_set[] =
 	{LHL_REG_OFF(lhl_lp_main_ctl2_adr), BCM_MASK32(13, 0), 0x07EE},
 
 	/* lhl_lp_dn_ctl_adr, set down count for CSR fields- adj, mode, overi_dis */
-	{	LHL_REG_OFF(lhl_lp_dn_ctl_adr), ~0, ((LHL4369_CSR_OVERI_DIS_DWN_CNT << 16) |
-		(LHL4369_CSR_MODE_DWN_CNT << 8) | (LHL4369_CSR_ADJ_DWN_CNT << 0))
-	},
+	{LHL_REG_OFF(lhl_lp_dn_ctl_adr), ~0, ((LHL4369_CSR_OVERI_DIS_DWN_CNT << 16) |
+		(LHL4369_CSR_MODE_DWN_CNT << 8) | (LHL4369_CSR_ADJ_DWN_CNT << 0))},
 
 	/* lhl_lp_up_ctl_adr, set up count for CSR fields- adj, mode, overi_dis */
-	{	LHL_REG_OFF(lhl_lp_up_ctl_adr), ~0, ((LHL4369_CSR_OVERI_DIS_UP_CNT << 16) |
-		(LHL4369_CSR_MODE_UP_CNT << 8) | (LHL4369_CSR_ADJ_UP_CNT << 0))
-	},
+	{LHL_REG_OFF(lhl_lp_up_ctl_adr), ~0, ((LHL4369_CSR_OVERI_DIS_UP_CNT << 16) |
+		(LHL4369_CSR_MODE_UP_CNT << 8) | (LHL4369_CSR_ADJ_UP_CNT << 0))},
 
 	/* lhl_lp_dn_ctl1_adr, set down count for hpbg_chop_dis, ASR_adj, vddc_sw_dis */
-	{	LHL_REG_OFF(lhl_lp_dn_ctl1_adr), ~0, ((LHL4369_VDDC_SW_DIS_DWN_CNT << 24) |
-		(LHL4369_ASR_ADJ_DWN_CNT << 16) | (LHL4369_HPBG_CHOP_DIS_DWN_CNT << 0))
-	},
+	{LHL_REG_OFF(lhl_lp_dn_ctl1_adr), ~0, ((LHL4369_VDDC_SW_DIS_DWN_CNT << 24) |
+		(LHL4369_ASR_ADJ_DWN_CNT << 16) | (LHL4369_HPBG_CHOP_DIS_DWN_CNT << 0))},
 
 	/* lhl_lp_up_ctl1_adr, set up count for hpbg_chop_dis, ASR_adj, vddc_sw_dis */
-	{	LHL_REG_OFF(lhl_lp_up_ctl1_adr), ~0, ((LHL4369_VDDC_SW_DIS_UP_CNT << 24) |
-		(LHL4369_ASR_ADJ_UP_CNT << 16) | (LHL4369_HPBG_CHOP_DIS_UP_CNT << 0))
-	},
+	{LHL_REG_OFF(lhl_lp_up_ctl1_adr), ~0, ((LHL4369_VDDC_SW_DIS_UP_CNT << 24) |
+		(LHL4369_ASR_ADJ_UP_CNT << 16) | (LHL4369_HPBG_CHOP_DIS_UP_CNT << 0))},
 
 	/* lhl_lp_dn_ctl4_adr, set down count for ASR fields -
 	 *     clk4m_dis, lppfm_mode, mode_sel, manual_mode
 	 */
-	{	LHL_REG_OFF(lhl_lp_dn_ctl4_adr), ~0, ((LHL4369_ASR_MANUAL_MODE_DWN_CNT << 24) |
+	{LHL_REG_OFF(lhl_lp_dn_ctl4_adr), ~0, ((LHL4369_ASR_MANUAL_MODE_DWN_CNT << 24) |
 		(LHL4369_ASR_MODE_SEL_DWN_CNT << 16) | (LHL4369_ASR_LPPFM_MODE_DWN_CNT << 8) |
-		(LHL4369_ASR_CLK4M_DIS_DWN_CNT << 0))
-	},
+		(LHL4369_ASR_CLK4M_DIS_DWN_CNT << 0))},
 
 	/* lhl_lp_up_ctl4_adr, set up count for ASR fields -
 	 *     clk4m_dis, lppfm_mode, mode_sel, manual_mode
 	 */
-	{	LHL_REG_OFF(lhl_lp_up_ctl4_adr), ~0, ((LHL4369_ASR_MANUAL_MODE_UP_CNT << 24) |
-		(LHL4369_ASR_MODE_SEL_UP_CNT << 16) | (LHL4369_ASR_LPPFM_MODE_UP_CNT << 8) |
-		(LHL4369_ASR_CLK4M_DIS_UP_CNT << 0))
-	},
+	{LHL_REG_OFF(lhl_lp_up_ctl4_adr), ~0, ((LHL4369_ASR_MANUAL_MODE_UP_CNT << 24) |
+		(LHL4369_ASR_MODE_SEL_UP_CNT << 16)| (LHL4369_ASR_LPPFM_MODE_UP_CNT << 8) |
+		(LHL4369_ASR_CLK4M_DIS_UP_CNT << 0))},
 
 	/* lhl_lp_dn_ctl3_adr, set down count for hpbg_pu, srbg_ref, ASR_overi_dis,
 	 * CSR_pfm_pwr_slice_en
 	 */
-	{	LHL_REG_OFF(lhl_lp_dn_ctl3_adr), ~0, ((LHL4369_PFM_PWR_SLICE_DWN_CNT << 24) |
+	{LHL_REG_OFF(lhl_lp_dn_ctl3_adr), ~0, ((LHL4369_PFM_PWR_SLICE_DWN_CNT << 24) |
 		(LHL4369_ASR_OVERI_DIS_DWN_CNT << 16) | (LHL4369_SRBG_REF_SEL_DWN_CNT << 8) |
-		(LHL4369_HPBG_PU_EN_DWN_CNT << 0))
-	},
+		(LHL4369_HPBG_PU_EN_DWN_CNT << 0))},
 
 	/* lhl_lp_up_ctl3_adr, set up count for hpbg_pu, srbg_ref, ASR_overi_dis,
 	 * CSR_pfm_pwr_slice_en
 	 */
-	{	LHL_REG_OFF(lhl_lp_up_ctl3_adr), ~0, ((LHL4369_PFM_PWR_SLICE_UP_CNT << 24) |
+	{LHL_REG_OFF(lhl_lp_up_ctl3_adr), ~0, ((LHL4369_PFM_PWR_SLICE_UP_CNT << 24) |
 		(LHL4369_ASR_OVERI_DIS_UP_CNT << 16) | (LHL4369_SRBG_REF_SEL_UP_CNT << 8) |
-		(LHL4369_HPBG_PU_EN_UP_CNT << 0))
-	},
+		(LHL4369_HPBG_PU_EN_UP_CNT << 0))},
 
 	/* lhl_lp_dn_ctl2_adr, set down count for CSR_trim_adj */
 	{LHL_REG_OFF(lhl_lp_dn_ctl2_adr), ~0, (LHL4369_CSR_TRIM_ADJ_DWN_CNT << 16)},
@@ -500,18 +492,16 @@ lhl_reg_set_t lv_sleep_mode_4369_lhl_reg_set[] =
 
 	/* Change the default down count values for the resources */
 	/* lhl_top_pwrdn_ctl_adr, set down count for top_level_sleep, iso, slb and pwrsw */
-	{	LHL_REG_OFF(lhl_top_pwrdn_ctl_adr), ~0, ((LHL4369_PWRSW_EN_DWN_CNT << 24) |
-		(LHL4369_SLB_EN_DWN_CNT << 16) | (LHL4369_ISO_EN_DWN_CNT << 8))
-	},
+	{LHL_REG_OFF(lhl_top_pwrdn_ctl_adr), ~0, ((LHL4369_PWRSW_EN_DWN_CNT << 24) |
+		(LHL4369_SLB_EN_DWN_CNT << 16) | (LHL4369_ISO_EN_DWN_CNT << 8))},
 
 	/* lhl_top_pwrdn2_ctl_adr, set down count for VMUX_asr_sel */
 	{LHL_REG_OFF(lhl_top_pwrdn2_ctl_adr), ~0, (LHL4369_VMUX_ASR_SEL_DWN_CNT << 16)},
 
 	/* Change the default up count values for the resources */
 	/* lhl_top_pwrup_ctl_adr, set up count for top_level_sleep, iso, slb and pwrsw */
-	{	LHL_REG_OFF(lhl_top_pwrup_ctl_adr), ~0, ((LHL4369_PWRSW_EN_UP_CNT << 24) |
-		(LHL4369_SLB_EN_UP_CNT << 16) | (LHL4369_ISO_EN_UP_CNT << 8))
-	},
+	{LHL_REG_OFF(lhl_top_pwrup_ctl_adr), ~0, ((LHL4369_PWRSW_EN_UP_CNT << 24) |
+		(LHL4369_SLB_EN_UP_CNT << 16) | (LHL4369_ISO_EN_UP_CNT << 8))},
 
 	/* lhl_top_pwrdn2_ctl_adr, set down count for VMUX_asr_sel */
 	{LHL_REG_OFF(lhl_top_pwrup2_ctl_adr), ~0, ((LHL4369_VMUX_ASR_SEL_UP_CNT << 16))},

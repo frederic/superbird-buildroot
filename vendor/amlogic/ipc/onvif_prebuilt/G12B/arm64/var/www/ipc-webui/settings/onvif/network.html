@@ -1,0 +1,45 @@
+<?php
+require "../../common.php";
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+    <title>Onvif-Network</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+
+<body>
+<form class="layui-form layui-form-pane" id="form_onvif_network" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item">
+        <label class="layui-form-label locale">Interface</label>
+        <div class="layui-input-inline">
+            <input type="text" name="interface" class="layui-input" autocomplete="off"
+                   id="interface">
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <label class="layui-form-label locale">Port</label>
+        <div class="layui-input-inline">
+            <input type="text" name="port" class="layui-input" autocomplete="off" id="port">
+        </div>
+    </div>
+    <div class="layui-form-item" style="margin-left: 50px">
+        <div class="layui-input-inline">
+            <button class="layui-btn locale" id="submit">Submit</button>
+            <button class="layui-btn layui-btn-danger locale" id="reset">Reset</button>
+        </div>
+    </div>
+</form>
+
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="network.js" type="application/javascript"></script>
+<script> translate_html(); </script>
+</body>
+</html>

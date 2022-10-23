@@ -43,7 +43,7 @@
 #include <linux/amlogic/media/utils/vdec_reg.h>
 #include "../utils/amvdec.h"
 #include "vh264.h"
-#include "../../../stream_input/parser/streambuf.h"
+#include "../../../stream_input/amports/streambuf.h"
 #include <linux/delay.h>
 #include <linux/amlogic/media/video_sink/video.h>
 #include <linux/amlogic/tee.h>
@@ -1680,55 +1680,55 @@ static void load_qos_data(int pic_number, uint32_t b_offset)
 	node->min_mv = mv_lo;
 #endif
 
+#ifdef DEBUG_QOS
 	/* {mvy_L0_max, mvy_L0_min} */
 	rdata32 = READ_VREG(VDEC_PIC_QUALITY_DATA);
 	mv_hi = (rdata32>>16)&0xffff;
 	if (mv_hi & 0x8000)
 		mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
 	pr_info(" [Picture %d Quality] MVY_L0 MAX : %d\n",
 		pic_number, mv_hi);
-#endif
+
 
 	mv_lo = (rdata32>>0)&0xffff;
 	if (mv_lo & 0x8000)
 		mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	pr_info(" [Picture %d Quality] MVY_L0 MIN : %d\n",
 		pic_number, mv_lo);
-#endif
+
 
 	/* {mvx_L1_max, mvx_L1_min} */
 	rdata32 = READ_VREG(VDEC_PIC_QUALITY_DATA);
 	mv_hi = (rdata32>>16)&0xffff;
 	if (mv_hi & 0x8000)
 		mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
+
 	pr_info(" [Picture %d Quality] MVX_L1 MAX : %d\n",
 		pic_number, mv_hi);
-#endif
+
 
 	mv_lo = (rdata32>>0)&0xffff;
 	if (mv_lo & 0x8000)
 		mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	pr_info(" [Picture %d Quality] MVX_L1 MIN : %d\n",
 		pic_number, mv_lo);
-#endif
+
 
 	/* {mvy_L1_max, mvy_L1_min} */
 	rdata32 = READ_VREG(VDEC_PIC_QUALITY_DATA);
 	mv_hi = (rdata32>>16)&0xffff;
 	if (mv_hi & 0x8000)
 		mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
+
 	pr_info(" [Picture %d Quality] MVY_L1 MAX : %d\n",
 		pic_number, mv_hi);
-#endif
+
 	mv_lo = (rdata32>>0)&0xffff;
 	if (mv_lo & 0x8000)
 		mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	pr_info(" [Picture %d Quality] MVY_L1 MIN : %d\n",
 		pic_number, mv_lo);
 #endif
@@ -2570,6 +2570,36 @@ static inline bool vh264_isr_parser(struct vframe_s *vf,
 	}
 	return true;
 }
+
+static inline void h264_update_gvs(void)
+{
+	u32 ratio_control;
+	u32 ar;
+
+	if (gvs->frame_height != frame_height) {
+		gvs->frame_width = frame_width;
+		gvs->frame_height = frame_height;
+	}
+	if (gvs->frame_dur != frame_dur) {
+		gvs->frame_dur = frame_dur;
+		if (frame_dur != 0)
+			gvs->frame_rate = 96000 / frame_dur;
+		else
+			gvs->frame_rate = -1;
+	}
+	gvs->error_count = READ_VREG(AV_SCRATCH_D);
+	gvs->status = stat;
+	if (fatal_error_reset)
+		gvs->status |= fatal_error_flag;
+	ar = min_t(u32,
+			h264_ar,
+			DISP_RATIO_ASPECT_RATIO_MAX);
+	ratio_control =
+		ar << DISP_RATIO_ASPECT_RATIO_BIT;
+	gvs->ratio_control = ratio_control;
+}
+
+
 #ifdef HANDLE_H264_IRQ
 static irqreturn_t vh264_isr(int irq, void *dev_id)
 #else
@@ -2875,7 +2905,7 @@ static void vh264_isr(void)
 			frame_count++;
 
 			s_vframe_qos.num = frame_count;
-			vdec_fill_frame_info(&s_vframe_qos, 1);
+			//vdec_fill_frame_info(&s_vframe_qos, 1);
 
 			/* on second IDR frame,check the diff between pts
 			 *  compute from duration and pts from lookup ,
@@ -3011,8 +3041,9 @@ static void vh264_isr(void)
 			 */
 
 			/*count info*/
-			gvs->frame_dur = frame_dur;
+			h264_update_gvs();
 			vdec_count_info(gvs, error, b_offset);
+			vdec_fill_vdec_frame(vdec_h264, &s_vframe_qos, gvs, vf, 0);
 
 			if ((pts_valid) && (check_pts_discontinue)
 					&& (!error)) {
@@ -4325,6 +4356,7 @@ static int amvdec_h264_probe(struct platform_device *pdev)
 	atomic_set(&vh264_active, 1);
 
 	mutex_unlock(&vh264_mutex);
+	vdec_set_vframe_comm(pdata, DRIVER_NAME);
 
 	return 0;
 }

@@ -56,6 +56,17 @@ struct _sensor_fsm_t {
     uint32_t boot_status;
 };
 
+struct sqrt_ext_param_t {
+    uint32_t gain;
+    uint32_t black_level_in;
+    uint32_t black_level_out;
+};
+
+struct square_be_ext_param_t {
+    uint32_t gain;
+    uint32_t black_level_in;
+    uint32_t black_level_out;
+};
 
 void sensor_fsm_clear( sensor_fsm_ptr_t p_fsm );
 void sensor_fsm_init( void *fsm, fsm_init_param_t *init_param );

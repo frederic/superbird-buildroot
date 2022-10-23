@@ -29,6 +29,7 @@
 #include <linux/amlogic/media/amvecm/ve.h>
 #include "dnlp_algorithm/dnlp_alg.h"
 #include <linux/amlogic/media/amvecm/amvecm.h>
+#include "ai_pq/ai_pq.h"
 
 bool ve_en;
 unsigned int ve_dnlp_rt;
@@ -262,7 +263,7 @@ void dnlp_alg_param_init(void)
 	dnlp_alg_param.dnlp_lowrange = 18;
 	dnlp_alg_param.dnlp_hghrange = 18;
 	dnlp_alg_param.dnlp_satur_rat = 30;
-	dnlp_alg_param.dnlp_satur_max = 40;
+	dnlp_alg_param.dnlp_satur_max = 0;
 	dnlp_alg_param.dnlp_set_saturtn = 0;
 	dnlp_alg_param.dnlp_sbgnbnd = 4;
 	dnlp_alg_param.dnlp_sendbnd = 4;
@@ -524,7 +525,7 @@ void ve_dnlp_calculate_reg(void)
 {
 	ulong i = 0, j = 0, cur = 0, data = 0,
 			offset = ve_dnlp_rt ? (1 << (ve_dnlp_rt - 1)) : 0;
-	if (is_meson_tl1_cpu()) {
+	if (cpu_after_eq(MESON_CPU_MAJOR_ID_TL1)) {
 		for (i = 0; i < 32; i++) {
 			ve_dnlp_reg_v2[i] = 0;
 			cur = i << 1;
@@ -548,6 +549,14 @@ void ve_dnlp_calculate_reg(void)
 			}
 		}
 	}
+}
+
+void ai_dnlp_param_update(int value)
+{
+	dnlp_alg_param.dnlp_final_gain = value;
+	if (dnlp_insmod_ok == 0)
+		return;
+	dnlp_dbg_node_copy();
 }
 
 void ve_set_v3_dnlp(struct ve_dnlp_curve_param_s *p)
@@ -855,6 +864,7 @@ void ve_set_v3_dnlp(struct ve_dnlp_curve_param_s *p)
 		/* disable dnlp */
 		ve_disable_dnlp();
 	}
-
+	/*ai pq get dnlp final gain*/
+	aipq_base_dnlp_param(dnlp_alg_param.dnlp_final_gain);
 }
 

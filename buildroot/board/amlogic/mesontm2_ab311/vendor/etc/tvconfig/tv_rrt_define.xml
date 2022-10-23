@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rating-system-definitions xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="2">
+    <rating-system-definition android:name="Entire Audience" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="0">
+        <rating-definition android:title="None" android:description="None" android:rating_id="1" />
+        <rating-definition android:title="TV-G" android:description="TV-G" android:rating_id="2" />
+        <rating-definition android:title="TV-PG" android:description="TV-PG" android:rating_id="3" />
+        <rating-definition android:title="TV-14" android:description="TV-14" android:rating_id="4" />
+        <rating-definition android:title="TV-MA" android:description="TV-MA" android:rating_id="5" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Dialogue" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="1">
+        <rating-definition android:title="D" android:description="D" android:rating_id="1" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Language" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="2">
+        <rating-definition android:title="L" android:description="L" android:rating_id="1" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Sex" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="3">
+        <rating-definition android:title="S" android:description="S" android:rating_id="1" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Violence" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="4">
+        <rating-definition android:title="V" android:description="V" android:rating_id="1" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Children" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="5">
+        <rating-definition android:title="TV-Y" android:description="TV-Y" android:rating_id="1" />
+        <rating-definition android:title="TV-Y7" android:description="TV-Y7" android:rating_id="2" />
+    </rating-system-definition>
+    <rating-system-definition android:name="Fantasy Violence" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="6">
+        <rating-definition android:title="FV" android:description="FV" android:rating_id="1" />
+    </rating-system-definition>
+    <rating-system-definition android:name="MPAA" android:rating="1" android:country="U.S. (50 states + possessions)" android:dimension_id="7">
+        <rating-definition android:title="N/A" android:description="MPAA Rating Not Applicable" android:rating_id="1" />
+        <rating-definition android:title="G" android:description="Suitable for All Ages" android:rating_id="2" />
+        <rating-definition android:title="PG" android:description="Parental Guidance Suggested" android:rating_id="3" />
+        <rating-definition android:title="PG-13" android:description="Parents Strongly Cautioned" android:rating_id="4" />
+        <rating-definition android:title="R" android:description="Restricted, under 17 must be accompanied by adult" android:rating_id="5" />
+        <rating-definition android:title="NC-17" android:description="No One 17 and Under Admitted" android:rating_id="6" />
+        <rating-definition android:title="X" android:description="No One 17 and Under Admitted" android:rating_id="7" />
+        <rating-definition android:title="NR" android:description="Not Rated by MPAA" android:rating_id="8" />
+    </rating-system-definition>
+</rating-system-definitions>

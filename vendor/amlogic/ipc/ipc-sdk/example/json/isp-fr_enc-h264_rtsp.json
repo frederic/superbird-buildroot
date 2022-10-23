@@ -1,0 +1,28 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        width: 1920,
+        height: 1080,
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264
+    }
+  },
+  {
+    type: GstBridge,
+    load: "ipc_gstbridge.so",
+    param: {
+      rtsp-port: 554,
+      rtsp-mount: "/live.sdp",
+      launch: "appsrc name=vin ! h264parse config-interval=1 ! rtph264pay pt=96 config-interval=1 name=pay0"
+    }
+  }
+]

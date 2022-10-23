@@ -2,7 +2,7 @@
 ## makefile for libgdc and gdc_test
 #
 LIBGDC_OBJ = gdc.o
-CFLAGS = -I ./include/gdc/
+CFLAGS += -I ./include/gdc/
 LIBGDC = libgdc.so
 
 LIBDIR:= .

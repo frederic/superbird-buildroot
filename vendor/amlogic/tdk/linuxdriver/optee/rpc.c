@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/workqueue.h>
 #include "tee_drv.h"
 #include "optee_private.h"
 #include "optee_smc.h"
@@ -310,6 +311,199 @@ static void handle_rpc_func_cmd_shm_free(struct tee_context *ctx,
 	arg->ret = TEEC_SUCCESS;
 }
 
+#define TEE_SECURE_TIMER_FLAG_ONESHOT   0
+#define TEE_SECURE_TIMER_FLAG_PERIOD    1
+struct optee_timer_data {
+	struct tee_context *ctx;
+	uint32_t sess;
+	uint32_t handle;
+	uint32_t flags;
+	uint32_t timeout;
+	struct delayed_work work;
+	struct list_head list_node;
+	uint32_t delay_cancel;
+	uint32_t working;
+};
+
+static void timer_work_task(struct work_struct *work)
+{
+	struct tee_ioctl_invoke_arg arg;
+	struct tee_param params[4];
+	struct optee_timer_data *timer_data = container_of((struct delayed_work *)work,
+			struct optee_timer_data, work);
+	struct tee_context *ctx = timer_data->ctx;
+	struct tee_device *teedev = ctx->teedev;
+	struct optee *optee = tee_get_drvdata(teedev);
+	struct optee_timer *timer = &optee->timer;
+	struct workqueue_struct *wq = timer->wq;
+	int ret = 0;
+
+	params[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT;
+	params[1].attr = TEE_IOCTL_PARAM_ATTR_TYPE_NONE;
+	params[2].attr = TEE_IOCTL_PARAM_ATTR_TYPE_NONE;
+	params[3].attr = TEE_IOCTL_PARAM_ATTR_TYPE_NONE;
+
+	params[0].u.value.a = timer_data->handle;
+
+	arg.session = timer_data->sess;
+	arg.num_params = 4;
+	arg.func = 0xFFFFFFFE;
+	mutex_lock(&timer->mutex);
+	timer_data->working = 1;
+	mutex_unlock(&timer->mutex);
+	ret = optee_invoke_func(ctx, &arg, params);
+	if (ret != 0)
+		pr_err(KERN_EMERG "%s: invoke cmd failed ret = 0x%x\n", __func__, ret);
+
+	mutex_lock(&timer->mutex);
+	if (timer_data->delay_cancel ||
+			(!(timer_data->flags & TEE_SECURE_TIMER_FLAG_PERIOD))) {
+		list_del(&timer_data->list_node);
+		kfree(timer_data);
+		mutex_unlock(&timer->mutex);
+	} else {
+		timer_data->working = 0;
+		mutex_unlock(&timer->mutex);
+		queue_delayed_work(wq, &timer_data->work,
+				msecs_to_jiffies(timer_data->timeout));
+	}
+}
+
+void optee_timer_init(struct optee_timer *timer)
+{
+	struct workqueue_struct *wq = NULL;
+
+	mutex_init(&timer->mutex);
+	INIT_LIST_HEAD(&timer->timer_list);
+
+	wq = create_workqueue("tee_timer");
+	if (!wq)
+		return;
+	timer->wq = wq;
+}
+
+void optee_timer_destroy(struct optee_timer *timer)
+{
+	struct optee_timer_data *timer_data = NULL;
+	struct optee_timer_data *temp = NULL;
+
+	mutex_lock(&timer->mutex);
+	list_for_each_entry_safe(timer_data, temp, &timer->timer_list, list_node) {
+		if (timer_data != NULL) {
+			cancel_delayed_work_sync(&timer_data->work);
+			list_del(&timer_data->list_node);
+			kfree(timer_data);
+		}
+	}
+	mutex_unlock(&timer->mutex);
+
+	mutex_destroy(&timer->mutex);
+	destroy_workqueue(timer->wq);
+}
+
+void optee_timer_missed_destroy(struct tee_context *ctx, u32 session)
+{
+	struct optee_timer_data *timer_data = NULL;
+	struct optee_timer_data *temp = NULL;
+	struct tee_device *teedev = ctx->teedev;
+	struct optee *optee = tee_get_drvdata(teedev);
+	struct optee_timer *timer = &optee->timer;
+
+	mutex_lock(&timer->mutex);
+	list_for_each_entry_safe(timer_data, temp, &timer->timer_list, list_node) {
+		if (timer_data != NULL && timer_data->ctx == ctx
+				&& timer_data->sess == session) {
+			if (timer_data->working) {
+				timer_data->delay_cancel = 1;
+				continue;
+			}
+			cancel_delayed_work_sync(&timer_data->work);
+			list_del(&timer_data->list_node);
+			kfree(timer_data);
+		}
+	}
+	mutex_unlock(&timer->mutex);
+}
+
+static void handle_rpc_func_cmd_timer_create(struct tee_context *ctx,
+					 struct optee_msg_arg *arg)
+{
+	struct optee_timer_data *timer_data;
+	struct tee_device *teedev = ctx->teedev;
+	struct optee *optee = tee_get_drvdata(teedev);
+	struct optee_timer *timer = &optee->timer;
+	struct workqueue_struct *wq = timer->wq;
+
+	if (arg->num_params != 2 ||
+	    arg->params[0].attr != OPTEE_MSG_ATTR_TYPE_VALUE_INPUT ||
+	    arg->params[1].attr != OPTEE_MSG_ATTR_TYPE_VALUE_INPUT) {
+		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
+		return;
+	}
+
+	timer_data = kmalloc(sizeof(struct optee_timer_data), GFP_KERNEL);
+	if (!timer_data) {
+		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
+		return;
+	}
+
+	timer_data->ctx = ctx;
+	timer_data->sess = arg->params[0].u.value.a;
+	timer_data->handle = arg->params[0].u.value.b;
+	timer_data->timeout = arg->params[1].u.value.a;
+	timer_data->flags = arg->params[1].u.value.b;
+	timer_data->delay_cancel = 0;
+	timer_data->working= 0;
+	INIT_DELAYED_WORK(&timer_data->work, timer_work_task);
+
+	mutex_lock(&timer->mutex);
+	list_add_tail(&timer_data->list_node, &timer->timer_list);
+	mutex_unlock(&timer->mutex);
+
+	queue_delayed_work(wq, &timer_data->work, msecs_to_jiffies(timer_data->timeout));
+
+	arg->ret = TEEC_SUCCESS;
+}
+
+static void handle_rpc_func_cmd_timer_destroy(struct tee_context *ctx,
+					 struct optee_msg_arg *arg)
+{
+	uint32_t handle;
+	struct tee_device *teedev = ctx->teedev;
+	struct optee *optee = tee_get_drvdata(teedev);
+	struct optee_timer *timer = &optee->timer;
+	struct optee_timer_data *timer_data;
+
+	if (arg->num_params != 1 ||
+	    arg->params[0].attr != OPTEE_MSG_ATTR_TYPE_VALUE_INPUT) {
+		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
+		return;
+	}
+
+	handle = arg->params[0].u.value.b;
+
+	mutex_lock(&timer->mutex);
+	list_for_each_entry(timer_data, &timer->timer_list, list_node) {
+		if (timer_data->handle == handle) {
+			if (timer_data->working) {
+				timer_data->delay_cancel = 1;
+				arg->ret = TEEC_SUCCESS;
+				goto out;
+			}
+			cancel_delayed_work_sync(&timer_data->work);
+			list_del(&timer_data->list_node);
+			kfree(timer_data);
+
+			arg->ret = TEEC_SUCCESS;
+			goto out;
+		}
+	}
+
+	arg->ret = TEEC_ERROR_BAD_PARAMETERS;
+out:
+	mutex_unlock(&timer->mutex);
+}
+
 static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
 				struct tee_shm *shm)
 {
@@ -336,6 +530,12 @@ static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
 		break;
 	case OPTEE_MSG_RPC_CMD_SHM_FREE:
 		handle_rpc_func_cmd_shm_free(ctx, arg);
+		break;
+	case OPTEE_MSG_RPC_CMD_TIMER_CREATE:
+		handle_rpc_func_cmd_timer_create(ctx, arg);
+		break;
+	case OPTEE_MSG_RPC_CMD_TIMER_DESTROY:
+		handle_rpc_func_cmd_timer_destroy(ctx, arg);
 		break;
 	default:
 		handle_rpc_supp_cmd(ctx, arg);

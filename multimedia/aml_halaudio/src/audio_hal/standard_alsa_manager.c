@@ -215,7 +215,7 @@ int standard_alsa_output_open(void **handle, aml_stream_config_t * stream_config
         // due to resample performance issue, we currently only support bypass
         if (alsa_param->rate == 176400 || alsa_param->rate == 88200) {
             device_name = PCM_DEVICE_8CH_44K;
-        } else if (alsa_param->rate == 192000 || alsa_param->rate == 96000) {
+        } else if (alsa_param->rate == 192000 || alsa_param->rate == 96000 || alsa_param->rate == 32000) {
             device_name = PCM_DEVICE_8CH_48K;
         } else {
             device_name = PCM_DEVICE_DEFAULT;

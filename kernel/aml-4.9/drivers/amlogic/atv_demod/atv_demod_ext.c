@@ -18,6 +18,10 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 
+#include <linux/amlogic/cpu_version.h>
+#include <linux/amlogic/power_domain.h>
+#include <dt-bindings/power/amlogic,pd.h>
+
 #include "atv_demod_ext.h"
 
 hook_func_t aml_fe_hook_atv_status;
@@ -94,4 +98,14 @@ bool aml_fe_hook_call_set_mode(bool mode)
 	mutex_unlock(&aml_fe_hook_mutex);
 
 	return state;
+}
+
+void atvdemod_power_switch(bool on)
+{
+	if (is_meson_tm2_cpu()) {
+		if (on)
+			power_domain_switch(PM_ATV_DEMOD, PWR_ON);
+		else
+			power_domain_switch(PM_ATV_DEMOD, PWR_OFF);
+	}
 }

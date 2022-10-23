@@ -34,15 +34,6 @@
 #include "a_osapi.h"
 #include "hif_msg_based.h"
 #include "athstartpack.h"
-#include "htc_internal.h"
-
-#define FROM_DMA_BUFFER TRUE
-#define TO_DMA_BUFFER   FALSE
-#define DEV_SCATTER_READ  TRUE
-#define DEV_SCATTER_WRITE FALSE
-#define DEV_SCATTER_ASYNC TRUE
-#define DEV_SCATTER_SYNC  FALSE
-
 
 typedef struct TAG_HIF_SDIO_DEVICE HIF_SDIO_DEVICE;
 
@@ -65,38 +56,5 @@ A_STATUS HIFDevSendBuffer(HIF_SDIO_DEVICE *htc_sdio_device, unsigned int transfe
 
 A_STATUS HIFDevMapServiceToPipe(HIF_SDIO_DEVICE *pDev, A_UINT16 ServiceId,
         A_UINT8 *ULPipe, A_UINT8 *DLPipe, A_BOOL SwapMapping);
-
-A_STATUS HIFDevCopyScatterListToFromDMABuffer(HIF_SCATTER_REQ *pReq, A_BOOL FromDMA);
-
-static inline A_STATUS DEV_PREPARE_SCATTER_OPERATION(HIF_SCATTER_REQ *pReq)  {
-    if ((pReq->Request & HIF_WRITE) && (pReq->ScatterMethod == HIF_SCATTER_DMA_BOUNCE)) {
-        return HIFDevCopyScatterListToFromDMABuffer(pReq,TO_DMA_BUFFER);
-    } else {
-        return A_OK;
-    }
-}
-
-    /* copy any READ data back into scatter list */
-#define DEV_FINISH_SCATTER_OPERATION(pR)                      \
-    if (A_SUCCESS((pR)->CompletionStatus) &&                  \
-        !((pR)->Request & HIF_WRITE) &&                       \
-         ((pR)->ScatterMethod == HIF_SCATTER_DMA_BOUNCE)) {   \
-         (pR)->CompletionStatus = HIFDevCopyScatterListToFromDMABuffer((pR),FROM_DMA_BUFFER); \
-    }
-
-#define DEV_ALLOC_SCATTER_REQ(pDev) (pDev)->HifScatterInfo.pAllocateReqFunc((pDev)->HIFDevice)
-#define DEV_FREE_SCATTER_REQ(pDev,pR) (pDev)->HifScatterInfo.pFreeReqFunc((pDev)->HIFDevice,(pR))
-#define DEV_GET_MAX_MSG_PER_BUNDLE(pDev)        (pDev)->HifScatterInfo.MaxScatterEntries
-#define DEV_GET_MAX_BUNDLE_LENGTH(pDev)         (pDev)->HifScatterInfo.MaxTransferSizePerScatterReq
-
-#define HTC_MAILBOX 0
-
-A_STATUS HIFDevSubmitScatterRequest(HIF_SDIO_DEVICE *pDev,
-                                    HIF_SCATTER_REQ *pScatterReq,
-                                    A_BOOL Read, A_BOOL Async);
-
-//#define DEV_GET_MAX_BUNDLE_RECV_LENGTH(pDev) HTC_MAX_MSG_PER_BUNDLE_RX*((pDev)->((HTC_TARGET *)pTarget)->TargetCreditSize)
-#define DEV_GET_MAX_BUNDLE_RECV_LENGTH(pDev)
-A_STATUS HIFDevSetupMsgBundling(HIF_SDIO_DEVICE *pDev);
 
 #endif /* HIF_SDIO_DEV_H_ */

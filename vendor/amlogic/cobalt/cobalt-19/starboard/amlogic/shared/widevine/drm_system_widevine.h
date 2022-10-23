@@ -200,6 +200,7 @@ class DrmSystemWidevine : public SbDrmSystemPrivate,
   std::vector<GenerateSessionUpdateRequestData>
       pending_generate_session_update_requests_;
   std::string first_wvcdm_session_id_;
+  std::string wvcdm_session_id_clearstream;
 
   scoped_ptr<::widevine::Cdm> cdm_;
 #if SB_API_VERSION >= 10

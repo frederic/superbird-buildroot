@@ -10,6 +10,12 @@ menu "amlogic"
     source "package/amlogic/aml_util/Config.in"
     source "package/amlogic/remotecfg/Config.in"
     source "package/amlogic/system_control/Config.in"
+    source "package/amlogic/fota/Config.in"
+
+    source "package/amlogic/liblog/Config.in"
+    source "package/amlogic/logcat/Config.in"
+    source "package/amlogic/logwrapper/Config.in"
+    source "package/amlogic/netcheck/Config.in"
 
 #Testing
     source "package/amlogic/aml_bootloader_message/Config.in"
@@ -32,6 +38,7 @@ menu "amlogic"
     source "package/amlogic/aml_brcm_bsa/Config.in"
     source "package/amlogic/aml_cypress_bsa/Config.in"
     source "package/amlogic/bluez-alsa/Config.in"
+    source "package/amlogic/bluez5_utils/Config.in"
     source "package/amlogic/broadcom/Config.in"
     source "package/amlogic/bt_setup/Config.in"
     source "package/amlogic/qualcomm/Config.in"
@@ -55,6 +62,9 @@ menu "amlogic"
     source "package/amlogic/libtotem/Config.in"
     source "package/amlogic/platinum/Config.in"
     source "package/amlogic/shairport/Config.in"
+    source "package/amlogic/hal_audio_service/Config.in"
+    source "package/amlogic/aml_amaudioutils/Config.in"
+    source "package/amlogic/aml_audio_hal/Config.in"
 
 #Media
     source "../multimedia/Config.in"
@@ -71,6 +81,7 @@ menu "amlogic"
     source "package/amlogic/aml_nn_detect_library/Config.in"
     source "package/amlogic/arm_isp/Config.in"
     source "package/amlogic/ipc/Config.in"
+    source "package/amlogic/uvc-gadget/Config.in"
     source "package/amlogic/slt/Config.in"
 
 #TV

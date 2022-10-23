@@ -65,36 +65,48 @@ sint rtw_endofpktfile(struct pkt_file *pfile)
 
 void rtw_set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 {
-
-#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX	
 	struct sk_buff *skb = (struct sk_buff *)pkt;
-	pattrib->hw_tcp_csum = 0;
+	struct iphdr *iph = NULL;
+	struct ipv6hdr *i6ph = NULL;
+	struct udphdr *uh = NULL;
+	struct tcphdr *th = NULL;
+	u8 	protocol = 0xFF;
 
-	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		if (skb_shinfo(skb)->nr_frags == 0) {
-			const struct iphdr *ip = ip_hdr(skb);
-			if (ip->protocol == IPPROTO_TCP) {
-				/* TCP checksum offload by HW */
-				RTW_INFO("CHECKSUM_PARTIAL TCP\n");
-				pattrib->hw_tcp_csum = 1;
-				/* skb_checksum_help(skb); */
-			} else if (ip->protocol == IPPROTO_UDP) {
-				/* RTW_INFO("CHECKSUM_PARTIAL UDP\n"); */
-#if 1
-				skb_checksum_help(skb);
-#else
-				/* Set UDP checksum = 0 to skip checksum check */
-				struct udphdr *udp = skb_transport_header(skb);
-				udp->check = 0;
-#endif
-			} else {
-				RTW_INFO("%s-%d TCP CSUM offload Error!!\n", __FUNCTION__, __LINE__);
-				WARN_ON(1);     /* we need a WARN() */
-			}
-		} else { /* IP fragmentation case */
-			RTW_INFO("%s-%d nr_frags != 0, using skb_checksum_help(skb);!!\n", __FUNCTION__, __LINE__);
+	if (skb->protocol == htons(ETH_P_IP)) {
+		iph = (struct iphdr *)skb_network_header(skb);
+		protocol = iph->protocol;
+	} else if (skb->protocol == htons(ETH_P_IPV6)) {
+		i6ph = (struct ipv6hdr *)skb_network_header(skb);
+		protocol = i6ph->nexthdr;
+	} else
+		{}
+
+	/*	HW unable to compute CSUM if header & payload was be encrypted by SW(cause TXDMA error) */
+	if (pattrib->bswenc == _TRUE) {
+		if (skb->ip_summed == CHECKSUM_PARTIAL)
 			skb_checksum_help(skb);
-		}
+		return;
+	}
+
+	/*	For HW rule, clear ipv4_csum & UDP/TCP_csum if it is UDP/TCP packet	*/
+	switch (protocol) {
+	case IPPROTO_UDP:
+		uh = (struct udphdr *)skb_transport_header(skb);
+		uh->check = 0;
+		if (iph)
+			iph->check = 0;
+		pattrib->hw_csum = _TRUE;
+		break;
+	case IPPROTO_TCP:
+		th = (struct tcphdr *)skb_transport_header(skb);
+		th->check = 0;
+		if (iph)
+			iph->check = 0;
+		pattrib->hw_csum = _TRUE;
+		break;
+	default:
+		break;
 	}
 #endif
 
@@ -276,10 +288,11 @@ void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe)
 void rtw_os_xmit_schedule(_adapter *padapter)
 {
 #if defined(CONFIG_SDIO_HCI) || defined(CONFIG_GSPI_HCI)
-	_adapter *pri_adapter = GET_PRIMARY_ADAPTER(padapter);
+	_adapter *pri_adapter;
 
 	if (!padapter)
 		return;
+	pri_adapter = GET_PRIMARY_ADAPTER(padapter);
 
 	if (_rtw_queue_empty(&padapter->xmitpriv.pending_xmitbuf_queue) == _FALSE)
 		_rtw_up_sema(&pri_adapter->xmitpriv.xmit_sema);
@@ -313,7 +326,6 @@ void rtw_os_xmit_schedule(_adapter *padapter)
 static bool rtw_check_xmit_resource(_adapter *padapter, _pkt *pkt)
 {
 	bool busy = _FALSE;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
 	u16	qidx;
 
@@ -404,9 +416,9 @@ int rtw_mlcst2unicst(_adapter *padapter, struct sk_buff *skb)
 		}
 
 		/* avoid come from STA1 and send back STA1 */
-		if (_rtw_memcmp(psta->cmn.mac_addr, &skb->data[6], 6) == _TRUE
-			|| _rtw_memcmp(psta->cmn.mac_addr, null_addr, 6) == _TRUE
-			|| _rtw_memcmp(psta->cmn.mac_addr, bc_addr, 6) == _TRUE
+		if (_rtw_memcmp(psta->cmn.mac_addr, &skb->data[6], ETH_ALEN) == _TRUE
+			|| _rtw_memcmp(psta->cmn.mac_addr, null_addr, ETH_ALEN) == _TRUE
+			|| _rtw_memcmp(psta->cmn.mac_addr, bc_addr, ETH_ALEN) == _TRUE
 		) {
 			DBG_COUNTER(padapter->tx_logs.os_tx_m2u_ignore_self);
 			continue;
@@ -417,7 +429,7 @@ int rtw_mlcst2unicst(_adapter *padapter, struct sk_buff *skb)
 		newskb = rtw_skb_copy(skb);
 
 		if (newskb) {
-			_rtw_memcpy(newskb->data, psta->cmn.mac_addr, 6);
+			_rtw_memcpy(newskb->data, psta->cmn.mac_addr, ETH_ALEN);
 			res = rtw_xmit(padapter, &newskb);
 			if (res < 0) {
 				DBG_COUNTER(padapter->tx_logs.os_tx_m2u_entry_err_xmit);
@@ -445,14 +457,14 @@ int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 #ifdef CONFIG_TX_MCAST2UNI
-	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	extern int rtw_mc2u_disable;
 #endif /* CONFIG_TX_MCAST2UNI	 */
-	s32 res = 0;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
-	u16 queue;
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX	
+	struct sk_buff *skb = pkt;
+	struct sk_buff *segs, *nskb;
+	netdev_features_t features = padapter->pnetdev->features;
 #endif
-
+	s32 res = 0;
 
 	if (padapter->registrypriv.mp_mode) {
 		RTW_INFO("MP_TX_DROP_OS_FRAME\n");
@@ -493,6 +505,33 @@ int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 	}
 #endif /* CONFIG_TX_MCAST2UNI	 */
 
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
+	if (skb_shinfo(skb)->gso_size) {
+	/*	split a big(65k) skb into several small(1.5k) skbs */
+		features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
+		segs = skb_gso_segment(skb, features);
+		if (IS_ERR(segs) || !segs)
+			goto drop_packet;
+
+		do {
+			nskb = segs;
+			segs = segs->next;
+			nskb->next = NULL;
+			rtw_mstat_update( MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, nskb->truesize);
+			res = rtw_xmit(padapter, &nskb);
+			if (res < 0) {
+				#ifdef DBG_TX_DROP_FRAME
+				RTW_INFO("DBG_TX_DROP_FRAME %s rtw_xmit fail\n", __FUNCTION__);
+				#endif
+				pxmitpriv->tx_drop++;
+				rtw_os_pkt_complete(padapter, nskb);
+			}
+		} while (segs);
+		rtw_os_pkt_complete(padapter, skb);
+		goto exit;
+	}
+#endif
+
 	res = rtw_xmit(padapter, &pkt);
 	if (res < 0) {
 		#ifdef DBG_TX_DROP_FRAME
@@ -513,6 +552,68 @@ exit:
 	return 0;
 }
 
+#ifdef CONFIG_CUSTOMER_ALIBABA_GENERAL
+int check_alibaba_meshpkt(struct sk_buff *skb)
+{
+	u16 protocol;
+
+	if (skb)
+		return (htons(skb->protocol) == ETH_P_ALL);
+
+	return _FALSE;
+}
+
+s32 rtw_alibaba_mesh_xmit_entry(_pkt *pkt, struct net_device *ndev)
+{
+	u16 frame_ctl;
+	
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
+	struct pkt_file pktfile;
+	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct pkt_attrib		*pattrib;
+	struct xmit_frame		*pmgntframe;
+	struct mlme_ext_priv    *pmlmeext = &(padapter->mlmeextpriv);
+	struct xmit_priv		*pxmitpriv = &(padapter->xmitpriv);
+	unsigned char   *pframe;
+	struct sk_buff *skb =  (struct sk_buff *)pkt;
+	int len = skb->len;
+	
+	rtw_mstat_update(MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, skb->truesize);
+	
+	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
+	if (pmgntframe == NULL) {
+		goto fail;
+		return -1;
+	}
+	
+	pattrib = &pmgntframe->attrib;
+	update_mgntframe_attrib(padapter, pattrib);
+	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
+	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+
+	_rtw_open_pktfile(pkt, &pktfile);
+	_rtw_pktfile_read(&pktfile, pframe, len);
+
+	pattrib->type = pframe[0] & 0x0C;
+	pattrib->subtype = pframe[0] & 0xF0;
+	pattrib->raid =  rtw_get_mgntframe_raid(padapter, WIRELESS_11G);
+	pattrib->rate = MGN_24M;
+	pattrib->pktlen = len;
+	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
+	pmlmeext->mgnt_seq++;
+
+	RTW_DBG_DUMP("rtw_alibaba_mesh_xmit_entry payload:", skb->data, len);
+
+	pattrib->last_txcmdsz = pattrib->pktlen;
+	dump_mgntframe(padapter, pmgntframe);
+
+fail:
+	rtw_skb_free(skb);
+	return 0;
+}
+#endif
+
 int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
@@ -520,6 +621,11 @@ int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 	int ret = 0;
 
 	if (pkt) {
+#ifdef CONFIG_CUSTOMER_ALIBABA_GENERAL
+		if (check_alibaba_meshpkt(pkt)) {
+			return rtw_alibaba_mesh_xmit_entry(pkt, pnetdev);
+		}
+#endif
 		if (check_fwstate(pmlmepriv, WIFI_MONITOR_STATE) == _TRUE) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24))
 			rtw_monitor_xmit_entry((struct sk_buff *)pkt, pnetdev);

@@ -496,7 +496,7 @@ int Parser_DumpInfo(gx_fast_enc_drv_t* p) {
                 if (info->inter.sad < info->intra.sad) {
                     get_mb_mv_P16x16(cur_mb, info->inter.mv);
                     info->final_sad = info->inter.sad - p->me_weight;
-                    LOGAPI("frame:%d, parser mb (%dx%d) type %d warning--set as inter 16x16, cur_mb:0x%x, inter sad:%d, intra sad:%d",
+                    LOGAPI("frame:%d, parser mb (%dx%d) type %d warning--set as inter 16x16, cur_mb:0x%lx, inter sad:%d, intra sad:%d",
                             p->total_encode_frame + 1,
                             x,
                             y,
@@ -527,7 +527,7 @@ int Parser_DumpInfo(gx_fast_enc_drv_t* p) {
                     info->intra.CPred = get_mb_CPred(cur_mb);
                     info->intra.LPred[0] = get_mb_LPred_I16(cur_mb);
                     info->final_sad = info->intra.sad - p->i16_weight;
-                    LOGAPI("frame:%d, parser mb (%dx%d) type %d warning--set as I16(mode %d), cur_mb:0x%x, inter sad:%d, intra sad:%d",
+                    LOGAPI("frame:%d, parser mb (%dx%d) type %d warning--set as I16(mode %d), cur_mb:0x%lx, inter sad:%d, intra sad:%d",
                             p->total_encode_frame + 1,
                             x,
                             y,
@@ -545,7 +545,7 @@ int Parser_DumpInfo(gx_fast_enc_drv_t* p) {
                     p->qp_stic.i16_bits[index] += info->bits;
                 }
             } else {
-                LOGAPI("parser mb (%dx%d) type %d error, cur_mb:0x%x", x, y, info->mb_type, (ulong) (cur_mb - p->dump_buf.addr));
+                LOGAPI("parser mb (%dx%d) type %d error, cur_mb:0x%lx", x, y, info->mb_type, (ulong) (cur_mb - p->dump_buf.addr));
                 return -1;
             }
             if (info->final_sad < 0)

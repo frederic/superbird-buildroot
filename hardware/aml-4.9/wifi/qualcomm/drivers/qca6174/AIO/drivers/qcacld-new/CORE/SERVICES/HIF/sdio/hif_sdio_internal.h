@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014,2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014,2016,2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -92,13 +92,11 @@ typedef PREPACK struct _MBOX_COUNTER_REGISTERS {
 #define SDIO_NUM_DATA_RX_BUFFERS  64
 #define SDIO_DATA_RX_SIZE         1664
 
-
 struct TAG_HIF_SDIO_DEVICE {
     HIF_DEVICE *HIFDevice;
     A_MUTEX_T Lock;
     A_MUTEX_T TxLock;
     A_MUTEX_T RxLock;
-
     MBOX_IRQ_PROC_REGISTERS IrqProcRegisters;
     MBOX_IRQ_ENABLE_REGISTERS IrqEnableRegisters;
     MBOX_COUNTER_REGISTERS MailBoxCounterRegisters;
@@ -113,32 +111,26 @@ struct TAG_HIF_SDIO_DEVICE {
     int CurrentDSRRecvCount;
     int RecheckIRQStatusCnt;
     A_UINT32 RecvStateFlags;
-	void *pTarget;
-    HIF_DEVICE_SCATTER_SUPPORT_INFO HifScatterInfo;
+    void *pTarget;
+#ifdef HIF_RX_THREAD
     struct hif_recv_task* pRecvTask;
+#endif
 };
 
+#ifdef HIF_RX_THREAD
 struct hif_recv_task {
     struct task_struct *rx_completion_task;
     struct semaphore sem_rx_completion;
     int    rx_completion_shutdown;
     struct completion rx_completion_exit;
-#if !HIF_RX_THREAD_V2
-    spinlock_t rx_completion_lock;
-    HTC_PACKET_QUEUE rxComQueue;
-#endif
-#if HIF_RX_THREAD_V2
-    spinlock_t rx_bundle_lock;
-    spinlock_t rx_sync_completion_lock;
+    adf_os_spinlock_t rx_bundle_lock;
+    adf_os_spinlock_t rx_sync_completion_lock;
     HTC_PACKET_QUEUE rxBundleQueue;
     HTC_PACKET_QUEUE rxSyncCompletionQueue;
-#endif
-
-#if HIF_ASYNC_ALLOC
-    spinlock_t rx_alloc_lock;
+    adf_os_spinlock_t rx_alloc_lock;
     HTC_PACKET_QUEUE rxAllocQueue;
-#endif
 };
+#endif
 
 #define LOCK_HIF_DEV(device)    A_MUTEX_LOCK(&(device)->Lock);
 #define UNLOCK_HIF_DEV(device)  A_MUTEX_UNLOCK(&(device)->Lock);
@@ -159,8 +151,6 @@ struct hif_recv_task {
 #define HTC_RX_PKT_PART_OF_BUNDLE                           (1 << 2)
 #define HTC_RX_PKT_NO_RECYCLE                               (1 << 3)
 #define HTC_RX_PKT_LAST_BUNDLED_PKT_HAS_ADDTIONAL_BLOCK     (1 << 4)
-
-#define HTC_SCATTER_REQ_FLAGS_PARTIAL_BUNDLE  (1 << 0)
 
 #define IS_DEV_IRQ_PROCESSING_ASYNC_ALLOWED(pDev) ((pDev)->HifIRQProcessingMode != HIF_DEVICE_IRQ_SYNC_ONLY)
 

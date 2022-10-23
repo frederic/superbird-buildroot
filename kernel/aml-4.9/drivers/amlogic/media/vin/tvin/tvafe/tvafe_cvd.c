@@ -77,8 +77,8 @@
 
 /* wait for signal stable */
 #define FMT_WAIT_CNT 15
-#define NTSC_SW_MAXCNT 20
-#define NTSC_SW_MIDCNT 40
+#define NTSC_SW_MAXCNT 40
+#define NTSC_SW_MIDCNT 20
 
 /*threshold for 4xx or 3xx valid*/
 #define CNT_VLD_TH 0x30
@@ -109,6 +109,7 @@ static bool scene_colorful_old;
 static int lock_cnt;
 static bool ntsc50_en;
 bool reinit_scan;
+static unsigned int cvd_l_ave_pre, cvd_vs_adj_en_pre, cvd_vs_adj_level;
 
 static int cdto_adj_th = TVAFE_CVD2_CDTO_ADJ_TH;
 module_param(cdto_adj_th, int, 0664);
@@ -157,6 +158,10 @@ static unsigned int acd_h = 0x890359;
 module_param(acd_h, uint, 0664);
 MODULE_PARM_DESC(acd_h, "acd_h");
 static unsigned int acd_h_back = 0x890359;
+
+static unsigned int dec_stop_not_adj;
+module_param(dec_stop_not_adj, uint, 0664);
+MODULE_PARM_DESC(dec_stop_not_adj, "dec_stop_not_adj");
 
 static unsigned int hs_adj_th_level0 = 0x260;
 static unsigned int hs_adj_th_level1 = 0x4f0;
@@ -370,30 +375,13 @@ static void tvafe_cvd2_write_mode_reg(struct tvafe_cvd2_s *cvd2,
 	W_APB_BIT(CVD2_RESET_REGISTER, 1, SOFT_RST_BIT, SOFT_RST_WID);
 
 	/* for rf&cvbs source acd table */
-	if ((cvd2->vd_port == TVIN_PORT_CVBS3) ||
-		(cvd2->vd_port == TVIN_PORT_CVBS0)) {
-
-		for (i = 0; i < (ACD_REG_NUM+1); i++) {
-			if (i == 0x21 || i == 0x22 || i == 0x2f)
-				continue;
-			W_APB_REG(((ACD_BASE_ADD+i)<<2),
-					(rf_acd_table[cvd2->config_fmt-
-					TVIN_SIG_FMT_CVBS_NTSC_M][i]));
-		}
-
-
-	} else {
-
-		for (i = 0; i < (ACD_REG_NUM+1); i++) {
-
-			if (i == 0x21 || i == 0x22 || i == 0x2f)
-				continue;
-			W_APB_REG(((ACD_BASE_ADD+i)<<2),
-					(cvbs_acd_table[cvd2->config_fmt-
-					TVIN_SIG_FMT_CVBS_NTSC_M][i]));
-		}
-
+	for (i = 0; i < (ACD_REG_NUM+1); i++) {
+		if (i == 0x21 || i == 0x22 || i == 0x2f)
+			continue;
+		W_APB_REG(((ACD_BASE_ADD+i)<<2), cvd2->acd_table[i]);
 	}
+
+
 	/*cvd filter config*/
 	tvafe_cvd2_filter_config();
 
@@ -407,8 +395,8 @@ static void tvafe_cvd2_write_mode_reg(struct tvafe_cvd2_s *cvd2,
 
 	/*setting for snow*/
 	if (tvafe_get_snow_cfg() &&
-		(tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2)) {
+		(tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2)) {
 		W_APB_BIT(CVD2_OUTPUT_CONTROL, 3, 5, 2);
 		W_APB_REG(ACD_REG_6C, 0x80500000);
 	}
@@ -604,6 +592,9 @@ void tvafe_cvd2_non_std_config(struct tvafe_cvd2_s *cvd2)
 					VACTIVE_START_BIT, VACTIVE_START_WID);
 			W_APB_BIT(CVD2_ACTIVE_VIDEO_VHEIGHT, 0xe0,
 					VACTIVE_HEIGHT_BIT, VACTIVE_HEIGHT_WID);
+			/* c0[2] = 0 ,bypass iir */
+			W_APB_REG(CVD2_NEW_DCRESTORE_CNTL,
+				  R_APB_REG(CVD2_NEW_DCRESTORE_CNTL) & ~0x4);
 		} else {
 			/* W_APB_BIT(CVD2_VSYNC_SIGNAL_THRESHOLD, 1, */
 			/* VS_SIGNAL_AUTO_TH_BIT, VS_SIGNAL_AUTO_TH_WID); */
@@ -649,7 +640,9 @@ void tvafe_cvd2_non_std_config(struct tvafe_cvd2_s *cvd2)
 
 			/* vsync signal is not good */
 			W_APB_REG(CVD2_NOISE_THRESHOLD, 0x00);
-
+			/* c0[2] = 0 ,bypass iir */
+			W_APB_REG(CVD2_NEW_DCRESTORE_CNTL,
+				  R_APB_REG(CVD2_NEW_DCRESTORE_CNTL) & ~0x4);
 		} else {
 
 			if (cvd2->info.scene_colorful)
@@ -827,13 +820,15 @@ static void tvafe_cvd2_info_init(struct tvafe_cvd2_s *cvd2)
 	/* set default value if needed */
 	cvd2->info.scene_colorful = 1;
 
-	if (devp->pq_conf) {
-		index = cvd2->config_fmt - TVIN_SIG_FMT_CVBS_NTSC_M;
+	index = cvd2->config_fmt - TVIN_SIG_FMT_CVBS_NTSC_M;
+	if (devp->acd_table)
+		cvd2->acd_table = devp->acd_table[index];
+	else
+		tvafe_pr_err("%s: cvd2 acd_table is null\n", __func__);
+	if (devp->pq_conf)
 		cvd2->pq_conf = devp->pq_conf[index];
-	} else {
-		tvafe_pr_err("%s: cvd2 pq_conf is null\n",
-			     __func__);
-	}
+	else
+		tvafe_pr_err("%s: cvd2 pq_conf is null\n", __func__);
 }
 
 /*
@@ -878,6 +873,18 @@ static void tvafe_cvd2_get_signal_status(struct tvafe_cvd2_s *cvd2)
 				(bool)((data & 0x04) >> VLOCK_BIT);
 	cvd2->hw_data[cvd2->hw_data_cur].chroma_lock =
 				(bool)((data & 0x08) >> CHROMALOCK_BIT);
+	if (cvd2->hw_data[cvd2->hw_data_cur].h_lock)
+		cvd2->info.h_unlock_cnt = 0;
+	else
+		cvd2->info.h_unlock_cnt++;
+	if (cvd2->hw_data[cvd2->hw_data_cur].v_lock)
+		cvd2->info.v_unlock_cnt = 0;
+	else
+		cvd2->info.v_unlock_cnt++;
+	if (!cvd2->hw_data[cvd2->hw_data_cur].no_sig)
+		cvd2->info.sig_unlock_cnt = 0;
+	else
+		cvd2->info.sig_unlock_cnt++;
 
 	data = R_APB_REG(CVD2_STATUS_REGISTER2);
 	cvd2->hw_data[cvd2->hw_data_cur].h_nonstd =
@@ -1457,6 +1464,19 @@ static bool tvafe_cvd2_condition_shift(struct tvafe_cvd2_s *cvd2)
 			}
 		}
 	}
+
+	/* fake chroma lock */
+	if ((cvd2->vd_port == TVIN_PORT_CVBS1) ||
+	    (cvd2->vd_port == TVIN_PORT_CVBS2)) {
+		if (cvd2->hw.chroma_lock && cvd2->hw.h_lock &&
+		    cvd2->hw.v_lock && !cvd2->hw.h_nonstd &&
+		    !cvd2->hw.no_color_burst) {
+			if (!cvd2->hw.fsc_358 && !cvd2->hw.fsc_443) {
+				return false;
+			}
+		}
+	}
+
 	if (((cvd2->vd_port == TVIN_PORT_CVBS3) ||
 		(cvd2->vd_port == TVIN_PORT_CVBS0)) &&
 		force_fmt_flag) {
@@ -1876,6 +1896,8 @@ static void tvafe_cvd2_search_video_mode(struct tvafe_cvd2_s *cvd2,
 					__func__);
 				}
 			}
+		} else {
+			cvd2->info.fmt_shift_cnt = 0;
 		}
 		/* non-standard signal config */
 		tvafe_cvd2_non_std_config(cvd2);
@@ -1893,13 +1915,16 @@ static void tvafe_cvd2_auto_de(struct tvafe_cvd2_s *cvd2)
 	if ((user_param->auto_adj_en & TVAFE_AUTO_DE) == 0)
 		return;
 
-	if (!cvd2->hw.line625 || (cvd2->config_fmt != TVIN_SIG_FMT_CVBS_PAL_I))
+	if (cvd2->config_fmt != TVIN_SIG_FMT_CVBS_PAL_I)
 		return;
 
 	lines->val[0] = lines->val[1];
 	lines->val[1] = lines->val[2];
 	lines->val[2] = lines->val[3];
-	lines->val[3] = R_APB_REG(CVD2_REG_E6);
+	if (user_param->cutwin_test_en & 0x2)
+		lines->val[3] = user_param->cutwin_test_vcnt;
+	else
+		lines->val[3] = R_APB_REG(CVD2_REG_E6);
 	for (i = 0; i < 4; i++) {
 		if (l_max < lines->val[i])
 			l_max = lines->val[i];
@@ -1932,7 +1957,7 @@ static void tvafe_cvd2_auto_de(struct tvafe_cvd2_s *cvd2)
 					tvafe_pr_info("%s: lrg vlines:%d, de_offset:%d tmp:%x\n",
 				__func__, l_ave, lines->de_offset, tmp);
 			}
-		} else {
+		} else if (l_ave > 0) {
 			if (lines->de_offset > 0) {
 				tmp = ((TVAFE_CVD2_PAL_DE_START -
 					lines->de_offset + 1) << 16) |
@@ -1945,9 +1970,13 @@ static void tvafe_cvd2_auto_de(struct tvafe_cvd2_s *cvd2)
 					__func__, l_ave, lines->de_offset, tmp);
 				lines->de_offset--;
 			}
+		} else {
+			scene_colorful_old = 0;
+			W_APB_REG(ACD_REG_2E, acd_vde_config);
 		}
 	}
 }
+
 /* vlis advice new add @20170329 */
 static void tvafe_cvd2_adj_vs(struct tvafe_cvd2_s *cvd2)
 {
@@ -1958,15 +1987,17 @@ static void tvafe_cvd2_adj_vs(struct tvafe_cvd2_s *cvd2)
 	if ((user_param->auto_adj_en & TVAFE_AUTO_VS) == 0)
 		return;
 
-	if (!cvd2->hw.line625 ||
-		((cvd2->config_fmt != TVIN_SIG_FMT_CVBS_PAL_I) &&
-		(cvd2->config_fmt != TVIN_SIG_FMT_CVBS_NTSC_M)))
+	if ((cvd2->config_fmt != TVIN_SIG_FMT_CVBS_PAL_I) &&
+	    (cvd2->config_fmt != TVIN_SIG_FMT_CVBS_NTSC_M))
 		return;
 	if ((user_param->auto_adj_en & TVAFE_AUTO_DE)  == 0) {
 		lines->val[0] = lines->val[1];
 		lines->val[1] = lines->val[2];
 		lines->val[2] = lines->val[3];
-		lines->val[3] = R_APB_REG(CVD2_REG_E6);
+		if (user_param->cutwin_test_en & 0x2)
+			lines->val[3] = user_param->cutwin_test_vcnt;
+		else
+			lines->val[3] = R_APB_REG(CVD2_REG_E6);
 	}
 	for (i = 0; i < 4; i++) {
 		if (l_max < lines->val[i])
@@ -1975,40 +2006,68 @@ static void tvafe_cvd2_adj_vs(struct tvafe_cvd2_s *cvd2)
 			l_min = lines->val[i];
 		l_ave += lines->val[i];
 	}
+
 	if (lines->check_cnt++ == user_param->vline_chk_cnt)
 		lines->check_cnt = user_param->vline_chk_cnt;
 	if (lines->check_cnt == user_param->vline_chk_cnt) {
 		l_ave = (l_ave - l_max - l_min + 1) >> 1;
 		if (l_ave > TVAFE_CVD2_AUTO_VS_TH) {
 			cvd2->info.vs_adj_en = 1;
+			if (l_ave & 0x80) /* > std freq */
+				cvd2->info.vs_adj_dir = 0;
+			else /* < std freq */
+				cvd2->info.vs_adj_dir = 1;
 			/*vlsi test result*/
 			/*0x3 for test colobar pattern*/
 			if (cvd2->info.hs_adj_en == 0)
 				W_APB_REG(CVD2_CHROMA_LOOPFILTER_STATE, 0x3);
 			else
 				W_APB_REG(CVD2_CHROMA_LOOPFILTER_STATE, 0xa);
+
+			/* get the average value */
+			if ((l_ave > vs_adj_th_level0) ||
+			    (l_ave < vs_adj_th_level00))
+				cvd2->info.vs_adj_level = 0;
+			else if ((l_ave > vs_adj_th_level1) ||
+				 (l_ave < vs_adj_th_level01))
+				cvd2->info.vs_adj_level = 1;
+			else if ((l_ave > vs_adj_th_level2) ||
+				 (l_ave < vs_adj_th_level02))
+				cvd2->info.vs_adj_level = 2;
+			else if ((l_ave > vs_adj_th_level3) ||
+				 (l_ave < vs_adj_th_level03))
+				cvd2->info.vs_adj_level = 3;
+			else if ((l_ave > vs_adj_th_level4) ||
+				 (l_ave < vs_adj_th_level04))
+				cvd2->info.vs_adj_level = 4;
+			else
+				cvd2->info.vs_adj_level = 0xff;
 		} else {
 			cvd2->info.vs_adj_en = 0;
+			cvd2->info.vs_adj_dir = 0;
 			if (R_APB_REG(CVD2_CHROMA_LOOPFILTER_STATE) != 0xa)
 				W_APB_REG(CVD2_CHROMA_LOOPFILTER_STATE, 0xa);
-		}
-		/* get the average value */
-		if ((l_ave > vs_adj_th_level0) || (l_ave < vs_adj_th_level00))
-			cvd2->info.vs_adj_level = 0;
-		else if ((l_ave > vs_adj_th_level1) ||
-			(l_ave < vs_adj_th_level01))
-			cvd2->info.vs_adj_level = 1;
-		else if ((l_ave > vs_adj_th_level2) ||
-			(l_ave < vs_adj_th_level02))
-			cvd2->info.vs_adj_level = 2;
-		else if ((l_ave > vs_adj_th_level3) ||
-			(l_ave < vs_adj_th_level03))
-			cvd2->info.vs_adj_level = 3;
-		else if ((l_ave > vs_adj_th_level4) ||
-			(l_ave < vs_adj_th_level04))
-			cvd2->info.vs_adj_level = 4;
-		else
+
 			cvd2->info.vs_adj_level = 0xff;
+		}
+
+		if (tvafe_dbg_print & TVAFE_DBG_NOSTD) {
+			if ((cvd_l_ave_pre != l_ave) ||
+			    (cvd_vs_adj_en_pre != cvd2->info.vs_adj_en) ||
+			     (cvd_vs_adj_level != cvd2->info.vs_adj_level)) {
+				tvafe_pr_info("%s: lines->val:%d %d %d %d, l_ave:%d, 0xe6:%d, vs_adj_en:%d, level:%d\n",
+					      __func__, lines->val[0],
+					      lines->val[1],
+					      lines->val[2], lines->val[3],
+					      l_ave, R_APB_REG(CVD2_REG_E6),
+					      cvd2->info.vs_adj_en,
+					      cvd2->info.vs_adj_level);
+			}
+		}
+
+		cvd_l_ave_pre = l_ave;
+		cvd_vs_adj_en_pre = cvd2->info.vs_adj_en;
+		cvd_vs_adj_level = cvd2->info.vs_adj_level;
 	}
 }
 #endif
@@ -2070,7 +2129,7 @@ static void tvafe_cvd2_reinit(struct tvafe_cvd2_s *cvd2)
  * tvafe cvd2 signal status for smr
  */
 inline bool tvafe_cvd2_no_sig(struct tvafe_cvd2_s *cvd2,
-			struct tvafe_cvd2_mem_s *mem)
+			struct tvafe_cvd2_mem_s *mem, bool is_dec_start)
 {
 	struct tvafe_user_param_s *user_param = tvafe_get_user_param();
 	static bool ret;
@@ -2090,9 +2149,10 @@ inline bool tvafe_cvd2_no_sig(struct tvafe_cvd2_s *cvd2,
 		ret = false;
 		cvd2->cvd2_init_en = false;
 #ifdef TVAFE_CVD2_AUTO_DE_ENABLE
-		if (((!cvd2->info.scene_colorful) &&
-		     (user_param->auto_adj_en & TVAFE_AUTO_DE)) ||
-		    (user_param->auto_adj_en & TVAFE_AUTO_VS)) {
+		if ((((!cvd2->info.scene_colorful) &&
+		      (user_param->auto_adj_en & TVAFE_AUTO_DE)) ||
+		     (user_param->auto_adj_en & TVAFE_AUTO_VS)) &&
+		    (!dec_stop_not_adj || (is_dec_start && dec_stop_not_adj))) {
 			tvafe_cvd2_auto_de(cvd2);
 			tvafe_cvd2_adj_vs(cvd2);
 		} else
@@ -2284,7 +2344,10 @@ inline void tvafe_cvd2_adj_hs(struct tvafe_cvd2_s *cvd2,
 	cvd2->info.hcnt64[0] = cvd2->info.hcnt64[1];
 	cvd2->info.hcnt64[1] = cvd2->info.hcnt64[2];
 	cvd2->info.hcnt64[2] = cvd2->info.hcnt64[3];
-	cvd2->info.hcnt64[3] = hcnt64;
+	if (user_param->cutwin_test_en & 0x1)
+		cvd2->info.hcnt64[3] = user_param->cutwin_test_hcnt;
+	else
+		cvd2->info.hcnt64[3] = hcnt64;
 	hcnt64_ave = 0;
 	hcnt64_max = 0;
 	hcnt64_min = 0xffffffff;
@@ -2334,8 +2397,8 @@ inline void tvafe_cvd2_adj_hs(struct tvafe_cvd2_s *cvd2,
 				W_APB_BIT(CVD2_ACTIVE_VIDEO_HSTART, temp,
 					HACTIVE_START_BIT, HACTIVE_START_WID);
 				/* 0x12d */
-				if (tvafe_cpu_type() == CPU_TYPE_TL1 ||
-					tvafe_cpu_type() == CPU_TYPE_TM2) {
+				if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+				    tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 					temp = 0x20 * cvd2->info.hs_adj_level;
 					delta = temp / 4;
 				}
@@ -2472,7 +2535,10 @@ inline void tvafe_cvd2_adj_hs_ntsc(struct tvafe_cvd2_s *cvd2,
 	cvd2->info.hcnt64[0] = cvd2->info.hcnt64[1];
 	cvd2->info.hcnt64[1] = cvd2->info.hcnt64[2];
 	cvd2->info.hcnt64[2] = cvd2->info.hcnt64[3];
-	cvd2->info.hcnt64[3] = hcnt64;
+	if (user_param->cutwin_test_en & 0x1)
+		cvd2->info.hcnt64[3] = user_param->cutwin_test_hcnt;
+	else
+		cvd2->info.hcnt64[3] = hcnt64;
 	hcnt64_ave = 0;
 	hcnt64_max = 0;
 	hcnt64_min = 0xffffffff;
@@ -2522,8 +2588,8 @@ inline void tvafe_cvd2_adj_cdto(struct tvafe_cvd2_s *cvd2,
 	struct tvafe_user_param_s *user_param = tvafe_get_user_param();
 	unsigned int hcnt64_max = 0, hcnt64_min = 0xffffffff,
 				hcnt64_ave = 0, i = 0;
-	unsigned int cur_cdto = 0, diff = 0;
-	u64 cal_cdto = 0;
+	unsigned int cur_cdto = 0, diff = 0, dest_cdto = 0;
+	unsigned long long cal_cdto = 0;
 
 	if ((user_param->auto_adj_en & TVAFE_AUTO_CDTO) == 0)
 		return;
@@ -2535,7 +2601,10 @@ inline void tvafe_cvd2_adj_cdto(struct tvafe_cvd2_s *cvd2,
 	cvd2->info.hcnt64[0] = cvd2->info.hcnt64[1];
 	cvd2->info.hcnt64[1] = cvd2->info.hcnt64[2];
 	cvd2->info.hcnt64[2] = cvd2->info.hcnt64[3];
-	cvd2->info.hcnt64[3] = hcnt64;
+	if (user_param->cutwin_test_en & 0x1)
+		cvd2->info.hcnt64[3] = user_param->cutwin_test_hcnt;
+	else
+		cvd2->info.hcnt64[3] = hcnt64;
 	for (i = 0; i < 4; i++) {
 		if (hcnt64_max < cvd2->info.hcnt64[i])
 			hcnt64_max = cvd2->info.hcnt64[i];
@@ -2550,33 +2619,51 @@ inline void tvafe_cvd2_adj_cdto(struct tvafe_cvd2_s *cvd2,
 	}
 	if (cvd2->info.hcnt64_cnt == TVAFE_SET_CVBS_CDTO_START) {
 
-		hcnt64_ave = (hcnt64_ave - hcnt64_max -
-					hcnt64_min + 1) >> CDTO_FILTER_FACTOR;
+		hcnt64_ave = (hcnt64_ave - hcnt64_max - hcnt64_min + 1) >> 1;
 		if (hcnt64_ave == 0)  /* to avoid kernel crash */
 			return;
-		cal_cdto = CVD2_CHROMA_DTO_PAL_I;
-		cal_cdto *= HS_CNT_STANDARD;
-		do_div(cal_cdto, hcnt64_ave);
+		if (hcnt64_ave >= HS_CNT_STANDARD)
+			diff = hcnt64_ave - HS_CNT_STANDARD;
+		else
+			diff = HS_CNT_STANDARD - hcnt64_ave;
 
 		cur_cdto = tvafe_cvd2_get_cdto();
-		diff = (unsigned int)abs((signed int)cal_cdto -
-				(signed int)CVD2_CHROMA_DTO_PAL_I);
-
-		if (diff < cdto_adj_th) {
-
+		if (diff < user_param->cdto_adj_hcnt_th) {
 			/* reset cdto to default value */
-			if (cur_cdto != CVD2_CHROMA_DTO_PAL_I)
+			if (cur_cdto != CVD2_CHROMA_DTO_PAL_I) {
 				tvafe_cvd2_cdto_tune(cur_cdto,
 					(unsigned int)CVD2_CHROMA_DTO_PAL_I);
+			}
 			cvd2->info.non_std_worst = 0;
 			return;
 		}
-		cvd2->info.non_std_worst = 1;
 
+		cal_cdto = CVD2_CHROMA_DTO_PAL_I;
+		cal_cdto *= HS_CNT_STANDARD;
+		if (hcnt64_ave <= HS_CNT_STANDARD) { /* positive */
+			cal_cdto *= user_param->cdto_adj_ratio_p;
+			do_div(cal_cdto, (hcnt64_ave * 1000));
+
+			dest_cdto = (unsigned int)cal_cdto;
+			if (dest_cdto >= user_param->cdto_adj_offset_p)
+				dest_cdto -= user_param->cdto_adj_offset_p;
+		} else { /* negative */
+			cal_cdto *= user_param->cdto_adj_ratio_n;
+			do_div(cal_cdto, (hcnt64_ave * 1000));
+
+			dest_cdto = (unsigned int)cal_cdto;
+			if (dest_cdto >= user_param->cdto_adj_offset_n)
+				dest_cdto -= user_param->cdto_adj_offset_n;
+		}
+
+		cvd2->info.non_std_worst = 1;
+		if (cur_cdto == dest_cdto)
+			return;
+		cvd2->info.cdto_value = dest_cdto;
 		if (tvafe_dbg_print & TVAFE_DBG_ISR)
 			tvafe_pr_info("%s: adj cdto from:0x%x to:0x%x\n",
-					__func__, (u32)cur_cdto, (u32)cal_cdto);
-		tvafe_cvd2_cdto_tune(cur_cdto, (unsigned int)cal_cdto);
+					__func__, cur_cdto, dest_cdto);
+		tvafe_cvd2_cdto_tune(cur_cdto, dest_cdto);
 	}
 }
 #endif
@@ -2728,8 +2815,8 @@ void tvafe_cvd2_rf_ntsc50_en(bool v)
 void tvafe_snow_config(unsigned int onoff)
 {
 	if (tvafe_snow_function_flag == 0 ||
-		tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2)
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2)
 		return;
 	if (onoff)
 		W_APB_BIT(CVD2_OUTPUT_CONTROL, 3, BLUE_MODE_BIT, BLUE_MODE_WID);
@@ -2739,8 +2826,15 @@ void tvafe_snow_config(unsigned int onoff)
 
 void tvafe_snow_config_clamp(unsigned int onoff)
 {
-	if (tvafe_cpu_type() == CPU_TYPE_TL1 ||
-	    tvafe_cpu_type() == CPU_TYPE_TM2) {
+	if ((tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) && onoff) {
+		/* 0x6d is tm2 adjust snow gain */
+		W_APB_REG(ACD_REG_6D, 0x03000000);
+	} else if ((tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) && !onoff) {
+		W_APB_REG(ACD_REG_6D, 0x00000000);
+	}
+
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+	    tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 		if (onoff)
 			vdin_adjust_tvafesnow_brightness();
 		return;

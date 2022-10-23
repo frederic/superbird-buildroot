@@ -1,7 +1,7 @@
 /*
  * Driver O/S-independent utility routines
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmxtlv.c 700655 2017-05-20 06:09:06Z $
+ * $Id: bcmxtlv.c 788740 2018-11-13 21:45:01Z $
  */
 
 #include <bcm_cfg.h>
@@ -63,8 +63,8 @@ bool
 bcm_valid_xtlv(const bcm_xtlv_t *elt, int buf_len, bcm_xtlv_opts_t opts)
 {
 	return elt != NULL &&
-		   buf_len >= bcm_xtlv_hdr_size(opts) &&
-		   buf_len  >= bcm_xtlv_size(elt, opts);
+		buf_len >= bcm_xtlv_hdr_size(opts) &&
+		buf_len  >= bcm_xtlv_size(elt, opts);
 }
 
 int
@@ -74,7 +74,7 @@ bcm_xtlv_size_for_data(int dlen, bcm_xtlv_opts_t opts)
 
 	hsz = bcm_xtlv_hdr_size(opts);
 	return ((opts & BCM_XTLV_OPTION_ALIGN32) ? ALIGN_SIZE(dlen + hsz, 4)
-			: (dlen + hsz));
+		: (dlen + hsz));
 }
 
 int
@@ -95,12 +95,17 @@ bcm_xtlv_len(const bcm_xtlv_t *elt, bcm_xtlv_opts_t opts)
 	int len;
 
 	lenp = (const uint8 *)&elt->len; /* nominal */
-	if (opts & BCM_XTLV_OPTION_IDU8) --lenp;
+	if (opts & BCM_XTLV_OPTION_IDU8) {
+		--lenp;
+	}
 
-	if (opts & BCM_XTLV_OPTION_LENU8)
+	if (opts & BCM_XTLV_OPTION_LENU8) {
 		len = *lenp;
-	else
+	} else if (opts & BCM_XTLV_OPTION_LENBE) {
+		len = (uint32)hton16(elt->len);
+	} else {
 		len = ltoh16_ua(lenp);
+	}
 
 	return len;
 }
@@ -109,10 +114,13 @@ int
 bcm_xtlv_id(const bcm_xtlv_t *elt, bcm_xtlv_opts_t opts)
 {
 	int id = 0;
-	if (opts & BCM_XTLV_OPTION_IDU8)
+	if (opts & BCM_XTLV_OPTION_IDU8) {
 		id =  *(const uint8 *)elt;
-	else
+	} else if (opts & BCM_XTLV_OPTION_IDBE) {
+		id = (uint32)hton16(elt->id);
+	} else {
 		id = ltoh16_ua((const uint8 *)elt);
+	}
 
 	return id;
 }
@@ -187,7 +195,7 @@ bcm_xtlv_head(bcm_xtlvbuf_t *tbuf)
 
 void
 bcm_xtlv_pack_xtlv(bcm_xtlv_t *xtlv, uint16 type, uint16 len, const uint8 *data,
-				   bcm_xtlv_opts_t opts)
+	bcm_xtlv_opts_t opts)
 {
 	uint8 *data_buf;
 	bcm_xtlv_opts_t mask = BCM_XTLV_OPTION_IDU8 | BCM_XTLV_OPTION_LENU8;
@@ -217,7 +225,9 @@ bcm_xtlv_pack_xtlv(bcm_xtlv_t *xtlv, uint16 type, uint16 len, const uint8 *data,
 		*lenp = (uint8)len;
 		data_buf = lenp + sizeof(uint8);
 	} else {
-		ASSERT(!"Unexpected xtlv option");
+		bool Unexpected_xtlv_option = TRUE;
+		BCM_REFERENCE(Unexpected_xtlv_option);
+		ASSERT(!Unexpected_xtlv_option);
 		return;
 	}
 
@@ -233,7 +243,7 @@ bcm_xtlv_pack_xtlv(bcm_xtlv_t *xtlv, uint16 type, uint16 len, const uint8 *data,
 /* xtlv header is always packed in LE order */
 void
 bcm_xtlv_unpack_xtlv(const bcm_xtlv_t *xtlv, uint16 *type, uint16 *len,
-					 const uint8 **data, bcm_xtlv_opts_t opts)
+	const uint8 **data, bcm_xtlv_opts_t opts)
 {
 	if (type)
 		*type = (uint16)bcm_xtlv_id(xtlv, opts);
@@ -291,23 +301,23 @@ bcm_xtlv_put_int(bcm_xtlvbuf_t *tbuf, uint16 type, const uint8 *data, int n, int
 		case sizeof(uint8):
 			break;
 		case sizeof(uint16):
-		{
-			uint16 v =  load16_ua(data);
-			htol16_ua_store(v, xtlv_data);
-			break;
-		}
+			{
+				uint16 v =  load16_ua(data);
+				htol16_ua_store(v, xtlv_data);
+				break;
+			}
 		case sizeof(uint32):
-		{
-			uint32 v = load32_ua(data);
-			htol32_ua_store(v, xtlv_data);
-			break;
-		}
+			{
+				uint32 v = load32_ua(data);
+				htol32_ua_store(v, xtlv_data);
+				break;
+			}
 		case sizeof(uint64):
-		{
-			uint64 v = load64_ua(data);
-			htol64_ua_store(v, xtlv_data);
-			break;
-		}
+			{
+				uint64 v = load64_ua(data);
+				htol64_ua_store(v, xtlv_data);
+				break;
+			}
 		default:
 			err = BCME_UNSUPPORTED;
 			goto done;
@@ -344,7 +354,7 @@ bcm_xtlv_put64(bcm_xtlvbuf_t *tbuf, uint16 type, const uint64 *data, int n)
  */
 int
 bcm_unpack_xtlv_entry(const uint8 **tlv_buf, uint16 xpct_type, uint16 xpct_len,
-					  uint8 *dst_data, bcm_xtlv_opts_t opts)
+	uint8 *dst_data, bcm_xtlv_opts_t opts)
 {
 	const bcm_xtlv_t *ptlv = (const bcm_xtlv_t *)*tlv_buf;
 	uint16 len;
@@ -371,7 +381,7 @@ bcm_unpack_xtlv_entry(const uint8 **tlv_buf, uint16 xpct_type, uint16 xpct_len,
  */
 int
 bcm_pack_xtlv_entry(uint8 **tlv_buf, uint16 *buflen, uint16 type, uint16 len,
-					const uint8 *src_data, bcm_xtlv_opts_t opts)
+	const uint8 *src_data, bcm_xtlv_opts_t opts)
 {
 	bcm_xtlv_t *ptlv = (bcm_xtlv_t *)*tlv_buf;
 	int size;
@@ -399,7 +409,7 @@ bcm_pack_xtlv_entry(uint8 **tlv_buf, uint16 *buflen, uint16 type, uint16 len,
  */
 int
 bcm_unpack_xtlv_buf(void *ctx, const uint8 *tlv_buf, uint16 buflen, bcm_xtlv_opts_t opts,
-					bcm_xtlv_unpack_cbfn_t *cbfn)
+	bcm_xtlv_unpack_cbfn_t *cbfn)
 {
 	uint16 len;
 	uint16 type;
@@ -433,8 +443,8 @@ bcm_unpack_xtlv_buf(void *ctx, const uint8 *tlv_buf, uint16 buflen, bcm_xtlv_opt
 
 int
 bcm_pack_xtlv_buf(void *ctx, uint8 *tlv_buf, uint16 buflen, bcm_xtlv_opts_t opts,
-				  bcm_pack_xtlv_next_info_cbfn_t get_next, bcm_pack_xtlv_pack_next_cbfn_t pack_next,
-				  int *outlen)
+	bcm_pack_xtlv_next_info_cbfn_t get_next, bcm_pack_xtlv_pack_next_cbfn_t pack_next,
+	int *outlen)
 {
 	int res = BCME_OK;
 	uint16 tlv_id;
@@ -482,7 +492,7 @@ done:
  */
 int
 bcm_pack_xtlv_buf_from_mem(uint8 **tlv_buf, uint16 *buflen, const xtlv_desc_t *items,
-						   bcm_xtlv_opts_t opts)
+	bcm_xtlv_opts_t opts)
 {
 	int res = BCME_OK;
 	uint8 *ptlv = *tlv_buf;
@@ -490,7 +500,7 @@ bcm_pack_xtlv_buf_from_mem(uint8 **tlv_buf, uint16 *buflen, const xtlv_desc_t *i
 	while (items->type != 0) {
 		if (items->len && items->ptr) {
 			res = bcm_pack_xtlv_entry(&ptlv, buflen, items->type,
-									  items->len, items->ptr, opts);
+				items->len, items->ptr, opts);
 			if (res != BCME_OK)
 				break;
 		}
@@ -507,7 +517,7 @@ bcm_pack_xtlv_buf_from_mem(uint8 **tlv_buf, uint16 *buflen, const xtlv_desc_t *i
  */
 int
 bcm_unpack_xtlv_buf_to_mem(uint8 *tlv_buf, int *buflen, xtlv_desc_t *items,
-						   bcm_xtlv_opts_t opts)
+	bcm_xtlv_opts_t opts)
 {
 	int res = BCME_OK;
 	bcm_xtlv_t *elt;
@@ -551,7 +561,7 @@ bcm_unpack_xtlv_buf_to_mem(uint8 *tlv_buf, int *buflen, xtlv_desc_t *items,
  */
 const uint8*
 bcm_get_data_from_xtlv_buf(const uint8 *tlv_buf, uint16 buflen, uint16 id,
-						   uint16 *datalen, bcm_xtlv_opts_t opts)
+	uint16 *datalen, bcm_xtlv_opts_t opts)
 {
 	const uint8 *retptr = NULL;
 	uint16 type, len;
@@ -591,7 +601,7 @@ bcm_get_data_from_xtlv_buf(const uint8 *tlv_buf, uint16 buflen, uint16 id,
 
 bcm_xtlv_t*
 bcm_xtlv_bcopy(const bcm_xtlv_t *src, bcm_xtlv_t *dst,
-			   int src_buf_len, int dst_buf_len, bcm_xtlv_opts_t opts)
+	int src_buf_len, int dst_buf_len, bcm_xtlv_opts_t opts)
 {
 	bcm_xtlv_t *dst_next = NULL;
 	src =  (src && bcm_valid_xtlv(src, src_buf_len, opts)) ? src : NULL;

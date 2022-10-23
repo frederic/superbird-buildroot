@@ -1,7 +1,7 @@
 /*
  * Indices for 802.11 a/b/g/n/ac 1-3 chain symmetric transmit rates
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -71,8 +71,7 @@ typedef enum wl_tx_bw {
 	WL_TX_BW_2P5,
 	WL_TX_BW_5,
 	WL_TX_BW_10
-}
-wl_tx_bw_t;
+} wl_tx_bw_t;
 
 /*
  * Transmit modes.

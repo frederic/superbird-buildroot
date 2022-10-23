@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -110,6 +110,9 @@ typedef tANI_U8 tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_REALM_LEN 2
 /* Cache ID length */
 #define CACHE_ID_LEN 2
+
+/* Maximum peer station number query one time */
+#define MAX_PEER_STA 12
 
 #ifdef FEATURE_WLAN_EXTSCAN
 
@@ -765,7 +768,7 @@ typedef struct sSirBssDescription
     //offset of the ieFields from bssId.
     tANI_U16             length;
     tSirMacAddr          bssId;
-    v_TIME_t             scansystimensec;
+    v_U64_t              scansystimensec;
     tANI_U32             timeStamp[2];
     tANI_U16             beaconInterval;
     tANI_U16             capabilityInfo;
@@ -1130,6 +1133,7 @@ typedef struct sSirSmeJoinReq
     tANI_U8             cc_switch_mode;
 #endif
     tVOS_CON_MODE       staPersona;             //Persona
+    bool sae_pmk_cached;
     bool                osen_association;
     bool                wps_registration;
     ePhyChanBondState   cbMode;                 // Pass CB mode value in Join.
@@ -1209,6 +1213,11 @@ typedef struct sSirSmeJoinReq
     struct cds_fils_connection_info fils_con_info;
 #endif
     tSirBssDescription  bssDescription;
+    /*
+     * WARNING: Pls make bssDescription as last variable in struct
+     * tSirSmeJoinReq as it has ieFields followed after this bss
+     * description. Adding a variable after this corrupts the ieFields
+     */
 } tSirSmeJoinReq, *tpSirSmeJoinReq;
 
 /* Definition for response message to previously issued join request */
@@ -1341,6 +1350,7 @@ typedef struct sSirSmeAssocInd
     tANI_U8              uniSig;  // DPU signature for unicast packets
     tANI_U8              bcastSig; // DPU signature for broadcast packets
     tAniAuthType         authType;
+    enum ani_akm_type    akm_type;
     tAniSSID             ssId; // SSID used by STA to associate
     tSirWAPIie           wapiIE;//WAPI IE received from peer
     tSirRSNie            rsnIE;// RSN IE received from peer
@@ -1375,9 +1385,21 @@ typedef struct sSirSmeAssocInd
     uint8_t              max_mcs_idx;
     uint8_t              rx_mcs_map;
     uint8_t              tx_mcs_map;
+    bool                 is_sae_authenticated;
+    const uint8_t *      owe_ie;
+    uint32_t             owe_ie_len;
+    uint16_t             owe_status;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
-
+/**
+ * struct owe_assoc_ind - owe association indication
+ * @node : List entry element
+ * @assoc_ind: pointer to assoc ind
+ */
+struct owe_assoc_ind {
+	vos_list_node_t node;
+	struct sSirSmeAssocInd *assoc_ind;
+};
 /// Definition for Association confirm
 /// ---> MAC
 typedef struct sSirSmeAssocCnf
@@ -1390,6 +1412,9 @@ typedef struct sSirSmeAssocCnf
     tANI_U16             aid;
     tSirMacAddr          alternateBssId;
     tANI_U8              alternateChannelId;
+    tSirMacStatusCodes   mac_status_code;
+    uint8_t *            owe_ie;
+    uint32_t             owe_ie_len;
 } tSirSmeAssocCnf, *tpSirSmeAssocCnf;
 
 /// Definition for Reassociation indication from peer
@@ -3035,7 +3060,6 @@ typedef struct sSirSmePreSwitchChannelInd
     tANI_U8   sessionId;
 } tSirSmePreSwitchChannelInd, *tpSirSmePreSwitchChannelInd;
 
-
 //
 // HDD -> LIM
 // tSirMsgQ.type = eWNI_SME_DEL_BA_PEER_IND
@@ -3182,6 +3206,10 @@ typedef struct sSmeCsaOffloadInd
     tANI_U16    mesgType;    // eWNI_SME_CSA_OFFLOAD_EVENT
     tANI_U16    mesgLen;
     tSirMacAddr bssId;       // BSSID
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+    tANI_U16    channel;
+    tANI_U16    tbtt_count;
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
 } tSmeCsaOffloadInd, *tpSmeCsaOffloadInd;
 
 /// WOW related structures
@@ -3655,6 +3683,14 @@ typedef struct sSirSmeAddStaSelfReq
     uint8_t         nss_5g;
     uint32_t        tx_aggregation_size;
     uint32_t        rx_aggregation_size;
+    uint32_t        tx_aggr_sw_retry_threshhold_be;
+    uint32_t        tx_aggr_sw_retry_threshhold_bk;
+    uint32_t        tx_aggr_sw_retry_threshhold_vi;
+    uint32_t        tx_aggr_sw_retry_threshhold_vo;
+    uint32_t        tx_non_aggr_sw_retry_threshhold_be;
+    uint32_t        tx_non_aggr_sw_retry_threshhold_bk;
+    uint32_t        tx_non_aggr_sw_retry_threshhold_vi;
+    uint32_t        tx_non_aggr_sw_retry_threshhold_vo;
 }tSirSmeAddStaSelfReq, *tpSirSmeAddStaSelfReq;
 
 typedef struct sSirSmeDelStaSelfReq
@@ -3701,6 +3737,17 @@ typedef struct sSirSmeCoexInd
     tANI_U32        coexIndData[SIR_COEX_IND_DATA_SIZE];
 }tSirSmeCoexInd, *tpSirSmeCoexInd;
 
+/**
+ * enum rxmgmt_flags - flags for received management frame.
+ * @RXMGMT_FLAG_NONE: Default value to indicate no flags are set.
+ * @RXMGMT_FLAG_EXTERNAL_AUTH: frame can be used for external authentication
+ *                             by upper layers.
+ */
+enum rxmgmt_flags {
+	RXMGMT_FLAG_NONE,
+	RXMGMT_FLAG_EXTERNAL_AUTH = 1 << 1,
+};
+
 typedef struct sSirSmeMgmtFrameInd
 {
     uint16_t        frame_len;
@@ -3708,6 +3755,7 @@ typedef struct sSirSmeMgmtFrameInd
     tANI_U8        sessionId;
     tANI_U8         frameType;
     tANI_S8         rxRssi;
+    enum rxmgmt_flags rx_flags;
     tANI_U8  frameBuf[1]; //variable
 }tSirSmeMgmtFrameInd, *tpSirSmeMgmtFrameInd;
 
@@ -4933,6 +4981,17 @@ struct sir_peer_info_resp {
 };
 
 /**
+ * @sta_num: number of peer station which has valid info
+ * @info: peer information
+ *
+ * all SAP peer station's information retrieved
+ */
+struct sir_peer_sta_info {
+	uint8_t sta_num;
+	struct sir_peer_info info[MAX_PEER_STA];
+};
+
+/**
  * struct sir_peer_info_ext_req - peer info request struct
  * @peer_macaddr: MAC address
  * @sessionId: vdev id
@@ -5255,6 +5314,9 @@ typedef struct sSirDfsCsaIeRequest
     uint8_t  ch_switch_mode;
     uint8_t  dfs_ch_switch_disable;
     uint8_t  sub20_switch_mode;
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+    tANI_U8  csaSwitchCount;
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
 }tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -5298,7 +5360,24 @@ typedef struct{
     u_int8_t thermalMgmtEnabled;
     u_int32_t throttlePeriod;
     u_int8_t throttle_duty_cycle_tbl[WLAN_THROTTLE_DUTY_CYCLE_LEVEL_MAX];
+#ifdef FEATURE_WLAN_THERMAL_SHUTDOWN
+    uint8_t  thermal_shutdown_enabled;
+    uint8_t  thermal_shutdown_auto_enabled;
+    uint16_t thermal_resume_threshold;
+    uint16_t thermal_warning_threshold;
+    uint16_t thermal_suspend_threshold;
+    uint16_t thermal_sample_rate;
+#endif
+
 } t_thermal_mgmt, *tp_thermal_mgmt;
+
+typedef struct{
+    u_int32_t dpd_enable;
+    u_int32_t dpd_delta_degreeHigh;
+    u_int32_t dpd_delta_degreeLow;
+    u_int32_t dpd_cooling_time;
+    u_int32_t dpd_duration_max;
+} t_dpd_recal_mgmt, *tp_dpd_recal_mgmt;
 
 typedef struct sSirTxPowerLimit
 {
@@ -6391,6 +6470,8 @@ typedef struct
     tANI_U32 contentionTimeAvg;
     /* num of data pkts used for contention statistics */
     tANI_U32 contentionNumSamples;
+    /* num of pending msdu */
+    tANI_U32 pending_msdu;
 } tSirWifiWmmAcStat, *tpSirWifiWmmAcStat;
 
 /* Interface statistics - corresponding to 2nd most
@@ -6668,6 +6749,16 @@ struct sir_wifi_ll_ext_peer_stats {
 };
 
 /**
+ * struct sir_wifi_ll_ext_time_stamp - time stamp for stats report
+ * @duration: the count duration on fw side for this report
+ * @end_time: timestamp when LL stats reported to user layer
+ */
+struct sir_wifi_ll_ext_period {
+	uint32_t duration;
+	v_TIME_t end_time;
+};
+
+/**
  * struct sir_wifi_ll_ext_stats - link layer stats report
  * @trigger_cond_id:  Indicate what triggered this event.
  *	1: timeout. 2: threshold
@@ -6706,6 +6797,8 @@ struct sir_wifi_ll_ext_peer_stats {
  *     |      peer_num                 |
  *     +-------------------------------+
  *     |      channel_num              |
+ *     +-------------------------------+
+ *     |      time stamp               |
  *     +-------------------------------+
  *     |      tx_mpdu_aggr_array_len   |
  *     +-------------------------------+
@@ -6760,6 +6853,7 @@ struct sir_wifi_ll_ext_stats {
 	uint32_t rx_chgd_bitmap;
 	uint8_t peer_num;
 	uint8_t channel_num;
+	struct sir_wifi_ll_ext_period time_stamp;
 	uint32_t tx_mpdu_aggr_array_len;
 	uint32_t tx_succ_mcs_array_len;
 	uint32_t tx_fail_mcs_array_len;
@@ -7127,6 +7221,8 @@ struct sblock_info {
  * @vdev_id: vdev id
  * @tsf_low: low 32bits of tsf
  * @tsf_high: high 32bits of tsf
+ * @tsf_id: tsf id
+ * @tsf_id_valid: valid tsf id or not
  *
  * driver use this struct to store the tsf info
  */
@@ -7134,7 +7230,18 @@ struct stsf {
 	uint32_t vdev_id;
 	uint32_t tsf_low;
 	uint32_t tsf_high;
+	uint32_t tsf_id;
+	uint32_t tsf_id_valid;
 };
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+typedef struct
+{
+    uint8_t vdev_id;
+    uint32_t status;
+} tSirMtEvent, *tpSirMtEvent;
+#endif
+
 
 /**
  * OCB structures
@@ -7234,6 +7341,11 @@ struct sir_ocb_config {
 	void *def_tx_param;
 	uint32_t def_tx_param_size;
 };
+
+/* Flag to indicate expiry time in TSF. */
+#define OCB_CONFIG_FLAG_EXPIRY_TIME_IN_TSF (0x01)
+/* Flag to indicate 802.11 frame mode. */
+#define OCB_CONFIG_FLAG_80211_FRAME_MODE   (0x02)
 
 /* The size of the utc time in bytes. */
 #define SIZE_UTC_TIME (10)
@@ -7448,7 +7560,7 @@ struct dsrc_radio_chan_stats_ctxt {
 	struct completion completion_evt;
 	uint32_t config_chans_num;
 	uint32_t config_chans_freq[DSRC_MAX_CHAN_STATS_CNT];
-	spinlock_t chan_stats_lock;
+	adf_os_spinlock_t chan_stats_lock;
 	uint32_t chan_stats_num;
 	struct radio_chan_stats_info chan_stats[DSRC_MAX_CHAN_STATS_CNT];
 };
@@ -7475,61 +7587,6 @@ struct sir_guard_time_request {
 
 /* Max number of rates allowed in Supported Rates IE */
 #define MAX_NUM_SUPPORTED_RATES (8)
-
-#define MAX_NUM_FW_SEGMENTS 4
-
-/**
- * struct fw_dump_seg_req - individual segment details
- * @seg_id - segment id.
- * @seg_start_addr_lo - lower address of the segment.
- * @seg_start_addr_hi - higher address of the segment.
- * @seg_length - length of the segment.
- * @dst_addr_lo - lower address of the destination buffer.
- * @dst_addr_hi - higher address of the destination buffer.
- *
- * This structure carries the information to firmware about the
- * individual segments. This structure is part of firmware memory
- * dump request.
- */
-struct fw_dump_seg_req
-{
-	uint8_t seg_id;
-	uint32_t seg_start_addr_lo;
-	uint32_t seg_start_addr_hi;
-	uint32_t seg_length;
-	uint32_t dst_addr_lo;
-	uint32_t dst_addr_hi;
-};
-
-/**
- * struct fw_dump_req - firmware memory dump request details.
- * @request_id - request id.
- * @num_seg - requested number of segments.
- * @fw_dump_seg_req - individual segment information.
- *
- * This structure carries information about the firmware
- * memory dump request.
- */
-struct fw_dump_req
-{
-	uint32_t request_id;
-	uint32_t num_seg;
-	struct fw_dump_seg_req segment[MAX_NUM_FW_SEGMENTS];
-};
-
-/**
- * struct fw_dump_rsp - firmware dump response details.
- * @request_id - request id.
- * @dump_complete - copy completion status.
- *
- * This structure is used to store the firmware dump copy complete
- * response from the firmware.
- */
-struct fw_dump_rsp
-{
-	uint32_t request_id;
-	uint32_t dump_complete;
-};
 
 /**
  * struct vdev_ie_info - IE info
@@ -7673,6 +7730,8 @@ struct udp_resp_offload {
  * @wow_pulse_pin: GPIO PIN for Pulse
  * @wow_pulse_interval_low: Pulse interval low
  * @wow_pulse_interval_high: Pulse interval high
+ * @wow_pulse_repeat_count: Pulse repeat count
+ * @wow_pulse_init_state: Pulse init level
  *
  * SME uses this structure to configure wow pulse info
  * and send it to WMA
@@ -7682,6 +7741,8 @@ struct wow_pulse_mode {
 	uint8_t                    wow_pulse_pin;
 	uint16_t                   wow_pulse_interval_high;
 	uint16_t                   wow_pulse_interval_low;
+	uint32_t                   wow_pulse_repeat_count;
+	uint8_t                    wow_pulse_init_state;
 };
 
 /*
@@ -8455,6 +8516,24 @@ struct sir_set_tx_rx_aggregation_size {
 };
 
 /**
+ * struct sir_set_tx_sw_retry_threshhold - set sw retry threshhold
+ * @vdev_id: vdev id of the session
+ * @retry_type: non-aggregation or aggregation
+ * @tx_sw_retry_threshhold_be: sw retry threshhold for BE
+ * @tx_sw_retry_threshhold_bk: sw retry threshhold for BK
+ * @tx_sw_retry_threshhold_vi: sw retry threshhold for VI
+ * @tx_sw_retry_threshhold_vo: sw retry threshhold for VO
+ */
+struct sir_set_tx_sw_retry_threshhold {
+	uint8_t vdev_id;
+	uint8_t retry_type;
+	uint32_t tx_sw_retry_threshhold_be;
+	uint32_t tx_sw_retry_threshhold_bk;
+	uint32_t tx_sw_retry_threshhold_vi;
+	uint32_t tx_sw_retry_threshhold_vo;
+};
+
+/**
  * struct sme_update_access_policy_vendor_ie - update vendor ie and access
  * policy
  * @msg_type: message id
@@ -8515,6 +8594,18 @@ struct sme_sta_inactivity_timeout {
 };
 
 /**
+ * struct sme_flush_pending - flush pending packets with specified tids
+ * @vdev_id: vdev Id.
+ * @peer_addr: peer mac address.
+ * @flush_ac: access category pending packets using
+ */
+struct sme_flush_pending {
+	uint8_t session_id;
+	v_MACADDR_t  peer_addr;
+	uint8_t flush_ac;
+};
+
+/**
  * struct scan_chan_info - channel info
  * @freq: radio frequence
  * @cmd flag: cmd flag
@@ -8554,6 +8645,20 @@ struct sme_sub20_chan_width {
 	uint16_t	length;
 	uint8_t	session_id;
 	uint8_t	channelwidth;
+};
+
+/**
+ * struct sme_change_country_code_ind - indicate country code changed
+ * @message_type: message Type is eWNI_SME_CC_CHANGE_IND.
+ * @msg_len: message length.
+ * @session_id: session Id.
+ * @country_code: country code information.
+ */
+struct sme_change_country_code_ind {
+	uint16_t  message_type;
+	uint16_t  msg_len;
+	uint8_t   session_id;
+	uint8_t   country_code[WNI_CFG_COUNTRY_CODE_LEN];
 };
 
 /**
@@ -8608,4 +8713,35 @@ struct action_frame_random_filter {
 	uint8_t mac_addr[VOS_MAC_ADDR_SIZE];
 };
 
+/**
+ * struct sae_info - SAE info used for commit/confirm messages
+ * @msg_type: Message type
+ * @msg_len: length of message
+ * @vdev_id: vdev id
+ * @peer_mac_addr: peer MAC address
+ * @ssid: SSID
+ */
+struct sir_sae_info {
+	uint16_t msg_type;
+	uint16_t msg_len;
+	uint32_t vdev_id;
+	v_MACADDR_t peer_mac_addr;
+	tSirMacSSid ssid;
+};
+
+/**
+ * struct sir_sae_msg - SAE msg used for message posting
+ * @message_type: message type
+ * @length: message length
+ * @session_id: SME session id
+ * @sae_status: SAE status, 0: Success, Non-zero: Failure.
+ * @peer_mac_addr: peer MAC address
+ */
+struct sir_sae_msg {
+	uint16_t message_type;
+	uint16_t length;
+	uint16_t session_id;
+	uint8_t sae_status;
+	tSirMacAddr peer_mac_addr;
+};
 #endif /* __SIR_API_H */

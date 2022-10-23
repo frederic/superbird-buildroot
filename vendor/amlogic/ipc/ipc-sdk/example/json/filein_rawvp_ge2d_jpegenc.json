@@ -1,0 +1,54 @@
+[
+  {
+    type: vbpool,
+    param:
+    {
+      pixfmt: NV12,
+      width: 320,
+      height: 240,
+      nbuf: 1
+    },
+    bind:
+    {
+      output: ge2d.ch1
+    }
+  },
+  {
+    type: filein,
+    param: {
+      path: "/data/blue_bt709_320x240_nv12.yuv"
+    }
+  },
+  {
+    type: rawvideoparse,
+    param: {
+      pixfmt: NV12,
+      width: 320,
+      height: 240
+    },
+    bind: {
+      output: ge2d.ch0
+    }
+  },
+  {
+    type: ge2d,
+    param:
+    {
+      name: ge2d,
+      op: stretchblt-from,
+      is-bt709tobt601j: 1
+    }
+  },
+  {
+    type: jpegenc
+  },
+  {
+    type: fileout,
+    param:
+    {
+      path: "/data/filein_rawvp_ge2d_jpegenc.yuv",
+      dump: 1
+    }
+  }
+]
+

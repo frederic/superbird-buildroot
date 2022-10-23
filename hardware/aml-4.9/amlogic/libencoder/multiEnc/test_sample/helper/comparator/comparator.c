@@ -94,7 +94,7 @@ static BOOL NullComparator_Rewind(
 ComparatorImpl nullComparatorImpl = {
     NULL,
     NULL,
-    0, 
+    0,
     0,
     NullComparator_Create,
     NullComparator_Destroy,
@@ -217,7 +217,7 @@ Comparator Comparator_Create(
         return NULL;
     }
 
-    if (success == FALSE) 
+    if (success == FALSE)
         return NULL;
 
     comp = (AbstractComparator*)osal_malloc(sizeof(AbstractComparator));
@@ -290,7 +290,7 @@ BOOL Comparator_CheckFrameCount(
     impl = absComp->impl;
 
     if (impl->curIndex != absComp->totalFrames) {
-        VLOG(ERR, "MISMATCH FRAME COUNT: GOLDEN(%d) DECODED(%d)\n", 
+        VLOG(ERR, "MISMATCH FRAME COUNT: GOLDEN(%d) DECODED(%d)\n",
             impl->numOfFrames, impl->curIndex);
         match = FALSE;
     }
@@ -315,7 +315,7 @@ Uint32 Comparator_GetFrameCount(
     return impl->numOfFrames;
 }
 
-/* \brief       When scan mode is enable, Comparator_Act() tries to find data matched with decoded result 
+/* \brief       When scan mode is enable, Comparator_Act() tries to find data matched with decoded result
  *              by scanning all data
  */
 BOOL Comparator_SetScanMode(
@@ -373,5 +373,25 @@ BOOL Comparator_CheckEOF(
     }
 
     return match;
+}
+
+BOOL Comparator_Configure(
+    Comparator  comp,
+    ComparatorConfType        cmd,
+    void*                     val
+    )
+{
+    ComparatorImpl*     impl     = NULL;
+    AbstractComparator* absComp  = (AbstractComparator*)comp;
+
+    if (comp == NULL) {
+        VLOG(ERR, "%s:%d Invalid handle\n", __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    impl = absComp->impl;
+    impl->Configure(impl, cmd, val);
+
+    return TRUE;
 }
 

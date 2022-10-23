@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -54,6 +54,8 @@ typedef struct _vsi_nn_resize_param
 
     /* resize layer local data structure */
     vsi_nn_resize_lcl_data local;
+    vx_bool_e    align_corners;
+    vx_bool_e    half_pixel_centers;
 } vsi_nn_resize_param;
 
 #ifdef __cplusplus

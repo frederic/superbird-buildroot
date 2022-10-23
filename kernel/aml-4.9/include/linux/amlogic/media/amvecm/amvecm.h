@@ -22,6 +22,7 @@
 #include "linux/amlogic/media/amvecm/cm.h"
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/utils/amstream.h>
+#include <linux/amlogic/media/video_sink/vpp.h>
 #include <linux/amlogic/cpu_version.h>
 #include <drm/drmP.h>
 
@@ -178,12 +179,12 @@ struct ve_pq_load_s {
 	enum pq_table_name_e param_id;
 	unsigned int length;
 	union {
-	void *param_ptr;
-	long long param_ptr_len;
+		void *param_ptr;
+		long long param_ptr_len;
 	};
 	union {
-	void *reserved;
-	long long reserved_len;
+		void *reserved;
+		long long reserved_len;
 	};
 };
 
@@ -219,10 +220,8 @@ enum pc_mode_e {
 #define AMVECM_IOC_G_PIC_MODE _IOR(_VE_CM, 0x59, struct am_vdj_mode_s)
 #define AMVECM_IOC_S_PIC_MODE _IOW(_VE_CM, 0x60, struct am_vdj_mode_s)
 
-
 /*HDR TYPE command list*/
 #define AMVECM_IOC_G_HDR_TYPE _IOR(_VE_CM, 0x61, enum hdr_type_e)
-
 
 /*Local contrast command list*/
 #define AMVECM_IOC_S_LC_CURVE _IOW(_VE_CM, 0x62, struct ve_lc_curve_parm_s)
@@ -235,6 +234,19 @@ struct hdr_tone_mapping_s {
 
 #define AMVECM_IOC_S_HDR_TM  _IOW(_VE_CM, 0x63, struct hdr_tone_mapping_s)
 #define AMVECM_IOC_G_HDR_TM  _IOR(_VE_CM, 0x64, struct hdr_tone_mapping_s)
+
+#define AMVECM_IOC_S_PQ_CTRL  _IOW(_VE_CM, 0x65, struct vpp_pq_ctrl_s)
+#define AMVECM_IOC_G_PQ_CTRL  _IOR(_VE_CM, 0x66, struct vpp_pq_ctrl_s)
+
+enum meson_cpu_ver_e {
+	VER_NULL = 0,
+	VER_A,
+	VER_B,
+	VER_C,
+	VER_MAX
+};
+/*cpu ver ioc*/
+#define AMVECM_IOC_S_MESON_CPU_VER _IOW(_VE_CM, 0x67, enum meson_cpu_ver_e)
 
 struct am_vdj_mode_s {
 	int flag;
@@ -351,37 +363,6 @@ enum ve_pq_timing_e {
 	TIMING_MAX,
 };
 
-enum vlock_hw_ver_e {
-	/*gxtvbb*/
-	vlock_hw_org,
-	/*
-	 *txl
-	 *txlx
-	 */
-	vlock_hw_ver1,
-	/* tl1 later
-	 * fix bug:i problem
-	 * fix bug:affect ss function
-	 * add: phase lock
-	 * tm2: have separate pll:tcon pll and hdmitx pll
-	 */
-	vlock_hw_ver2,
-};
-
-struct vecm_match_data_s {
-	u32 vlk_support;
-	u32 vlk_new_fsm;
-	enum vlock_hw_ver_e vlk_hwver;
-	u32 vlk_phlock_en;
-	u32 vlk_pll_sel;/*independent panel pll and hdmitx pll*/
-};
-
-enum vd_path_e {
-	VD1_PATH = 0,
-	VD2_PATH = 1,
-	VD_PATH_MAX = 2
-};
-
 /*overscan:
  *length 0~31bit :number of crop;
  *src_timing: bit31: on: load/save all crop
@@ -407,42 +388,69 @@ struct ve_pq_overscan_s {
 
 extern struct ve_pq_overscan_s overscan_table[TIMING_MAX];
 
+struct aipq_load_s {
+	unsigned int height;
+	unsigned int width;
+	union {
+		void *table_ptr;
+		long long table_len;
+	};
+};
+
+#define AMVECM_IOC_S_AIPQ_TABLE _IOW(_VE_CM, 0x68, struct aipq_load_s)
+
 #define _DI_	'D'
 
 struct am_pq_parm_s {
 	unsigned int table_name;
 	unsigned int table_len;
 	union {
-	void *table_ptr;
-	long long l_table;
+		void *table_ptr;
+		long long l_table;
 	};
 	union {
-	void *reserved;
-	long long l_reserved;
+		void *reserved;
+		long long l_reserved;
 	};
 };
 
 #define AMDI_IOC_SET_PQ_PARM  _IOW(_DI_, 0x51, struct am_pq_parm_s)
 
-/* #if (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8) */
-/* #define WRITE_VPP_REG(x,val)*/
-/* WRITE_VCBUS_REG(x,val) */
-/* #define WRITE_VPP_REG_BITS(x,val,start,length)*/
-/* WRITE_VCBUS_REG_BITS(x,val,start,length) */
-/* #define READ_VPP_REG(x)*/
-/* READ_VCBUS_REG(x) */
-/* #define READ_VPP_REG_BITS(x,start,length)*/
-/* READ_VCBUS_REG_BITS(x,start,length) */
-/* #else */
-/* #define WRITE_VPP_REG(x,val)*/
-/* WRITE_CBUS_REG(x,val) */
-/* #define WRITE_VPP_REG_BITS(x,val,start,length)*/
-/* WRITE_CBUS_REG_BITS(x,val,start,length) */
-/* #define READ_VPP_REG(x)*/
-/* READ_CBUS_REG(x) */
-/* #define READ_VPP_REG_BITS(x,start,length)*/
-/* READ_CBUS_REG_BITS(x,start,length) */
-/* #endif */
+enum vlock_hw_ver_e {
+	/*gxtvbb*/
+	vlock_hw_org = 0,
+	/*
+	 *txl
+	 *txlx
+	 */
+	vlock_hw_ver1,
+	/* tl1 later
+	 * fix bug:i problem
+	 * fix bug:affect ss function
+	 * add: phase lock
+	 * tm2: have separate pll:tcon pll and hdmitx pll
+	 */
+	vlock_hw_ver2,
+	/* tm2 verion B
+	 * fix some bug
+	 */
+	vlock_hw_tm2verb,
+};
+
+struct vecm_match_data_s {
+	u32 vlk_support;
+	u32 vlk_new_fsm;
+	enum vlock_hw_ver_e vlk_hwver;
+	u32 vlk_phlock_en;
+	u32 vlk_pll_sel;/*independent panel pll and hdmitx pll*/
+};
+
+enum vd_path_e {
+	VD1_PATH = 0,
+	VD2_PATH = 1,
+	VD_PATH_MAX = 2
+};
+
 
 static inline void WRITE_VPP_REG(uint32_t reg,
 		const uint32_t value)
@@ -478,12 +486,19 @@ extern signed int vd1_brightness, vd1_contrast;
 extern bool gamma_en;
 extern unsigned int atv_source_flg;
 extern unsigned int sr_demo_flag;
-
+extern unsigned int sr_offset[2];
 extern enum hdr_type_e hdr_source_type;
 extern bool pd_detect_en;
+extern bool wb_en;
+extern struct pq_ctrl_s pq_cfg;
+
+extern bool wb_en;
+extern struct pq_ctrl_s pq_cfg;
+extern unsigned int lc_offset;
 
 #define CSC_FLAG_TOGGLE_FRAME	1
 #define CSC_FLAG_CHECK_OUTPUT	2
+#define CSC_FLAG_FORCE_SIGNAL	4
 
 extern int amvecm_on_vs(
 	struct vframe_s *display_vf,
@@ -499,7 +514,8 @@ extern int amvecm_on_vs(
 extern void refresh_on_vs(struct vframe_s *vf);
 extern void pc_mode_process(void);
 extern void pq_user_latch_process(void);
-extern void vlock_process(struct vframe_s *vf);
+extern void vlock_process(struct vframe_s *vf,
+		struct vpp_frame_par_s *cur_video_sts);
 
 /* master_display_info for display device */
 struct hdr_metadata_info_s {
@@ -538,5 +554,30 @@ extern int am_meson_ctm_set(u32 index, struct drm_color_ctm *ctm);
 extern int am_meson_ctm_disable(void);
 
 extern void enable_osd1_mtx(unsigned int en);
-#endif /* AMVECM_H */
+void set_cur_hdr_policy(uint policy);
+bool di_api_mov_sel(unsigned int mode,
+		    unsigned int *pdate);
+enum hdr_type_e get_cur_source_type(enum vd_path_e vd_path);
 
+int amvecm_set_saturation_hue(int mab);
+
+/*ai detected scenes*/
+enum detect_scene_e {
+	BLUE_SCENE = 0,
+	GREEN_SCENE,
+	SKIN_TONE_SCENE,
+	PEAKING_SCENE,
+	SATURATION_SCENE,
+	DYNAMIC_CONTRAST_SCENE,
+	NOISE_SCENE,
+	SCENE_MAX
+};
+
+/*detected single scene process*/
+struct single_scene_s {
+	int enable;
+	int (*func)(int offset, int enable);
+};
+
+extern struct single_scene_s detected_scenes[SCENE_MAX];
+#endif /* AMVECM_H */

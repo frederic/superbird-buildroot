@@ -72,5 +72,10 @@ VM_HW_Err_t VM_HW_CloseSession(uint8_t bServiceIdx);
 
 VM_HW_Err_t VM_HW_SetParameters_Rend(uint8_t bServiceIdx,
 				vmx_hw_soc_rend_t* hwParameters);
+VM_HW_Err_t VM_HW_SetParameters_Last(uint8_t bServiceIdx, uint8_t *arg,
+		unsigned int len);
+
+VM_HW_Err_t VM_HW_SetCWC(uint8_t bServiceIdx, uint8_t* Kwmcwc, size_t len,
+		uint8_t klStage);
 
 #endif // _TEE_VXWM_API_H_

@@ -108,7 +108,12 @@ case  TSENSOR:
 		case  SENSOR_HWID:
 			ret = sensor_hw_id(instance, value, direction, ret_value);
 			break;
-
+		case  SENSOR_WDRMODE_ID:
+			ret = sensor_mode_dynamic_switch(instance, value, direction, ret_value);
+			break;
+		case  SENSOR_ANTIFLICKER_ID:
+			ret = sensor_antiflicker_switch(instance, value, direction, ret_value);
+			break;
 	}//switch (command)
 	break;
 case  TSYSTEM:
@@ -369,6 +374,18 @@ case  TALGORITHMS:
 		case AWB_ZONE_WEIGHT:
 			ret = awb_zone_weight(instance, value, direction, ret_value);
 			break;
+		case DEFOG_MODE_ID:
+			ret = defog_alg_mode(instance, value, direction, ret_value);
+			break;
+		case DEFOG_RATIO_DELTA:
+			ret = defog_alg_ratio_delta(instance, value, direction, ret_value);
+			break;
+		case DEFOG_BLACK_PERCENTAGE:
+			ret = defog_alg_black_pctg(instance, value, direction, ret_value);
+			break;
+		case DEFOG_WHITE_PERCENTAGE:
+			ret = defog_alg_white_pctg(instance, value, direction, ret_value);
+			break;
 	}//switch (command)
 	break;
 case  TSCENE_MODES:
@@ -394,8 +411,8 @@ case  TSCENE_MODES:
 		case  SNR_MANUAL_ID:
 			ret = snr_manual(instance, value, direction, ret_value);
 			break;
-		case  SNR_OFFSET_ID:
-			ret = snr_offset(instance, value, direction, ret_value);
+		case  SNR_STRENGTH_ID:
+			ret = snr_strength(instance, value, direction, ret_value);
 			break;
 		case  TNR_MANUAL_ID:
 			ret = tnr_manual(instance, value, direction, ret_value);
@@ -451,16 +468,18 @@ case TAML_SCALER:
 }//switch (command_type)
 
 #if FW_HAS_CONTROL_CHANNEL
-	ctrl_channel_handle_command( ctx_id, command_type, command, value, direction );
+	if (ret == SUCCESS)
+		ctrl_channel_handle_command( ctx_id, command_type, command, value, direction );
 #endif
 
-if(ret!=SUCCESS)
-{
-	LOG(LOG_WARNING,"API COMMAND FAILED: type %d, cmd %d, value %lu, direction %d, ret_value %lu, result %d",command_type, command, (unsigned long)value, direction, (unsigned long)*ret_value, ret);
-}
-else
-{
-	LOG(LOG_DEBUG,"API type %d, cmd %d, value %lu, direction %d, ret_value %lu, result %d",command_type, command, (unsigned long)value, direction, (unsigned long)*ret_value, ret);
-}
+	if (ret == IMPLEMENTED)
+		ret = SUCCESS;
+
+	if (ret != SUCCESS) {
+		LOG(LOG_WARNING,"API COMMAND FAILED: type %d, cmd %d, value %lu, direction %d, ret_value %lu, result %d",command_type, command, (unsigned long)value, direction, (unsigned long)*ret_value, ret);
+	} else {
+		LOG(LOG_NOTICE,"API type %d, cmd %d, value %lu, direction %d, ret_value %lu, result %d",command_type, command, (unsigned long)value, direction, (unsigned long)*ret_value, ret);
+	}
+
 	return ret;
 }

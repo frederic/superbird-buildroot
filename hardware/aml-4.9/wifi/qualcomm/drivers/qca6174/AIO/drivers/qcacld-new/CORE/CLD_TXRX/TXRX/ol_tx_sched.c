@@ -521,7 +521,7 @@ struct ol_tx_sched_wrr_adv_category_info_t {
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VO,           1,     17,    24,     0,  1);
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(VI,           3,     17,    16,     1,  4);
 #if defined (MSM8976_TCP_PERF)
-OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BE,          10,     17,    32,     1,  8);
+OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BE,          10,      9,     8,     1,  8);
 #else
 OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC(BE,          10,     17,    16,     1,  8);
 #endif

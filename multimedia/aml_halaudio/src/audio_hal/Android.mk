@@ -44,7 +44,8 @@
 	audio_speex_resample_api.c \
 	audio_simple_resample_api.c \
 	aml_audio_resample_manager.c \
-	aml_datmos_config.cpp
+	aml_datmos_config.cpp \
+	aml_external_process.c
 
     LOCAL_C_INCLUDES += \
 		$(LOCAL_PATH)/../include   \

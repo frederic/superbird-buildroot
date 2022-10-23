@@ -181,7 +181,6 @@ void _update_fr( crop_fsm_ptr_t p_fsm, int isr )
 
     width = acamera_isp_top_active_width_read( p_fsm->cmn.isp_base );
     height = acamera_isp_top_active_height_read( p_fsm->cmn.isp_base );
-    LOG( LOG_INFO, "crop was configured with w:%u h:%u\n", width, height );
 
     if ( p_fsm->crop_fr.enable ) {
         // check limits
@@ -220,9 +219,7 @@ void crop_fsm_process_interrupt( crop_fsm_const_ptr_t p_fsm, uint8_t irq_event )
 
     int no_log_in_isr = 1;
     if ( p_fsm->need_updating ) {
-        LOG( LOG_INFO, "_update_ds from crop_fsm_process_interrupt irq_event:%d", irq_event );
         switch ( irq_event ) {
-
         case ACAMERA_IRQ_FRAME_WRITER_FR:
             _update_fr( (crop_fsm_ptr_t)p_fsm, no_log_in_isr );
 #if ISP_HAS_DS1
@@ -240,7 +237,6 @@ void crop_resolution_changed( crop_fsm_ptr_t p_fsm )
     _update_fr( p_fsm, 0 );
 
 #if ISP_HAS_DS1
-    LOG( LOG_INFO, "_update_ds from crop_resolution_changed" );
     _update_ds( p_fsm, 0 );
 #endif
     fsm_raise_event( p_fsm, event_id_crop_updated );

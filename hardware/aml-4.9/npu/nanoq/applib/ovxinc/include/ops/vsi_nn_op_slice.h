@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -30,11 +30,20 @@
 extern "C" {
 #endif
 
+typedef struct _vsi_nn_slice_lcl_data
+{
+    vx_int32 begin_dims[VSI_NN_MAX_DIM_NUM];
+    vx_int32 end_dims[VSI_NN_MAX_DIM_NUM];
+    vx_int32 stride_dims[VSI_NN_MAX_DIM_NUM];
+} vsi_nn_slice_lcl_data;
+
 typedef struct _vsi_nn_slice_param
 {
     uint32_t   dims;
     uint32_t * start;
     uint32_t * length;
+
+    vsi_nn_slice_lcl_data  *lcl_data;
 } vsi_nn_slice_param;
 
 #ifdef __cplusplus

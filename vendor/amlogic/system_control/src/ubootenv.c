@@ -32,7 +32,7 @@ static struct env_attribute env_attribute_header;
 
 extern char **environ;
 
-static env_attribute *env_parse_attribute(void) {
+static struct env_attribute *env_parse_attribute(void) {
     char *value;
     char *key;
     char *line;
@@ -49,6 +49,8 @@ static env_attribute *env_parse_attribute(void) {
         if (key != NULL) {
             *key = 0;
             strcpy(attr->key, proc);
+            attr->value = (char *)malloc(strlen(key+1)+1);
+            memset(attr->value,0,strlen(key+1)+1);
             strcpy(attr->value, key + sizeof(char));
         } else {
             syslog(LOG_ERR, "[ubootenv] error need '=' skip this value");
@@ -93,7 +95,7 @@ env_attribute_t *bootenv_get_attr(void) {
 }
 
 void bootenv_print(void) {
-    env_attribute *attr = &env_attribute_header;
+    struct env_attribute *attr = &env_attribute_header;
     while (attr != NULL) {
         syslog(LOG_INFO, "[ubootenv] key(%s) value(%s)", attr->key, attr->value);
         attr = attr->next;
@@ -179,6 +181,10 @@ int bootenv_set_value(const char *key, const char *value, int creat_args_flag) {
 
     while (attr) {
         if (!strcmp(key, attr->key)) {
+            if(attr->value != NULL)
+              free(attr->value);
+            attr->value=malloc(strlen(value)+1);
+            memset(attr->value,0,strlen(value)+1);
             strcpy(attr->value, value);
 
             return 2;
@@ -193,6 +199,8 @@ int bootenv_set_value(const char *key, const char *value, int creat_args_flag) {
         last->next = attr;
         memset(attr, 0, sizeof(env_attribute_t));
         strcpy(attr->key, key);
+        attr->value=malloc(strlen(value)+1);
+        memset(attr->value,0,strlen(value)+1);
         strcpy(attr->value, value);
 
         return 1;
@@ -412,6 +420,7 @@ int bootenv_reinit(void) {
     while (pAttr) {
         pTmp = pAttr;
         pAttr = pAttr->next;
+        free(pTmp->value);
         free(pTmp);
     }
     bootenv_init();

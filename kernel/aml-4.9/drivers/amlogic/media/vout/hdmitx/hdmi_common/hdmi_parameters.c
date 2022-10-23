@@ -2017,7 +2017,7 @@ static struct hdmi_format_para fmt_para_vesa_1280x1024p60_5x4 = {
 	.tmds_clk = 108000,
 	.timing = {
 		.pixel_freq = 108000,
-		.h_freq = 64080,
+		.h_freq = 63981,
 		.v_freq = 60020,
 		.vsync = 60,
 		.vsync_polarity = 1,
@@ -2402,7 +2402,7 @@ static struct hdmi_format_para fmt_para_vesa_1680x1050p60_8x5 = {
 	.tmds_clk = 146250,
 	.timing = {
 		.pixel_freq = 146250,
-		.h_freq = 65340,
+		.h_freq = 65290,
 		.v_freq = 59954,
 		.vsync = 60,
 		.vsync_polarity = 1,
@@ -2584,6 +2584,102 @@ static struct hdmi_format_para fmt_para_vesa_2560x1600p60_8x5 = {
 	},
 };
 
+static struct hdmi_format_para fmt_para_vesa_3440x1440p60_43x18 = {
+	.vic = HDMIV_3440x1440p60hz,
+	.name = "3440x1440p60hz",
+	.pixel_repetition_factor = 0,
+	.progress_mode = 1,
+	.scrambler_en = 0,
+	.tmds_clk_div40 = 0,
+	.tmds_clk = 319750,
+	.timing = {
+		.pixel_freq = 319750,
+		.h_freq = 88819,
+		.v_freq = 59973,
+		.vsync_polarity = 1, /* +VSync */
+		.hsync_polarity = 1, /* +HSync */
+		.h_active = 3440,
+		.h_total = 3600,
+		.h_blank = 160,
+		.h_front = 48,
+		.h_sync = 32,
+		.h_back = 80,
+		.v_active = 1440,
+		.v_total = 1481,
+		.v_blank = 41,
+		.v_front = 3,
+		.v_sync = 10,
+		.v_back = 28,
+		.v_sync_ln = 1,
+	},
+	.hdmitx_vinfo = {
+		.name = "3440x1440p60hz",
+		.mode = VMODE_HDMI,
+		.width = 3440,
+		.height = 1440,
+		.field_height = 1440,
+		.aspect_ratio_num = 43,
+		.aspect_ratio_den = 18,
+		.sync_duration_num = 60,
+		.sync_duration_den = 1,
+		.video_clk = 319750000,
+		.htotal = 3600,
+		.vtotal = 1481,
+		.fr_adj_type = VOUT_FR_ADJ_HDMI,
+		.viu_color_fmt = COLOR_FMT_YUV444,
+		.viu_mux = VIU_MUX_ENCP,
+	},
+};
+
+
+static struct hdmi_format_para fmt_para_vesa_2400x1200p90_2x1 = {
+	.vic = HDMIV_2400x1200p90hz,
+	.name = "2400x1200p90hz",
+	.pixel_repetition_factor = 0,
+	.progress_mode = 1,
+	.scrambler_en = 0,
+	.tmds_clk_div40 = 0,
+	.tmds_clk = 280000,
+	.timing = {
+		.pixel_freq = 280000,
+		.h_freq = 112812,
+		.v_freq = 90106,
+		.vsync = 90,
+		.vsync_polarity = 1,
+		.hsync_polarity = 1,
+		.h_active = 2400,
+		.h_total = 2482,
+		.h_blank = 82,
+		.h_front = 20,
+		.h_sync = 30,
+		.h_back = 32,
+		.v_active = 1200,
+		.v_total = 1252,
+		.v_blank = 52,
+		.v_front = 17,
+		.v_sync = 5,
+		.v_back = 30,
+		.v_sync_ln = 1,
+	},
+	.hdmitx_vinfo = {
+		.name              = "2400x1200p90hz",
+		.mode              = VMODE_HDMI,
+		.width             = 2400,
+		.height            = 1200,
+		.field_height      = 1200,
+		.aspect_ratio_num  = 2,
+		.aspect_ratio_den  = 1,
+		.sync_duration_num = 90,
+		.sync_duration_den = 1,
+		.video_clk         = 280000000,
+		.htotal            = 2482,
+		.vtotal            = 1252,
+		.fr_adj_type       = VOUT_FR_ADJ_HDMI,
+		.viu_color_fmt     = COLOR_FMT_YUV444,
+		.viu_mux           = VIU_MUX_ENCP,
+	},
+};
+
 static struct hdmi_format_para *all_fmt_paras[] = {
 	&fmt_para_3840x2160p60_16x9,
 	&fmt_para_3840x2160p50_16x9,
@@ -2637,6 +2733,8 @@ static struct hdmi_format_para *all_fmt_paras[] = {
 	&fmt_para_vesa_1920x1200p60_8x5,
 	&fmt_para_vesa_2160x1200p90_9x5,
 	&fmt_para_vesa_2560x1600p60_8x5,
+	&fmt_para_vesa_3440x1440p60_43x18,
+	&fmt_para_vesa_2400x1200p90_2x1,
 	&fmt_para_null_hdmi_fmt,
 	&fmt_para_non_hdmi_fmt,
 	NULL,
@@ -2803,6 +2901,7 @@ struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr)
 	char *lname;
 	enum hdmi_vic vic = HDMI_Unknown;
 	struct hdmi_format_para *para = &fmt_para_non_hdmi_fmt;
+	unsigned int copy_len;
 
 	if (!name)
 		return para;
@@ -2823,7 +2922,10 @@ struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr)
 		sizeof(struct hdmi_format_para *))) {
 		para = all_fmt_paras[i];
 		memset(&para->ext_name[0], 0, sizeof(para->ext_name));
-		memcpy(&para->ext_name[0], name, sizeof(para->ext_name));
+		copy_len = strlen(name);
+		if (copy_len >= sizeof(para->ext_name))
+			copy_len = sizeof(para->ext_name) - 1;
+		memcpy(&para->ext_name[0], name, copy_len);
 		hdmi_parse_attr(para, name);
 		hdmi_parse_attr(para, attr);
 	} else {
@@ -3512,3 +3614,9 @@ bool is_hdmi14_4k(enum hdmi_vic vic)
 	return ret;
 }
 
+bool is_hdmi4k_420(enum hdmi_vic vic)
+{
+	if ((vic & HDMITX_VIC420_OFFSET) == HDMITX_VIC420_OFFSET)
+		return 1;
+	return 0;
+}

@@ -48,9 +48,12 @@ class FilterBasedPlayerWorkerHandler : public PlayerWorker::Handler,
       SbDrmSystem drm_system,
       const SbMediaAudioSampleInfo* audio_sample_info,
       SbPlayerOutputMode output_mode,
-      SbDecodeTargetGraphicsContextProvider* provider);
+      SbDecodeTargetGraphicsContextProvider* provider,
+      bool bsubdecoder
+      );
 
-  static bool AllocateDecoders(SbMediaVideoCodec video_codec, SbMediaAudioCodec audio_codec);
+  static bool GetDecoderType(const char *max_video_capabilities);
+  static bool AllocateDecoders(SbMediaVideoCodec video_codec, SbMediaAudioCodec audio_codec,bool bsubdecoder);
 
  private:
   bool IsPunchoutMode() const;
@@ -114,6 +117,7 @@ class FilterBasedPlayerWorkerHandler : public PlayerWorker::Handler,
   bool audio_ended_ = false;
   bool video_ended_ = false;
   bool underflow_pause = false;
+  bool bsubdecoder_ = false;
 
   // A mutex guarding changes to the existence (e.g. creation/destruction)
   // of the |video_renderer_| object.  This is necessary because calls to
@@ -126,12 +130,18 @@ class FilterBasedPlayerWorkerHandler : public PlayerWorker::Handler,
   ::starboard::Mutex video_renderer_existence_mutex_;
 
   // multiple decoders case
+  #if SB_API_VERSION >= 11
+  const static int max_audio_decoders = 2;
+  const static int max_video_decoders = 2;
+  #else
   const static int max_audio_decoders = 1;
   const static int max_video_decoders = 1;
+  #endif
   static ::starboard::Mutex av_refcount_mutex;
   static int num_audios;
   static int num_videos;
-
+  static bool bmaindecoder_running;
+  static bool bsubdecoder_running;
   SbPlayerOutputMode output_mode_;
   SbDecodeTargetGraphicsContextProvider*
       decode_target_graphics_context_provider_;

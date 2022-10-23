@@ -12,6 +12,8 @@ all:
 	-$(MAKE) -C audio_hal install
 	-$(MAKE) -C test all
 	-$(MAKE) -C test install
+	-$(MAKE) -C postprocess all
+	-$(MAKE) -C postprocess install
 install:
 	-$(MAKE) -C tinyalsa install	
 clean:
@@ -20,3 +22,4 @@ clean:
 	-$(MAKE) -C utils clean
 	-$(MAKE) -C audio_hal clean
 	-$(MAKE) -C test clean
+	-$(MAKE) -C postprocess clean

@@ -65,31 +65,31 @@
 
 static DECLARE_WAIT_QUEUE_HEAD(wq);
 static u32 fetch_done = 0;
-static void *fetchbuf = NULL;
+static void *fetchbuff = NULL;
 
 static const char tsdemux_fetch_id[] = "tsdemux-fetch-id";
 
-static int stbuf_fetch_init(void)
+static int stbuff_fetch_init(void)
 {
-	if (NULL != fetchbuf)
+	if (NULL != fetchbuff)
 		return 0;
 	pr_dbg("%s line:%d\n",__FUNCTION__,__LINE__);
 
-	fetchbuf = (void *)__get_free_pages(GFP_KERNEL,
+	fetchbuff = (void *)__get_free_pages(GFP_KERNEL,
 					 get_order(FETCHBUF_SIZE));
-	if (!fetchbuf) {
+	if (!fetchbuff) {
 		pr_info("%s: Can not allocate fetch working buffer\n",
 			 __func__);
 		return -ENOMEM;
 	}
 	return 0;
 }
-static void stbuf_fetch_release(void)
+static void stbuff_fetch_release(void)
 {
-	if (0 && fetchbuf) {
+	if (0 && fetchbuff) {
 		/* always don't free.for safe alloc/free*/
-		free_pages((unsigned long)fetchbuf, get_order(FETCHBUF_SIZE));
-		fetchbuf = 0;
+		free_pages((unsigned long)fetchbuff, get_order(FETCHBUF_SIZE));
+		fetchbuff = 0;
 	}
 }
 static irqreturn_t parser_isr(int irq, void *dev_id)
@@ -126,7 +126,7 @@ static void _hwdmx_inject_init(HWDMX_Demux *pdmx) {
 	if (pdmx->inject_init)
 		return ;
 
-	stbuf_fetch_init();
+	stbuff_fetch_init();
 
 	r = vdec_request_irq(PARSER_IRQ, parser_isr,
 			"tsdemux-fetch", (void *)tsdemux_fetch_id);
@@ -160,12 +160,12 @@ static int _hwdmx_inject_write(HWDMX_Demux *pdmx, const char *buf, int count) {
 		 len = count;
 	 else {
 		 len = min_t(size_t, r, FETCHBUF_SIZE);
-		 if (copy_from_user(fetchbuf, p, len))
+		 if (copy_from_user(fetchbuff, p, len))
 			 return -EFAULT;
 
 		 dma_addr =
 			 dma_map_single(hwdemux_get_dma_device(),
-					 fetchbuf,
+					 fetchbuff,
 					 FETCHBUF_SIZE, DMA_TO_DEVICE);
 		 if (dma_mapping_error(hwdemux_get_dma_device(),
 					 dma_addr))
@@ -174,7 +174,7 @@ static int _hwdmx_inject_write(HWDMX_Demux *pdmx, const char *buf, int count) {
 
 	 fetch_done = 0;
 
-	 wmb(); 	 /* Ensure fetchbuf  contents visible */
+	 wmb(); 	 /* Ensure fetchbuff  contents visible */
 
 	 if (isphybuf) {
 		 u32 buf_32 = (unsigned long)buf & 0xffffffff;
@@ -212,7 +212,7 @@ void hwdmx_inject_destroy(HWDMX_Demux *pdmx) {
  if (!(pdmx && pdmx->init)) {
 	 return ;
  }
- stbuf_fetch_release();
+ stbuff_fetch_release();
 
  WRITE_PARSER_REG(PARSER_INT_ENABLE, 0);
  vdec_free_irq(PARSER_IRQ, (void *)tsdemux_fetch_id);

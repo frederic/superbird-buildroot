@@ -83,6 +83,7 @@ void get_sink_format(struct audio_stream_out *stream)
         (source_format != AUDIO_FORMAT_DTS_HD)
 #ifdef DATMOS
         && (source_format != AUDIO_FORMAT_DOLBY_TRUEHD)
+        && (source_format != AUDIO_FORMAT_MAT)
 #endif
        ) {
         /*unsupport format [dts-hd/true-hd]*/
@@ -270,6 +271,37 @@ int set_audio_source(int audio_source)
     return aml_mixer_ctrl_set_int(AML_MIXER_ID_AUDIO_IN_SRC, audio_source);
 }
 
+int set_audio_source_e(enum input_source audio_source, bool is_auge)
+{
+    int src = audio_source;
+
+    if (is_auge) {
+        switch (audio_source) {
+        case LINEIN:
+            src = TDMIN_A;
+            break;
+        case ATV:
+            src = FRATV;
+            break;
+        case HDMIIN:
+            src = FRHDMIRX;
+            break;
+        case ARCIN:
+            src = EARCRX_DMAC;
+            break;
+        case SPDIFIN:
+            src = SPDIFIN_AUGE;
+            break;
+        default:
+            ALOGW("%s(), src: %d not support", __func__, src);
+            src = FRHDMIRX;
+            break;
+        }
+    }
+
+    return aml_mixer_ctrl_set_int(AML_MIXER_ID_AUDIO_IN_SRC, src);
+}
+
 int set_spdifin_pao(int enable)
 {
     return aml_mixer_ctrl_set_int(AML_MIXER_ID_SPDIFIN_PAO, enable);
@@ -290,6 +322,7 @@ int get_hdmiin_samplerate(void)
 int enable_HW_resample(int sr, int enable)
 {
     int value = 0;
+    ALOGD("%s() en = %d", __func__, enable);
     if (enable == 0) {
         aml_mixer_ctrl_set_int(AML_MIXER_ID_HW_RESAMPLE_ENABLE, HW_RESAMPLE_DISABLE);
         return 0;
@@ -387,8 +420,8 @@ int get_stream_parameters(struct audio_hw_device *dev, const char *keys, char *t
     }
 
     if (strstr(keys, "audio_format")) {
-        if (adev->decode_format == AUDIO_FORMAT_DOLBY_TRUEHD) {
-            snprintf(temp_buf, temp_buf_size, "audio_format=%d", (adev->is_truehd_within_mat == false) ? (AUDIO_FORMAT_MAT) : (adev->decode_format));
+        if (adev->decode_format == AUDIO_FORMAT_MAT) {
+            snprintf(temp_buf, temp_buf_size, "audio_format=%d", (adev->is_truehd_within_mat == true) ? (AUDIO_FORMAT_DOLBY_TRUEHD) : (adev->decode_format));
         } else {
             snprintf(temp_buf, temp_buf_size, "audio_format=%d", adev->decode_format);
         }
@@ -427,7 +460,7 @@ int spdifhw_audio_format_detection()
     case DTSHD:
         return AUDIO_FORMAT_DTS_HD;
     case TRUEHD:
-        return AUDIO_FORMAT_DOLBY_TRUEHD;
+        return AUDIO_FORMAT_MAT;
     case LPCM:
         return AUDIO_FORMAT_PCM_16_BIT;
     default:
@@ -436,4 +469,27 @@ int spdifhw_audio_format_detection()
     return AUDIO_FORMAT_INVALID;
 }
 
+audio_format_t hdmiin_hw_audio_format_detection(void)
+{
+    enum audio_type type = aml_mixer_ctrl_get_int(AML_MIXER_ID_HDMIIN_AUDIO_TYPE);
+
+    switch (type) {
+    case AC3:
+        return AUDIO_FORMAT_AC3;
+    case EAC3:
+        return AUDIO_FORMAT_E_AC3;
+    case DTS:
+    case DTSCD:
+        return AUDIO_FORMAT_DTS;
+    case DTSHD:
+        return AUDIO_FORMAT_DTS_HD;
+    case TRUEHD:
+        return AUDIO_FORMAT_MAT;
+    case LPCM:
+        return AUDIO_FORMAT_PCM_16_BIT;
+    default:
+        return AUDIO_FORMAT_INVALID;
+    }
+    return AUDIO_FORMAT_INVALID;
+}
 

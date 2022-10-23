@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver - Dongle Host Driver (DHD) related
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_cfg80211.c 771186 2018-07-09 09:14:04Z $
+ * $Id: dhd_cfg80211.c 807961 2019-03-05 05:47:47Z $
  */
 
 #include <linux/vmalloc.h>
@@ -129,32 +129,34 @@ s32 dhd_cfg80211_clean_p2p_info(struct bcm_cfg80211 *cfg)
 #ifdef WL_STATIC_IF
 int32
 wl_cfg80211_update_iflist_info(struct bcm_cfg80211 *cfg, struct net_device *ndev,
-							   int ifidx, uint8 *addr, int bssidx, char *name, int if_state)
+	int ifidx, uint8 *addr, int bssidx, char *name, int if_state)
 {
 	return dhd_update_iflist_info(cfg->pub, ndev, ifidx, addr, bssidx, name, if_state);
 }
 #endif /* WL_STATIC_IF */
 
 struct net_device* wl_cfg80211_allocate_if(struct bcm_cfg80211 *cfg, int ifidx, const char *name,
-		uint8 *mac, uint8 bssidx, const char *dngl_name)
+	uint8 *mac, uint8 bssidx, const char *dngl_name)
 {
 	return dhd_allocate_if(cfg->pub, ifidx, name, mac, bssidx, FALSE, dngl_name);
 }
 
 int wl_cfg80211_register_if(struct bcm_cfg80211 *cfg,
-							int ifidx, struct net_device* ndev, bool rtnl_lock_reqd)
+	int ifidx, struct net_device* ndev, bool rtnl_lock_reqd)
 {
 	return dhd_register_if(cfg->pub, ifidx, rtnl_lock_reqd);
 }
 
 int wl_cfg80211_remove_if(struct bcm_cfg80211 *cfg,
-						  int ifidx, struct net_device* ndev, bool rtnl_lock_reqd)
+	int ifidx, struct net_device* ndev, bool rtnl_lock_reqd)
 {
 	return dhd_remove_if(cfg->pub, ifidx, rtnl_lock_reqd);
 }
 
 void wl_cfg80211_cleanup_if(struct net_device *net)
 {
+	struct bcm_cfg80211 *cfg = wl_get_cfg(net);
+	BCM_REFERENCE(cfg);
 	dhd_cleanup_if(net);
 }
 
@@ -263,7 +265,7 @@ default_conf_out:
 }
 
 int dhd_cfgvendor_priv_string_handler(struct bcm_cfg80211 *cfg, struct wireless_dev *wdev,
-									  const struct bcm_nlmsg_hdr *nlioc, void *buf)
+	const struct bcm_nlmsg_hdr *nlioc, void *buf)
 {
 	struct net_device *ndev = NULL;
 	dhd_pub_t *dhd;

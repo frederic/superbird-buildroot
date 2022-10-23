@@ -2,7 +2,7 @@
  * Misc utility routines for accessing PMU corerev specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: hndpmu.c 714395 2017-08-04 08:22:31Z $
+ * $Id: hndpmu.c 783841 2018-10-09 06:24:16Z $
  */
 
 /**
@@ -143,95 +143,95 @@ si_switch_pmu_dependency(si_t *sih, uint mode)
 	max_mask = R_REG(osh, &pmu->max_res_mask);
 	W_REG(osh, &pmu->min_res_mask, (min_mask | current_res_state));
 	switch (mode) {
-	case PMU_4364_1x1_MODE:
-	{
-		if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
-			pmu_res_depend_table = bcm4364a0_res_depend_1x1;
-			pmu_res_depend_table_sz =
-				ARRAYSIZE(bcm4364a0_res_depend_1x1);
+		case PMU_4364_1x1_MODE:
+		{
+			if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
+					pmu_res_depend_table = bcm4364a0_res_depend_1x1;
+					pmu_res_depend_table_sz =
+						ARRAYSIZE(bcm4364a0_res_depend_1x1);
 			max_mask = PMU_4364_MAX_MASK_1x1;
 			W_REG(osh, &pmu->res_table_sel, RES4364_SR_SAVE_RESTORE);
 			W_REG(osh, &pmu->res_updn_timer, PMU_4364_SAVE_RESTORE_UPDNTIME_1x1);
 #if defined(SAVERESTORE)
-			if (SR_ENAB()) {
-				/* Disable 3x3 SR engine */
-				W_REG(osh, &cc->sr1_control0,
-					  CC_SR0_4364_SR_ENG_CLK_EN |
-					  CC_SR0_4364_SR_RSRC_TRIGGER |
-					  CC_SR0_4364_SR_WD_MEM_MIN_DIV |
-					  CC_SR0_4364_SR_INVERT_CLK |
-					  CC_SR0_4364_SR_ENABLE_HT |
-					  CC_SR0_4364_SR_ALLOW_PIC |
-					  CC_SR0_4364_SR_PMU_MEM_DISABLE);
-			}
+				if (SR_ENAB()) {
+					/* Disable 3x3 SR engine */
+					W_REG(osh, &cc->sr1_control0,
+					CC_SR0_4364_SR_ENG_CLK_EN |
+					CC_SR0_4364_SR_RSRC_TRIGGER |
+					CC_SR0_4364_SR_WD_MEM_MIN_DIV |
+					CC_SR0_4364_SR_INVERT_CLK |
+					CC_SR0_4364_SR_ENABLE_HT |
+					CC_SR0_4364_SR_ALLOW_PIC |
+					CC_SR0_4364_SR_PMU_MEM_DISABLE);
+				}
 #endif /* SAVERESTORE */
-		}
-		break;
-	}
-	case PMU_4364_3x3_MODE:
-	{
-		if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
-			W_REG(osh, &pmu->res_table_sel, RES4364_SR_SAVE_RESTORE);
-			W_REG(osh, &pmu->res_updn_timer,
-				  PMU_4364_SAVE_RESTORE_UPDNTIME_3x3);
-			/* Change the dependency table only if required */
-			if ((max_mask != PMU_4364_MAX_MASK_3x3) ||
-					(max_mask != PMU_4364_MAX_MASK_RSDB)) {
-				pmu_res_depend_table = bcm4364a0_res_depend_rsdb;
-				pmu_res_depend_table_sz =
-					ARRAYSIZE(bcm4364a0_res_depend_rsdb);
-				max_mask = PMU_4364_MAX_MASK_3x3;
 			}
+			break;
+		}
+		case PMU_4364_3x3_MODE:
+		{
+			if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
+				W_REG(osh, &pmu->res_table_sel, RES4364_SR_SAVE_RESTORE);
+				W_REG(osh, &pmu->res_updn_timer,
+					PMU_4364_SAVE_RESTORE_UPDNTIME_3x3);
+				/* Change the dependency table only if required */
+				if ((max_mask != PMU_4364_MAX_MASK_3x3) ||
+					(max_mask != PMU_4364_MAX_MASK_RSDB)) {
+						pmu_res_depend_table = bcm4364a0_res_depend_rsdb;
+						pmu_res_depend_table_sz =
+							ARRAYSIZE(bcm4364a0_res_depend_rsdb);
+						max_mask = PMU_4364_MAX_MASK_3x3;
+				}
+#if defined(SAVERESTORE)
+				if (SR_ENAB()) {
+					/* Enable 3x3 SR engine */
+					W_REG(osh, &cc->sr1_control0,
+					CC_SR0_4364_SR_ENG_CLK_EN |
+					CC_SR0_4364_SR_RSRC_TRIGGER |
+					CC_SR0_4364_SR_WD_MEM_MIN_DIV |
+					CC_SR0_4364_SR_INVERT_CLK |
+					CC_SR0_4364_SR_ENABLE_HT |
+					CC_SR0_4364_SR_ALLOW_PIC |
+					CC_SR0_4364_SR_PMU_MEM_DISABLE |
+					CC_SR0_4364_SR_ENG_EN_MASK);
+				}
+#endif /* SAVERESTORE */
+			}
+			break;
+		}
+		case PMU_4364_RSDB_MODE:
+		default:
+		{
+			if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
+				W_REG(osh, &pmu->res_table_sel, RES4364_SR_SAVE_RESTORE);
+				W_REG(osh, &pmu->res_updn_timer,
+					PMU_4364_SAVE_RESTORE_UPDNTIME_3x3);
+				/* Change the dependency table only if required */
+				if ((max_mask != PMU_4364_MAX_MASK_3x3) ||
+					(max_mask != PMU_4364_MAX_MASK_RSDB)) {
+						pmu_res_depend_table =
+							bcm4364a0_res_depend_rsdb;
+						pmu_res_depend_table_sz =
+							ARRAYSIZE(bcm4364a0_res_depend_rsdb);
+						max_mask = PMU_4364_MAX_MASK_RSDB;
+				}
 #if defined(SAVERESTORE)
 			if (SR_ENAB()) {
-				/* Enable 3x3 SR engine */
-				W_REG(osh, &cc->sr1_control0,
-					  CC_SR0_4364_SR_ENG_CLK_EN |
-					  CC_SR0_4364_SR_RSRC_TRIGGER |
-					  CC_SR0_4364_SR_WD_MEM_MIN_DIV |
-					  CC_SR0_4364_SR_INVERT_CLK |
-					  CC_SR0_4364_SR_ENABLE_HT |
-					  CC_SR0_4364_SR_ALLOW_PIC |
-					  CC_SR0_4364_SR_PMU_MEM_DISABLE |
-					  CC_SR0_4364_SR_ENG_EN_MASK);
-			}
+					/* Enable 3x3 SR engine */
+					W_REG(osh, &cc->sr1_control0,
+					CC_SR0_4364_SR_ENG_CLK_EN |
+					CC_SR0_4364_SR_RSRC_TRIGGER |
+					CC_SR0_4364_SR_WD_MEM_MIN_DIV |
+					CC_SR0_4364_SR_INVERT_CLK |
+					CC_SR0_4364_SR_ENABLE_HT |
+					CC_SR0_4364_SR_ALLOW_PIC |
+					CC_SR0_4364_SR_PMU_MEM_DISABLE |
+					CC_SR0_4364_SR_ENG_EN_MASK);
+				}
 #endif /* SAVERESTORE */
-		}
-		break;
-	}
-	case PMU_4364_RSDB_MODE:
-	default:
-	{
-		if (CHIPID(sih->chip) == BCM4364_CHIP_ID) {
-			W_REG(osh, &pmu->res_table_sel, RES4364_SR_SAVE_RESTORE);
-			W_REG(osh, &pmu->res_updn_timer,
-				  PMU_4364_SAVE_RESTORE_UPDNTIME_3x3);
-			/* Change the dependency table only if required */
-			if ((max_mask != PMU_4364_MAX_MASK_3x3) ||
-					(max_mask != PMU_4364_MAX_MASK_RSDB)) {
-				pmu_res_depend_table =
-					bcm4364a0_res_depend_rsdb;
-				pmu_res_depend_table_sz =
-					ARRAYSIZE(bcm4364a0_res_depend_rsdb);
-				max_mask = PMU_4364_MAX_MASK_RSDB;
 			}
-#if defined(SAVERESTORE)
-			if (SR_ENAB()) {
-				/* Enable 3x3 SR engine */
-				W_REG(osh, &cc->sr1_control0,
-					  CC_SR0_4364_SR_ENG_CLK_EN |
-					  CC_SR0_4364_SR_RSRC_TRIGGER |
-					  CC_SR0_4364_SR_WD_MEM_MIN_DIV |
-					  CC_SR0_4364_SR_INVERT_CLK |
-					  CC_SR0_4364_SR_ENABLE_HT |
-					  CC_SR0_4364_SR_ALLOW_PIC |
-					  CC_SR0_4364_SR_PMU_MEM_DISABLE |
-					  CC_SR0_4364_SR_ENG_EN_MASK);
-			}
-#endif /* SAVERESTORE */
+			break;
 		}
-		break;
-	}
 	}
 	si_pmu_resdeptbl_upd(sih, osh, pmu, pmu_res_depend_table, pmu_res_depend_table_sz);
 	W_REG(osh, &pmu->max_res_mask, max_mask);
@@ -270,13 +270,13 @@ si_pmu_ulp_enter_cb(void *handle, ulp_ext_info_t *einfo, uint8 *cache_data)
 
 static int
 si_pmu_ulp_exit_cb(void *handle, uint8 *cache_data,
-				   uint8 *p2_cache_data)
+	uint8 *p2_cache_data)
 {
 	si_pmu_ulp_cr_dat_t *crinfo = (si_pmu_ulp_cr_dat_t *)cache_data;
 
 	ilpcycles_per_sec = crinfo->ilpcycles_per_sec;
 	ULP_DBG(("%s: ilpcycles_per_sec: %x, cache_data: %p\n", __FUNCTION__,
-			 ilpcycles_per_sec, cache_data));
+		ilpcycles_per_sec, cache_data));
 	return BCME_OK;
 }
 
@@ -290,14 +290,14 @@ si_pmu_ulp_chipconfig(si_t *sih, osl_t *osh)
 	if (CHIPID(sih->chip) == BCM43012_CHIP_ID) {
 		/* DS1 reset and clk enable init value config */
 		si_pmu_chipcontrol(sih, PMU_CHIPCTL14, ~0x0,
-						   (PMUCCTL14_43012_ARMCM3_RESET_INITVAL |
-							PMUCCTL14_43012_DOT11MAC_CLKEN_INITVAL |
-							PMUCCTL14_43012_SDIOD_RESET_INIVAL |
-							PMUCCTL14_43012_SDIO_CLK_DMN_RESET_INITVAL |
-							PMUCCTL14_43012_SOCRAM_CLKEN_INITVAL |
-							PMUCCTL14_43012_M2MDMA_RESET_INITVAL |
-							PMUCCTL14_43012_DOT11MAC_PHY_CLK_EN_INITVAL |
-							PMUCCTL14_43012_DOT11MAC_PHY_CNTL_EN_INITVAL));
+			(PMUCCTL14_43012_ARMCM3_RESET_INITVAL |
+			PMUCCTL14_43012_DOT11MAC_CLKEN_INITVAL |
+			PMUCCTL14_43012_SDIOD_RESET_INIVAL |
+			PMUCCTL14_43012_SDIO_CLK_DMN_RESET_INITVAL |
+			PMUCCTL14_43012_SOCRAM_CLKEN_INITVAL |
+			PMUCCTL14_43012_M2MDMA_RESET_INITVAL |
+			PMUCCTL14_43012_DOT11MAC_PHY_CLK_EN_INITVAL |
+			PMUCCTL14_43012_DOT11MAC_PHY_CNTL_EN_INITVAL));
 
 		/* Clear SFlash clock request and enable High Quality clock */
 		CHIPC_REG(sih, clk_ctl_st, CCS_SFLASH_CLKREQ | CCS_HQCLKREQ, CCS_HQCLKREQ);
@@ -307,8 +307,8 @@ si_pmu_ulp_chipconfig(si_t *sih, osl_t *osh)
 
 		/* Force power switch off */
 		si_pmu_chipcontrol(sih, PMU_CHIPCTL2,
-						   (PMUCCTL02_43012_SUBCORE_PWRSW_FORCE_ON |
-							PMUCCTL02_43012_PHY_PWRSW_FORCE_ON), 0);
+				(PMUCCTL02_43012_SUBCORE_PWRSW_FORCE_ON |
+				PMUCCTL02_43012_PHY_PWRSW_FORCE_ON), 0);
 
 	}
 }
@@ -354,12 +354,12 @@ si_pmu_ds1_res_init(si_t *sih, osl_t *osh)
 	while (pmu_res_updown_table_sz--) {
 		ASSERT(pmu_res_updown_table != NULL);
 		PMU_MSG(("DS1: Changing rsrc %d res_updn_timer to 0x%x\n",
-				 pmu_res_updown_table[pmu_res_updown_table_sz].resnum,
-				 pmu_res_updown_table[pmu_res_updown_table_sz].updown));
+			pmu_res_updown_table[pmu_res_updown_table_sz].resnum,
+			pmu_res_updown_table[pmu_res_updown_table_sz].updown));
 		W_REG(osh, &pmu->res_table_sel,
-			  pmu_res_updown_table[pmu_res_updown_table_sz].resnum);
+			pmu_res_updown_table[pmu_res_updown_table_sz].resnum);
 		W_REG(osh, &pmu->res_updn_timer,
-			  pmu_res_updown_table[pmu_res_updown_table_sz].updown);
+			pmu_res_updown_table[pmu_res_updown_table_sz].updown);
 	}
 
 	/* Return to original core */
@@ -423,10 +423,10 @@ si_pmu_fast_lpo_disable(si_t *sih)
 	}
 
 	PMU_REG(sih, pmucontrol_ext,
-			PCTL_EXT_FASTLPO_ENAB |
-			PCTL_EXT_FASTLPO_SWENAB |
-			PCTL_EXT_FASTLPO_PCIE_SWENAB,
-			0);
+		PCTL_EXT_FASTLPO_ENAB |
+		PCTL_EXT_FASTLPO_SWENAB |
+		PCTL_EXT_FASTLPO_PCIE_SWENAB,
+		0);
 	OSL_DELAY(1000);
 	return BCME_OK;
 }
@@ -464,9 +464,9 @@ si_pmustatstimer_update(osl_t *osh, pmuregs_t *pmu, uint8 timerid)
 	W_REG(osh, &pmu->pmu_statstimer_addr, timerid);
 	stats_timer_ctrl =
 		((pmustatstimer[timerid].src_num << PMU_ST_SRC_SHIFT) &
-		 PMU_ST_SRC_MASK) |
+			PMU_ST_SRC_MASK) |
 		((pmustatstimer[timerid].cnt_mode << PMU_ST_CNT_MODE_SHIFT) &
-		 PMU_ST_CNT_MODE_MASK) |
+			PMU_ST_CNT_MODE_MASK) |
 		((pmustatstimer[timerid].enable << PMU_ST_EN_SHIFT) & PMU_ST_EN_MASK) |
 		((pmustatstimer[timerid].int_enable << PMU_ST_INT_EN_SHIFT) & PMU_ST_INT_EN_MASK);
 	W_REG(osh, &pmu->pmu_statstimer_ctrl, stats_timer_ctrl);
@@ -577,9 +577,9 @@ si_pmustatstimer_dump(si_t *sih)
 	ILPPeriod = R_REG(osh, &pmu->ILPPeriod);
 
 	max_stats_timer_num = ((core_cap_ext & PCAP_EXT_ST_NUM_MASK) >>
-						   PCAP_EXT_ST_NUM_SHIFT) + 1;
+		PCAP_EXT_ST_NUM_SHIFT) + 1;
 	max_stats_timer_src_num = ((core_cap_ext & PCAP_EXT_ST_SRC_NUM_MASK) >>
-							   PCAP_EXT_ST_SRC_NUM_SHIFT) + 1;
+		PCAP_EXT_ST_SRC_NUM_SHIFT) + 1;
 
 	pmuintstatus = R_REG(osh, &pmu->pmuintstatus);
 	pmuintmask0 = R_REG(osh, &pmu->pmuintmask0);
@@ -587,18 +587,18 @@ si_pmustatstimer_dump(si_t *sih)
 	PMU_ERROR(("%s : TIME %d\n", __FUNCTION__, current_time_ms));
 
 	PMU_ERROR(("\tMAX Timer Num %d, MAX Source Num %d\n",
-			   max_stats_timer_num, max_stats_timer_src_num));
+		max_stats_timer_num, max_stats_timer_src_num));
 	PMU_ERROR(("\tpmucapabilities 0x%8x, core_cap_ext 0x%8x, AlpPeriod 0x%8x, ILPPeriod 0x%8x, "
-			   "pmuintmask0 0x%8x, pmuintstatus 0x%8x, pmurev %d\n",
-			   pmucapabilities, core_cap_ext, AlpPeriod, ILPPeriod,
-			   pmuintmask0, pmuintstatus, PMUREV(sih->pmurev)));
+		"pmuintmask0 0x%8x, pmuintstatus 0x%8x, pmurev %d\n",
+		pmucapabilities, core_cap_ext, AlpPeriod, ILPPeriod,
+		pmuintmask0, pmuintstatus, PMUREV(sih->pmurev)));
 
 	for (i = 0; i < max_stats_timer_num; i++) {
 		W_REG(osh, &pmu->pmu_statstimer_addr, i);
 		stat_timer_ctrl = R_REG(osh, &pmu->pmu_statstimer_ctrl);
 		stat_timer_N = R_REG(osh, &pmu->pmu_statstimer_N);
 		PMU_ERROR(("\t Timer %d : control 0x%8x, %d\n",
-				   i, stat_timer_ctrl, stat_timer_N));
+			i, stat_timer_ctrl, stat_timer_N));
 	}
 
 	/* Return to original core */

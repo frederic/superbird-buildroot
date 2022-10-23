@@ -11,6 +11,7 @@
 /* #include <mach/register.h> */
 /* #include <mach/am_regs.h> */
 #define CONFIG_DTB_SIZE  (256*1024U)
+#define CONFIG_DDR_PARAMETER_SIZE  SZ_2M
 #define DTB_CELL_SIZE	(16*1024U)
 #define	STORE_CODE				1
 #define	STORE_CACHE				(1<<1)
@@ -22,6 +23,7 @@
 /* MMC Partition Table */
 #define     MMC_PARTITIONS_MAGIC            "MPT"
 #define     MMC_RESERVED_NAME               "reserved"
+#define     MMC_TUNING_NAME                 "tuning"
 
 #define     SZ_1M                           0x00100000
 
@@ -35,6 +37,7 @@
 #define	MMC_DTB_OFFSET			((SZ_1M*(36+4))/512)
 /* the size of bootloader partition */
 #define     MMC_BOOT_PARTITION_SIZE         (4*SZ_1M)
+#define     MMC_TUNING_OFFSET                0X14400
 
 /* the size of reserve space behind bootloader partition */
 #define     MMC_BOOT_PARTITION_RESERVED     (32*SZ_1M)

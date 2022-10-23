@@ -67,17 +67,17 @@ static FILE *fpLog  = NULL;
 static pthread_mutex_t s_log_mutex;
 #endif
 
-debug_log_level_t g_log_level = ERR;
+debug_log_level_t g_vp5_log_level = ERR;
 
 void vp5_set_log_level(debug_log_level_t level)
 {
     char *log_level = getenv("VP5_LOG_LEVEL");
     if (log_level) {
-        g_log_level = (debug_log_level_t)atoi(log_level);
-	printf("Set log level by environment to %d\n", g_log_level);
+        g_vp5_log_level = (debug_log_level_t)atoi(log_level);
+        printf("Set log level by environment to %d\n", g_vp5_log_level);
     } else {
-        g_log_level = level;
-	printf("Set log level to %d\n", g_log_level);
+        g_vp5_log_level = level;
+        printf("Set log level to %d\n", g_vp5_log_level);
     }
     return;
 }

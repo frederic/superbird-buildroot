@@ -5,7 +5,7 @@
  * IEEE Std 802.1X-2001
  * IEEE 802.1X RADIUS Usage Guidelines
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -28,7 +28,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: eapol.h 767212 2018-06-13 00:17:23Z $
+ * $Id: eapol.h 809460 2019-03-14 00:35:24Z $
  */
 
 #ifndef _eapol_h_
@@ -125,15 +125,29 @@ typedef BWL_PRE_PACKED_STRUCT struct {
 #define EAPOL_WPA_PMK_SHA384_LEN        48u
 #define EAPOL_WPA_PMK_DEFAULT_LEN	32u
 #define EAPOL_WPA_KCK_DEFAULT_LEN	16u
+#define EAPOL_WPA_KCK_SHA384_LEN	24u
 #define EAPOL_WPA_KCK_MIC_DEFAULT_LEN	16u
+#define EAPOL_WPA_KCK_MIC_SHA384_LEN	24u
 #define EAPOL_WPA_ENCR_KEY_DEFAULT_LEN	16u
+
+#define EAPOL_WPA_KEK2_SHA256_LEN	16u
+#define EAPOL_WPA_KEK2_SHA384_LEN	32u
+#define EAPOL_WPA_KCK2_SHA256_LEN	16u
+#define EAPOL_WPA_KCK2_SHA384_LEN	24u
 
 #ifndef EAPOL_KEY_HDR_VER_V2
 #define EAPOL_WPA_KEY_MIC_LEN		16u /* deprecated */
 #define EAPOL_WPA_KEY_LEN		95u /* deprecated */
 #endif // endif
 
+#define EAPOL_PTK_KEY_MAX_LEN	(EAPOL_WPA_KEY_MAX_MIC_LEN +\
+				EAPOL_WPA_ENCR_KEY_MAX_LEN +\
+				EAPOL_WPA_TEMP_ENCR_KEY_MAX_LEN +\
+				EAPOL_WPA_KCK2_SHA384_LEN +\
+				EAPOL_WPA_KEK2_SHA384_LEN)
+
 #ifndef EAPOL_KEY_HDR_VER_V2
+
 /* WPA EAPOL-Key : deprecated */
 typedef BWL_PRE_PACKED_STRUCT struct {
 	unsigned char type;		/* Key Descriptor Type */
@@ -196,6 +210,8 @@ typedef eapol_wpa_key_header_v2_t eapol_wpa_key_header_t;
 #define WPA_KEY_SECURE		0x200
 #define WPA_KEY_ERROR		0x400
 #define WPA_KEY_REQ		0x800
+#define WPA_KEY_ENC_KEY_DATA	0x01000		/* Encrypted Key Data */
+#define WPA_KEY_SMK_MESSAGE	0x02000		/* SMK Message */
 #define WPA_KEY_DESC_VER(_ki)   ((_ki) & 0x03u)
 
 #define WPA_KEY_DESC_V2_OR_V3 WPA_KEY_DESC_V2

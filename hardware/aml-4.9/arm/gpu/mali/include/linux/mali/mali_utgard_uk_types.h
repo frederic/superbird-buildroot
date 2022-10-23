@@ -108,6 +108,7 @@ typedef enum {
 	_MALI_UK_DUMP_MMU_PAGE_TABLE,            /**< _mali_ukk_mem_dump_mmu_page_table() */
 	_MALI_UK_DMA_BUF_GET_SIZE,               /**< _mali_ukk_dma_buf_get_size() */
 	_MALI_UK_MEM_WRITE_SAFE,                 /**< _mali_uku_mem_write_safe() */
+	_MALI_UK_MESON_UPDATE_VIDEO_TEXTURE,     /**< _mali_uku_meson_update_video_texture() */
 
 	/** Common functions for each core */
 
@@ -823,6 +824,11 @@ typedef struct {
 	u32 flags;                                      /**< [in] see_MALI_MEMORY_BIND_BACKEND_* */
 	u32 vaddr;                                      /**<  [in] identifier for mapped memory object in kernel space  */
 } _mali_uk_unbind_mem_s;
+
+typedef struct {
+	u64 ctx;                                        /**< [in,out] user-kernel context (trashed on output) */
+	s32 fd;                                      /**<  [in] dma fd  */
+} _meson_update_video_texture_s;
 
 typedef struct {
 	u64 ctx;                                        /**< [in,out] user-kernel context (trashed on output) */

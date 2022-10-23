@@ -13,43 +13,33 @@
  *
  *****************************************************************************/
 
-#ifndef __HAL_PHY_RF_H__
-#define __HAL_PHY_RF_H__
+#ifndef __HALPHYRF_H__
+#define __HALPHYRF_H__
 
 #if (RTL8814A_SUPPORT == 1)
-    #if RT_PLATFORM == PLATFORM_MACOSX
-        #include "rtl8814a/halrf_iqk_8814a.h"
-    #else
-        #include "halrf/rtl8814a/halrf_iqk_8814a.h"
-    #endif
+	#include "halrf/rtl8814a/halrf_iqk_8814a.h"
 #endif
 
 #if (RTL8822B_SUPPORT == 1)
-    #if RT_PLATFORM == PLATFORM_MACOSX
-        #include "rtl8822b/halrf_iqk_8822b.h"
-        #include "../../MAC/Halmac_type.h"
-    #else
-        #include "halrf/rtl8822b/halrf_iqk_8822b.h"
-        #include "../mac/Halmac_type.h"
-    #endif
+	#include "halrf/rtl8822b/halrf_iqk_8822b.h"
+	#include "../mac/Halmac_type.h"
 #endif
-
-#if RT_PLATFORM == PLATFORM_MACOSX
-    #include "halrf_powertracking_win.h"
-    #include "halrf_kfree.h"
-    #include "halrf_txgapcal.h"
-#else
-    #include "halrf/halrf_powertracking_win.h"
-    #include "halrf/halrf_kfree.h"
-    #include "halrf/halrf_txgapcal.h"
-#endif
-
+#include "halrf/halrf_powertracking_win.h"
+#include "halrf/halrf_kfree.h"
+#include "halrf/halrf_txgapcal.h"
 #if (RTL8821C_SUPPORT == 1)
-    #if RT_PLATFORM == PLATFORM_MACOSX
-        #include "rtl8821c/halrf_iqk_8821c.h"
-    #else
-        #include "halrf/rtl8821c/halrf_iqk_8821c.h"
-    #endif
+	#include "halrf/rtl8821c/halrf_iqk_8821c.h"
+#endif
+
+#if (RTL8195B_SUPPORT == 1)
+//	#include "halrf/rtl8195b/halrf.h"
+	#include "halrf/rtl8195b/halrf_iqk_8195b.h"
+	#include "halrf/rtl8195b/halrf_txgapk_8195b.h"
+	#include "halrf/rtl8195b/halrf_dpk_8195b.h"
+#endif
+
+#if (RTL8814B_SUPPORT == 1)
+	#include "halrf/rtl8814b/halrf_iqk_8814b.h"
 #endif
 
 enum spur_cal_method {
@@ -63,12 +53,14 @@ enum pwrtrack_method {
 	MIX_MODE,
 	TSSI_MODE,
 	MIX_2G_TSSI_5G_MODE,
-	MIX_5G_TSSI_2G_MODE
+	MIX_5G_TSSI_2G_MODE,
+	CLEAN_MODE
 };
 
 typedef void(*func_set_pwr)(void *, enum pwrtrack_method, u8, u8);
 typedef void(*func_iqk)(void *, u8, u8, u8);
 typedef void(*func_lck)(void *);
+typedef void(*func_tssi_dck)(void *, u8);
 typedef void(*func_swing)(void *, u8 **, u8 **, u8 **, u8 **);
 typedef void(*func_swing8814only)(void *, u8 **, u8 **, u8 **, u8 **);
 typedef void (*func_swing_xtal)(void *, s8 **, s8 **);
@@ -85,7 +77,8 @@ struct txpwrtrack_cfg {
 	u32		thermal_reg_addr;
 	func_set_pwr	odm_tx_pwr_track_set_pwr;
 	func_iqk	do_iqk;
-	func_lck		phy_lc_calibrate;
+	func_lck	phy_lc_calibrate;
+	func_tssi_dck	do_tssi_dck;
 	func_swing	get_delta_swing_table;
 	func_swing8814only	get_delta_swing_table8814only;
 	func_swing_xtal			get_delta_swing_xtal_table;
@@ -114,7 +107,10 @@ odm_txpowertracking_callback_thermal_meter(
 #endif
 );
 
-
+#if (RTL8822C_SUPPORT == 1 || RTL8814B_SUPPORT == 1)
+void
+odm_txpowertracking_new_callback_thermal_meter(void *dm_void);
+#endif
 
 #define ODM_TARGET_CHNL_NUM_2G_5G	59
 
@@ -132,4 +128,4 @@ void odm_iq_calibrate(struct dm_struct	*dm);
 void phydm_rf_init(struct dm_struct		*dm);
 void phydm_rf_watchdog(struct dm_struct		*dm);
 
-#endif	/*  #ifndef __HAL_PHY_RF_H__ */
+#endif	/*#ifndef __HALPHYRF_H__*/

@@ -27,6 +27,7 @@
 //#include <cutils/bitops.h>
 
 #include "audio_effect.h"
+#if 1
 
 
 __BEGIN_DECLS
@@ -308,3 +309,4 @@ typedef struct audio_effect_library_s {
 __END_DECLS
 
 #endif  // ANDROID_AUDIO_EFFECT_H
+#endif

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_IPC_SYSTEM_SERVICE
+  bool "ipc system service"
+
+  help
+     ipc system service

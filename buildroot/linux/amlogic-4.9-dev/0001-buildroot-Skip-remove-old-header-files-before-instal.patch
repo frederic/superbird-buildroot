@@ -1,0 +1,37 @@
+From 1ea254bdc2878373051a8ecd25b62bda903edb3e Mon Sep 17 00:00:00 2001
+From: Blance Tang <guofeng.tang@amlogic.com>
+Date: Mon, 23 Dec 2019 13:24:28 +0800
+Subject: [PATCH] buildroot: Skip remove old header files before install header
+ files [1/1]
+
+PD#SWPL-
+
+Problem:
+
+Solution:
+
+Verify:
+  Local
+
+Change-Id: I540b09061c216e57600e7a39d9c684929d8e2716
+Signed-off-by: Blance Tang <guofeng.tang@amlogic.com>
+---
+ scripts/Makefile.headersinst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/Makefile.headersinst b/scripts/Makefile.headersinst
+index 1106d6c..2671977c 100644
+--- a/scripts/Makefile.headersinst
++++ b/scripts/Makefile.headersinst
+@@ -68,7 +68,7 @@ input-files3-name := $(notdir $(input-files3))
+ 
+ # Work out what needs to be removed
+ oldheaders    := $(patsubst $(installdir)/%,%,$(wildcard $(installdir)/*.h))
+-unwanted      := $(filter-out $(all-files),$(oldheaders))
++#unwanted      := $(filter-out $(all-files),$(oldheaders))
+ 
+ # Prefix unwanted with full paths to $(INSTALL_HDR_PATH)
+ unwanted-file := $(addprefix $(installdir)/, $(unwanted))
+-- 
+2.7.4
+

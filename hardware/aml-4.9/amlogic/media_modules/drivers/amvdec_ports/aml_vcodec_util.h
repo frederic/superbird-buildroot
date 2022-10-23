@@ -24,74 +24,72 @@
 #include <linux/dma-direction.h>
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 
-#define DEBUG
-
-typedef unsigned long long u64;
-typedef signed long long s64;
-typedef unsigned int u32;
-typedef unsigned short int u16;
-typedef short int s16;
-typedef unsigned char u8;
+typedef unsigned long long	u64;
+typedef signed long long	s64;
+typedef unsigned int		u32;
+typedef unsigned short int	u16;
+typedef short int		s16;
+typedef unsigned char		u8;
 
 #define CODEC_MODE(a, b, c, d)\
 	(((u8)(a) << 24) | ((u8)(b) << 16) | ((u8)(c) << 8) | (u8)(d))
 
+#define BUFF_IDX(h, i)\
+	(((ulong)(h) << 8) | (u8)(i))
+
 struct aml_vcodec_mem {
+	int	index;
 	ulong	addr;
 	u32	size;
 	void	*vaddr;
 	u32	bytes_used;
 	u32	offset;
 	dma_addr_t dma_addr;
+	u32	model;
 };
 
 struct aml_vcodec_ctx;
 struct aml_vcodec_dev;
 
-extern int aml_v4l2_dbg_level;
-extern bool aml_vcodec_dbg;
+extern u32 debug_mode;
 
-
-#if defined(DEBUG)
-
-#define aml_v4l2_debug(level, fmt, args...)				\
-	do {								\
-		if (aml_v4l2_dbg_level >= level)			\
-			pr_info(fmt "\n", ##args);			\
-	} while (0)
-
-#define aml_v4l2_debug_enter()  aml_v4l2_debug(3, "+")
-#define aml_v4l2_debug_leave()  aml_v4l2_debug(3, "-")
-
-#define aml_vcodec_debug(h, fmt, args...)				\
-	do {								\
-		if (aml_vcodec_dbg)					\
-			pr_info("[%d]: %s() " fmt "\n",			\
-				((struct aml_vcodec_ctx *)h->ctx)->id,	\
-				__func__, ##args);			\
-	} while (0)
-
-#define aml_vcodec_debug_enter(h)  aml_vcodec_debug(h, "+")
-#define aml_vcodec_debug_leave(h)  aml_vcodec_debug(h, "-")
-
-#else
-
-#define aml_v4l2_debug(level, fmt, args...)
-#define aml_v4l2_debug_enter()
-#define aml_v4l2_debug_leave()
-
-#define aml_vcodec_debug(h, fmt, args...)
-#define aml_vcodec_debug_enter(h)
-#define aml_vcodec_debug_leave(h)
-
+#ifdef v4l_dbg
+#undef v4l_dbg
 #endif
 
-#define aml_v4l2_err(fmt, args...) \
-	pr_err("[ERR]" fmt "\n", ##args)
+/* v4l debug define. */
+#define V4L_DEBUG_CODEC_ERROR	(0)
+#define V4L_DEBUG_CODEC_PRINFO	(1 << 0)
+#define V4L_DEBUG_CODEC_STATE	(1 << 1)
+#define V4L_DEBUG_CODEC_BUFMGR	(1 << 2)
+#define V4L_DEBUG_CODEC_INPUT	(1 << 3)
+#define V4L_DEBUG_CODEC_OUTPUT	(1 << 4)
+#define V4L_DEBUG_CODEC_COUNT	(1 << 5)
+#define V4L_DEBUG_CODEC_PARSER	(1 << 6)
+#define V4L_DEBUG_CODEC_PROT	(1 << 7)
+#define V4L_DEBUG_CODEC_EXINFO	(1 << 8)
 
-#define aml_vcodec_err(h, fmt, args...)					\
-	pr_err("[ERR][%d]" fmt "\n",					\
-		((struct aml_vcodec_ctx *)h->ctx)->id, ##args)
+#define __v4l_dbg(h, id, fmt, args...)					\
+	do {								\
+		if (h)							\
+			pr_info("[%d]: " fmt, id, ##args);		\
+		else							\
+			pr_info(fmt, ##args);				\
+	} while (0)
+
+#define v4l_dbg(h, flags, fmt, args...)						\
+	do {									\
+		struct aml_vcodec_ctx *__ctx = (struct aml_vcodec_ctx *) h;	\
+		if ((flags == V4L_DEBUG_CODEC_ERROR) ||				\
+			(flags == V4L_DEBUG_CODEC_PRINFO) ||			\
+			(debug_mode & flags)) {				\
+			if (flags == V4L_DEBUG_CODEC_ERROR) {			\
+				__v4l_dbg(h, __ctx->id, "[ERR]: " fmt, ##args);	\
+			} else	{						\
+				__v4l_dbg(h, __ctx->id, fmt, ##args);		\
+			}							\
+		}								\
+	} while (0)
 
 void __iomem *aml_vcodec_get_reg_addr(struct aml_vcodec_ctx *data,
 				unsigned int reg_idx);

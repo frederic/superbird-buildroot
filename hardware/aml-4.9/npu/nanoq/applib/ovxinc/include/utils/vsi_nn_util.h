@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,6 +31,7 @@
 #include "vsi_nn_platform.h"
 #include "vsi_nn_tensor.h"
 #include "vsi_nn_types.h"
+#include "vsi_nn_context.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +44,9 @@ extern "C" {
 #ifndef _cnt_of_array
 #define _cnt_of_array( arr )            (sizeof( arr )/sizeof( arr[0] ))
 #endif
+
+#define vsi_nn_safe_free( _PTR ) if( _PTR ){ \
+    free( _PTR ); _PTR = NULL; }
 
 /*-------------------------------------------
                   Functions
@@ -239,36 +243,6 @@ OVXLIB_API const char* vsi_nn_DescribeStatus
     vsi_status status
     );
 
-#if defined(_WIN32)
-#define RTLD_LAZY   0
-#define RTLD_NOW    0
-
-#define RTLD_GLOBAL (1 << 1)
-#define RTLD_LOCAL  (1 << 2)
-
-#define RTLD_DEFAULT    ((void *)0)
-#define RTLD_NEXT       ((void *)-1)
-
-OVXLIB_API void * vsi_nn_dlopen_win32
-    (
-    const char *file,
-    int mode
-    );
-
-OVXLIB_API int vsi_nn_dlclose_win32
-    (
-    void *handle
-    );
-
-OVXLIB_API void * vsi_nn_dlsym_win32
-    (
-    void *handle,
-    const char *name
-    );
-
-OVXLIB_API char * vsi_nn_dlerror_win32(void);
-#endif
-
 uint32_t vsi_nn_compute_filter_shape
     (
     vsi_nn_pad_e padding_type,
@@ -297,6 +271,87 @@ void vsi_nn_compute_padding_conv1d
     vsi_nn_pad_e pad_type,
     uint32_t   * out_pad
     );
+
+void vsi_nn_OptimizedEltOPShape
+    (
+       vsi_nn_tensor_t * input,
+       uint32_t          sizes[VSI_NN_MAX_DIM_NUM],
+       uint32_t        * num_of_dims
+    );
+
+vsi_bool vsi_nn_OptimizedEltWiseOPShape
+    (
+    vsi_nn_tensor_t * input0,
+    vsi_nn_tensor_t * input1,
+    vsi_nn_tensor_t * output,
+    uint32_t          sizes0[VSI_NN_MAX_DIM_NUM],
+    uint32_t          sizes1[VSI_NN_MAX_DIM_NUM],
+    uint32_t          sizes2[VSI_NN_MAX_DIM_NUM],
+    uint32_t        * dim_num
+    );
+
+vsi_bool vsi_nn_IsEVISFeatureAvaiable
+    (
+    vsi_nn_context_t context
+    );
+
+int32_t vsi_nn_compareVersion
+    (
+    vsi_nn_graph_t * graph,
+    uint32_t version_major,
+    uint32_t version_minor,
+    uint32_t version_patch
+    );
+
+typedef uint32_t(*comp_func)(void* data, int32_t left, int32_t right);
+
+/**
+ * the meta function for sort/partial sort
+ * This function is the key meta function of qsort, which can be used in sort/partial sort.
+ * But you can NOT use this function directly to sort/partial sort.
+ * This function do NOT sort data itself, but sort its index.
+ *
+ * @param[in] buffer of data which will be sorted.
+ * @param[in] the left(start) index of data.
+ * @param[in] the right(end) index of data.
+ * @param[in] compare function. the meaning of return value is as same as std::sort.
+ * @param[in] recursively execute vsi_nn_partition.
+ * @param[out] the sorted index of data.
+ */
+OVXLIB_API int32_t vsi_nn_partition
+    (
+        void* data,
+        int32_t left,
+        int32_t right,
+        comp_func func,
+        vsi_bool is_recursion,
+        uint32_t* indices
+    );
+
+/**
+ * Reorder tensors
+ *
+ * @param[in]  tensors Tensor list to reorder.
+ * @param[in]  order New orders.
+ * @param[in]  num Number of tensors.
+ * @param[out] out_tensors Ordered tensors
+ * */
+static inline void vsi_nn_reorder_tensor
+    (
+    vsi_nn_tensor_t** tensors,
+    const int32_t* order,
+    size_t num,
+    vsi_nn_tensor_t** out_tensors
+    )
+{
+    size_t i;
+    for( i = 0; i < num; i++ )
+    {
+        out_tensors[i] = tensors[order[i]];
+    }
+}
+
+void vsi_nn_print_int_array( int32_t* array, size_t size );
 
 #ifdef __cplusplus
 }

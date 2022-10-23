@@ -87,6 +87,7 @@ struct loopback {
 	struct toddr *tddr;
 
 	struct loopback_chipinfo *chipinfo;
+	bool vad_running;
 };
 
 #define LOOPBACK_RATES      (SNDRV_PCM_RATE_8000_192000)
@@ -123,9 +124,17 @@ static irqreturn_t loopback_ddr_isr(int irq, void *data)
 	struct device *dev = rtd->platform->dev;
 	struct loopback *p_loopback = (struct loopback *)dev_get_drvdata(dev);
 	unsigned int status;
+	bool vad_running = vad_lb_is_running(p_loopback->id);
 
 	if (!snd_pcm_running(ss))
 		return IRQ_NONE;
+
+	if (p_loopback->vad_running != vad_running) {
+		if (p_loopback->vad_running)
+			snd_pcm_stop_xrun(ss);
+
+		p_loopback->vad_running = vad_running;
+	}
 
 	status = aml_toddr_get_status(p_loopback->tddr) & MEMIF_INT_MASK;
 	if (status & MEMIF_INT_COUNT_REPEAT) {
@@ -202,13 +211,23 @@ static int loopback_prepare(struct snd_pcm_substream *ss)
 	struct snd_pcm_runtime *runtime = ss->runtime;
 	struct loopback *p_loopback = runtime->private_data;
 	unsigned int start_addr, end_addr, int_addr;
+	unsigned int period, threshold;
 
 	start_addr = runtime->dma_addr;
-	end_addr = start_addr + runtime->dma_bytes - 8;
-	int_addr = frames_to_bytes(runtime, runtime->period_size) / 8;
+	end_addr = start_addr + runtime->dma_bytes - FIFO_BURST;
+	period	 = frames_to_bytes(runtime, runtime->period_size);
+	int_addr = period / FIFO_BURST;
 
 	if (ss->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		struct toddr *to = p_loopback->tddr;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, to->fifo_depth);
+		threshold /= 2;
+		aml_toddr_set_fifos(to, threshold);
 
 		aml_toddr_set_buf(to, start_addr, end_addr);
 		aml_toddr_set_intrpt(to, int_addr);
@@ -580,10 +599,8 @@ static int loopback_set_ctrl(struct loopback *p_loopback, int bitwidth)
 		datain_cfg.type       = datain_toddr_type;
 		datain_cfg.m          = datain_msb;
 		datain_cfg.n          = datain_lsb;
-		datalb_cfg.datalb_src  = 0; /* todo: tdmin_LB */
-		/* get resample B status */
-		datalb_cfg.resample_enable =
-			(unsigned int)get_resample_enable(RESAMPLE_B);
+		datain_cfg.src        = p_loopback->datain_src;
+
 		lb_set_datain_cfg(p_loopback->id, &datain_cfg);
 	}
 
@@ -616,7 +633,10 @@ static int loopback_set_ctrl(struct loopback *p_loopback, int bitwidth)
 		datalb_cfg.type        = datalb_toddr_type;
 		datalb_cfg.m           = datalb_msb;
 		datalb_cfg.n           = datalb_lsb;
-		datalb_cfg.datalb_src  = p_loopback->datalb_src;
+		datalb_cfg.datalb_src  = 0; /* todo: tdmin_LB */
+		/* get resample B status */
+		datalb_cfg.resample_enable =
+			(unsigned int)get_resample_enable(RESAMPLE_B);
 
 		lb_set_datalb_cfg(p_loopback->id, &datalb_cfg);
 	}
@@ -707,7 +727,6 @@ static int loopback_dai_prepare(
 
 		aml_toddr_select_src(to, src);
 		aml_toddr_set_format(to, &fmt);
-		aml_toddr_set_fifos(to, 0x40);
 
 		if (p_loopback->datain_chnum > 0) {
 			switch (p_loopback->datain_src) {
@@ -884,7 +903,6 @@ static int loopback_dai_hw_params(
 	struct snd_pcm_hw_params *params,
 	struct snd_soc_dai *dai)
 {
-	struct snd_pcm_runtime *runtime = ss->runtime;
 	struct loopback *p_loopback = snd_soc_dai_get_drvdata(dai);
 	unsigned int rate, channels;
 	snd_pcm_format_t format;
@@ -928,7 +946,7 @@ static int loopback_dai_hw_params(
 			break;
 		}
 	}
-	loopback_set_clk(p_loopback, runtime->rate, true);
+	loopback_set_clk(p_loopback, rate, true);
 
 	return ret;
 }

@@ -14,13 +14,14 @@ LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../vpuapi
 
 LOCAL_SRC_FILES := \
-	aml_v4l2.cpp libvpmulti_codec.cpp AML_MultiEncoder.cpp 
+	libvpmulti_codec.c AML_MultiEncoder.c #aml_v4l2 
 
 LOCAL_ARM_MODE := arm
 LOCAL_SHARED_LIBRARIES += libutils libcutils libamvenc_api
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
+LOCAL_CFLAGS=-Wno-error
 LOCAL_MODULE := libvpcodec
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_TAGS := optional

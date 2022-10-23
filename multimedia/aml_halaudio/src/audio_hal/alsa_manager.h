@@ -46,8 +46,6 @@ size_t aml_alsa_input_read(void *handle, void *buffer, size_t bytes);
 
 void aml_alsa_init(cJSON * config);
 
-
-
-
+bool aml_audio_hw_type_parser_init(cJSON * config);
 
 #endif // _ALSA_MANAGER_H_

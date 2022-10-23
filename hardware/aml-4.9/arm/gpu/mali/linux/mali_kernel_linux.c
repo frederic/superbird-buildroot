@@ -1011,6 +1011,11 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 		err = mem_free_wrapper(session_data, (_mali_uk_free_mem_s __user *)arg);
 		break;
 
+	case MALI_IOC_MESON_UPDATE_VIDEO_TEXTURE:
+		BUILD_BUG_ON(!IS_ALIGNED(sizeof(_meson_update_video_texture_s), sizeof(s32)));
+		err = meson_mem_start_wrapper(session_data, (_meson_update_video_texture_s __user *)arg);
+		break;
+
 	case MALI_IOC_MEM_BIND:
 		BUILD_BUG_ON(!IS_ALIGNED(sizeof(_mali_uk_bind_mem_s), sizeof(u64)));
 		err = mem_bind_wrapper(session_data, (_mali_uk_bind_mem_s __user *)arg);

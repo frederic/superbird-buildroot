@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "g12a_u212_rdk.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesong12a_u212/initramfs/ramfslist-32"

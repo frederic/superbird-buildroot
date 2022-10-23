@@ -1,0 +1,104 @@
+From 20d631ea4e743bb7576246990c0c922f3102369a Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Sat, 9 May 2020 20:01:28 +0800
+Subject: [PATCH] optimze the display mode change behavior, make display
+ refrash immediately
+
+---
+ libweston/compositor-drm.c | 49 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index 38b1e13..03a47f8 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -4169,8 +4169,7 @@ drm_output_switch_mode(struct weston_output *output_base, struct weston_mode *mo
+ 	 */
+ 	b->state_invalid = true;
+ #ifdef FIX_UI_SIZE_FOR_4K
+-	//sleep is a workaround for wait for drm hdmi driver.
+-	sleep(2);
++	weston_log("switch mode , need next commit effect new mode\n");
+ 	//nothing need todo on fix ui mode
+ 	return 0;
+ #endif
+@@ -6278,9 +6277,48 @@ drm_output_print_modes(struct drm_output *output)
+ 
+ 
+ #ifdef ENABLE_DRM_HELP
++struct wl_event_source *drm_helper_timer = NULL;
++static int drm_helper_timeout(void *data) {
++	weston_log("drm helper timer fire");
++	return 0;
++}
++
++static int drm_helper_create_helper_timer(struct weston_compositor *compositor) {
++	struct wl_event_loop *loop = NULL;
++	loop = wl_display_get_event_loop(compositor->wl_display);
++	assert(loop);
++
++	drm_helper_timer = wl_event_loop_add_timer(loop,
++			drm_helper_timeout,
++			NULL);
++
++	if (drm_helper_timer == NULL) {
++		weston_log("creating drm helper timer failed: %s\n",
++			   strerror(errno));
++		return -1;
++	}
++}
++
++static int drm_helper_remove_helper_timer() {
++	if (drm_helper_timer != NULL) {
++		wl_event_source_remove(drm_helper_timer);
++		drm_helper_timer = NULL;
++	}
++}
++
++static void drm_output_refresh_force(struct weston_compositor *compositor) {
++	weston_compositor_damage_all(compositor);
++	if (drm_helper_timer == NULL) {
++		weston_log("drm helper timer create failed, can't update ouput immediate.\n");
++		return;
++	}
++	//trigger a wl_event_loop_dispatch_idle
++	wl_event_source_timer_update(drm_helper_timer, 16);
++}
+ static int drm_output_switch_mode_helper(output_ctx ctx, drm_helper_mode* mode) {
+ 	struct weston_mode m;
+ 	int ratio = 0;
++	int ret = 0;
+ 	m.width = mode->width;
+ 	m.height = mode->height;
+ 	m.refresh = mode->refresh * 1000;
+@@ -6293,7 +6331,10 @@ static int drm_output_switch_mode_helper(output_ctx ctx, drm_helper_mode* mode)
+ 			break;
+ 		}
+ 	}
+-	return weston_output_mode_set_native((struct weston_output *)ctx, &m, ((struct weston_output *)ctx)->current_scale);
++	ret = weston_output_mode_set_native((struct weston_output *)ctx, &m, ((struct weston_output *)ctx)->current_scale);
++	drm_output_refresh_force(((struct weston_output *)ctx)->compositor);
++
++	return ret;
+ }
+ #endif
+ 
+@@ -6875,6 +6916,7 @@ drm_destroy(struct weston_compositor *ec)
+ {
+ 
+ #ifdef ENABLE_DRM_HELP
++	drm_helper_remove_helper_timer();
+ 	stop_help_worker();
+ #endif
+ 	struct drm_backend *b = to_drm_backend(ec);
+@@ -7705,6 +7747,7 @@ drm_backend_create(struct weston_compositor *compositor,
+ 
+ #ifdef ENABLE_DRM_HELP
+ 	start_help_worker(b->drm.fd, b->atomic_modeset);
++	drm_helper_create_helper_timer(compositor);
+ #endif
+ 
+ 	if (drm_backend_create_heads(b, drm_device) < 0) {
+-- 
+2.26.1
+

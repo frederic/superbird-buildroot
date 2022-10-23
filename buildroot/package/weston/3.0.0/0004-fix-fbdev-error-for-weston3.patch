@@ -1,0 +1,55 @@
+Index: weston-3.0.0/libweston/compositor-fbdev.c
+===================================================================
+--- weston-3.0.0.orig/libweston/compositor-fbdev.c	2017-08-18 18:11:45.347923430 +0800
++++ weston-3.0.0/libweston/compositor-fbdev.c	2017-08-18 18:24:23.636896347 +0800
+@@ -371,6 +371,7 @@
+ 	return fd;
+ }
+ 
++#ifdef BUILD_USE_PIXMAN
+ /* Closes the FD on success or failure. */
+ static int
+ fbdev_frame_buffer_map(struct fbdev_output *output, int fd)
+@@ -414,6 +415,7 @@
+ 
+ 	return retval;
+ }
++#endif
+ 
+ static void
+ fbdev_frame_buffer_destroy(struct fbdev_output *output)
+@@ -428,7 +430,7 @@
+ }
+ 
+ static void fbdev_output_destroy(struct weston_output *base);
+-static void fbdev_output_disable(struct weston_output *base);
++static int fbdev_output_disable(struct weston_output *base);
+ 
+ static int
+ fbdev_output_enable(struct weston_output *base)
+@@ -509,7 +511,7 @@
+ 
+ 	output->base.name = strdup("fbdev");
+ 	output->base.destroy = fbdev_output_destroy;
+-	output->base.disable = NULL;
++	output->base.disable = fbdev_output_disable;
+ 	output->base.enable = fbdev_output_enable;
+ 
+ 	weston_output_init(&output->base, backend->compositor);
+@@ -638,7 +640,7 @@
+ /* NOTE: This leaves output->fb_info populated, caching data so that if
+  * fbdev_output_reenable() is called again, it can determine whether a mode-set
+  * is needed. */
+-static void
++static int
+ fbdev_output_disable(struct weston_output *base)
+ {
+ #ifdef BUILD_USE_PIXMAN
+@@ -653,6 +655,7 @@
+ 
+ 	fbdev_frame_buffer_destroy(output);
+ #endif
++        return 0;
+ }
+ 
+ static void

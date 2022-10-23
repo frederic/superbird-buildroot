@@ -66,11 +66,18 @@ else
 	COBALT_ENABLE_WIDEVINE_CE_CDM="echo compile without widevine support"
 endif
 
+ifeq ($(BR2_PACKAGE_YOUTUBESIGN_BIN), y)
+	COBALT_DEPENDENCIES += youtubesign-bin
+endif
+
+
 ifeq ($(BR2_PACKAGE_COBALT_UPDATE_PREBUILD), y)
 	COBALT_UPDATE_PREBUILD_CMDS = $(TARGET_STRIP) -s $(COBALT_OUT_DIR)/cobalt -o $(COBALT_PREBUILT_DIRECTORY)/cobalt;
 	COBALT_UPDATE_PREBUILD_CMDS += cp -afT $(COBALT_OUT_DIR)/content $(COBALT_PREBUILT_DIRECTORY)/../content;
 endif
-
+ifeq ($(BR2_PACKAGE_MESON_MALI_WAYLAND_DRM_EGL), y)
+TOOLCHAIN_EXTERNAL_CFLAGS+=-DAML_OSD_USE_DRM=ON
+endif
 COBALT_CFLAGS="$(TOOLCHAIN_EXTERNAL_CFLAGS)"
 #COBALT_CFLAGS="-mcpu=cortex-a9 -mabi=aapcs-linux -mfloat-abi=softfp -marm  -msoft-float "
 

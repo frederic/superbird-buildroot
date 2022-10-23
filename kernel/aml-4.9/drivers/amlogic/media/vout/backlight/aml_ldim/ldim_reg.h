@@ -105,6 +105,21 @@
 /* LD_CFG_BASE */
 #define REG_LD_BLMAT_RAM_MISC           0xf
 
+/* each base has 16 address space */
+/******  TM2  ******/
+#define REG_LD_RGB_NRMW_BASE_TM2       0x20
+#define REG_LD_BLK_HIDX_BASE_TM2       0x30
+#define REG_LD_BLK_VIDX_BASE_TM2       0x50
+#define REG_LD_LUT_VHK_NEGPOS_BASE_TM2 0x70
+#define REG_LD_LUT_VHO_NEGPOS_BASE_TM2 0x80
+#define REG_LD_LUT_HHK_BASE_TM2        0x90
+#define REG_LD_REFLECT_DGR_BASE_TM2    0xa0
+#define REG_LD_LUT_LEXT_BASE_TM2       0xb0
+#define REG_LD_LUT_HDG_BASE_TM2        0x100
+#define REG_LD_LUT_VDG_BASE_TM2        0x200
+#define REG_LD_LUT_VHK_BASE_TM2        0x300
+#define REG_LD_LUT_ID_BASE_TM2         0x400
+
 /* #define LDIM_STTS_HIST_REGION_IDX      0x1aa0 */
 #define LOCAL_DIM_STATISTIC_EN_BIT          31
 #define LOCAL_DIM_STATISTIC_EN_WID           1
@@ -125,6 +140,21 @@
 #define REGION_RD_INDEX_BIT                  0
 #define REGION_RD_INDEX_WID                  7
 
+// configure DMA
+#define VPU_DMA_RDMIF_CTRL3				0x27cc
+#define VPU_DMA_RDMIF_BADDR0				0x27cd
+#define VPU_DMA_WRMIF_CTRL1				0x27d1
+#define VPU_DMA_WRMIF_CTRL2				0x27d2
+#define VPU_DMA_WRMIF_CTRL3				0x27d3
+#define VPU_DMA_WRMIF_BADDR0				0x27d4
+#define VPU_DMA_RDMIF_CTRL				0x27d8
+#define VPU_DMA_RDMIF_BADDR1				0x27d9
+#define VPU_DMA_RDMIF_BADDR2				0x27da
+#define VPU_DMA_RDMIF_BADDR3				0x27db
+#define VPU_DMA_WRMIF_CTRL				0x27dc
+#define VPU_DMA_WRMIF_BADDR1				0x27dd
+#define VPU_DMA_WRMIF_BADDR2				0x27de
+#define VPU_DMA_WRMIF_BADDR3				0x27df
 
 #ifndef CONFIG_AMLOGIC_MEDIA_RDMA
 #define LDIM_VSYNC_RDMA      0

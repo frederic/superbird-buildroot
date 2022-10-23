@@ -441,7 +441,8 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 
 	if (likely((pTable->status == PTS_RUNNING) ||
 			   (pTable->status == PTS_LOADING))) {
-		struct pts_rec_s *rec;
+		struct pts_rec_s *rec = NULL;
+		struct pts_rec_s *rec_prev = NULL;
 
 		if (type == PTS_TYPE_VIDEO && pTable->first_checkin_pts == -1) {
 			pTable->first_checkin_pts = val;
@@ -460,6 +461,7 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 			pTable->first_checkin_pts = val;
 			pTable->first_checkin_pts_uS64 = uS64;
 			timestamp_checkin_firstapts_set(val);
+			timestamp_checkin_firstaoffset_set(offset);
 			/*
 			 *if (tsync_get_debug_pts_checkin() &&
 			 * tsync_get_debug_apts()) {
@@ -473,8 +475,8 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 		if (tsync_get_debug_pts_checkin()) {
 			if (tsync_get_debug_vpts()
 				&& (type == PTS_TYPE_VIDEO)) {
-				pr_info("check in vpts <0x%x:0x%x>,",
-						offset, val);
+				pr_info("check in vpts <0x%x:0x%x>",
+					offset, val);
 				pr_info("current vpts 0x%x\n",
 						timestamp_vpts_get());
 			}
@@ -496,6 +498,25 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 						   struct pts_rec_s, list);
 		}
 
+		if (!list_empty(&pTable->valid_list)) {
+			rec_prev = list_entry(
+			    pTable->valid_list.prev, struct pts_rec_s, list);
+			if (rec_prev->offset == pTable->last_checkin_offset) {
+				if (offset > pTable->last_checkin_offset)
+					rec_prev->size =
+					offset - pTable->last_checkin_offset;
+				else
+					rec_prev->size = 0;
+			}
+		}
+
+		if ((pTable->last_checkin_offset > 0)
+			&& (offset > pTable->last_checkin_offset))
+			rec->size =
+				offset - pTable->last_checkin_offset;
+		else
+			rec->size = rec_prev ? rec_prev->size : 0;
+
 		rec->offset = offset;
 		rec->val = val;
 		rec->pts_uS64 = uS64;
@@ -511,15 +532,20 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 
 		if (pTable->status == PTS_LOADING) {
 			if (tsync_get_debug_vpts() && (type == PTS_TYPE_VIDEO))
-				pr_info("init vpts[%d] at 0x%x\n", type, val);
+				pr_info("init vpts[%d] at 0x%x,0x%llx\n",
+					type, val, rec->pts_uS64);
 
 			if (tsync_get_debug_apts() && (type == PTS_TYPE_AUDIO))
-				pr_info("init apts[%d] at 0x%x\n", type, val);
+				pr_info("init apts[%d] at 0x%x\n",
+					type, val);
 
-			if (type == PTS_TYPE_VIDEO && !tsync_get_tunnel_mode())
+			if (type == PTS_TYPE_VIDEO && !
+			tsync_get_tunnel_mode()) {
 				timestamp_vpts_set(val);
-			else if (type == PTS_TYPE_AUDIO)
+				timestamp_vpts_set_u64(rec->pts_uS64);
+			} else if (type == PTS_TYPE_AUDIO) {
 				timestamp_apts_set(val);
+			}
 
 			pTable->status = PTS_RUNNING;
 		}
@@ -574,6 +600,28 @@ int pts_checkin_wrptr(u8 type, u32 ptr, u32 val)
 			val);
 }
 EXPORT_SYMBOL(pts_checkin_wrptr);
+
+int pts_checkin_wrptr_pts33(u8 type, u32 ptr, u64 pts_val)
+{
+	u32 offset, cur_offset = 0, page = 0, page_no;
+	u64 us;
+
+	if (type >= PTS_TYPE_MAX)
+		return -EINVAL;
+
+	offset = ptr - pts_table[type].buf_start;
+	get_wrpage_offset(type, &page, &cur_offset);
+
+	page_no = (offset > cur_offset) ? (page - 1) : page;
+
+	us = div64_u64(pts_val * 100, 9);
+
+	return pts_checkin_offset_inline(type,
+			pts_table[type].buf_size * page_no + offset,
+			(u32)pts_val,
+			us);
+}
+EXPORT_SYMBOL(pts_checkin_wrptr_pts33);
 
 int pts_checkin(u8 type, u32 val)
 {
@@ -839,7 +887,9 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 			if (!pTable->first_lookup_ok) {
 				pTable->first_lookup_ok = 1;
 				if (type == PTS_TYPE_VIDEO)
-					timestamp_firstvpts_set(*val);
+					pr_info("video first pts = 0x%x offset:0x%x\n",
+							*val, offset);
+					/* timestamp_firstvpts_set(*val);*/
 				if (tsync_get_debug_pts_checkout()) {
 					if (tsync_get_debug_vpts()
 						&& (type == PTS_TYPE_VIDEO)) {
@@ -944,6 +994,8 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 					else
 						timestamp_firstvpts_set(
 						timestamp_vpts_get());
+					pr_info("video first pts lookup failed. offset:0x%x\n",
+						offset);
 				}
 
 				if (tsync_get_debug_pts_checkout()) {
@@ -1417,6 +1469,7 @@ int pts_start(u8 type)
 							- pTable->buf_start;
 #endif
 			timestamp_vpts_set(0);
+			timestamp_vpts_set_u64(0);
 			timestamp_pcrscr_set(0);
 			/* video always need the pcrscr,*/
 			/*Clear it to use later */
@@ -1450,6 +1503,7 @@ int pts_start(u8 type)
 				 */
 				/* BUG_ON(pTable->buf_size <= 0x10000); */
 				timestamp_vpts_set(0);
+				timestamp_vpts_set_u64(0);
 				timestamp_pcrscr_set(0);
 				/* video always need the pcrscr, */
 				/*Clear it to use later*/

@@ -1,0 +1,5 @@
+config BR2_PACKAGE_DOLBY_MS12_RELEASE
+	bool "dolby_ms12"
+	help
+	  Dolby MS12 For Soundbar Products
+

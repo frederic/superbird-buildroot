@@ -155,7 +155,7 @@ void monitor_handle_alg_flow( monitor_fsm_ptr_t p_fsm, mon_alg_info_t *p_mon_inf
         i = p_mon_info->alg_arr_write_pos;
 
         if ( p_mon_info->alg_state_arr[i].item_is_using ) {
-            LOG( LOG_INFO, "MON_ALG_FLOW %s: overwrite frame: %d, pos: %d.", p_mon_info->alg_name, p_mon_info->alg_state_arr[i].frame_id_tracking, i );
+            LOG( LOG_DEBUG, "MON_ALG_FLOW %s: overwrite frame: %d, pos: %d.", p_mon_info->alg_name, p_mon_info->alg_state_arr[i].frame_id_tracking, i );
             // monitor_dump_alg_state_arr(p_mon_info);
         }
 

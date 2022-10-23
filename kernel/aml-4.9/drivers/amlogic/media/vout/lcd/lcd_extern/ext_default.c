@@ -33,7 +33,8 @@
 static struct lcd_extern_config_s *ext_config;
 static struct aml_lcd_extern_i2c_dev_s *i2c0_dev;
 static struct aml_lcd_extern_i2c_dev_s *i2c1_dev;
-
+static struct aml_lcd_extern_i2c_dev_s *i2c2_dev;
+static struct aml_lcd_extern_i2c_dev_s *i2c3_dev;
 
 static void set_lcd_csb(unsigned int v)
 {
@@ -164,7 +165,7 @@ static int lcd_extern_reg_write(unsigned char *buf, unsigned int len)
 static int lcd_extern_power_cmd_dynamic_size(unsigned char *table, int flag)
 {
 	int i = 0, j, step = 0, max_len = 0;
-	unsigned char type, cmd_size;
+	unsigned char type, size;
 	int delay_ms, ret = 0;
 
 	if (flag)
@@ -176,136 +177,184 @@ static int lcd_extern_power_cmd_dynamic_size(unsigned char *table, int flag)
 	case LCD_EXTERN_I2C:
 		while ((i + 1) < max_len) {
 			type = table[i];
+			size = table[i + 1];
 			if (type == LCD_EXT_CMD_TYPE_END)
 				break;
 			if (lcd_debug_print_flag) {
-				EXTPR("%s: step %d: type=0x%02x, cmd_size=%d\n",
-					__func__, step, type, table[i+1]);
+				EXTPR("%s: step %d: type=0x%02x, size=%d\n",
+				      __func__, step, type, size);
 			}
-			cmd_size = table[i+1];
-			if (cmd_size == 0)
+			if (size == 0)
 				goto power_cmd_dynamic_i2c_next;
-			if ((i + 2 + cmd_size) > max_len)
+			if ((i + 2 + size) > max_len)
 				break;
 
 			if (type == LCD_EXT_CMD_TYPE_NONE) {
 				/* do nothing */
 			} else if (type == LCD_EXT_CMD_TYPE_GPIO) {
-				if (cmd_size < 2) {
+				if (size < 2) {
 					EXTERR(
-				"step %d: invalid cmd_size %d for GPIO\n",
-						step, cmd_size);
+				"step %d: invalid size %d for GPIO\n",
+					       step, size);
 					goto power_cmd_dynamic_i2c_next;
 				}
 				if (table[i+2] < LCD_GPIO_MAX) {
 					lcd_extern_gpio_set(table[i+2],
 						table[i+3]);
 				}
-				if (cmd_size > 2) {
+				if (size > 2) {
 					if (table[i+4] > 0)
 						mdelay(table[i+4]);
 				}
 			} else if (type == LCD_EXT_CMD_TYPE_DELAY) {
 				delay_ms = 0;
-				for (j = 0; j < cmd_size; j++)
+				for (j = 0; j < size; j++)
 					delay_ms += table[i+2+j];
 				if (delay_ms > 0)
 					mdelay(delay_ms);
-			} else if (type == LCD_EXT_CMD_TYPE_CMD) {
-				if (i2c0_dev == NULL) {
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD_BIN_DATA)) {
+				if (!i2c0_dev) {
 					EXTERR("invalid i2c0 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c0_dev->client,
-					&table[i+2], cmd_size);
-			} else if (type == LCD_EXT_CMD_TYPE_CMD2) {
-				if (i2c1_dev == NULL) {
+							   &table[i + 2],
+							   size);
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD2) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD2_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD2_BIN_DATA)) {
+				if (!i2c1_dev) {
 					EXTERR("invalid i2c1 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c1_dev->client,
-					&table[i+2], cmd_size);
+							   &table[i + 2],
+							   size);
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD3) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD3_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD3_BIN_DATA)) {
+				if (!i2c2_dev) {
+					EXTERR("invalid i2c2 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c2_dev->client,
+							   &table[i + 2],
+							   size);
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD4) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD4_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD4_BIN_DATA)) {
+				if (!i2c3_dev) {
+					EXTERR("invalid i2c3 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c3_dev->client,
+							   &table[i + 2],
+							   size);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD_DELAY) {
-				if (i2c0_dev == NULL) {
+				if (!i2c0_dev) {
 					EXTERR("invalid i2c0 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c0_dev->client,
-					&table[i+2], (cmd_size-1));
-				if (table[i+cmd_size+1] > 0)
-					mdelay(table[i+cmd_size+1]);
+							   &table[i + 2],
+							   (size - 1));
+				if (table[i + size + 1] > 0)
+					mdelay(table[i + size + 1]);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD2_DELAY) {
-				if (i2c1_dev == NULL) {
+				if (!i2c1_dev) {
 					EXTERR("invalid i2c1 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c1_dev->client,
-					&table[i+2], (cmd_size-1));
-				if (table[i+cmd_size+1] > 0)
-					mdelay(table[i+cmd_size+1]);
+							   &table[i + 2],
+							   (size - 1));
+				if (table[i + size + 1] > 0)
+					mdelay(table[i + size + 1]);
+			} else if (type == LCD_EXT_CMD_TYPE_CMD3_DELAY) {
+				if (!i2c2_dev) {
+					EXTERR("invalid i2c2 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c2_dev->client,
+							   &table[i + 2],
+							   (size - 1));
+				if (table[i + size + 1] > 0)
+					mdelay(table[i + size + 1]);
+			} else if (type == LCD_EXT_CMD_TYPE_CMD4_DELAY) {
+				if (!i2c3_dev) {
+					EXTERR("invalid i2c3 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c3_dev->client,
+							   &table[i + 2],
+							   (size - 1));
+				if (table[i + size + 1] > 0)
+					mdelay(table[i + size + 1]);
 			} else {
 				EXTERR("%s: %s(%d): type 0x%02x invalid\n",
 					__func__, ext_config->name,
 					ext_config->index, type);
 			}
 power_cmd_dynamic_i2c_next:
-			i += (cmd_size + 2);
+			i += (size + 2);
 			step++;
 		}
 		break;
 	case LCD_EXTERN_SPI:
 		while ((i + 1) < max_len) {
 			type = table[i];
+			size = table[i + 1];
 			if (type == LCD_EXT_CMD_TYPE_END)
 				break;
 			if (lcd_debug_print_flag) {
-				EXTPR("%s: step %d: type=0x%02x, cmd_size=%d\n",
-					__func__, step, type, table[i+1]);
+				EXTPR("%s: step %d: type=0x%02x, size=%d\n",
+				      __func__, step, type, size);
 			}
-			cmd_size = table[i+1];
-			if (cmd_size == 0)
+			if (size == 0)
 				goto power_cmd_dynamic_spi_next;
-			if ((i + 2 + cmd_size) > max_len)
+			if ((i + 2 + size) > max_len)
 				break;
 
 			if (type == LCD_EXT_CMD_TYPE_NONE) {
 				/* do nothingy */
 			} else if (type == LCD_EXT_CMD_TYPE_GPIO) {
-				if (cmd_size < 2) {
+				if (size < 2) {
 					EXTERR(
-				"step %d: invalid cmd_size %d for GPIO\n",
-						step, cmd_size);
+				"step %d: invalid size %d for GPIO\n",
+						step, size);
 					goto power_cmd_dynamic_spi_next;
 				}
 				if (table[i+2] < LCD_GPIO_MAX) {
 					lcd_extern_gpio_set(table[i+2],
 						table[i+3]);
 				}
-				if (cmd_size > 2) {
+				if (size > 2) {
 					if (table[i+4] > 0)
 						mdelay(table[i+4]);
 				}
 			} else if (type == LCD_EXT_CMD_TYPE_DELAY) {
 				delay_ms = 0;
-				for (j = 0; j < cmd_size; j++)
+				for (j = 0; j < size; j++)
 					delay_ms += table[i+2+j];
 				if (delay_ms > 0)
 					mdelay(delay_ms);
-			} else if (type == LCD_EXT_CMD_TYPE_CMD) {
-				ret = lcd_extern_spi_write(&table[i+2],
-					cmd_size);
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD_BIN)) {
+				ret = lcd_extern_spi_write(&table[i + 2], size);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD_DELAY) {
 				ret = lcd_extern_spi_write(&table[i+2],
-					(cmd_size-1));
-				if (table[i+cmd_size+1] > 0)
-					mdelay(table[i+cmd_size+1]);
+							   (size - 1));
+				if (table[i + size + 1] > 0)
+					mdelay(table[i + size + 1]);
 			} else {
 				EXTERR("%s: %s(%d): type 0x%02x invalid\n",
 					__func__, ext_config->name,
 					ext_config->index, type);
 			}
 power_cmd_dynamic_spi_next:
-			i += (cmd_size + 2);
+			i += (size + 2);
 			step++;
 		}
 		break;
@@ -363,38 +412,86 @@ static int lcd_extern_power_cmd_fixed_size(unsigned char *table, int flag)
 					delay_ms += table[i+1+j];
 				if (delay_ms > 0)
 					mdelay(delay_ms);
-			} else if (type == LCD_EXT_CMD_TYPE_CMD) {
-				if (i2c0_dev == NULL) {
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD_BIN_DATA)) {
+				if (!i2c0_dev) {
 					EXTERR("invalid i2c0 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c0_dev->client,
-					&table[i+1], (cmd_size-1));
-			} else if (type == LCD_EXT_CMD_TYPE_CMD2) {
-				if (i2c1_dev == NULL) {
+							   &table[i + 1],
+							   (cmd_size - 1));
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD2) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD2_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD2_BIN_DATA)) {
+				if (!i2c1_dev) {
 					EXTERR("invalid i2c1 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c1_dev->client,
-					&table[i+1], (cmd_size-1));
+							   &table[i + 1],
+							   (cmd_size - 1));
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD3) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD3_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD3_BIN_DATA)) {
+				if (!i2c2_dev) {
+					EXTERR("invalid i2c2 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c2_dev->client,
+							   &table[i + 1],
+							   (cmd_size - 1));
+			} else if ((type == LCD_EXT_CMD_TYPE_CMD4) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD4_BIN) ||
+				   (type == LCD_EXT_CMD_TYPE_CMD4_BIN_DATA)) {
+				if (!i2c3_dev) {
+					EXTERR("invalid i2c3 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c3_dev->client,
+							   &table[i + 1],
+							   (cmd_size - 1));
 			} else if (type == LCD_EXT_CMD_TYPE_CMD_DELAY) {
-				if (i2c0_dev == NULL) {
+				if (!i2c0_dev) {
 					EXTERR("invalid i2c0 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c0_dev->client,
-					&table[i+1], (cmd_size-2));
+							   &table[i + 1],
+							   (cmd_size - 2));
 				if (table[i+cmd_size-1] > 0)
 					mdelay(table[i+cmd_size-1]);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD2_DELAY) {
-				if (i2c1_dev == NULL) {
+				if (!i2c1_dev) {
 					EXTERR("invalid i2c1 device\n");
 					return -1;
 				}
 				ret = lcd_extern_i2c_write(i2c1_dev->client,
-					&table[i+1], (cmd_size-2));
+							   &table[i + 1],
+							   (cmd_size - 2));
 				if (table[i+cmd_size-1] > 0)
 					mdelay(table[i+cmd_size-1]);
+			} else if (type == LCD_EXT_CMD_TYPE_CMD3_DELAY) {
+				if (!i2c2_dev) {
+					EXTERR("invalid i2c2 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c2_dev->client,
+							   &table[i + 1],
+							   (cmd_size - 2));
+				if (table[i + cmd_size - 1] > 0)
+					mdelay(table[i + cmd_size - 1]);
+			} else if (type == LCD_EXT_CMD_TYPE_CMD4_DELAY) {
+				if (!i2c3_dev) {
+					EXTERR("invalid i2c3 device\n");
+					return -1;
+				}
+				ret = lcd_extern_i2c_write(i2c3_dev->client,
+							   &table[i + 1],
+							   (cmd_size - 2));
+				if (table[i + cmd_size - 1] > 0)
+					mdelay(table[i + cmd_size - 1]);
 			} else {
 				EXTERR("%s: %s(%d): type 0x%02x invalid\n",
 					__func__, ext_config->name,
@@ -546,7 +643,7 @@ int aml_lcd_extern_default_probe(struct aml_lcd_extern_driver_s *ext_drv)
 		if (ext_config->i2c_addr < LCD_EXT_I2C_ADDR_INVALID) {
 			i2c0_dev = lcd_extern_get_i2c_device(
 					ext_config->i2c_addr);
-			if (i2c0_dev == NULL) {
+			if (!i2c0_dev) {
 				EXTERR("invalid i2c0 device\n");
 				return -1;
 			}
@@ -556,13 +653,38 @@ int aml_lcd_extern_default_probe(struct aml_lcd_extern_driver_s *ext_drv)
 		if (ext_config->i2c_addr2 < LCD_EXT_I2C_ADDR_INVALID) {
 			i2c1_dev = lcd_extern_get_i2c_device(
 					ext_config->i2c_addr2);
-			if (i2c1_dev == NULL) {
+			if (!i2c1_dev) {
 				EXTERR("invalid i2c1 device\n");
 				i2c0_dev = NULL;
 				return -1;
 			}
 			EXTPR("get i2c1 device: %s, addr 0x%02x OK\n",
 				i2c1_dev->name, i2c1_dev->client->addr);
+		}
+		if (ext_config->i2c_addr3 < LCD_EXT_I2C_ADDR_INVALID) {
+			i2c2_dev = lcd_extern_get_i2c_device(
+					ext_config->i2c_addr3);
+			if (!i2c2_dev) {
+				EXTERR("invalid i2c2 device\n");
+				i2c0_dev = NULL;
+				i2c1_dev = NULL;
+				return -1;
+			}
+			EXTPR("get i2c2 device: %s, addr 0x%02x OK\n",
+			      i2c2_dev->name, i2c2_dev->client->addr);
+		}
+		if (ext_config->i2c_addr4 < LCD_EXT_I2C_ADDR_INVALID) {
+			i2c3_dev = lcd_extern_get_i2c_device(
+					ext_config->i2c_addr4);
+			if (!i2c3_dev) {
+				EXTERR("invalid i2c3 device\n");
+				i2c0_dev = NULL;
+				i2c1_dev = NULL;
+				i2c2_dev = NULL;
+				return -1;
+			}
+			EXTPR("get i2c3 device: %s, addr 0x%02x OK\n",
+			      i2c3_dev->name, i2c3_dev->client->addr);
 		}
 		break;
 	case LCD_EXTERN_SPI:
@@ -582,6 +704,8 @@ int aml_lcd_extern_default_remove(void)
 {
 	i2c0_dev = NULL;
 	i2c1_dev = NULL;
+	i2c2_dev = NULL;
+	i2c3_dev = NULL;
 	ext_config = NULL;
 
 	return 0;

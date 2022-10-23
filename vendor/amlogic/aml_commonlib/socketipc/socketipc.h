@@ -182,7 +182,7 @@ extern "C" {
 #define _IMPLEMENT_IPC_FUNCTION(handle,...) \
     _DECLARE_IPC_FUNCTION(handle,##__VA_ARGS__)\
     static int32_t _typeid_call_##handle[] = {SIPC_EXPAND_PARAM_TYPEID(__VA_ARGS__) 0};\
-    static SIPC_Function _ipc_imp_func_##handle = {#handle, (void*)0, _typeid_call_##handle, NULL};\
+    static SIPC_Function _ipc_imp_func_##handle = {#handle, (void*)0, _typeid_call_##handle, NULL, 0, NULL};\
     SIPC_Function *g_ipc_func_##handle __attribute__((section("ipc_function_import_table"))) = &_ipc_imp_func_##handle;\
     int32_t call_##handle(SIPC_Peer ipc SIPC_EXPAND_ARG_LIST(__VA_ARGS__)) {\
         return ipc_call_fmt(ipc, SIPC_FUNCTION(handle) SIPC_EXPAND_PARAM_LIST(__VA_ARGS__));\
@@ -191,7 +191,7 @@ extern "C" {
     _DECLARE_IPC_FUNCTION_SYNC(handle,argfmt,retfmt)\
     static int32_t _typeid_call_##handle[] = {SIPC_EXPAND_PARAM_TYPEID argfmt 0};\
     static int32_t _typeid_ret_##handle[] = {SIPC_EXPAND_PARAM_TYPEID retfmt 0};\
-    static SIPC_Function _ipc_imp_func_##handle = {#handle, (void*)0, _typeid_call_##handle, _typeid_ret_##handle};\
+    static SIPC_Function _ipc_imp_func_##handle = {#handle, (void*)0, _typeid_call_##handle, _typeid_ret_##handle, 0, NULL};\
     SIPC_Function *g_ipc_func_##handle __attribute__((section("ipc_function_import_table"))) = &_ipc_imp_func_##handle;\
     int32_t call_##handle(SIPC_Peer ipc SIPC_EXPAND_ARG_LIST argfmt SIPC_EXPAND_ARG_PLIST retfmt) {\
         return ipc_call_fmt(ipc, SIPC_FUNCTION(handle) SIPC_EXPAND_PARAM_LIST argfmt SIPC_EXPAND_PARAM_PLIST retfmt);\
@@ -207,7 +207,7 @@ extern "C" {
             r = on_##handle(ipc SIPC_EXPAND_PARAM_LIST(__VA_ARGS__)); \
         return r;\
     }\
-    static SIPC_Function _ipc_exp_func_##handle = {#handle, _ipc_handle_##handle, _typeid_call_##handle, NULL};\
+    static SIPC_Function _ipc_exp_func_##handle = {#handle, _ipc_handle_##handle, _typeid_call_##handle, NULL, 0, NULL};\
     SIPC_Function *g_ipc_func_##handle __attribute__((section("ipc_function_export_table"))) = &_ipc_exp_func_##handle;\
     int32_t call_##handle(SIPC_Peer ipc SIPC_EXPAND_ARG_LIST(__VA_ARGS__)) {\
         return ipc_call_fmt(ipc, SIPC_FUNCTION(handle) SIPC_EXPAND_PARAM_LIST(__VA_ARGS__));\
@@ -229,7 +229,7 @@ extern "C" {
     int32_t resp_##handle(SIPC_Peer ipc SIPC_EXPAND_ARG_LIST retfmt) {\
         return ipc_resp_fmt(ipc, _typeid_ret_##handle, SIPC_NO_ERR SIPC_EXPAND_PARAM_LIST retfmt);\
     }\
-    static SIPC_Function _ipc_exp_func_##handle = {#handle, _ipc_handle_##handle, _typeid_call_##handle, _typeid_ret_##handle};\
+    static SIPC_Function _ipc_exp_func_##handle = {#handle, _ipc_handle_##handle, _typeid_call_##handle, _typeid_ret_##handle, 0, NULL};\
     SIPC_Function *g_ipc_func_##handle __attribute__((section("ipc_function_export_table"))) = &_ipc_exp_func_##handle;\
     int32_t call_##handle(SIPC_Peer ipc SIPC_EXPAND_ARG_LIST argfmt SIPC_EXPAND_ARG_PLIST retfmt) {\
         return ipc_call_fmt(ipc, SIPC_FUNCTION(handle) SIPC_EXPAND_PARAM_LIST argfmt SIPC_EXPAND_PARAM_PLIST retfmt);\

@@ -162,7 +162,8 @@ static int decode_hrd_parameters(struct get_bits_context *gb,
 
 	cpb_count = get_ue_golomb_31(gb) + 1;
 	if (cpb_count > 32U) {
-		pr_err("cpb_count %d invalid\n", cpb_count);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"cpb_count %d invalid\n", cpb_count);
 		return -1;
 	}
 
@@ -237,7 +238,7 @@ static int decode_vui_parameters(struct get_bits_context *gb,  struct h264_SPS_t
 	}
 
 	if (show_bits1(gb) && get_bits_left(gb) < 10) {
-		pr_info("Truncated VUI\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Truncated VUI\n");
 		return 0;
 	}
 
@@ -246,7 +247,8 @@ static int decode_vui_parameters(struct get_bits_context *gb,  struct h264_SPS_t
 		unsigned num_units_in_tick = get_bits_long(gb, 32);
 		unsigned time_scale        = get_bits_long(gb, 32);
 		if (!num_units_in_tick || !time_scale) {
-			pr_info("time_scale/num_units_in_tick invalid or unsupported (%u/%u)\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER,
+				"time_scale/num_units_in_tick invalid or unsupported (%u/%u)\n",
 				time_scale, num_units_in_tick);
 			sps->timing_info_present_flag = 0;
 		} else {
@@ -287,7 +289,8 @@ static int decode_vui_parameters(struct get_bits_context *gb,  struct h264_SPS_t
 
 		if (sps->num_reorder_frames > 16U
 			/* max_dec_frame_buffering || max_dec_frame_buffering > 16 */) {
-			pr_info("Clipping illegal num_reorder_frames %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"Clipping illegal num_reorder_frames %d\n",
 				sps->num_reorder_frames);
 				sps->num_reorder_frames = 16;
 			return -1;
@@ -316,7 +319,8 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 	sps_id		= get_ue_golomb_31(gb);
 
 	if (sps_id >= MAX_SPS_COUNT) {
-		pr_info( "sps_id %u out of range\n", sps_id);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"sps_id %u out of range\n", sps_id);
 		goto fail;
 	}
 
@@ -346,12 +350,14 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 		sps->chroma_format_idc = get_ue_golomb_31(gb);
 
 		if (sps->chroma_format_idc > 3U) {
-			pr_err("chroma_format_idc %u\n", sps->chroma_format_idc);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"chroma_format_idc %u\n", sps->chroma_format_idc);
 			goto fail;
 		} else if (sps->chroma_format_idc == 3) {
 			sps->residual_color_transform_flag = get_bits1(gb);
 			if (sps->residual_color_transform_flag) {
-				pr_info( "separate color planes are not supported\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+					"separate color planes are not supported\n");
 				goto fail;
 			}
 		}
@@ -359,14 +365,16 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 		sps->bit_depth_luma	= get_ue_golomb(gb) + 8;
 		sps->bit_depth_chroma	= get_ue_golomb(gb) + 8;
 		if (sps->bit_depth_chroma != sps->bit_depth_luma) {
-			pr_err("Different chroma and luma bit depth\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"Different chroma and luma bit depth\n");
 			goto fail;
 		}
 
 		if (sps->bit_depth_luma	< 8 || sps->bit_depth_luma > 14 ||
 			sps->bit_depth_chroma < 8 || sps->bit_depth_chroma > 14) {
-			pr_info("illegal bit depth value (%d, %d)\n",
-			sps->bit_depth_luma, sps->bit_depth_chroma);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"illegal bit depth value (%d, %d)\n",
+				sps->bit_depth_luma, sps->bit_depth_chroma);
 			goto fail;
 		}
 
@@ -385,9 +393,9 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 	log2_max_frame_num_minus4 = get_ue_golomb(gb);
 	if (log2_max_frame_num_minus4 < MIN_LOG2_MAX_FRAME_NUM - 4 ||
 		log2_max_frame_num_minus4 > MAX_LOG2_MAX_FRAME_NUM - 4) {
-		pr_info(
-		"log2_max_frame_num_minus4 out of range (0-12): %d\n",
-		log2_max_frame_num_minus4);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"log2_max_frame_num_minus4 out of range (0-12): %d\n",
+			log2_max_frame_num_minus4);
 		goto fail;
 	}
 	sps->log2_max_frame_num = log2_max_frame_num_minus4 + 4;
@@ -396,7 +404,8 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 	if (sps->poc_type == 0) { // FIXME #define
 		u32 t = get_ue_golomb(gb);
 		if (t > 12) {
-			pr_info( "log2_max_poc_lsb (%d) is out of range\n", t);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"log2_max_poc_lsb (%d) is out of range\n", t);
 			goto fail;
 		}
 		sps->log2_max_poc_lsb = t + 4;
@@ -407,20 +416,23 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 
 		sps->poc_cycle_length = get_ue_golomb(gb);
 		if ((u32)sps->poc_cycle_length >= ARRAY_SIZE(sps->offset_for_ref_frame)) {
-			pr_info("poc_cycle_length overflow %d\n", sps->poc_cycle_length);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"poc_cycle_length overflow %d\n", sps->poc_cycle_length);
 			goto fail;
 		}
 
 		for (i = 0; i < sps->poc_cycle_length; i++)
 			sps->offset_for_ref_frame[i] = get_se_golomb_long(gb);
 	} else if (sps->poc_type != 2) {
-		pr_info( "illegal POC type %d\n", sps->poc_type);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"illegal POC type %d\n", sps->poc_type);
 		goto fail;
 	}
 
 	sps->ref_frame_count = get_ue_golomb_31(gb);
 	if (sps->ref_frame_count > MAX_DELAYED_PIC_COUNT) {
-		pr_info("too many reference frames %d\n", sps->ref_frame_count);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"too many reference frames %d\n", sps->ref_frame_count);
 		goto fail;
 	}
 	sps->gaps_in_frame_num_allowed_flag = get_bits1(gb);
@@ -430,7 +442,7 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 	sps->frame_mbs_only_flag = get_bits1(gb);
 
 	if (sps->mb_height >= INT_MAX / 2U) {
-		pr_info("height overflow\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "height overflow\n");
 		goto fail;
 	}
 	sps->mb_height *= 2 - sps->frame_mbs_only_flag;
@@ -442,7 +454,8 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 
 	if ((u32)sps->mb_width  >= INT_MAX / 16 ||
 		(u32)sps->mb_height >= INT_MAX / 16) {
-		pr_info( "mb_width/height overflow\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"mb_width/height overflow\n");
 		goto fail;
 	}
 
@@ -467,7 +480,9 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 			crop_bottom > (u32)INT_MAX / 4 / step_y ||
 			(crop_left + crop_right ) * step_x >= width ||
 			(crop_top + crop_bottom) * step_y >= height) {
-			pr_info( "crop values invalid %u %u %u %u / %d %d\n", crop_left, crop_right, crop_top, crop_bottom, width, height);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+				"crop values invalid %u %u %u %u / %d %d\n",
+				crop_left, crop_right, crop_top, crop_bottom, width, height);
 			goto fail;
 		}
 
@@ -491,8 +506,10 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 	}
 
 	if (get_bits_left(gb) < 0) {
-		pr_info("Overread %s by %d bits\n", sps->vui_parameters_present_flag ? "VUI" : "SPS", -get_bits_left(gb));
-		goto out;
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"Overread %s by %d bits\n",
+			sps->vui_parameters_present_flag ? "VUI" : "SPS", -get_bits_left(gb));
+		/*goto out;*/
 	}
 
 #if 0
@@ -527,16 +544,18 @@ static int aml_h264_parser_sps(struct get_bits_context *gb, struct h264_SPS_t *s
 		(sps->max_dec_frame_buffering <
 		sps->num_reorder_frames)) {
 		sps->num_reorder_frames = sps->max_dec_frame_buffering;
-		pr_info("set reorder_pic_num to %d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER,
+			"set reorder_pic_num to %d\n",
 			sps->num_reorder_frames);
 	}
 
 	if (!sps->sar.den)
 		sps->sar.den = 1;
-out:
+/*out:*/
 	if (1) {
 		static const char csp[4][5] = { "Gray", "420", "422", "444" };
-		pr_info("sps:%u profile:%d/%d poc:%d ref:%d %dx%d %s %s crop:%u/%u/%u/%u %s %s %d/%d b%d reo:%d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER,
+			"sps:%u profile:%d/%d poc:%d ref:%d %dx%d %s %s crop:%u/%u/%u/%u %s %s %d/%d b%d reo:%d\n",
 			sps_id, sps->profile_idc, sps->level_idc,
 			sps->poc_type,
 			sps->ref_frame_count,
@@ -625,14 +644,16 @@ static int decode_extradata_ps(u8 *data, int size, struct h264_param_sets *ps)
 
 	if (get_bits1(&gb) != 0) {
 		ret = -1;
-		pr_err("invalid h264 data,return!\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"invalid h264 data,return!\n");
 		goto out;
 	}
 
 	ref_idc	 = get_bits(&gb, 2);
 	nal_type = get_bits(&gb, 5);
 
-	pr_info("nal_unit_type: %d(%s), nal_ref_idc: %d\n",
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER,
+		"nal_unit_type: %d(%s), nal_ref_idc: %d\n",
 		nal_type, h264_nal_unit_name(nal_type), ref_idc);
 
 	switch (nal_type) {
@@ -649,7 +670,8 @@ static int decode_extradata_ps(u8 *data, int size, struct h264_param_sets *ps)
 		ps->pps_parsed = true;
 		break;*/
 	default:
-		pr_err("Unsupport parser nal type (%s).\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"Unsupport parser nal type (%s).\n",
 			h264_nal_unit_name(nal_type));
 		break;
 	}
@@ -672,7 +694,8 @@ int h264_decode_extradata_ps(u8 *buf, int size, struct h264_param_sets *ps)
 			len = size - (p - buf);
 			ret = decode_extradata_ps(p, len, ps);
 			if (ret) {
-				pr_err("parse extra data failed. err: %d\n", ret);
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+					"parse extra data failed. err: %d\n", ret);
 				return ret;
 			}
 

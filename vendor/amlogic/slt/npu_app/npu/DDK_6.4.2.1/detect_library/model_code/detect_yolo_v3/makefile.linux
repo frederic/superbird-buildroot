@@ -1,0 +1,27 @@
+include $(AQROOT)/makefile.linux.def
+
+INCLUDE += -I$(AQROOT)/sdk/inc -I$(OVXLIB_DIR)/include/ops -I$(OVXLIB_DIR)/include  -I./include -I../detect_api/include
+CFLAGS += $(INCLUDE)
+CFLAGS += -fPIC -shared
+
+
+LIBS += -L$(OVXLIB_DIR)/lib -l ovxlib
+LIBS += -L$(LIB_DIR) -lm
+#############################################################################
+# Macros.
+PROGRAM = 1
+DYNAMIC      := 1
+TARGET_NAME = libnn_yolo_v3.so
+CUR_SOURCE =  ${wildcard *.c} 
+#############################################################################
+# Objects.
+OBJECTS =  ${patsubst %.c, $(OBJ_DIR)/%.o, $(CUR_SOURCE)}
+
+
+# installation directory
+INSTALL_DIR := ./
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

@@ -21,14 +21,14 @@
 #include "acamera_firmware_api.h"
 #include "acamera_logger.h"
 
-extern uint32_t soc_iq_get_calibrations( int32_t, void *, ACameraCalibrations *c );
+extern uint32_t soc_iq_get_calibrations( int32_t, void *, ACameraCalibrations *c, char* s_name);
 
-uint32_t get_calibrations_v4l2( uint32_t ctx_id, void *sensor_arg, ACameraCalibrations *c )
+uint32_t get_calibrations_v4l2( uint32_t ctx_id, void *sensor_arg, ACameraCalibrations *c, char* s_name )
 {
     uint32_t ret = 0;
 
-    ret = soc_iq_get_calibrations( ctx_id, sensor_arg, c );
-    LOG( LOG_CRIT, "Request calibration ctx_id:%d sensor_arg:0x%x from soc_iq device ret %d", ctx_id, sensor_arg, ret );
+    ret = soc_iq_get_calibrations( ctx_id, sensor_arg, c, s_name );
+    LOG( LOG_INFO, "Request calibration ctx_id:%d sensor_arg:%s from soc_iq device ret %d", ctx_id, sensor_arg, ret );
 
     return ret;
 }

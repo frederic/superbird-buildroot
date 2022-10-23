@@ -415,4 +415,23 @@ struct optee_msg_arg {
  */
 #define OPTEE_MSG_RPC_CMD_SHM_FREE	7
 
+/*
+ * Create timer for TA
+ *
+ * [in]  param[0].u.value.a		TA session
+ * [in]  param[0].u.value.b		Timer handle
+ * [in]  param[1].u.value.a		Timeout
+ * [in]  param[2].u.value.b		Flags
+ */
+#define OPTEE_MSG_RPC_CMD_TIMER_CREATE  102
+
+/*
+ * Destroy timer previously created with OPTEE_MSG_RPC_CMD_TIMER_CREATE
+ *
+ * [in]  param[0].u.value.a		TA session
+ * [in]  param[0].u.value.b		Timer handle
+ */
+
+#define OPTEE_MSG_RPC_CMD_TIMER_DESTROY 103
+
 #endif /* _OPTEE_MSG_H */

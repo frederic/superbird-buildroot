@@ -1,7 +1,7 @@
 /*
  * Byte order utilities
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- *  $Id: bcmendian.h 633810 2016-04-25 16:46:55Z $
+ *  $Id: bcmendian.h 788572 2018-11-13 03:52:19Z $
  *
  * This file by default provides proper behavior on little-endian architectures.
  * On big-endian architectures, IL_BIGENDIAN should be defined.
@@ -108,10 +108,10 @@
 #define load64_ua(a)		ltoh64_ua(a)
 #define store64_ua(a, v)	htol64_ua_store(v, a)
 
-#define _LTOH16_UA(cp)	((cp)[0] | ((cp)[1] << 8))
-#define _LTOH32_UA(cp)	((cp)[0] | ((cp)[1] << 8) | ((cp)[2] << 16) | ((cp)[3] << 24))
-#define _NTOH16_UA(cp)	(((cp)[0] << 8) | (cp)[1])
-#define _NTOH32_UA(cp)	(((cp)[0] << 24) | ((cp)[1] << 16) | ((cp)[2] << 8) | (cp)[3])
+#define _LTOH16_UA(cp)	(uint16)((cp)[0] | ((cp)[1] << 8))
+#define _LTOH32_UA(cp)	(uint32)((cp)[0] | ((cp)[1] << 8) | ((cp)[2] << 16) | ((cp)[3] << 24))
+#define _NTOH16_UA(cp)	(uint16)(((cp)[0] << 8) | (cp)[1])
+#define _NTOH32_UA(cp)	(uint32)(((cp)[0] << 24) | ((cp)[1] << 16) | ((cp)[2] << 8) | (cp)[3])
 
 #define _LTOH64_UA(cp)	((uint64)(cp)[0] | ((uint64)(cp)[1] << 8) | \
 	((uint64)(cp)[2] << 16) | ((uint64)(cp)[3] << 24) | \

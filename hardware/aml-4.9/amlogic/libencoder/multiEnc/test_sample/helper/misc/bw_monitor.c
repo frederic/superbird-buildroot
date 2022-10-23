@@ -181,36 +181,38 @@ static BWMonitorOps_t s_dummy_ops = {
 typedef struct _tag_backbone_bw_context_struct {
     BW_CONTEXT_COMMON_VARS
 
-    Uint32 arid_prp_total; 
-    Uint32 awid_prp_total; 
+    Uint32 arid_prp_total;
+    Uint32 awid_prp_total;
     Uint32 arid_fbd_y_total;
     Uint32 awid_fbc_y_total;
     Uint32 arid_fbd_c_total;
     Uint32 awid_fbc_c_total;
-    Uint32 arid_pri_total; 
-    Uint32 awid_pri_total; 
-    Uint32 arid_sec_total; 
-    Uint32 awid_sec_total; 
-    Uint32 arid_proc_total; 
-    Uint32 awid_proc_total; 
+    Uint32 arid_pri_total;
+    Uint32 awid_pri_total;
+    Uint32 arid_sec_total;
+    Uint32 awid_sec_total;
+    Uint32 arid_proc_total;
+    Uint32 awid_proc_total;
+    Uint32 awid_bwb_total;
 } BackBoneBwCtx;
 
 typedef struct _tag_backbone_bw_data_struct {
-    Uint32 arid_prp; 
-    Uint32 awid_prp; 
+    Uint32 arid_prp;
+    Uint32 awid_prp;
     Uint32 arid_fbd_y;
     Uint32 awid_fbc_y;
     Uint32 arid_fbd_c;
     Uint32 awid_fbc_c;
-    Uint32 arid_pri; 
-    Uint32 awid_pri; 
-    Uint32 arid_sec; 
-    Uint32 awid_sec; 
-    Uint32 arid_proc; 
-    Uint32 awid_proc; 
-} BWBackboneData; 
+    Uint32 arid_pri;
+    Uint32 awid_pri;
+    Uint32 arid_sec;
+    Uint32 awid_sec;
+    Uint32 arid_proc;
+    Uint32 awid_proc;
+    Uint32 awid_bwb;
+} BWBackboneData;
 
-static BWCtx 
+static BWCtx
 backbone_bw_monitor_allocate(
     Uint32   coreIndex
     )
@@ -223,7 +225,7 @@ backbone_bw_monitor_allocate(
     return context;
 }
 
-static void 
+static void
 backbone_bw_monitor_release(
     BWCtx    context
     )
@@ -235,6 +237,7 @@ backbone_bw_monitor_release(
     Uint32          avgFBDRead;
     Uint64          avgProcRead, avgProcWrite;
     Uint64          avgPRPRead, avgPRPWrite;
+    Uint64          avgBWBWrite;
     Uint64          avgWrite;
     Uint64          avgRead;
     Uint64          avg;
@@ -252,15 +255,16 @@ backbone_bw_monitor_release(
     avgFBDRead   = (ctx->arid_fbd_y_total+ctx->arid_fbd_c_total) / ctx->numFrames;
     avgPRPRead   = ctx->arid_prp_total / ctx->numFrames;
     avgPRPWrite  = ctx->awid_prp_total / ctx->numFrames;
-    avgWrite     = (ctx->awid_pri_total+ctx->awid_sec_total+ctx->awid_proc_total+ctx->awid_fbc_y_total+ctx->awid_fbc_c_total+ctx->awid_prp_total) / ctx->numFrames;
+    avgBWBWrite  = ctx->awid_bwb_total / ctx->numFrames;
+    avgWrite     = (ctx->awid_pri_total+ctx->awid_sec_total+ctx->awid_proc_total+ctx->awid_fbc_y_total+ctx->awid_fbc_c_total+ctx->awid_prp_total+ctx->awid_bwb_total) / ctx->numFrames;
     avgRead      = (ctx->arid_pri_total+ctx->arid_sec_total+ctx->arid_proc_total+ctx->arid_fbd_y_total+ctx->arid_fbd_c_total+ctx->arid_prp_total) / ctx->numFrames;
     avg          = ctx->total / ctx->numFrames;
 
-    osal_fprintf(ctx->fpBWTotal, "=======================================================================================================================================================\n");
+    osal_fprintf(ctx->fpBWTotal, "+===================================================================================================================================================================\n");
 
-    osal_fprintf(ctx->fpBWTotal, "AVER.  %10d %10d %10d %10d %10d %10d  %10d %10d %10d %10d %10d %10d  %10d\n",
-                 avgPriWrite, avgSecWrite, avgFBCWrite, avgPRPWrite, avgProcWrite, avgWrite, 
-                 avgPriRead,  avgSecRead,  avgFBDRead,  avgPRPRead,  avgProcRead,  avgRead, 
+    osal_fprintf(ctx->fpBWTotal, "AVER.   %10d %10d %10d %10d %10d %10d %10d  %10d %10d %10d %10d %10d %10d  %10d\n",
+                 avgPriWrite, avgSecWrite, avgFBCWrite, avgPRPWrite, avgProcWrite, avgBWBWrite, avgWrite,
+                 avgPriRead,  avgSecRead,  avgFBDRead,  avgPRPRead,  avgProcRead,               avgRead,
                  avg);
 
     osal_free(context);
@@ -286,20 +290,20 @@ backbone_bw_monitor_print(
 {
     BWBackboneData* bdata = (BWBackboneData*)data;
     BWCommonCtx*    common = (BWCommonCtx*)context;
-    Uint32          total_wr_bw; 
+    Uint32          total_wr_bw;
     Uint32          total_rd_bw;
 
-    total_wr_bw = bdata->awid_pri + bdata->awid_sec + bdata->awid_fbc_y + bdata->awid_fbc_c + bdata->awid_prp + bdata->awid_proc;
+    total_wr_bw = bdata->awid_pri + bdata->awid_sec + bdata->awid_fbc_y + bdata->awid_fbc_c + bdata->awid_prp + bdata->awid_proc + bdata->awid_bwb;
     total_rd_bw = bdata->arid_pri + bdata->arid_sec + bdata->arid_fbd_y + bdata->arid_fbd_c + bdata->arid_prp + bdata->arid_proc;
     if (common->numFrames == 1) {
-        osal_fprintf(common->fpBWTotal, "  No.                              WRITE(B)                                                     READ(B)                                        TOTAL\n");
-        osal_fprintf(common->fpBWTotal, "        ----------------------------------------------------------------  -----------------------------------------------------------------  ----------\n");
-        osal_fprintf(common->fpBWTotal, "              PRI       SEC       FBC       PRP       PROC      TOTAL        PRI        SEC        FBD         PRP        PROC       TOTAL\n");
-        osal_fprintf(common->fpBWTotal, "+======================================================================================================================================================\n");
+        osal_fprintf(common->fpBWTotal, "  No.                                    WRITE(B)                                                            READ(B)                                        TOTAL\n");
+        osal_fprintf(common->fpBWTotal, "        ----------------------------------------------------------------------------  -----------------------------------------------------------------  -----------\n");
+        osal_fprintf(common->fpBWTotal, "              PRI        SEC        FBC        PRP       PROC        BWB       TOTAL        PRI       SEC        FBD         PRP       PROC      TOTAL\n");
+        osal_fprintf(common->fpBWTotal, "+===================================================================================================================================================================\n");
     }
-    osal_fprintf(common->fpBWTotal, "%5d %s %10d %10d %10d %10d %10d %10d  %10d %10d %10d %10d %10d %10d  %10d\n", common->numFrames-1, picTypeString[picType], 
-        bdata->awid_pri, bdata->awid_sec, (bdata->awid_fbc_y+bdata->awid_fbc_c), bdata->awid_prp, bdata->awid_proc, total_wr_bw, 
-        bdata->arid_pri, bdata->arid_sec, (bdata->arid_fbd_y+bdata->arid_fbd_c), bdata->arid_prp, bdata->arid_proc, total_rd_bw,
+    osal_fprintf(common->fpBWTotal, "%5d %s %10d %10d %10d %10d %10d %10d %10d  %10d %10d %10d %10d %10d %10d  %10d\n", common->numFrames-1, picTypeString[picType],
+        bdata->awid_pri, bdata->awid_sec, (bdata->awid_fbc_y+bdata->awid_fbc_c), bdata->awid_prp, bdata->awid_proc, bdata->awid_bwb, total_wr_bw,
+        bdata->arid_pri, bdata->arid_sec, (bdata->arid_fbd_y+bdata->arid_fbd_c), bdata->arid_prp, bdata->arid_proc,                  total_rd_bw,
         (total_wr_bw + total_rd_bw));
     osal_fflush(common->fpBWTotal);
 }
@@ -346,6 +350,7 @@ backbone_bw_monitor_get_data(
     ctx->total += idata->awid_sec   = bwdata.secBwWrite;
     ctx->total += idata->arid_proc  = bwdata.procBwRead;
     ctx->total += idata->awid_proc  = bwdata.procBwWrite;
+    ctx->total += idata->awid_bwb   = bwdata.bwbBwWrite;
 
     if (prevTotal == ctx->total) {
         // VPU didn't decode a frame.
@@ -364,6 +369,7 @@ backbone_bw_monitor_get_data(
     ctx->awid_sec_total   += idata->awid_sec  ;
     ctx->arid_proc_total  += idata->arid_proc ;
     ctx->awid_proc_total  += idata->awid_proc ;
+    ctx->awid_bwb_total   += idata->awid_bwb  ;
 
     return (BWData)idata;
 }
@@ -382,7 +388,7 @@ static BWMonitorOps_t s_vp_backbone_ops = {
 /************************************************************************/
 BWCtx
 BWMonitorSetup(
-    CodecInst*  instance, 
+    CodecInst*  instance,
     BOOL        perFrame,
     char*       strLogDir
     )
@@ -440,7 +446,7 @@ BWMonitorSetup(
     return common;
 }
 
-void 
+void
 BWMonitorReset(
     BWCtx    context
     )
@@ -453,7 +459,7 @@ BWMonitorReset(
     common->ops->reset(context);
 }
 
-void 
+void
 BWMonitorRelease(
     BWCtx    context
     )
@@ -465,11 +471,11 @@ BWMonitorRelease(
 
     common->ops->release(context);
 
-    if (common->fpBWTotal) 
+    if (common->fpBWTotal)
         osal_fclose(common->fpBWTotal);
 }
 
-void 
+void
 BWMonitorUpdate(
     BWCtx       context,
     Uint32      numCores
@@ -488,7 +494,7 @@ BWMonitorUpdate(
     common->numFrames++;
 }
 
-void 
+void
     BWMonitorUpdatePrint(
     BWCtx       context,
     Uint32      picType
@@ -504,4 +510,3 @@ void
 
     osal_free(common->data);
 }
-

@@ -123,11 +123,13 @@ typedef struct {
     int handle;        ///< codec device handler
     int extradata_size;      ///< extra data size
     char extradata[AUDIO_EXTRA_DATA_SIZE];
-	int SessionID;
-	int dspdec_not_supported;//check some profile that audiodsp decoder can not support,we switch to arm decoder	
-	int droppcm_flag;				// drop pcm flag, if switch audio (1)
+    int SessionID;
+    int dspdec_not_supported;//check some profile that audiodsp decoder can not support,we switch to arm decoder
+    int droppcm_flag;				// drop pcm flag, if switch audio (1)
     int automute;
     unsigned int has_video;
+    int associate_dec_supported;//support associate or not
+    int mixing_level;
 } arm_audio_info;
 
 //audio decoder type, default arc

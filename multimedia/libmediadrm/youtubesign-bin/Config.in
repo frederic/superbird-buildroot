@@ -1,0 +1,7 @@
+config BR2_PACKAGE_YOUTUBESIGN_BIN
+        bool "youtube sign binary"
+        select BR2_PACKAGE_TDK
+        help
+          prebuilt for youtube device sign.
+
+          http://openlinux.amlogic.com

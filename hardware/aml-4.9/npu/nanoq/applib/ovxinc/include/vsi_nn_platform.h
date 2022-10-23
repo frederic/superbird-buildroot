@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -30,10 +30,14 @@
 #include <VX/vx_api.h>
 #include <VX/vx_compatibility.h>
 #include <VX/vx_khr_import_kernel.h>
-
-#ifdef VX_VERSION_1_2
-#include <VX/viv_nn_compatibility.h>
+#if defined(VX_KHR_COMPATIBILITY) && (0x1==VX_KHR_COMPATIBILITY)
+#include <VX/vx_khr_compatible.h>
 #endif
+
+/*
+    This is a compatibility head file for backward compatibility OpenVX 1.1 spec
+*/
+#include "vsi_nn_compatibility.h"
 
 #if defined(__cplusplus)
 extern "C"{

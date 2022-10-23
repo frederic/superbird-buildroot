@@ -128,6 +128,9 @@ struct mapped_device {
 	bool init_tio_pdu:1;
 
 	struct srcu_struct io_barrier;
+#ifdef CONFIG_AMLOGIC_MODIFY
+	unsigned long queued_request;
+#endif
 };
 
 void dm_init_md_queue(struct mapped_device *md);

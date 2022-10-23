@@ -33,6 +33,9 @@ config BR2_PACKAGE_WESTON
 
 if BR2_PACKAGE_WESTON
 
+config BR2_PACKAGE_WESTON_VERSION
+	string ""
+
 # Helper to make sure at least one compositor is selected.
 config BR2_PACKAGE_WESTON_HAS_COMPOSITOR
 	bool
@@ -121,6 +124,22 @@ config BR2_PACKAGE_WESTON_DRM_FIX_UI_SIZE
 	bool "Use fixed ui size on differ display mode"
 	help
 	  Use fixed ui size on differ display mode.
+
+config BR2_PACKAGE_WESTON_MAX_OUTPUT_PIPLINE
+	int "max output pipline supported"
+	default "1"
+	help
+	  For multi connector support, We set max output pipline and
+	  use connector's priority config to enable maximum connectors.
+
+if BR2_PACKAGE_WESTON_DRM
+config BR2_PACKAGE_WESTON_OUTPUT_DYNAMIC_SWITCH
+	bool "dynamic switch output hdmi/cvbs"
+	default y
+	help
+	  For hdmi/cvbs bind with same crtc,hdmi and cvbs could not
+	  output same time.
+endif
 
 source "package/weston/weston-daemon/Config.in"
 

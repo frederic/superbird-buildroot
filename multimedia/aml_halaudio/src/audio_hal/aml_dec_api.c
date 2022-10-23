@@ -60,6 +60,7 @@ static aml_dec_func_t * get_decoder_function(audio_format_t format, int dolby_st
         }
     }
     case AUDIO_FORMAT_DOLBY_TRUEHD:
+    case AUDIO_FORMAT_MAT:
         return &aml_datmos_func;
     case AUDIO_FORMAT_DTS:
     case AUDIO_FORMAT_DTS_HD: {
@@ -292,7 +293,7 @@ int aml_decoder_process(aml_dec_t *aml_dec, unsigned char*buffer, int bytes, int
     }
 
 
-    if (aml_dec->format == AUDIO_FORMAT_DOLBY_TRUEHD) {
+    if (aml_dec->format == AUDIO_FORMAT_DOLBY_TRUEHD || aml_dec->format == AUDIO_FORMAT_MAT) {
         aml_dec->next_PAPB = aml_dec->first_PAPB;
     }
 

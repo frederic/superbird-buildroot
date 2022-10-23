@@ -40,8 +40,10 @@ bl30_arb_cvn="0x0"
 bl31_arb_cvn="0x0"
 bl32_arb_cvn="0x0"
 bl33_arb_cvn="0x0"
+with_bl40="false"
+sign_bl40="false"
 
-while getopts "s:h:p:r:a:b:uno:" opt; do
+while getopts "s:h:p:r:a:b:unmdo:" opt; do
   case $opt in
     s) readonly soc="$OPTARG" ;;
     h) readonly hash_ver="$OPTARG" ;;
@@ -50,6 +52,8 @@ while getopts "s:h:p:r:a:b:uno:" opt; do
     a) readonly fw_kaes_dir="$OPTARG" ;;
     b) readonly fw_arb_config="$OPTARG" ;;
     n) readonly encryption_option="none" ;;
+    m) readonly with_bl40="true" ;;
+    d) readonly sign_bl40="true" ;;
     u) readonly unsigned_only="true"; encryption_option="none" ;;
     o) readonly bl_out_dir="$OPTARG" ;;
     \?)
@@ -93,6 +97,7 @@ readonly rsa_bl30=${soc_fw_krsa_dir}/bl3xkey.pem
 readonly rsa_bl31=${soc_fw_krsa_dir}/bl3xkey.pem
 readonly rsa_bl32=${soc_fw_krsa_dir}/bl3xkey.pem
 readonly rsa_bl33=${soc_fw_krsa_dir}/bl3xkey.pem
+readonly rsa_bl40=${soc_fw_krsa_dir}/bl40key.pem
 readonly rsa_kernel=${soc_fw_krsa_dir}/kernelkey.pem
 
 readonly kaes_bl2=${soc_fw_kaes_dir}/bl2aeskey
@@ -100,6 +105,7 @@ readonly kaes_bl30=${soc_fw_kaes_dir}/bl3xaeskey
 readonly kaes_bl31=${soc_fw_kaes_dir}/bl3xaeskey
 readonly kaes_bl32=${soc_fw_kaes_dir}/bl3xaeskey
 readonly kaes_bl33=${soc_fw_kaes_dir}/bl3xaeskey
+readonly kaes_bl40=${soc_fw_kaes_dir}/bl40aeskey
 readonly kaes_kernel=${soc_fw_kaes_dir}/kernelaeskey
 
 readonly bl2_iv=${soc_fw_kaes_dir}/bl2aesiv
@@ -107,6 +113,7 @@ readonly bl30_iv=${soc_fw_kaes_dir}/bl3xaesiv
 readonly bl31_iv=${soc_fw_kaes_dir}/bl3xaesiv
 readonly bl32_iv=${soc_fw_kaes_dir}/bl3xaesiv
 readonly bl33_iv=${soc_fw_kaes_dir}/bl3xaesiv
+readonly bl40_iv=${soc_fw_kaes_dir}/bl40aesiv
 readonly kernel_iv=${soc_fw_kaes_dir}/kernelaesiv
 
 function check_rsa_key_files() {
@@ -262,9 +269,31 @@ if [ $encryption_option != "none" ]; then
 
   encryption_flags="${encryption_flags} --kernel-aes-key ${kaes_kernel}"
   encryption_flags="${encryption_flags} --kernel-aes-iv ${kernel_iv}"
+
+  encryption_flags_bl40="--bl40-aes-key  ${kaes_bl40} --bl40-aes-iv ${bl40_iv}"
 fi
 
+bl40_flags=
+
 if [ $unsigned_only != "true" ]; then
+  if [ ${sign_bl40} == "true" ]; then
+      "$sign_boot_tool" --create-signed-bl40 \
+          --key-hash-ver 2                               \
+          --root-key-idx 0                               \
+          --root-key    "$rsa_bl40"                      \
+          --root-key-0  "$rsa_bl40"                      \
+          --root-key-1  "$rsa_bl40"                      \
+          --bl40         "${soc_prebuilts}/bl40.bin"     \
+          --bl40-key     "$rsa_bl40"                     \
+          ${encryption_flags_bl40}                       \
+          -e            "$encryption_option"             \
+          --bl40-arb-cvn 0x0                             \
+          -o            "${bl_out_dir}/bl40.bin.${postfix}"
+      bl40_flags="--bl40 ${bl_out_dir}/bl40.bin.${postfix}"
+  elif [ ${with_bl40} == "true" ]; then
+      bl40_flags="--bl40 ${soc_prebuilts}/bl40.bin"
+  fi
+
   "$sign_boot_tool" --create-signed-bl \
     --key-hash-ver 2                                     \
     --root-key-idx 0                                     \
@@ -293,6 +322,8 @@ if [ $unsigned_only != "true" ]; then
     --ddrfw6       "${ddrfw}/lpddr4_2d.fw"               \
     --ddrfw7       "${ddrfw}/diag_lpddr4.fw"             \
     --ddrfw8       "${ddrfw}/aml_ddr.fw"                 \
+    --ddrfw9  "${soc_prebuilts}/lpddr3_1d.fw"            \
+    ${bl40_flags}                                        \
     ${encryption_flags}                                  \
     -e            "$encryption_option"                   \
     --bl2-arb-cvn $bl2_arb_cvn                           \
@@ -309,12 +340,16 @@ if [ $unsigned_only != "true" ]; then
 	cat ${bl_out_dir}/u-boot.bin.${postfix} >> ${bl_out_dir}/u-boot.bin.${postfix}.sd.bin
 fi
 
+if [ ${with_bl40} == "true" ]; then
+  bl40_flags="--bl40 ${soc_prebuilts}/bl40.bin"
+fi
 "$sign_boot_tool_dev" --create-unsigned-bl              \
     --bl2 "${soc_prebuilts}/bl2_new.bin"                \
     --bl30 "${soc_prebuilts}/bl30_new.bin"              \
     --bl31 "${soc_prebuilts}/bl31.img"                  \
     --bl32 "${BL32_IMG}"                                \
     --bl33 "${soc_prebuilts}/bl33.bin"                  \
+    ${bl40_flags}                                       \
     --ddrfw1       "${ddrfw}/ddr4_1d.fw"                \
     --ddrfw2       "${ddrfw}/ddr4_2d.fw"                \
     --ddrfw3       "${ddrfw}/ddr3_1d.fw"                \
@@ -323,6 +358,7 @@ fi
     --ddrfw6       "${ddrfw}/lpddr4_2d.fw"              \
     --ddrfw7       "${ddrfw}/diag_lpddr4.fw"            \
     --ddrfw8       "${ddrfw}/aml_ddr.fw"                \
+    --ddrfw9  "${soc_prebuilts}/lpddr3_1d.fw"           \
     -o "${bl_out_dir}/u-boot.bin.unsigned"
 
 head -c 65536 "${bl_out_dir}/u-boot.bin.unsigned" > "${bl_out_dir}/u-boot.bin.usb.bl2.unsigned"
@@ -330,51 +366,58 @@ tail -c +65537 "${bl_out_dir}/u-boot.bin.unsigned" > "${bl_out_dir}/u-boot.bin.u
 dd if=/dev/urandom of=${bl_out_dir}/u-boot.bin.unsigned.sd.bin count=1 >& /dev/null
 cat ${bl_out_dir}/u-boot.bin.unsigned >> ${bl_out_dir}/u-boot.bin.unsigned.sd.bin
 
-
-rsa_root_hash=${soc_fw_krsa_dir}/rootkeys-hash.bin
-
-"$sign_boot_tool_dev" --create-root-hash \
-	--key-hash-ver 2                       \
-	--root-key-0 "$rsa_root0"              \
-	--root-key-1 "$rsa_root1"              \
-	--root-key-2 "$rsa_root2"              \
-	--root-key-3 "$rsa_root3"              \
-	-o "$rsa_root_hash"
-
-"$efuse_gen" --generate-efuse-pattern \
-	--soc g12a                          \
-	--key-hash-ver 2                    \
-	--root-hash "$rsa_root_hash"        \
-	--aes-key "${kaes_bl2}"             \
-	--enable-sb true                    \
-	--enable-aes true                   \
-	--enable-anti-rollback $enable_antirollback    \
-	-o "${bl_out_dir}/pattern.secureboot.efuse"
-
-#if found usb.password.hash.bin then generate pattern.usb.efuse
-#which contain usb password pattern
-
-readonly passwordhash=${soc_fw_krsa_dir}/usb.password.hash.bin
-if [ -f $passwordhash ]; then
-	"$efuse_gen" --generate-efuse-pattern \
-	--soc g12a                          \
-	--key-hash-ver 2                    \
-	--root-hash "$rsa_root_hash"        \
-	--aes-key "${kaes_bl2}"             \
-	--enable-sb true                    \
-	--enable-aes true                   \
-	--enable-anti-rollback $enable_antirollback    \
-	--enable-usb-password true          \
-	--password-hash $passwordhash       \
-	-o "${bl_out_dir}/pattern.efuse"
-
-	"$efuse_gen" --generate-efuse-pattern \
-	--soc g12a                          \
-	--enable-usb-password true          \
-	--password-hash $passwordhash       \
-	-o "${bl_out_dir}/pattern.usb.efuse"
-else
-  cp -f "${bl_out_dir}/pattern.secureboot.efuse" "${bl_out_dir}/pattern.efuse"
+if [ ${sign_bl40} == "true" ]; then
+"$sign_boot_tool_dev" --create-unsigned-bl40 \
+    --bl40 "${soc_prebuilts}/bl40.bin" \
+    -o "${bl_out_dir}/bl40.bin.unsigned"
 fi
 
-rm -f "$rsa_root_hash"
+if [ $unsigned_only != "true" ]; then
+    rsa_root_hash=${soc_fw_krsa_dir}/rootkeys-hash.bin
+
+    "$sign_boot_tool_dev" --create-root-hash \
+        --key-hash-ver 2                       \
+        --root-key-0 "$rsa_root0"              \
+        --root-key-1 "$rsa_root1"              \
+        --root-key-2 "$rsa_root2"              \
+        --root-key-3 "$rsa_root3"              \
+        -o "$rsa_root_hash"
+
+    "$efuse_gen" --generate-efuse-pattern \
+        --soc g12a                          \
+        --key-hash-ver 2                    \
+        --root-hash "$rsa_root_hash"        \
+        --aes-key "${kaes_bl2}"             \
+        --enable-sb true                    \
+        --enable-aes true                   \
+        --enable-anti-rollback $enable_antirollback    \
+        -o "${bl_out_dir}/pattern.secureboot.efuse"
+
+    #if found usb.password.hash.bin then generate pattern.usb.efuse
+    #which contain usb password pattern
+
+    readonly passwordhash=${soc_fw_krsa_dir}/usb.password.hash.bin
+    if [ -f $passwordhash ]; then
+        "$efuse_gen" --generate-efuse-pattern \
+        --soc g12a                          \
+        --key-hash-ver 2                    \
+        --root-hash "$rsa_root_hash"        \
+        --aes-key "${kaes_bl2}"             \
+        --enable-sb true                    \
+        --enable-aes true                   \
+        --enable-anti-rollback $enable_antirollback    \
+        --enable-usb-password true          \
+        --password-hash $passwordhash       \
+        -o "${bl_out_dir}/pattern.efuse"
+
+        "$efuse_gen" --generate-efuse-pattern \
+        --soc g12a                          \
+        --enable-usb-password true          \
+        --password-hash $passwordhash       \
+        -o "${bl_out_dir}/pattern.usb.efuse"
+    else
+      cp -f "${bl_out_dir}/pattern.secureboot.efuse" "${bl_out_dir}/pattern.efuse"
+    fi
+
+    rm -f "$rsa_root_hash"
+fi

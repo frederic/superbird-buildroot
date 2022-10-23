@@ -44,7 +44,7 @@
 #include "hciattach.h"
 #include "hciattach_h4.h"
 
-#define RTK_VERSION "3.1.3ea0d4e.20190618-192542"
+#define RTK_VERSION "3.1.a2a2042.20191024-161739"
 
 #define TIMESTAMP_PR
 

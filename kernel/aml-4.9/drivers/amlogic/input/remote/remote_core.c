@@ -28,6 +28,7 @@
 #include <linux/errno.h>
 #include <asm/irq.h>
 #include <linux/io.h>
+#include <linux/amlogic/pm.h>
 
 /*#include <mach/pinmux.h>*/
 #include <linux/major.h>
@@ -148,7 +149,9 @@ void remote_keydown(struct remote_dev *dev, int scancode, int status)
 		keycode = dev->getkeycode(dev, scancode);
 		if (keycode == KEY_POWER)
 			pm_stay_awake(dev->dev);
-		ir_do_keydown(dev, scancode, keycode);
+
+		if (likely(!is_pm_freeze_mode() || (keycode == KEY_POWER)))
+			ir_do_keydown(dev, scancode, keycode);
 	}
 
 	if (dev->keypressed) {

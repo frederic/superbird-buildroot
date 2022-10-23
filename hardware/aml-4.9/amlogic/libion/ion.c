@@ -273,7 +273,7 @@ int ion_query_heap_cnt(int fd, int* cnt) {
 int ion_query_get_heaps(int fd, int cnt, void* buffers) {
     int ret;
     struct ion_heap_query query = {
-        .cnt = cnt, .heaps = (long)buffers,
+        .cnt = cnt, .heaps = (unsigned long)buffers,
     };
 
     ret = ion_ioctl(fd, ION_IOC_HEAP_QUERY, &query);

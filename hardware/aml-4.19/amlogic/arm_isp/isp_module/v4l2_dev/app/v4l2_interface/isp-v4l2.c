@@ -226,8 +226,9 @@ static int isp_v4l2_fop_close( struct file *file )
             dev->stream_id_index[pstream->stream_type] = -1;
         if (pstream->stream_started)
         {
+            isp_v4l2_stream_type_t type = pstream->stream_type;
             isp_v4l2_stream_deinit( pstream, atomic_read(&dev->stream_on_cnt) );
-			if (atomic_read(&dev->stream_on_cnt) && (pstream->stream_type != V4L2_STREAM_TYPE_META))
+			if (atomic_read(&dev->stream_on_cnt) && ( type != V4L2_STREAM_TYPE_META))
 				atomic_sub_return( 1, &dev->stream_on_cnt );
             dev->pstreams[sp->stream_id] = NULL;
         }
@@ -421,6 +422,9 @@ static int isp_v4l2_streamon( struct file *file, void *priv, enum v4l2_buf_type 
 
     if ( isp_v4l2_is_q_busy( &sp->vb2_q, file ) )
         return -EBUSY;
+    else
+        if (pstream->stream_started)
+            return -EBUSY;
 
     rc = vb2_streamon( &sp->vb2_q, i );
     if ( rc != 0 ) {
@@ -510,7 +514,6 @@ static int isp_v4l2_reqbufs( struct file *file, void *priv,
 
 #if ISP_HAS_DS2
     if (sp->stream_id == V4L2_STREAM_TYPE_DS2) {
-        LOG( LOG_INFO, "request buffer count = %d\n", p->count);
         am_sc_set_buf_num(p->count);
         am_sc_system_init();
     }
@@ -700,8 +703,6 @@ static int isp_cma_alloc(struct platform_device *pdev, unsigned long size)
     }
     isp_kaddr = (void *)cma_pages;
 
-    LOG( LOG_INFO, "isp_cma_mem : %p, paddr:0x%x\n", isp_kaddr, isp_paddr);
-
     return 0;
 }
 
@@ -864,7 +865,6 @@ int isp_v4l2_create_instance( struct v4l2_device *v4l2_dev, struct platform_devi
 
     rc = of_property_read_u32(pdev->dev.of_node, "temper-buf-size",
                                &temper_buf_size);
-    LOG(LOG_INFO, "%s:temper buffer size %d, rtn %d\n", __func__, temper_buf_size, rc);
     if ( rc != 0 ) {
         LOG(LOG_ERR, "failed to get temper-buf-size from dts, use default value\n");
         temper_buf_size = DEFAULT_TEMPER_BUFFER_SIZE;
@@ -878,7 +878,6 @@ int isp_v4l2_create_instance( struct v4l2_device *v4l2_dev, struct platform_devi
         return rc;
 
     rc = of_property_read_u32(pdev->dev.of_node, "temper-line-offset", &temper_line_offset);
-    LOG(LOG_INFO, "%s:temper line offset %d, rtn %d\n", __func__, temper_line_offset, rc);
     if (rc != 0) {
         LOG(LOG_ERR, "failed to get temper_line_offset from dts, use default value\n");
         temper_line_offset = DEFAULT_TEMPER_LINE_OFFSET;
@@ -939,8 +938,6 @@ free_cma:
 
 void isp_v4l2_destroy_instance( struct platform_device *pdev )
 {
-    LOG( LOG_INFO, "%s: Enter.\n", __func__ );
-
 	if ( g_isp_v4l2_devs[0] ) {
         int ctx_id;
 

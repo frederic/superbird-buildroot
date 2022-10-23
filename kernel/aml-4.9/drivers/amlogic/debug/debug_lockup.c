@@ -26,6 +26,7 @@
 #include <linux/debugfs.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#include <linux/amlogic/debug_ftrace_ramoops.h>
 
 /*isr trace*/
 #define ns2ms			(1000 * 1000)
@@ -68,11 +69,47 @@ core_param(isr_check_en, isr_check_en, int, 0644);
 static unsigned long out_thr = OUT_WIN;
 core_param(out_thr, out_thr, ulong, 0644);
 
+static int isr_long_panic;
+core_param(isr_long_panic, isr_long_panic, int, 0644);
+static int sirq_long_panic;
+core_param(sirq_long_panic, sirq_long_panic, int, 0644);
+static int dis_irq_long_panic;
+core_param(dis_irq_long_panic, dis_irq_long_panic, int, 0644);
+static int irq_ratio_panic;
+core_param(irq_ratio_panic, irq_ratio_panic, int, 0644);
+
+noinline void isr_long_trace(void)
+{
+	pr_err("%s()\n", __func__);
+}
+EXPORT_SYMBOL(isr_long_trace);
+
+noinline void irq_ratio_trace(void)
+{
+	pr_err("%s()\n", __func__);
+}
+EXPORT_SYMBOL(irq_ratio_trace);
+
+noinline void sirq_long_trace(void)
+{
+	pr_err("%s()\n", __func__);
+}
+EXPORT_SYMBOL(sirq_long_trace);
+
+noinline void dis_irq_long_trace(void)
+{
+	pr_err("%s()\n", __func__);
+}
+EXPORT_SYMBOL(dis_irq_long_trace);
+
 void notrace isr_in_hook(unsigned int cpu, unsigned long long *tin,
 	unsigned int irq, void *act)
 {
 	if (irq >= IRQ_CNT || !isr_check_en || oops_in_progress)
 		return;
+
+	pstore_ftrace_io_tag((unsigned long)irq, (unsigned long)act);
+
 	cpu_irq[cpu] = irq;
 	cpu_action[cpu] = act;
 	*tin = sched_clock();
@@ -103,17 +140,24 @@ void notrace isr_out_hook(unsigned int cpu, unsigned long long tin,
 	t_total[irq] = (tout-t_base[irq]);
 	cnt_total[irq]++;
 
+	pstore_ftrace_io_tag(0xFFF1, (unsigned long)irq);
+
 	if (tout > isr_thr + tin) {
 		t_diff = tout - tin;
 		do_div(t_diff, ns2ms);
 		pr_err("ISR_Long___ERR. irq:%d  tout-tin:%llu ms\n",
-			irq, t_diff);
+		       irq, t_diff);
+
+		isr_long_trace();
+
+		if (isr_long_panic)
+			panic("isr_long_panic");
 	}
 
 	if (t_total[irq] < CHK_WINDOW)
 		return;
 
-	if (t_isr[irq] * 100 >= 35 * t_total[irq]) {
+	if (t_isr[irq] * 100 >= 50 * t_total[irq]) {
 		t_isr_tmp = t_isr[irq];
 		do_div(t_isr_tmp, ns2ms);
 		t_total_tmp = t_total[irq];
@@ -123,6 +167,11 @@ void notrace isr_out_hook(unsigned int cpu, unsigned long long tin,
 		pr_err("IRQRatio___ERR.irq:%d ratio:%llu\n", irq, ratio);
 		pr_err("t_isr:%llu  t_total:%llu, cnt:%d\n",
 			t_isr_tmp, t_total_tmp, cnt_total[irq]);
+
+		irq_ratio_trace();
+
+		if (irq_ratio_panic)
+			panic("irq_ratio_panic");
 	}
 	t_base[irq] = sched_clock();
 	t_isr[irq] = 0;
@@ -135,11 +184,14 @@ void notrace sirq_in_hook(unsigned int cpu, unsigned long long *tin, void *p)
 {
 	cpu_sirq[cpu] = p;
 	*tin = sched_clock();
+	pstore_ftrace_io_tag(0xFFE0, (unsigned long)p);
 }
 void notrace sirq_out_hook(unsigned int cpu, unsigned long long tin, void *p)
 {
 	unsigned long long tout = sched_clock();
 	unsigned long long t_diff;
+
+	pstore_ftrace_io_tag(0xFFE1, (unsigned long)p);
 
 	if (cpu_sirq[cpu] && tin && (tout > tin + sirq_thr) &&
 		!oops_in_progress) {
@@ -147,6 +199,11 @@ void notrace sirq_out_hook(unsigned int cpu, unsigned long long tin, void *p)
 		do_div(t_diff, ns2ms);
 		pr_err("SIRQLong___ERR. sirq:%p  tout-tin:%llu ms\n",
 			p, t_diff);
+
+		sirq_long_trace();
+
+		if (sirq_long_panic)
+			panic("sirq_long_panic");
 	}
 	cpu_sirq[cpu] = NULL;
 }
@@ -222,7 +279,11 @@ void notrace irq_trace_stop(unsigned long flag)
 			pr_err("\n\nDisIRQ___ERR:%llu ms <%llu %llu> %d:\n",
 				t, t_i_e, t_i_d[cpu], out_cnt);
 			print_stack_trace(&irq_trace[cpu], 0);
-			dump_stack();
+
+			dis_irq_long_trace();
+
+			if (dis_irq_long_panic)
+				panic("dis_irq_long_panic");
 		}
 	}
 	t_i_d[cpu] = 0;
@@ -354,6 +415,114 @@ debug_fs(irq_check_en);
 debug_fs(isr_check_en);
 debug_fs(out_thr);
 
+#define FIVE(m)         {m; m; m; m; m; }
+#define TEN(m)          {FIVE(m) FIVE(m)}
+#define FIFTY(m)        {TEN(m) TEN(m) TEN(m) TEN(m) TEN(m)}
+#define HUNDRED(m)      {FIFTY(m) FIFTY(m)}
+#define FIVE_HUNDRED(m) {HUNDRED(m) HUNDRED(m) HUNDRED(m) HUNDRED(m) HUNDRED(m)}
+#define THOUSAND(m)     {FIVE_HUNDRED(m) FIVE_HUNDRED(m)}
+#if defined CONFIG_ARM
+#define ONE_LOOP asm("mov r0, r0\n":::"r0", "memory")
+#elif defined CONFIG_ARM64
+#define ONE_LOOP asm("mov x0, x0\n":::"x0", "memory")
+#endif
+
+#define TIMENS_1M_LOOPS_OF_1G_CPU 1005000  //about 1ms
+static int cpu_speed_test(void)
+{
+	int i, mhz;
+	unsigned long long start, end;
+	unsigned int delta;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	/* do 1M loops */
+	start = sched_clock();
+	for (i = 0; i < 1000; i++)
+		THOUSAND(ONE_LOOP);
+
+	end = sched_clock();
+
+	local_irq_restore(flags);
+
+	if (end - start > UINT_MAX) {
+		WARN(1, "cpu_speed_test() consume %llu ns\n", end - start);
+		return 0;
+	}
+
+	delta = (unsigned int)(end - start);
+	mhz = TIMENS_1M_LOOPS_OF_1G_CPU * 1000 / delta;
+
+	pr_debug("cpu_speed_test() delta_us=%u mhz=%d\n", delta / 1000, mhz);
+
+	return mhz;
+}
+
+static ssize_t cpu_mhz_read(struct file *file, char __user *userbuf,
+			    size_t count, loff_t *ppos)
+{
+	char buf[20];
+	int mhz;
+	ssize_t len;
+
+	mhz = cpu_speed_test();
+	len = snprintf(buf, sizeof(buf), "%d\n", mhz);
+
+	pr_info("cpu_speed_test() mhz=%d\n", mhz);
+
+	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
+}
+
+static const struct file_operations cpu_mhz_debug_ops = {
+	.open = simple_open,
+	.read = cpu_mhz_read,
+};
+
+static int test_mhz_period_ms;
+core_param(test_mhz_period_ms, test_mhz_period_ms, int, 0644);
+
+static int test_mhz_console;
+core_param(test_mhz_console, test_mhz_console, int, 0644);
+
+static enum hrtimer_restart test_mhz_hrtimer_func(struct hrtimer *timer)
+{
+	int mhz;
+	ktime_t now, interval;
+
+	if (!test_mhz_period_ms) {
+		pr_info("stop test_mhz hrtimer\n");
+		return HRTIMER_NORESTART;
+	}
+
+	mhz = cpu_speed_test();
+	trace_printk("cpu_mhz=%d\n", mhz);
+
+	if (test_mhz_console)
+		pr_info("cpu_mhz=%d\n", mhz);
+
+	now = ktime_get();
+	interval = ktime_set(test_mhz_period_ms / 1000,
+			     test_mhz_period_ms % 1000 * 1000000);
+	hrtimer_forward(timer, now, interval);
+	return HRTIMER_RESTART;
+}
+
+static void test_mhz_hrtimer_init(void)
+{
+	struct hrtimer *hrtimer;
+
+	if (!test_mhz_period_ms)
+		return;
+
+	hrtimer = kmalloc(sizeof(*hrtimer), GFP_KERNEL);
+
+	hrtimer_init(hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrtimer->function = test_mhz_hrtimer_func;
+
+	hrtimer_start(hrtimer, ktime_set(1, 0), HRTIMER_MODE_REL);
+}
+
 static int __init debug_lockup_init(void)
 {
 	debug_lockup = debugfs_create_dir("lockup", NULL);
@@ -374,9 +543,13 @@ static int __init debug_lockup_init(void)
 			    debug_lockup, NULL, &isr_check_en_debug_ops);
 	debugfs_create_file("irq_check_en", S_IFREG | 0664,
 			    debug_lockup, NULL, &irq_check_en_debug_ops);
+	debugfs_create_file("cpu_mhz", S_IFREG | 0664,
+			    debug_lockup, NULL, &cpu_mhz_debug_ops);
 	if (irq_check_en || isr_check_en)
 		aml_wdt_disable_dbg();
 	irq_flg = 1;
+
+	test_mhz_hrtimer_init();
 	return 0;
 }
 late_initcall(debug_lockup_init);

@@ -810,6 +810,14 @@ _mali_osk_errcode_t _mali_ukk_mem_unbind(_mali_uk_unbind_mem_s *args)
 	return _MALI_OSK_ERR_OK;
 }
 
+_mali_osk_errcode_t _meson_update_video_texture(_meson_update_video_texture_s *args)
+{
+	struct  mali_session_data *session = (struct mali_session_data *)(uintptr_t)args->ctx;
+	int fd = args->fd;
+
+	return meson_update_video_texture(session, fd);
+}
+
 /*
 * Function _mali_ukk_mem_cow --  COW for an allocation
 * This function allocate new pages for  a range (range, range+size) of allocation

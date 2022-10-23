@@ -67,6 +67,7 @@ typedef struct vp_multi_s {
   bool mPrependSPSPPSToIDRFrames;
   bool mSpsPpsHeaderReceived;
   bool mKeyFrameRequested;
+  int mLongTermRefRequestFlags;
   int mNumInputFrames;
   AMVEncFrameFmt fmt;
   int mSPSPPSDataSize;
@@ -127,9 +128,16 @@ AMVEnc_Status initEncParams(VPMultiEncHandle *handle,
     handle->mEncParams.MBsIntraOverlap = 0;
     handle->mEncParams.encode_once = 1;
 
-    if (encode_info.enc_feature_opts & 0x1) handle->mEncParams.roi_enable = 1;
-    if (encode_info.enc_feature_opts & 0x2)
-        handle->mEncParams.param_change_enable = 1;
+    if (encode_info.enc_feature_opts & ENABLE_ROI_FEATURE)
+      handle->mEncParams.roi_enable = 1;
+    if (encode_info.enc_feature_opts & ENABLE_PARA_UPDATE)
+      handle->mEncParams.param_change_enable = 1;
+    if (encode_info.enc_feature_opts & ENABLE_LONG_TERM_REF)
+      handle->mEncParams.longterm_ref_enable = 1;
+    if (encode_info.enc_feature_opts & 0x7c) {
+        handle->mEncParams.GopPreset = (AMVGOPModeOPT)
+                ((encode_info.enc_feature_opts >>2) & 0x1f);
+    }
 
   if (encode_info.img_format == IMG_FMT_NV12) {
     VLOG(INFO, "img_format is IMG_FMT_NV12 \n");
@@ -264,6 +272,7 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
   if (in_buffer_info == NULL) {
     VLOG(ERR, "invalid input buffer_info\n");
     result.is_valid = false;
+    result.err_cod = AMVENC_UNINITIALIZED;
     return result;
   }
   handle->bufType = (AMVEncBufferType)(in_buffer_info->buf_type);
@@ -272,6 +281,7 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
     if (handle->mEncParams.width % 16) {
        VLOG(ERR, "dma buffer width must be multiple of 16!");
        result.is_valid = false;
+       result.err_cod = AMVENC_ENCPARAM_MEM_FAIL;
        return result;
     }
   }
@@ -296,6 +306,10 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
       VLOG(ERR, "Encode SPS and PPS error, encoderStatus = %d. handle: %p\n",
            ret, (void*)handle);
       result.is_valid = false;
+      if (ret == AMVENC_FAIL)
+         result.err_cod = AMVENC_INVALID_PARAM;
+      else
+          result.err_cod = ret;
       return result;
     }
   }
@@ -330,6 +344,7 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
             && dma_info->num_planes != 2) {
           VLOG(ERR, "invalid num_planes %d\n", dma_info->num_planes);
           result.is_valid = false;
+          result.err_cod = AMVENC_ENCPARAM_MEM_FAIL;
           return result;
         }
       } else if (handle->fmt == AMVENC_YUV420P) {
@@ -337,6 +352,7 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
             && dma_info->num_planes != 3) {
           VLOG(ERR, "YUV420P invalid num_planes %d\n", dma_info->num_planes);
           result.is_valid = false;
+          result.err_cod = AMVENC_ENCPARAM_MEM_FAIL;
           return result;
         }
       }
@@ -345,6 +361,7 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
         if (dma_info->shared_fd[i] < 0) {
           VLOG(ERR, "invalid dma_fd %d\n", dma_info->shared_fd[i]);
           result.is_valid = false;
+          result.err_cod = AMVENC_ENCPARAM_MEM_FAIL;
           return result;
         }
         handle->shared_fd[i] = dma_info->shared_fd[i];
@@ -370,10 +387,19 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
     videoInput.op_flag = 0;
 
     if (handle->mKeyFrameRequested == true) {
-      videoInput.op_flag = AMVEncFrameIO_FORCE_IDR_FLAG;
+      videoInput.op_flag |= AMVEncFrameIO_FORCE_IDR_FLAG;
       handle->mKeyFrameRequested = false;
       VLOG(INFO, "Force encode a IDR frame at %d frame",
            handle->mNumInputFrames);
+    }
+    if (handle->mEncParams.longterm_ref_enable) {
+      if (handle->mLongTermRefRequestFlags) {
+        videoInput.op_flag |= ((handle->mLongTermRefRequestFlags & 0x3)<<2);
+        VLOG(INFO, "Use LTR flags 0x%x at %d frame",
+             handle->mLongTermRefRequestFlags,
+             handle->mNumInputFrames);
+        handle->mLongTermRefRequestFlags = 0;
+      }
     }
     // if (handle->idrPeriod == 0) {
     // videoInput.op_flag |= AMVEncFrameIO_FORCE_IDR_FLAG;
@@ -385,6 +411,10 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
     if (ret < AMVENC_SUCCESS) {
       VLOG(ERR, "encoderStatus = %d, handle: %p", ret,(void*)handle);
       result.is_valid = false;
+      if (ret == AMVENC_FAIL)
+         result.err_cod = AMVENC_INVALID_PARAM;
+      else
+          result.err_cod = ret;
       return result;
     }
 
@@ -430,6 +460,10 @@ encoding_metadata_t vl_multi_encoder_encode(vl_codec_handle_t codec_handle,
     if (ret < AMVENC_SUCCESS) {
       VLOG(ERR, "encoderStatus = %d, handle: %p", ret,(void*)handle);
       result.is_valid = false;
+      if (ret == AMVENC_FAIL)
+         result.err_cod = AMVENC_INVALID_PARAM;
+      else
+          result.err_cod = ret;
       return result;
     }
     /* check the returned frame if it has */
@@ -556,6 +590,22 @@ int vl_video_encoder_change_gop(vl_codec_handle_t codec_handle,
     return 0;
 }
 
+int vl_video_encoder_longterm_ref(vl_codec_handle_t codec_handle,
+                                  int LongtermRefFlags)
+{
+    VPMultiEncHandle* handle = (VPMultiEncHandle *)codec_handle;
+
+    if (handle->am_enc_handle == 0) //not init the encoder yet
+        return -1;
+    if (handle->mEncParams.longterm_ref_enable == 0) //no enabled
+        return -2;
+    if (LongtermRefFlags > 3 || LongtermRefFlags < 0) {
+           VLOG(ERR, "Longterm ref flag invalid  0x%x\n", LongtermRefFlags);
+        return -3;
+    }
+    handle->mLongTermRefRequestFlags = LongtermRefFlags;
+    return 0;
+}
 int vl_multi_encoder_destroy(vl_codec_handle_t codec_handle) {
     VPMultiEncHandle *handle = (VPMultiEncHandle *)codec_handle;
     AML_MultiEncRelease(handle->am_enc_handle);

@@ -14,8 +14,49 @@
 
 #include "starboard/system.h"
 
+#include <unistd.h>
+#include <sys/socket.h>
+#include <linux/if.h>  // NOLINT(build/include_alpha)
+#include <netdb.h>
+#include <sys/ioctl.h>
 #include "starboard/common/log.h"
+#include "starboard/common/string.h"
+#include  <linux/sockios.h>
+#include  <linux/ethtool.h>
+
+int set_network_status(const char * devicename)
+{
+  struct ifreq ifr;
+  int sockfd;
+  if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  {
+    return -1;
+  }
+  SbStringCopy(ifr.ifr_name, devicename,SbStringGetLength(devicename)+1);
+  struct ethtool_value edata;
+  edata.cmd = ETHTOOL_GLINK;
+  edata.data = 0;
+  ifr.ifr_data = (char *) &edata;
+  if(ioctl( sockfd, SIOCETHTOOL, &ifr ) == -1)
+  {
+    close(sockfd);
+    return -1;
+  }
+  if (edata.data == 1)
+  {
+    return 0;
+  }
+  else
+  {
+    return 1;
+  }
+  return 1;
+}
 
 SbSystemConnectionType SbSystemGetConnectionType() {
-  return kSbSystemConnectionTypeWired;
+  const char * devicename = "eth0";
+  if (set_network_status(devicename) == 0)
+    return kSbSystemConnectionTypeWired;
+  else
+    return kSbSystemConnectionTypeWireless;
 }

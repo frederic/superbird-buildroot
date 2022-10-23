@@ -33,8 +33,8 @@
  */
 #define CONFIG_PLATFORM_POWER_INIT
 #define CONFIG_VCCK_INIT_VOLTAGE	800		// VCCK power up voltage
-#define CONFIG_VDDEE_INIT_VOLTAGE	800		// VDDEE power up voltage
-#define CONFIG_VDDEE_SLEEP_VOLTAGE	731		// VDDEE suspend voltage
+#define CONFIG_VDDEE_INIT_VOLTAGE	840		// VDDEE power up voltage
+#define CONFIG_VDDEE_SLEEP_VOLTAGE	770		// VDDEE suspend voltage
 
 /* configs for CEC */
 #define CONFIG_CEC_OSD_NAME		"AML_TV"
@@ -117,11 +117,22 @@
         "recovery_part=recovery\0"\
         "recovery_offset=0\0"\
         "cvbs_drv=0\0"\
-        "lock=10001000\0"\
+        "lock=10101000\0"\
         "osd_reverse=0\0"\
         "video_reverse=0\0"\
         "active_slot=normal\0"\
         "boot_part=boot\0"\
+        "suspend=off\0"\
+        "powermode=on\0"\
+        "ffv_wake=off\0"\
+        "ffv_freeze=off\0"\
+        "edid_14_dir=/vendor/etc/tvconfig/hdmi/port_14.bin\0" \
+        "edid_20_dir=/vendor/etc/tvconfig/hdmi/port_20.bin\0" \
+        "edid_select=0\0" \
+        "port_map=0x4321\0" \
+        "cec_fun=0x2F\0" \
+        "logic_addr=0x0\0" \
+        "cec_ac_wakeup=1\0" \
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
             "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
@@ -134,29 +145,97 @@
             "\0"\
         "storeargs="\
             "get_bootloaderversion;" \
-            "setenv bootargs ${initargs} ${fs_type} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmimode=${hdmimode} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
+            "setenv bootargs ${initargs} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmimode=${hdmimode} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
 	    "setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
             "run cmdline_keys;"\
             "\0"\
+        "cec_init="\
+            "echo cec_ac_wakeup=${cec_ac_wakeup}; "\
+            "if test ${cec_ac_wakeup} = 1; then "\
+                "cec ${logic_addr} ${cec_fun}; "\
+                "if test ${edid_select} = 1111; then "\
+                    "hdmirx init ${port_map} ${edid_20_dir}; "\
+                "else "\
+                    "hdmirx init ${port_map} ${edid_14_dir}; "\
+                "fi;"\
+            "fi;"\
+            "\0"\
+        "ffv_freeze_action="\
+            "run cec_init;"\
+            "setenv ffv_freeze on;"\
+            "setenv bootargs ${bootargs} ffv_freeze=on"\
+            "\0"\
+        "cold_boot_normal_check="\
+            "setenv bootargs ${bootargs} ffv_freeze=off; "\
+            /*"run try_auto_burn;uboot wake up "*/\
+            "if test ${powermode} = on; then "\
+                /*"run try_auto_burn; "*/\
+            "else if test ${powermode} = standby; then "\
+                "run cec_init;"\
+                "systemoff; "\
+            "else if test ${powermode} = last; then "\
+               "echo suspend=${suspend}; "\
+                "if test ${suspend} = off; then "\
+                    /*"run try_auto_burn; "*/\
+                "else if test ${suspend} = on; then "\
+                    "run cec_init;"\
+                    "systemoff; "\
+                "else if test ${suspend} = shutdown; then "\
+                    "run cec_init;"\
+                    "systemoff; "\
+                "fi; fi; fi; "\
+            "fi; fi; fi; "\
+            "\0"\
         "switch_bootmode="\
             "get_rebootmode;"\
+            "setenv ffv_freeze off;"\
             "if test ${reboot_mode} = factory_reset; then "\
                     "run recovery_from_flash;"\
             "else if test ${reboot_mode} = update; then "\
                     "run update;"\
             "else if test ${reboot_mode} = cold_boot; then "\
-                /*"run try_auto_burn; "*/\
+                "echo cold boot: ffv_wake=${ffv_wake} powermode=${powermode} suspend=${suspend};"\
+                "if test ${ffv_wake} = on; then "\
+                    "if test ${powermode} = on; then "\
+                        "setenv bootargs ${bootargs} ffv_freeze=off; "\
+                    "else if test ${powermode} = standby; then "\
+                        "run ffv_freeze_action; "\
+                    "else if test ${powermode} = last; then "\
+                        "if test ${suspend} = off; then "\
+                            "setenv bootargs ${bootargs} ffv_freeze=off; "\
+                        "else if test ${suspend} = on; then "\
+                            "run ffv_freeze_action; "\
+                        "else if test ${suspend} = shutdown; then "\
+                            "run ffv_freeze_action; "\
+                        "fi; fi; fi; "\
+                    "fi; fi; fi; "\
+                "else "\
+                    "run cold_boot_normal_check;"\
+                "fi; "\
+            "else if test ${reboot_mode} = ffv_reboot; then "\
+                "if test ${ffv_wake} = on; then "\
+                    "run ffv_freeze_action; "\
+                "fi; "\
             "else if test ${reboot_mode} = fastboot; then "\
                 "fastboot;"\
-            "fi;fi;fi;fi;"\
+            "fi;fi;fi;fi;fi;"\
+            "\0" \
+        "reset_suspend="\
+            "if test ${ffv_freeze} != on; then "\
+                "if test ${suspend} = on || test ${suspend} = shutdown; then "\
+                    "setenv ""suspend off"";"\
+                    "saveenv;"\
+                "fi;"\
+            "fi;"\
             "\0" \
         "storeboot="\
             "boot_cooling;"\
             "get_system_as_root_mode;"\
             "echo system_mode: ${system_mode};"\
             "if test ${system_mode} = 1; then "\
-                    "setenv fs_type ""ro rootwait skip_initramfs"";"\
-                    "run storeargs;"\
+                "setenv bootargs ${bootargs} ro rootwait skip_initramfs;"\
+            "else "\
+                "setenv bootargs ${bootargs} $(fs_type);"\
             "fi;"\
             "get_valid_slot;"\
             "get_avb_mode;"\
@@ -245,6 +324,32 @@
         "init_display="\
             "hdmitx hpd;osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;bmp scale;vout output ${outputmode}"\
             "\0"\
+        "check_display="\
+            "if test ${reboot_mode} = cold_boot; then "\
+                "if test ${powermode} = standby; then "\
+                    "echo not init_display; "\
+                "else if test ${powermode} = last; then "\
+                    "echo suspend=${suspend}; "\
+                    "if test ${suspend} = off; then "\
+                        "run init_display; "\
+                    "else if test ${suspend} = on; then "\
+                        "echo not init_display; "\
+                    "else if test ${suspend} = shutdown; then "\
+                        "echo not init_display; "\
+                    "fi; fi; fi; "\
+                "else "\
+                    "run init_display; "\
+                "fi; fi; "\
+            "else if test ${reboot_mode} = ffv_reboot; then "\
+                "if test ${ffv_wake} = on; then "\
+                    "echo ffv reboot no display; "\
+                "else "\
+                    "run init_display; "\
+                "fi; "\
+            "else "\
+                "run init_display; "\
+            "fi;fi; "\
+            "\0"\
         "cmdline_keys="\
             "if keyman init 0x1234; then "\
                 "if keyman read usid ${loadaddr} str; then "\
@@ -280,16 +385,23 @@
 			"fi;fi;" \
 		"fi;\0" \
 
+#ifdef CONFIG_PXP_EMULATOR
+#define CONFIG_PREBOOT "echo preboot for pxp"
+#define CONFIG_BOOTCOMMAND "echo bootcmd for pxp"
+#else
 #define CONFIG_PREBOOT  \
 	"run bcb_cmd; "\
 	"run factory_reset_poweroff_protect;"\
 	"run upgrade_check;"\
-	"run init_display;"\
+	/* "run init_display;"\ */\
+	"run check_display;"\
 	"run storeargs;"\
 	"bcb uboot-command;"\
-	"run switch_bootmode;"
+	"run switch_bootmode;"\
+	"run reset_suspend;"
 
 #define CONFIG_BOOTCOMMAND "run storeboot"
+#endif // #ifdef CONFIG_PXP_EMULATOR
 
 //#define CONFIG_ENV_IS_NOWHERE  1
 #define CONFIG_ENV_SIZE   (64*1024)
@@ -339,7 +451,7 @@
 /* axg only support slc nand */
 /* swither for mtd nand which is for slc only. */
 /* support for mtd */
-//#define CONFIG_AML_MTD 1
+#define CONFIG_AML_MTD 1
 /* support for nftl */
 //#define CONFIG_AML_NAND	1
 
@@ -515,7 +627,7 @@
 #define CONFIG_UNIFY_KEY_MANAGE                 1
 
 /* net */
-//#define CONFIG_CMD_NET   1
+#define CONFIG_CMD_NET   1
 #if defined(CONFIG_CMD_NET)
 	#define CONFIG_DESIGNWARE_ETH 1
 	#define CONFIG_PHYLIB	1
@@ -584,10 +696,11 @@
 #define CONFIG_CMD_MISC     1
 #define CONFIG_CMD_ITEST    1
 #define CONFIG_CMD_CPU_TEMP 1
+#define CONFIG_CMD_CEC      1
 /* #define CONFIG_CMD_HDMIRX   1 */
 #define CONFIG_SYS_MEM_TOP_HIDE 0x08000000 //hide 128MB for kernel reserve
 #define CONFIG_CMD_LOADB    1
-//#define CONFIG_MULTI_DTB    1
+#define CONFIG_MULTI_DTB    1
 
 /* debug mode defines */
 //#define CONFIG_DEBUG_MODE           1

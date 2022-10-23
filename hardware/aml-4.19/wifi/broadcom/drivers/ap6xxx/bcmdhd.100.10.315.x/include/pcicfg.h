@@ -1,7 +1,7 @@
 /*
  * pcicfg.h: PCI configuration constants and structures.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: pcicfg.h 756835 2018-04-10 21:24:10Z $
+ * $Id: pcicfg.h 795237 2018-12-18 03:26:49Z $
  */
 
 #ifndef	_h_pcicfg_
@@ -78,6 +78,7 @@
 #define PCI_CAP_MSICAP_ID		0x05
 #define PCI_CAP_VENDSPEC_ID		0x09
 #define PCI_CAP_PCIECAP_ID		0x10
+#define PCI_CAP_MSIXCAP_ID		0x11
 
 /* Data structure to define the Message Signalled Interrupt facility
  * Valid for PCI and PCIE configurations
@@ -135,11 +136,13 @@ typedef struct _pciconfig_cap_pcie {
 
 /* PCIE Extended configuration */
 #define PCIE_ADV_CORR_ERR_MASK	0x114
+#define PCIE_ADV_CORR_ERR_MASK_OFFSET	0x14
 #define CORR_ERR_RE	(1 << 0) /* Receiver  */
-#define CORR_ERR_BT 	(1 << 6) /* Bad TLP  */
+#define CORR_ERR_BT	(1 << 6) /* Bad TLP  */
 #define CORR_ERR_BD	(1 << 7) /* Bad DLLP */
 #define CORR_ERR_RR	(1 << 8) /* REPLAY_NUM rollover */
 #define CORR_ERR_RT	(1 << 12) /* Reply timer timeout */
+#define CORR_ERR_AE	(1 << 13) /* Adviosry Non-Fital Error Mask */
 #define ALL_CORR_ERRORS (CORR_ERR_RE | CORR_ERR_BT | CORR_ERR_BD | \
 			 CORR_ERR_RR | CORR_ERR_RT)
 
@@ -248,9 +251,13 @@ typedef struct _pcie_enhanced_caphdr {
 #define PCI_PHY_DBG_CLKREG_3	0x1e1c
 
 /* Bit settings for PCIE_CFG_SUBSYSTEM_CONTROL register */
+#define PCIE_BAR1COHERENTACCEN_BIT	8
+#define PCIE_BAR2COHERENTACCEN_BIT	9
 #define PCIE_SSRESET_STATUS_BIT		13
 #define PCIE_SSRESET_DISABLE_BIT	14
 #define PCIE_SSRESET_DIS_ENUM_RST_BIT		15
+
+#define PCIE_BARCOHERENTACCEN_MASK	0x300
 
 /* Bit settings for PCI_UC_ERR_STATUS register */
 #define PCI_UC_ERR_URES			(1 << 20)	/* Unsupported Request Error Status */

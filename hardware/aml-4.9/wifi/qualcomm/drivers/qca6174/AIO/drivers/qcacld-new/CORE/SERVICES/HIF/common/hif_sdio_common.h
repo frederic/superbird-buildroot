@@ -106,7 +106,7 @@
 
 /* for SDIO we recommend a 128-byte block size */
 #if defined(WITH_BACKPORTS)
-#define HIF_DEFAULT_IO_BLOCK_SIZE          256
+#define HIF_DEFAULT_IO_BLOCK_SIZE          128
 #else
 #define HIF_DEFAULT_IO_BLOCK_SIZE          256
 #endif

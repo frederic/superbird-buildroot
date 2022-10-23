@@ -949,7 +949,7 @@ BOOL loaderYuvFeeder_Feed(
         if (bitdepth == 10)      // 10bit packed
             out_width *= 2;
     }
-    LoadYuvImageByYCbCrLine(impl->handle, coreIdx, pYuv_int8, out_width, out_height, fb, srcFbIndex);
+    LoadYuvImageByYCbCrLine(impl->handle, coreIdx, pYuv_int8, out_width, out_height, fb, arg, srcFbIndex);
     //LoadYuvImageBurstFormat(coreIdx, pYuv_int8, out_width, out_height, fb, TRUE);
 
 

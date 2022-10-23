@@ -5,4 +5,4 @@
 /etc/hosts
 /etc/wpa_supplicant.conf
 /etc/localtime
-/etc/ipc.json
+/etc/ipc/config.json

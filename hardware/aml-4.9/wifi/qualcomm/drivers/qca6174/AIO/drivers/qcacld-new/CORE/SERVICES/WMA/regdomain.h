@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -325,6 +325,7 @@ struct regulatory {
     const void *regpair;
     COUNTRY_CODE_SOURCE cc_src;
     uint32_t reg_flags;
+    vos_timer_t reg_set_timer;
 };
 /* Multi-Device RegDomain Support */
 typedef struct ath_hal_reg_dmn_tables {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -467,9 +467,24 @@ enum
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 #define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE          "gWlanMccToSccSwitchMode"
-#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_MIN      ( VOS_MCC_TO_SCC_SWITCH_DISABLE)
-#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_MAX      ( VOS_MCC_TO_SCC_SWITCH_FORCE )
-#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_DEFAULT  (VOS_MCC_TO_SCC_SWITCH_DISABLE)
+#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_MIN      VOS_MCC_TO_SCC_SWITCH_DISABLE
+#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_MAX      VOS_MCC_TO_SCC_SWITCH_FORCE
+#define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_DEFAULT  VOS_MCC_TO_SCC_SWITCH_DISABLE
+
+#define CFG_WLAN_BAND_SWITCH_ENABLE              "gWlanBandSwitchEnable"
+#define CFG_WLAN_BAND_SWITCH_ENABLE_MIN          ( 0 )
+#define CFG_WLAN_BAND_SWITCH_ENABLE_MAX          ( 1 )
+#define CFG_WLAN_BAND_SWITCH_ENABLE_DEFAULT      ( 0 )
+
+#define CFG_WLAN_AP_P2PGO_CONC_ENABLE            "gWlanApP2pGOConcurrencyEnable"
+#define CFG_WLAN_AP_P2PGO_CONC_ENABLE_MIN        ( 0 )
+#define CFG_WLAN_AP_P2PGO_CONC_ENABLE_MAX        ( 1 )
+#define CFG_WLAN_AP_P2PGO_CONC_ENABLE_DEFAULT    ( 0 )
+
+#define CFG_WLAN_AP_P2PGC_CONC_ENABLE            "gWlanApP2pClientConcurEnable"
+#define CFG_WLAN_AP_P2PGC_CONC_ENABLE_MIN        ( 0 )
+#define CFG_WLAN_AP_P2PGC_CONC_ENABLE_MAX        ( 1 )
+#define CFG_WLAN_AP_P2PGC_CONC_ENABLE_DEFAULT    ( 0 )
 #endif
 
 
@@ -1573,6 +1588,55 @@ typedef enum
 
 /*
  * <ini>
+ * gMaskForTxLegacyRate - mask legacy rate
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0
+ *
+ * This ini is used to mask legacy data rate
+ * for tx data.
+ *
+ * Usage: External
+ *
+ * 1:mask 0:unmask
+ * bits 0-3:  maskbit for CCK rate(1,2,5.5,11)
+ * bits 4-7:  Reserved
+ * bits 8-15:  maskbit for 11A rate(6,9,12,18,24,36,48,54)
+ * bits 16-31:  Reserved
+ *
+ * </ini>
+ */
+#define CFG_MASK_FOR_TX_LEGACY_RATE                 "gMaskForTxLegacyRate"
+#define CFG_MASK_FOR_TX_LEGACY_RATE_MIN             (WNI_CFG_MASK_LEGACY_RATE_STAMIN)
+#define CFG_MASK_FOR_TX_LEGACY_RATE_MAX             (WNI_CFG_MASK_LEGACY_RATE_STAMAX)
+#define CFG_MASK_FOR_TX_LEGACY_RATE_DEFAULT         (WNI_CFG_MASK_LEGACY_RATE_STADEF)
+
+/*
+ * <ini>
+ * gMaskForTxHtRate - mask HT rate
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0
+ *
+ * This ini is used to mask HT data rate
+ * for tx data.
+ *
+ * Usage: External
+ *
+ * 1:mask 0:unmask
+ * bits 0-7:  maskbit for MCS0~MCS7 for nss1
+ * bits 8-15:  maskbit for MCS0~MCS7 for nss2
+ * bits 16-31:  Reserved
+ *
+ * </ini>
+ */
+#define CFG_MASK_FOR_TX_HT_RATE                 "gMaskForTxHtRate"
+#define CFG_MASK_FOR_TX_HT_RATE_MIN             (WNI_CFG_MASK_HT_RATE_STAMIN)
+#define CFG_MASK_FOR_TX_HT_RATE_MAX             (WNI_CFG_MASK_HT_RATE_STAMAX)
+#define CFG_MASK_FOR_TX_HT_RATE_DEFAULT         (WNI_CFG_MASK_HT_RATE_STADEF)
+
+/*
+ * <ini>
  * gSapGetPeerInfo - Enable/Disable remote peer info query support
  * @Min: 0 - Disable remote peer info query support
  * @Max: 1 - Enable remote peer info query support
@@ -2245,6 +2309,209 @@ typedef enum
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_MAX       ( 1000 )
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_DEFAULT   ( 0 )
 
+#ifdef FEATURE_WLAN_THERMAL_SHUTDOWN
+/*
+ * <ini>
+ * gThermalShutdownEnable - Enable/Disable Thermal Shutdown feature to protect
+                            IC too hot and die
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable Thermal Shutdown feature
+ *
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_THERMAL_SHUTDOWN_ENABLE_NAME      "gThermalShutdownEnable"
+#define CFG_THERMAL_SHUTDOWN_ENABLE_MIN       ( 0 )
+#define CFG_THERMAL_SHUTDOWN_ENABLE_MAX       ( 1 )
+#define CFG_THERMAL_SHUTDOWN_ENABLE_DEFAULT   ( 0 )
+
+/*
+ * <ini>
+ * gThermalShutdownAutoEnable - Enable/Disable Automatic Thermal Shutdown
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * In Automatic mode, host driver send the suspend command if the condition is
+ * meet, or else the command is send by host app.
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_THERMAL_SHUTDOWN_AUTO_ENABLE_NAME      "gThermalShutdownAutoEnable"
+#define CFG_THERMAL_SHUTDOWN_AUTO_ENABLE_MIN       ( 0 )
+#define CFG_THERMAL_SHUTDOWN_AUTO_ENABLE_MAX       ( 1 )
+#define CFG_THERMAL_SHUTDOWN_AUTO_ENABLE_DEFAULT   ( 1 )
+
+/*
+ * <ini>
+ * gThermalShutdownTempSuspend - Temperature threshold of suspend
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 117
+ *
+ * If the reported temperature from firmware is higher than this threshold,
+ * the suspend command will be sent to shutdown the target.
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_THERMAL_SHUTDOWN_TEMP_SUSPEND_NAME      "gThermalShutdownTempSuspend"
+#define CFG_THERMAL_SHUTDOWN_TEMP_SUSPEND_MIN       ( 0 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_SUSPEND_MAX       ( 1000 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_SUSPEND_DEFAULT   ( 117 )
+
+/*
+ * <ini>
+ * gThermalShutdownTempWarning - Temperature threshold of warning.
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 115
+ *
+ * Firmware report temperature to host as indication if the temperature is
+ * higher than this threshold.
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_THERMAL_SHUTDOWN_TEMP_WARNING_NAME      "gThermalShutdownTempWarning"
+#define CFG_THERMAL_SHUTDOWN_TEMP_WARNING_MIN       ( 0 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_WARNING_MAX       ( 1000 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_WARNING_DEFAULT   ( 115 )
+
+/*
+ * <ini>
+ * gThermalShutdownTempResume - Temperature threshold of resume
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 113
+ *
+ * If the reported temperature from firmware is lower than this threshold,
+ * the resume command will be sent to shutdown the target.
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_THERMAL_SHUTDOWN_TEMP_RESUME_NAME      "gThermalShutdownTempResume"
+#define CFG_THERMAL_SHUTDOWN_TEMP_RESUME_MIN       ( 0 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_RESUME_MAX       ( 1000 )
+#define CFG_THERMAL_SHUTDOWN_TEMP_RESUME_DEFAULT   ( 113 )
+
+/*
+ * <ini>
+ * gThermalSampleRate - The sample rate of temperature for firmware
+ * @Min: 1000
+ * @Max: 10000
+ * @Default: 5000
+ *
+ * Thermal Sample Rate (in milliseconds) used by FW to sample temperature of IC
+ *
+ *
+ * Supported Feature: Thermal Shutdown
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_THERMAL_SAMPLE_RATE_NAME      "gThermalSampleRate"
+#define CFG_THERMAL_SAMPLE_RATE_MIN       ( 1000 )
+#define CFG_THERMAL_SAMPLE_RATE_MAX       ( 10000 )
+#define CFG_THERMAL_SAMPLE_RATE_DEFAULT   ( 5000 )
+#endif /* FEATURE_WLAN_THERMAL_SHUTDOWN */
+
+/*
+ * <ini>
+ * gRemoveTimeStampSyncCmd - Enable/Disable to remove time stamp sync cmd
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the removal of time stamp sync cmd
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_REMOVE_TIME_STAMP_SYNC_CMD_NAME      "gRemoveTimeStampSyncCmd"
+#define CFG_REMOVE_TIME_STAMP_SYNC_CMD_MIN       ( 0 )
+#define CFG_REMOVE_TIME_STAMP_SYNC_CMD_MAX       ( 1 )
+#define CFG_REMOVE_TIME_STAMP_SYNC_CMD_DEFAULT   ( 0 )
+
+/*
+ * <ini>
+ * gDPDRecalibEnable - Enable/Disable Runtime DPD Recaliberation feature
+ * 		       The parameter ‘enable’ in WMI is used to enable
+ *		       feature and debug log. Set bit0 to enable feature,
+ *		       set bit1 is to enable FW log to host, and set bit2 is
+ *		       to enable UART output.
+ *
+ * @Min: 0
+ * @Max: 7
+ * @Default: 1
+ *
+ * This ini is used to enable/disable DPD Recaliberation feature
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_DPD_RECALIB_ENABLE_NAME      "gDPDRecalibEnable"
+#define CFG_DPD_RECALIB_ENABLE_MIN       ( 0 )
+#define CFG_DPD_RECALIB_ENABLE_MAX       ( 7 )
+#define CFG_DPD_RECALIB_ENABLE_DEFAULT   ( 1 )
+
+/*Thermal thresholds: DPD will be triggered
+    when current temperature above this threshold */
+
+/* Delta degree C above first DPD cal after chip is on. Unit: degree C. */
+#define CFG_DPD_RECALIB_DELTA_DEGREE_HIGH_NAME    "gDPDRecalibDeltaDegreeHigh"
+#define CFG_DPD_RECALIB_DELTA_DEGREE_HIGH_MIN       ( 10 )
+#define CFG_DPD_RECALIB_DELTA_DEGREE_HIGH_MAX       ( 60 )
+#define CFG_DPD_RECALIB_DELTA_DEGREE_HIGH_DEFAULT   ( 35 )
+
+/* Delta degree C above first DPD cal after chip is on. Unit: degree C. */
+#define CFG_DPD_RECALIB_DELTA_DEGREE_LOW_NAME    "gDPDRecalibDeltaDegreeLow"
+#define CFG_DPD_RECALIB_DELTA_DEGREE_LOW_MIN       ( 10 )
+#define CFG_DPD_RECALIB_DELTA_DEGREE_LOW_MAX       ( 60 )
+#define CFG_DPD_RECALIB_DELTA_DEGREE_LOW_DEFAULT   ( 25 )
+
+/* Cold down time between two DPD re-cal. Unit: ms*/
+#define CFG_DPD_RECALIB_COOLING_TIME_NAME    "gDPDRecalibCoolingTime"
+#define CFG_DPD_RECALIB_COOLING_TIME_MIN       ( 0 )
+#define CFG_DPD_RECALIB_COOLING_TIME_MAX       ( 5 )
+#define CFG_DPD_RECALIB_COOLING_TIME_DEFAULT   ( 1 )
+
+/*  Max duration for dpd re-cal. Unit: ms */
+#define CFG_DPD_RECALIB_DURATION_MAX_NAME    "gDPDRecalibDurationMax"
+#define CFG_DPD_RECALIB_DURATION_MAX_MIN       ( 30 )
+#define CFG_DPD_RECALIB_DURATION_MAX_MAX       ( 180 )
+#define CFG_DPD_RECALIB_DURATION_MAX_DEFAULT   ( 120 )
 
 /*
  * Enable/Disable Modulated DTIM feature
@@ -2731,6 +2998,48 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_P2P_LISTEN_OFFLOAD_ENABLE                   ( 1 )
 #define CFG_P2P_LISTEN_OFFLOAD_DEFAULT                  ( CFG_P2P_LISTEN_OFFLOAD_DISABLE )
 
+#ifdef CONFIG_GPIO_OOB
+/*
+ * <ini>
+ * goob_gpio_num - OOB GPIO NUM
+ * @Min: 0
+ * @Max: 255
+ * @Default: 255
+ *
+ * This ini is used to config OOB GPIO NUM
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_OOB_GPIO_NUM_NAME             "goob_gpio_num"
+#define CFG_ENABLE_OOB_GPIO_NUM_MIN              (0)
+#define CFG_ENABLE_OOB_GPIO_NUM_MAX              (255)
+#define CFG_ENABLE_OOB_GPIO_NUM_DEFAULT          (CFG_ENABLE_OOB_GPIO_NUM_MAX)
+
+/*
+ * <ini>
+ * goob_gpio_flag - OOB GPIO flag
+ *                  bit 0 - enable OOB wake up
+ *                  bit 1 - enable OOB interrupt
+ * @Min: 0
+ * @Max: 3
+ * @Default: 0
+ *
+ * This ini is used to enable OOB GPIO feature
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_OOB_GPIO_FLAG_NAME            "goob_gpio_flag"
+#define CFG_ENABLE_OOB_GPIO_FLAG_MIN             (0)
+#define CFG_ENABLE_OOB_GPIO_FLAG_MAX             (3)
+#define CFG_ENABLE_OOB_GPIO_FLAG_DEFAULT         (0)
+#endif
+
 /*
  * Firmware uart print
  */
@@ -2754,6 +3063,39 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_FW_SELF_RECOVERY_DISABLE      ( 0 )
 #define CFG_ENABLE_FW_SELF_RECOVERY_ENABLE       ( 1 )
 #define CFG_ENABLE_FW_SELF_RECOVERY_DEFAULT      ( CFG_ENABLE_FW_SELF_RECOVERY_DISABLE )
+
+/*
+ * Enable/Disable warm reset for USB
+ */
+/*
+ * <ini>
+ * enable_usb_warm_reset - Enable/Disable warm reset for USB
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to control warm reset feature for USB solution.
+ * When enabled, dedicated binary will be downloaded to target during
+ * initialization, as well as target be notified when USB disconnected.
+ *
+ * Usage: Internal
+ *
+ * 1: Enable
+ * 0: Disable
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_USB_WARM_RESET_NAME           "enable_usb_warm_reset"
+#define CFG_ENABLE_USB_WARM_RESET_DISABLE        ( 0 )
+#define CFG_ENABLE_USB_WARM_RESET_ENABLE         ( 1 )
+#define CFG_ENABLE_USB_WARM_RESET_DEFAULT        ( CFG_ENABLE_USB_WARM_RESET_DISABLE )
+/*
+ * Enable/Disable fast FW dump
+ */
+#define CFG_ENABLE_FAST_FW_DUMP_NAME         "gEnableFastFwDump"
+#define CFG_ENABLE_FAST_FW_DUMP_DISABLE      ( 0 )
+#define CFG_ENABLE_FAST_FW_DUMP_ENABLE       ( 1 )
+#define CFG_ENABLE_FAST_FW_DUMP_DEFAULT      ( CFG_ENABLE_FAST_FW_DUMP_DISABLE )
 
 #ifdef WLAN_FEATURE_11AC
 //Macro to handle maximum receive AMPDU size configuration
@@ -3253,6 +3595,27 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_REORDER_OFFLOAD_SUPPORT_MAX     ( 1 )
 #define CFG_REORDER_OFFLOAD_SUPPORT_DEFAULT ( 0 )
 
+/*
+ * <ini>
+ * gEnableHostapdEdca - Use hostapd EDCA local params
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable using hostapd
+ * EDCA local params.
+ *
+ * Supported Feature: EDCA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_EDCA_FROM_HOSTAPD                      "gEnableHostapdEdcaLocal"
+#define CFG_EDCA_FROM_HOSTAPD_MIN                  ( 0 )
+#define CFG_EDCA_FROM_HOSTAPD_MAX                  ( 1 )
+#define CFG_EDCA_FROM_HOSTAPD_DEFAULT              ( 0 )
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define CFG_ROAMING_OFFLOAD_NAME                "gRoamOffloadEnabled"
 #define CFG_ROAMING_OFFLOAD_MIN                 (0)
@@ -3336,6 +3699,32 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_NAN_SUPPORT_MIN                      (0)
 #define CFG_ENABLE_NAN_SUPPORT_MAX                      (1)
 #endif
+
+/*
+ * <ini>
+ * gEnableAcTxqOptimize
+ * @Min: 0
+ * @Max: 0x13
+ * @Default: 0
+ *
+ * This ini is used to enable one AC tx queue optimize
+ *
+ * Usage: Internal/External
+ *
+ * bits 0-1:   WMM_AC_BE 0
+ *             WMM_AC_BK 1
+ *             WMM_AC_VI 2
+ *             WMM_AC_VO 3
+ * bits 2-3:   reserved
+ * bits 4:     Enalbe
+ * bits 5-7:   reserved
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_AC_TXQ_OPTIMIZE                 "gEnableAcTxqOptimize"
+#define CFG_ENABLE_AC_TXQ_OPTIMIZE_MIN             ( 0x0 )
+#define CFG_ENABLE_AC_TXQ_OPTIMIZE_MAX             ( 0x13 )
+#define CFG_ENABLE_AC_TXQ_OPTIMIZE_DEFAULT         ( 0x0 )
 
 #define CFG_ENABLE_SELF_RECOVERY                   "gEnableSelfRecovery"
 #define CFG_ENABLE_SELF_RECOVERY_MIN               ( 0 )
@@ -3689,7 +4078,7 @@ enum dot11p_mode {
  */
 #define CFG_BTC_DYNAMIC_WLAN_BT_COEX           "gDynamicBTCOEX"
 #define CFG_BTC_DYNAMIC_WLAN_BT_COEX_MIN       (0)
-#define CFG_BTC_DYNAMIC_WLAN_BT_COEX_MAX       (1)
+#define CFG_BTC_DYNAMIC_WLAN_BT_COEX_MAX       (2)
 #define CFG_BTC_DYNAMIC_WLAN_BT_COEX_DEFAULT   (0)
 
 /**
@@ -3808,6 +4197,19 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_BTC_WLAN_COEX_TX_POWER_MAX       (63)
 #define CFG_BTC_WLAN_COEX_TX_POWER_DEFAULT   (63)
 
+/* Config to set WLAN on the uplink periodically pauses and unpauses its data queues */
+#ifdef WMI_COEX_BTC_DUTYCYCLE
+#define CFG_COEX_PAUSE_NAME             "gCoexWLANPauseDuration"
+#define CFG_COEX_PAUSE_MIN              (0)
+#define CFG_COEX_PAUSE_MAX              (100)
+#define CFG_COEX_PAUSE_DEFAULT          (30)
+
+#define CFG_COEX_UNPAUSE_NAME           "gCoexWLANUnpauseDuration"
+#define CFG_COEX_UNPAUSE_MIN            (0)
+#define CFG_COEX_UNPAUSE_MAX            (100)
+#define CFG_COEX_UNPAUSE_DEFAULT        (30)
+#endif
+
 /* Parameters for roaming scans performed at high RSSI */
 
 /* Maximum number of scans after RSSI change */
@@ -3846,9 +4248,35 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 /* GPIO pin to toogle when capture tsf */
 #define CFG_SET_TSF_GPIO_PIN_NAME                  "gtsf_gpio_pin"
 #define CFG_SET_TSF_GPIO_PIN_MIN                   (0)
-#define CFG_SET_TSF_GPIO_PIN_MAX                   (254)
+#define CFG_SET_TSF_GPIO_PIN_MAX                   (255)
 #define TSF_GPIO_PIN_INVALID                       (255)
 #define CFG_SET_TSF_GPIO_PIN_DEFAULT               (TSF_GPIO_PIN_INVALID)
+
+#ifdef WLAN_FEATURE_TSF
+/* GPIO pin to toogle when capture tsf in host side */
+#define CFG_SET_TSF_GPIO_PIN_HOST_NAME                  "gtsf_gpio_pin_host"
+#define CFG_SET_TSF_GPIO_PIN_HOST_MIN                   (0)
+#define CFG_SET_TSF_GPIO_PIN_HOST_MAX                   (254)
+#define CFG_SET_TSF_GPIO_PIN_HOST_DEFAULT               (TSF_GPIO_PIN_INVALID)
+
+/*
+ * <ini>
+ * gtsf_by_register - get tsf by register
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to get tsf by register
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_GET_TSF_BY_REGISTER_NAME                  "gtsf_by_register"
+#define CFG_GET_TSF_BY_REGISTER_MIN                   (0)
+#define CFG_GET_TSF_BY_REGISTER_MAX                   (1)
+#define CFG_GET_TSF_BY_REGISTER_DEFAULT               (0)
 
 #ifdef WLAN_FEATURE_TSF_PLUS
 /* PTP options */
@@ -3860,6 +4288,7 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_SET_TSF_PTP_OPT_RAW                   (0x4)
 #define CFG_SET_TSF_DBG_FS                        (0x8)
 #define CFG_SET_TSF_PTP_OPT_DEFAULT               (0xf)
+#endif
 #endif
 
 #define CFG_MULTICAST_HOST_FW_MSGS          "gMulticastHostFwMsgs"
@@ -3904,6 +4333,199 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_RX_AGGREGATION_SIZE_MIN      (1)
 #define CFG_RX_AGGREGATION_SIZE_MAX      (64)
 #define CFG_RX_AGGREGATION_SIZE_DEFAULT  (64)
+
+/*
+ * <ini>
+ * g_tx_aggr_retry_be - Configure Tx aggregation retry for BE
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_aggr_retry_be gives an option to configure Tx aggregation
+ * retry for BE. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_AGGR_SW_RETRY_BE      "g_tx_aggr_retry_be"
+#define CFG_TX_AGGR_SW_RETRY_BE_MIN      (0)
+#define CFG_TX_AGGR_SW_RETRY_BE_MAX      (16)
+#define CFG_TX_AGGR_SW_RETRY_BE_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_aggr_retry_bk - Configure Tx aggregation retry for BK
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_aggr_retry_bk gives an option to configure Tx aggregation
+ * retry for BK. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_AGGR_SW_RETRY_BK      "g_tx_aggr_retry_bk"
+#define CFG_TX_AGGR_SW_RETRY_BK_MIN      (0)
+#define CFG_TX_AGGR_SW_RETRY_BK_MAX      (16)
+#define CFG_TX_AGGR_SW_RETRY_BK_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_aggr_retry_vi - Configure Tx aggregation retry for VI
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_aggr_retry_vi gives an option to configure Tx aggregation
+ * retry for VI. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_AGGR_SW_RETRY_VI      "g_tx_aggr_retry_vi"
+#define CFG_TX_AGGR_SW_RETRY_VI_MIN      (0)
+#define CFG_TX_AGGR_SW_RETRY_VI_MAX      (16)
+#define CFG_TX_AGGR_SW_RETRY_VI_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_aggr_retry_vo - Configure Tx aggregation retry for VO
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_aggr_retry_vo gives an option to configure Tx aggregation
+ * retry for VO. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_AGGR_SW_RETRY_VO      "g_tx_aggr_retry_vo"
+#define CFG_TX_AGGR_SW_RETRY_VO_MIN      (0)
+#define CFG_TX_AGGR_SW_RETRY_VO_MAX      (16)
+#define CFG_TX_AGGR_SW_RETRY_VO_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_non_aggr_retry_be - Configure Tx non-aggregation retry for BE
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_non_aggr_retry_be gives an option to configure Tx
+ * non-aggregation sw retry for BE.
+ * This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_NON_AGGR_SW_RETRY_BE      "g_tx_non_aggr_retry_be"
+#define CFG_TX_NON_AGGR_SW_RETRY_BE_MIN      (0)
+#define CFG_TX_NON_AGGR_SW_RETRY_BE_MAX      (16)
+#define CFG_TX_NON_AGGR_SW_RETRY_BE_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_non_aggr_retry_bk - Configure Tx non-aggregation retry for BK
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_non_aggr_retry_bk gives an option to configure Tx non-aggregation
+ * retry for BK. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_NON_AGGR_SW_RETRY_BK      "g_tx_non_aggr_retry_bk"
+#define CFG_TX_NON_AGGR_SW_RETRY_BK_MIN      (0)
+#define CFG_TX_NON_AGGR_SW_RETRY_BK_MAX      (16)
+#define CFG_TX_NON_AGGR_SW_RETRY_BK_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_non_aggr_retry_vi - Configure Tx non-aggregation retry for VI
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_non_aggr_retry_vi gives an option to configure Tx non aggregation
+ * retry for VI. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_NON_AGGR_SW_RETRY_VI      "g_tx_non_aggr_retry_vi"
+#define CFG_TX_NON_AGGR_SW_RETRY_VI_MIN      (0)
+#define CFG_TX_NON_AGGR_SW_RETRY_VI_MAX      (16)
+#define CFG_TX_NON_AGGR_SW_RETRY_VI_DEFAULT  (0)
+
+/*
+ * <ini>
+ * g_tx_non_aggr_retry_vo - Configure Tx aggregation retry for VO
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * g_tx_non_aggr_retry_vo gives an option to configure Tx non-aggregation
+ * retry for VO. This can be useful in debugging throughput issues.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA & SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_TX_NON_AGGR_SW_RETRY_VO      "g_tx_non_aggr_retry_vo"
+#define CFG_TX_NON_AGGR_SW_RETRY_VO_MIN      (0)
+#define CFG_TX_NON_AGGR_SW_RETRY_VO_MAX      (16)
+#define CFG_TX_NON_AGGR_SW_RETRY_VO_DEFAULT  (0)
 
 /*
  * fine timing measurement capability information
@@ -4061,18 +4683,40 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 
 #ifdef WLAN_FEATURE_WOW_PULSE
 /*
- * Enable/Disable  WOW PULSE feature
- * Set the wakeup pulse which FW use to wake up HOST
- * Default : Disable
+ * <ini>
+ * gwow_pulse_support - wow pulse enable/disable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable wow pulse feature.
+ * This feature FW send the customized pulse to wakeup host.
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_SUPPORT_NAME     "gwow_pulse_support"
 #define CFG_WOW_PULSE_SUPPORT_MIN      (0)
 #define CFG_WOW_PULSE_SUPPORT_MAX      (1)
-#define CFG_WOW_PULSE_SUPPORT_DEFAULT  (CFG_WOW_PULSE_SUPPORT_MIN)
+#define CFG_WOW_PULSE_SUPPORT_DEFAULT  (1)
 
 /*
- * GPIO PIN for Pulse
- * Which PIN to send the Pulse
+ * <ini>
+ * gwow_pulse_pin - wow pulse pin number
+ * @Min: CFG_SET_TSF_GPIO_PIN_MIN
+ * @Max: CFG_SET_TSF_GPIO_PIN_MAX
+ * @Default: 35
+ *
+ * This ini is used to configure which pin to send wow pulse.
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_PIN_NAME         "gwow_pulse_pin"
 #define CFG_WOW_PULSE_PIN_MIN          (CFG_SET_TSF_GPIO_PIN_MIN)
@@ -4080,24 +4724,88 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_WOW_PULSE_PIN_DEFAULT      (35)
 
 /*
- * Pulse interval low
- * The interval of low level in the pulse
- * The value which defined by customer should between 160 and 480
+ * <ini>
+ * gwow_pulse_interval_low - wow pulse interval low
+ * @Min: 20
+ * @Max: 480
+ * @Default: 20
+ *
+ * This ini is used to configure interval of wow low pulse,
+ * unit is ms.
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_INTERVAL_LOW_NAME     "gwow_pulse_interval_low"
-#define CFG_WOW_PULSE_INTERVAL_LOW_MIN      (160)
+#define CFG_WOW_PULSE_INTERVAL_LOW_MIN      (20)
 #define CFG_WOW_PULSE_INTERVAL_LOW_MAX      (480)
-#define CFG_WOW_PULSE_INTERVAL_LOW_DEFAULT  (180)
+#define CFG_WOW_PULSE_INTERVAL_LOW_DEFAULT  (20)
 
 /*
- * Pulse interval high
- * The interval of high level in the pulse
- * The value which defined by customer should between 20 and 40
+ * <ini>
+ * gwow_pulse_interval_high - wow pulse interval high
+ * @Min: 20
+ * @Max: 480
+ * @Default: 180
+ *
+ * This ini is used to configure interval of wow high pulse,
+ * unit is ms.
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_INTERVAL_HIGH_NAME    "gwow_pulse_interval_high"
 #define CFG_WOW_PULSE_INTERVAL_HIGH_MIN     (20)
-#define CFG_WOW_PULSE_INTERVAL_HIGH_MAX     (40)
-#define CFG_WOW_PULSE_INTERVAL_HIGH_DEFAULT (20)
+#define CFG_WOW_PULSE_INTERVAL_HIGH_MAX     (480)
+#define CFG_WOW_PULSE_INTERVAL_HIGH_DEFAULT (180)
+
+/*
+ * <ini>
+ * gwow_pulse_repeat_count - wow pulse repetition count
+ * @Min: 1
+ * @Max: 0xFFFFFFFF
+ * @Default: 1
+ *
+ * This ini is used to configure repeat count of wow pin wave,
+ * level low to level high is one time, 0xFFFFFFFF means endless.
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_WOW_PULSE_REPEAT_COUNT_NAME    "gwow_pulse_repeat_count"
+#define CFG_WOW_PULSE_REPEAT_COUNT_MIN     (1)
+#define CFG_WOW_PULSE_REPEAT_COUNT_MAX     (0xFFFFFFFF)
+#define CFG_WOW_PULSE_REPEAT_COUNT_DEFAULT (1)
+
+/*
+ * <ini>
+ * gwow_pulse_init_state - wow pulse init level
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to configure init level of wow pin,
+ * 1 is high level, 0 is low level
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_WOW_PULSE_INIT_STATE_NAME    "gwow_pulse_init_state"
+#define CFG_WOW_PULSE_INIT_STATE_MIN     (0)
+#define CFG_WOW_PULSE_INIT_STATE_MAX     (1)
+#define CFG_WOW_PULSE_INIT_STATE_DEFAULT (1)
 #endif
 
 /*
@@ -4457,6 +5165,11 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_SUB_20_CHANNEL_WIDTH_MAX             (6)
 #define CFG_SUB_20_CHANNEL_WIDTH_DEFAULT         (0)
 
+#define CFG_STA_CHANGE_COUNTRYCODE_DYN_NAME     "g_sta_change_cc_via_beacon"
+#define CFG_STA_CHANGE_COUNTRYCODE_DYN_ENABLE   (1)
+#define CFG_STA_CHANGE_COUNTRYCODE_DYN_DISABLE  (0)
+#define CFG_STA_CHANGE_COUNTRYCODE_DYN_DEFAULT  (0)
+
 /*
  * 5G preference parameters for boosting RSSI
  * enable_band_specific_pref: Enable preference for 5G from INI.
@@ -4471,8 +5184,8 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_ENABLE_5G_BAND_PREF_DEFAULT          (0)
 
 #define CFG_5G_RSSI_BOOST_THRESHOLD_NAME         "5g_rssi_boost_threshold"
-#define CFG_5G_RSSI_BOOST_THRESHOLD_MIN          (-55)
-#define CFG_5G_RSSI_BOOST_THRESHOLD_MAX          (-70)
+#define CFG_5G_RSSI_BOOST_THRESHOLD_MIN          (-70)
+#define CFG_5G_RSSI_BOOST_THRESHOLD_MAX          (-55)
 #define CFG_5G_RSSI_BOOST_THRESHOLD_DEFAULT      (-60)
 
 #define CFG_5G_RSSI_BOOST_FACTOR_NAME            "5g_rssi_boost_factor"
@@ -4493,8 +5206,8 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
  */
 
 #define CFG_5G_RSSI_PENALIZE_THRESHOLD_NAME      "5g_rssi_penalize_threshold"
-#define CFG_5G_RSSI_PENALIZE_THRESHOLD_MIN       (-65)
-#define CFG_5G_RSSI_PENALIZE_THRESHOLD_MAX       (-80)
+#define CFG_5G_RSSI_PENALIZE_THRESHOLD_MIN       (-80)
+#define CFG_5G_RSSI_PENALIZE_THRESHOLD_MAX       (-65)
 #define CFG_5G_RSSI_PENALIZE_THRESHOLD_DEFAULT   (-70)
 
 #define CFG_5G_RSSI_PENALIZE_FACTOR_NAME         "5g_rssi_penalize_factor"
@@ -4781,6 +5494,147 @@ FG_BTC_BT_INTERVAL_PAGE_P2P_STA_DEFAULT
 #define CFG_OCB_TX_PER_PKT_STATS_ENABLE_DEFAULT ( 0 )
 #endif /* WLAN_FEATURE_DSRC */
 
+/*
+ * <ini>
+ * gCCAThresholdEnable - enable/disable CCA threshold setting
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to overide CCA threshold for ESTI Adaptivity.
+ *
+ * Related: NOne
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_CCA_THRESHOLD_ENABLE_NAME    "gCCAThresholdEnable"
+#define CFG_CCA_THRESHOLD_ENABLE_MIN     (0)
+#define CFG_CCA_THRESHOLD_ENABLE_MAX     (1)
+#define CFG_CCA_THRESHOLD_ENABLE_DEFAULT (0)
+
+/*
+ * <ini>
+ * gCCAThreshold2G - CCA threshold for 2G band
+ * @Min: 10
+ * @Max: 127
+ * @Default: 28
+ *
+ * Once CCA threshold is enabled, this is threshold for 2G band.
+ *
+ * Related: None
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_CCA_THRESHOLD_2G_NAME    "gCCAThreshold2G"
+#define CFG_CCA_THRESHOLD_2G_MIN     (10)
+#define CFG_CCA_THRESHOLD_2G_MAX     (127)
+#define CFG_CCA_THRESHOLD_2G_DEFAULT (28)
+
+/*
+ * <ini>
+ * gCCAThreshold5G - CCA threshold for 5G band
+ * @Min: 10
+ * @Max: 127
+ * @Default: 28
+ *
+ * Once CCA threshold is enabled, this is threshold for 5G band.
+ *
+ * Related: None
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_CCA_THRESHOLD_5G_NAME    "gCCAThreshold5G"
+#define CFG_CCA_THRESHOLD_5G_MIN     (10)
+#define CFG_CCA_THRESHOLD_5G_MAX     (127)
+#define CFG_CCA_THRESHOLD_5G_DEFAULT (28)
+
+/*
+ * <ini>
+ * gEnableMonOnSta - extend the monitor capability for STA
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * this is used to control monitor feature for STA.
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_MONITOR_ON_STA	  "gEnableMonOnSta"
+#define CFG_ENABLE_MONITOR_ON_STA_MIN     (0)
+#define CFG_ENABLE_MONITOR_ON_STA_MAX     (1)
+#define CFG_ENABLE_MONITOR_ON_STA_DEFAULT (0)
+
+/*
+ * <ini>
+ * enable_sae_for_sap - Enable/Disable SAE support in driver for SAP
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable SAE support in driver for SAP mode
+ * Driver will process/drop the SAE authentication frames based on this config.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAE
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_SAE_FOR_SAP_NAME    "enable_sae_for_sap"
+#define CFG_ENABLE_SAE_FOR_SAP_DEFAULT (1)
+#define CFG_ENABLE_SAE_FOR_SAP_MIN     (0)
+#define CFG_ENABLE_SAE_FOR_SAP_MAX     (1)
+
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+/*SAP Channel Switch Support*/
+#define CFG_SAP_CHANNEL_SWITCH_WITH_CSA_NAME "gSAPChannelSwitchWithCSA"
+#define CFG_SAP_CHANNEL_SWITCH_WITH_CSA_MIN      (0)
+#define CFG_SAP_CHANNEL_SWITCH_WITH_CSA_MAX      (1)
+#define CFG_SAP_CHANNEL_SWITCH_WITH_CSA_DEFAULT  (0)
+
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+
+/*
+ * <ini>
+ * sae_enabled - Enable/Disable SAE support in driver
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable SAE support in driver
+ * Driver will update config to supplicant based on this config.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAE
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_IS_SAE_ENABLED_NAME    "sae_enabled"
+#define CFG_IS_SAE_ENABLED_DEFAULT (1)
+#define CFG_IS_SAE_ENABLED_MIN     (0)
+#define CFG_IS_SAE_ENABLED_MAX     (1)
+
+#ifdef MULTI_IF_LOG
+#define CFG_HOST_LOG_CUSTOM_NETLINK_PROTO        "host_log_custom_nl_proto"
+#define CFG_HOST_LOG_CUSTOM_NETLINK_PROTO_DEFAULT (2)
+#define CFG_HOST_LOG_CUSTOM_NETLINK_PROTO_MIN     (0)
+#define CFG_HOST_LOG_CUSTOM_NETLINK_PROTO_MAX     (32)
+#endif
 /*---------------------------------------------------------------------------
   Type declarations
   -------------------------------------------------------------------------*/
@@ -5235,9 +6089,17 @@ struct hdd_config {
    v_BOOL_t                    enableTCPChkSumOffld;
    v_BOOL_t                    enableIPChecksumOffload;
    v_BOOL_t                    enablePowersaveOffload;
+#ifdef CONFIG_GPIO_OOB
+   v_U32_t                     oob_gpio_num;
+   v_U32_t                     oob_gpio_flag;
+#endif
    v_BOOL_t                    enablefwprint;
    v_BOOL_t                    enablefwlog;
+   v_BOOL_t                    fastfwdump;
    v_BOOL_t                    enableFwSelfRecovery;
+#ifdef FEATURE_USB_WARM_RESET
+   v_BOOL_t                    enable_usb_warm_reset;
+#endif
    v_BOOL_t                    fP2pListenOffload;
 #ifdef WLAN_FEATURE_11AC
    v_U8_t                      fVhtAmpduLenExponent;
@@ -5255,6 +6117,9 @@ struct hdd_config {
 #endif
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
    v_U32_t                     WlanMccToSccSwitchMode;
+   bool                        wlan_band_switch_enable;
+   bool                        wlan_ap_p2pgo_conc_enable;
+   bool                        wlan_ap_p2pclient_conc_enable;
 #endif
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
    v_U32_t                     WlanAutoShutdown;
@@ -5274,9 +6139,20 @@ struct hdd_config {
    v_U16_t                     thermalTempMaxLevel2;
    v_U16_t                     thermalTempMinLevel3;
    v_U16_t                     thermalTempMaxLevel3;
+#ifdef FEATURE_WLAN_THERMAL_SHUTDOWN
+   /* Thermal Shutdown feature is enabled or not. */
+   bool                    thermal_shutdown_enabled;
+   /* Thermal Shutdown is autonomous in driver or requested by user app. */
+   bool                    thermal_shutdown_auto_enabled;
+   uint16_t                     thermal_resume_threshold;
+   uint16_t                     thermal_warning_threshold;
+   uint16_t                     thermal_suspend_threshold;
+   uint16_t                     thermal_sample_rate;
+#endif
    v_U32_t                     TxPower2g;
    v_U32_t                     TxPower5g;
    v_U32_t                     gEnableDebugLog;
+   uint8_t                     enable_ac_txq_optimize;
    v_U8_t                      rxhandle;
    uint8_t                     cpu_map_list[CFG_RPS_RX_QUEUE_CPU_MAP_LIST_LEN];
    v_BOOL_t                    fDfsPhyerrFilterOffload;
@@ -5294,6 +6170,7 @@ struct hdd_config {
    uint8_t                     rate_for_tx_mgmt;
    uint8_t                     rate_for_tx_mgmt_2g;
    uint8_t                     rate_for_tx_mgmt_5g;
+   uint8_t                     remove_time_stamp_sync_cmd;
 #ifdef QCA_LL_TX_FLOW_CT
    v_U32_t                     TxFlowLowWaterMark;
    v_U32_t                     TxFlowHighWaterMarkOffset;
@@ -5376,6 +6253,7 @@ struct hdd_config {
    bool                        crash_inject_enabled;
    v_S31_t                     dfsRadarPriMultiplier;
    v_U8_t                      reorderOffloadSupport;
+   uint8_t                     enable_hostapd_edca_local;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
    v_BOOL_t                    isRoamOffloadEnabled;
@@ -5514,10 +6392,16 @@ struct hdd_config {
    uint32_t                    coex_pta_config_param;
 #endif
 
+#ifdef WMI_COEX_BTC_DUTYCYCLE
+   uint32_t               coex_btc_PauseDuration;
+   uint32_t               coex_btc_UnPauseDuration;
+#endif
+
    uint8_t                     inform_bss_rssi_raw;
 #ifdef WLAN_FEATURE_TSF
    uint32_t                    tsf_gpio_pin;
-
+   uint32_t                    tsf_gpio_pin_host;
+   uint8_t                     tsf_by_register;
 #ifdef WLAN_FEATURE_TSF_PLUS
    uint8_t                     tsf_ptp_options;
 #endif /* WLAN_FEATURE_TSF_PLUS */
@@ -5556,6 +6440,8 @@ struct hdd_config {
    uint8_t                     wow_pulse_pin;
    uint16_t                    wow_pulse_interval_high;
    uint16_t                    wow_pulse_interval_low;
+   uint32_t                    wow_pulse_repeat_count;
+   uint8_t                     wow_pulse_init_state;
 #endif
    bool                        enable_go_cts2self_for_sta;
    uint8_t                     ht_mpdu_density;
@@ -5572,6 +6458,14 @@ struct hdd_config {
    bool                        g_use_otpmac;
    uint32_t                    tx_aggregation_size;
    uint32_t                    rx_aggregation_size;
+   uint32_t                    tx_aggr_sw_retry_threshhold_be;
+   uint32_t                    tx_aggr_sw_retry_threshhold_bk;
+   uint32_t                    tx_aggr_sw_retry_threshhold_vi;
+   uint32_t                    tx_aggr_sw_retry_threshhold_vo;
+   uint32_t                    tx_non_aggr_sw_retry_threshhold_be;
+   uint32_t                    tx_non_aggr_sw_retry_threshhold_bk;
+   uint32_t                    tx_non_aggr_sw_retry_threshhold_vi;
+   uint32_t                    tx_non_aggr_sw_retry_threshhold_vo;
    bool                        bug_report_for_scan_results;
    bool                        enable_edca_params;
    uint32_t                    edca_vo_cwmin;
@@ -5642,6 +6536,7 @@ struct hdd_config {
    uint8_t probe_req_ouis[MAX_PRB_REQ_VENDOR_OUI_INI_LEN];
    /* parameter for indicating sub20 channel width */
    uint8_t                     sub_20_channel_width;
+   bool                        sta_change_cc_via_beacon;
    uint32_t                    rx_wakelock_timeout;
    /* beacon count before channel switch */
    uint8_t                     sap_chanswitch_beacon_cnt;
@@ -5656,6 +6551,30 @@ struct hdd_config {
 #ifdef WLAN_FEATURE_DSRC
    bool                        ocb_tx_per_pkt_stats_enabled;
 #endif
+   bool      cca_threshold_enable;
+   uint32_t  cca_threshold_2g;
+   uint32_t  cca_threshold_5g;
+   uint8_t                     mon_on_sta_enable;
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+   uint32_t                    sap_ch_switch_with_csa;
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+
+   uint32_t dpd_recalib_enabled;
+   uint32_t dpd_recalib_delta_degreehigh;
+   uint32_t dpd_recalib_delta_degreelow;
+   uint32_t dpd_recalib_cooling_time;
+   uint32_t dpd_recalib_duration_max;
+#ifdef WLAN_FEATURE_SAE
+   bool is_sae_enabled;
+   bool enable_sae_for_sap;
+#endif
+
+#ifdef MULTI_IF_LOG
+   uint32_t host_log_custom_nl_proto;
+#endif
+
+   uint32_t  mask_tx_legacy_rate;
+   uint32_t  mask_tx_ht_rate;
 };
 
 typedef struct hdd_config hdd_config_t;

@@ -159,3 +159,11 @@ enum AM_MESON_CPU_MAJOR_ID get_cpu_major_id(void)
 	return cpu_ver_id;
 }
 EXPORT_SYMBOL(get_cpu_major_id);
+
+bool is_cpu_tm2_revb(void)
+{
+	return ((get_cpu_major_id() == AM_MESON_CPU_MAJOR_ID_TM2) &&
+		(is_meson_rev_b()));
+}
+EXPORT_SYMBOL(is_cpu_tm2_revb);
+

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -49,7 +49,10 @@ typedef struct _vsi_nn_reduce_lcl_data_t
 
 typedef struct _vsi_nn_reduce_lcl2_data_t
 {
+    vsi_nn_tensor_t *reshaped_input;
     vsi_nn_tensor_t *reshaped_output;
+    vsi_nn_tensor_t *reshaped_tmp;
+    vsi_nn_tensor_t *axis_tensor2;
 } vsi_nn_reduce_lcl2_data_t;
 
 typedef struct _vsi_nn_reduce_param
@@ -60,7 +63,7 @@ typedef struct _vsi_nn_reduce_param
     vx_uint32   *axis;
     vx_uint32   axis_num;
     vx_bool     keep_dim;
-    vsi_nn_reduce_lcl2_data_t local2;
+    vsi_nn_reduce_lcl2_data_t* local2;
 } vsi_nn_reduce_param;
 
 #ifdef __cplusplus

@@ -3062,23 +3062,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta,
 VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatFromReference(vx_meta_format meta, vx_reference exemplar);
 
 VX_API_ENTRY vx_status VX_API_CALL
-vxMapWeightsBiasesParameter(
-    vx_weights_biases_parameter     weights_biases,
-    vx_map_id *                     map_id,
-    vx_uint32 *                     stride,
-    void **                         ptr,
-    vx_enum                         usage,
-    vx_enum                         mem_type,
-    vx_uint32                       flags
-    );
-
-VX_API_ENTRY vx_status VX_API_CALL
-vxUnmapWeightsBiasesParameter(
-    vx_weights_biases_parameter     weights_biases,
-    vx_map_id                       map_id
-    );
-
-VX_API_ENTRY vx_status VX_API_CALL
 vxConfigTarget(
     vx_context context,
     vx_int32 dp_amount,

@@ -285,6 +285,10 @@ struct mmc_card {
 #define MMC_QUIRK_TRIM_BROKEN	(1<<12)		/* Skip trim */
 #define MMC_QUIRK_BROKEN_HPI	(1<<13)		/* Disable broken HPI support */
 
+#ifdef CONFIG_AMLOGIC_MMC
+/* secure erase to slow,change to normal erase */
+#define MMC_QUIRK_BROKEN_SECURE_ERASE	BIT(14)
+#endif
 
 	unsigned int		erase_size;	/* erase size in sectors */
  	unsigned int		erase_shift;	/* if erase unit is power 2 */

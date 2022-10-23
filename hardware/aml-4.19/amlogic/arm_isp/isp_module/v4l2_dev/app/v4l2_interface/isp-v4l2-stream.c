@@ -308,7 +308,6 @@ void callback_meta( uint32_t ctx_num, const void *fw_metadata )
     }
 #endif
     pstream->last_frame_id = frame_id;
-    LOG( LOG_INFO, "[Stream#%d] Meta Frame ID %d.", pstream->stream_id, frame_id );
 
 #if V4L2_FRAME_ID_SYNC
     rc = sync_frame( pstream->stream_type, ctx_num, frame_id, SYNC_FLAG_META );
@@ -449,7 +448,7 @@ void callback_raw( uint32_t ctx_num, aframe_t *aframe, const metadata_t *metadat
 
         for ( i = 0; i < exposures_num; i++ ) {
             frame_mgr->frame_buffer.addr[i] = aframe[i].address;
-            LOG( LOG_INFO, "[Stream#2] v4l2 addresses:0x%x", aframe[i].address );
+            LOG( LOG_DEBUG, "[Stream#2] v4l2 addresses:0x%x", aframe[i].address );
             aframe[i].status = dma_buf_purge;
         }
         if ( pstream->stream_common->sensor_info.preset[pstream->stream_common->sensor_info.preset_cur].exposures[pstream->stream_common->sensor_info.preset[pstream->stream_common->sensor_info.preset_cur].fps_cur] > exposures_num ) {
@@ -472,8 +471,6 @@ void callback_raw( uint32_t ctx_num, aframe_t *aframe, const metadata_t *metadat
     if ( metadata )
         LOG( LOG_DEBUG, "metadata: width: %u, height: %u, line_size: %u, frame_number: %u.",
              metadata->width, metadata->height, metadata->line_size, metadata->frame_number );
-
-    LOG( LOG_INFO, "[Stream#2] v4l2 callback_raw end" );
 }
 #endif
 
@@ -704,7 +701,7 @@ void callback_ds2( uint32_t ctx_num, tframe_t *tframe, const metadata_t *metadat
 			wake_up_interruptible( &frame_mgr->frame_wq );
 
 		if ( metadata )
-			LOG( LOG_INFO, "metadata: width: %u, height: %u, line_size: %u, frame_number: %u.",
+			LOG( LOG_DEBUG, "metadata: width: %u, height: %u, line_size: %u, frame_number: %u.",
 				 metadata->width, metadata->height, metadata->line_size, metadata->frame_number );
 #endif
 
@@ -878,13 +875,11 @@ void isp_v4l2_stream_fill_buf( isp_v4l2_stream_t *pstream, isp_v4l2_buffer_t *bu
             for ( i = 0; i < pstream->cur_v4l2_fmt.fmt.pix_mp.num_planes; i++ ) {
                 vbuf = vb2_plane_vaddr( vb, i );
                 img_frame_size = pstream->cur_v4l2_fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
-                LOG( LOG_INFO, "copying for plane %u %u dest:%p src:%p addr:0x%x", i, img_frame_size, vbuf, ddr_mem + hw_buf_offset[i], hw_buf_offset[i] );
                 memcpy( vbuf, ddr_mem + hw_buf_offset[i] - paddr, img_frame_size );
             }
         } else if ( pstream->cur_v4l2_fmt.type == V4L2_BUF_TYPE_VIDEO_CAPTURE ) {
             vbuf = vb2_plane_vaddr( vb, 0 );
             img_frame_size = pstream->cur_v4l2_fmt.fmt.pix.sizeimage;
-            LOG( LOG_INFO, "copying for single plane %u", img_frame_size );
             memcpy( vbuf, ddr_mem + hw_buf_offset[0] - paddr, img_frame_size );
         } else {
             LOG( LOG_ERR, "v4l2 bufer format not supported" );
@@ -935,8 +930,6 @@ static int isp_v4l2_stream_copy_thread( void *data )
         LOG( LOG_ERR, "Null stream passed" );
         return -EINVAL;
     }
-
-    LOG( LOG_INFO, "[Stream#%d] Enter HW thread.", pstream->stream_id );
 
     frame_mgr = &pstream->frame_mgr;
     set_freezable();
@@ -1028,8 +1021,6 @@ static int isp_v4l2_stream_copy_thread( void *data )
         }
         spin_unlock( &pstream->slock );
 
-        cache_flush(tframe.primary.address, tframe.primary.size + tframe.secondary.size);
-
         vvb = &pbuf->vvb;
         vb = &vvb->vb2_buf;
 
@@ -1040,14 +1031,13 @@ static int isp_v4l2_stream_copy_thread( void *data )
         vb->timestamp = ktime_get_ns();
         pstream->fw_frame_seq_count++;
 
+        cache_flush(tframe.primary.address, tframe.primary.size + tframe.secondary.size);
         /* Fill buffer */
         LOG( LOG_DEBUG, "[Stream#%d] filled buffer %d with frame_buf_idx: %d.",
              pstream->stream_id, buf_index, idx_tmp );
 
         /* Put buffer back to vb2 queue */
         vb2_buffer_done( vb, VB2_BUF_STATE_DONE );
-        LOG( LOG_INFO, "[Stream#%d] vid_cap buffer %d done frame_id:%d",
-             pstream->stream_id, buf_index, meta.frame_id );
 
         /* Notify buffer ready */
         isp_v4l2_notify_event( pstream->ctx_id, pstream->stream_id, V4L2_EVENT_ACAMERA_FRAME_READY );
@@ -1094,8 +1084,6 @@ static int isp_v4l2_stream_copy_thread( void *data )
 
     /* Notify stream off */
     isp_v4l2_notify_event( pstream->ctx_id, pstream->stream_id, V4L2_EVENT_ACAMERA_STREAM_OFF );
-
-    LOG( LOG_INFO, "[Stream#%d] Exit HW thread.", pstream->stream_id );
 
     return 0;
 }
@@ -1161,8 +1149,6 @@ int isp_v4l2_stream_on( isp_v4l2_stream_t *pstream )
             LOG( LOG_ERR, "[Stream#%d] create kernel_thread() failed", pstream->stream_id );
             return PTR_ERR( pstream->kthread_stream );
         }
-        LOG( LOG_INFO, "[Stream#%d] stream_thread pid: %u", pstream->stream_id, pstream->kthread_stream->pid );
-
     }
 #if ISP_HAS_META_CB
     else { //metadata has no thread
@@ -1194,8 +1180,6 @@ void isp_v4l2_stream_off( isp_v4l2_stream_t *pstream, int stream_on_count )
         return;
     }
 
-    LOG( LOG_INFO, "[Stream#%d] called", pstream->stream_id );
-
     fw_intf_stream_stop( pstream->ctx_id, pstream->stream_type, stream_on_count );
 
     /* shutdown control thread */
@@ -1206,7 +1190,6 @@ void isp_v4l2_stream_off( isp_v4l2_stream_t *pstream, int stream_on_count )
 #if ISP_HAS_META_CB
     else if ( pstream->stream_type == V4L2_STREAM_TYPE_META ) {
         while ( atomic_read( &pstream->running ) > 0 ) { //metadata has no thread
-            LOG( LOG_INFO, "[Stream#%d] still running %d !", pstream->stream_id, atomic_read( &pstream->running ) );
             schedule();
         }
         atomic_set( &pstream->running, -1 );
@@ -1231,9 +1214,6 @@ void isp_v4l2_stream_off( isp_v4l2_stream_t *pstream, int stream_on_count )
 #endif
 
         vb2_buffer_done( vb, VB2_BUF_STATE_ERROR );
-
-        LOG( LOG_INFO, "[Stream#%d] vid_cap buffer %d done",
-             pstream->stream_id, buf_index );
     }
     spin_unlock( &pstream->slock );
 
@@ -1268,7 +1248,7 @@ int isp_v4l2_stream_enum_framesizes( isp_v4l2_stream_t *pstream, struct v4l2_frm
 
     /* check index */
     if ( fsize->index >= pstream->stream_common->snapshot_sizes.frmsize_num ) {
-        LOG( LOG_INFO, "[Stream#%d] index (%d) should be smaller than %lu.",
+        LOG( LOG_DEBUG, "[Stream#%d] index (%d) should be smaller than %lu.",
              pstream->stream_id, fsize->index, pstream->stream_common->snapshot_sizes.frmsize_num );
         return -EINVAL;
     }
@@ -1288,7 +1268,7 @@ int isp_v4l2_stream_enum_format( isp_v4l2_stream_t *pstream, struct v4l2_fmtdesc
 
     /* check index */
     if ( f->index >= ARRAY_SIZE( isp_v4l2_supported_formats ) ) {
-        LOG( LOG_INFO, "[Stream#%d] index (%d) should be smaller than %lu.",
+        LOG( LOG_DEBUG, "[Stream#%d] index (%d) should be smaller than %lu.",
              pstream->stream_id, f->index, ARRAY_SIZE( isp_v4l2_supported_formats ) );
         return -EINVAL;
     }
@@ -1311,9 +1291,6 @@ int isp_v4l2_stream_enum_format( isp_v4l2_stream_t *pstream, struct v4l2_fmtdesc
     /* copy format code */
     f->pixelformat = fmt->fourcc;
 
-    LOG( LOG_INFO, "[Stream#%d] index: %d, format: 0x%x, desc: %s.\n",
-         pstream->stream_id, f->index, f->pixelformat, f->description );
-
     return 0;
 }
 
@@ -1323,7 +1300,7 @@ int isp_v4l2_stream_try_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
     int i;
     u32 offset;
 
-    LOG( LOG_INFO, "[Stream#%d] try fmt type: %u, pixelformat: 0x%x, width: %u, height: %u.\n",
+    LOG( LOG_DEBUG, "[Stream#%d] try fmt type: %u, pixelformat: 0x%x, width: %u, height: %u.\n",
          pstream->stream_id, f->type, f->fmt.pix_mp.pixelformat, f->fmt.pix_mp.width, f->fmt.pix_mp.height );
 
 #if ISP_HAS_META_CB
@@ -1357,7 +1334,7 @@ int isp_v4l2_stream_try_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
             acamera_command( pstream->ctx_id, TSENSOR, SENSOR_INFO_PRESET, spreset, COMMAND_SET, &rev_val );
             acamera_command( pstream->ctx_id, TSENSOR, SENSOR_INFO_EXPOSURES, 0, COMMAND_GET, &exposures_preset );
 
-            LOG( LOG_INFO, "[Stream#%d] Changing the number of planes according preset %d to exposures %d=>%d.\n", pstream->stream_id, spreset, tfmt->planes, exposures_preset );
+            LOG( LOG_DEBUG, "[Stream#%d] Changing the number of planes according preset %d to exposures %d=>%d.\n", pstream->stream_id, spreset, tfmt->planes, exposures_preset );
             tfmt->planes = exposures_preset;
         } else {
             tfmt->planes = 1;
@@ -1426,7 +1403,7 @@ int isp_v4l2_stream_get_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
 
     *f = pstream->cur_v4l2_fmt;
 
-    LOG( LOG_INFO, "[Stream#%d]   - GET fmt - width: %4u, height: %4u, format: 0x%x.",
+    LOG( LOG_DEBUG, "[Stream#%d]   - GET fmt - width: %4u, height: %4u, format: 0x%x.",
          pstream->stream_id,
          f->fmt.pix_mp.width,
          f->fmt.pix_mp.height,
@@ -1448,9 +1425,7 @@ int isp_v4l2_stream_set_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
         return -EINVAL;
     }
 
-    LOG( LOG_INFO, "[Stream#%d] VIDIOC_S_FMT operation", pstream->stream_id );
-
-    LOG( LOG_CRIT, "[Stream#%d]   - SET fmt - width: %4u, height: %4u, format: 0x%x.",
+    LOG( LOG_INFO, "[Stream#%d]   - SET fmt - width: %4u, height: %4u, format: 0x%x.",
          pstream->stream_id,
          f->fmt.pix_mp.width,
          f->fmt.pix_mp.height,
@@ -1510,7 +1485,7 @@ int isp_v4l2_stream_set_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
     /* update format */
     rc = fw_intf_stream_set_output_format( pstream->ctx_id, pstream->stream_type, f->fmt.pix_mp.pixelformat );
     if ( rc < 0 ) {
-        LOG( LOG_CRIT, "set format failed ! (rc = %d)", rc ); 
+        LOG( LOG_CRIT, "set format failed ! (rc = %d)", rc );
         return rc;
     }
 
@@ -1518,7 +1493,7 @@ int isp_v4l2_stream_set_format( isp_v4l2_stream_t *pstream, struct v4l2_format *
     pstream->cur_v4l2_fmt = *f;
 
 
-    LOG( LOG_CRIT, "[Stream#%d]   - New fmt - width: %4u, height: %4u, format: 0x%x, type: %5u. ",
+    LOG( LOG_INFO, "[Stream#%d]   - New fmt - width: %4u, height: %4u, format: 0x%x, type: %5u. ",
          pstream->stream_id,
          pstream->cur_v4l2_fmt.fmt.pix_mp.width,
          pstream->cur_v4l2_fmt.fmt.pix_mp.height,
@@ -1772,10 +1747,7 @@ int isp_v4l2_get_crop(isp_v4l2_stream_t *pstream,
 
 int isp_v4l2_stream_enum_frameintervals( isp_v4l2_stream_t *pstream, struct v4l2_frmivalenum *fival )
 {
-
     if ( !isp_v4l2_stream_find_format( fival->pixel_format ) ) {
-        LOG( LOG_INFO, "Failed to find format:[Stream#%d] index: %d, pixel_format: 0x%x.\n",
-        pstream->stream_id, fival->index, fival->pixel_format );
         return -EINVAL;
     }
 

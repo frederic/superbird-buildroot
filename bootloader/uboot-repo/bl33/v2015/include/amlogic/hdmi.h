@@ -210,6 +210,7 @@ enum hdmi_vic {
 	HDMIV_2560x1440p60hz,
 	HDMIV_2560x1600p60hz,
 	HDMIV_3440x1440p60hz,
+	HDMIV_2400x1200p90hz,
 };
 
 /* CEA TIMING STRUCT DEFINITION */
@@ -538,6 +539,16 @@ enum hdmi_audio_packet {
 	HDMI_AUDIO_PACKET_1BT = 0x07,
 	HDMI_AUDIO_PACKET_DST = 0x08,
 	HDMI_AUDIO_PACKET_HBR = 0x09,
+};
+
+enum hdmi_phy_para {
+	HDMI_PHYPARA_6G = 1, /* 2160p60hz 444 8bit */
+	HDMI_PHYPARA_4p5G, /* 2160p50hz 420 12bit */
+	HDMI_PHYPARA_3p7G, /* 2160p30hz 444 10bit */
+	HDMI_PHYPARA_3G, /* 2160p24hz 444 8bit */
+	HDMI_PHYPARA_LT3G, /* 1080p60hz 444 12bit */
+	HDMI_PHYPARA_DEF = HDMI_PHYPARA_LT3G,
+	HDMI_PHYPARA_270M, /* 480p60hz 444 8bit */
 };
 
 /* get hdmi cea timing

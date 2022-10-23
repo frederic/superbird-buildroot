@@ -53,20 +53,23 @@ class MonotonicSystemTimeProviderImpl : public MonotonicSystemTimeProvider {
 ::starboard::Mutex FilterBasedPlayerWorkerHandler::av_refcount_mutex;
 int FilterBasedPlayerWorkerHandler::num_audios = 0;
 int FilterBasedPlayerWorkerHandler::num_videos = 0;
-
+bool FilterBasedPlayerWorkerHandler::bmaindecoder_running = false;
+bool FilterBasedPlayerWorkerHandler::bsubdecoder_running = false;
 FilterBasedPlayerWorkerHandler::FilterBasedPlayerWorkerHandler(
     SbMediaVideoCodec video_codec,
     SbMediaAudioCodec audio_codec,
     SbDrmSystem drm_system,
     const SbMediaAudioSampleInfo* audio_sample_info,
     SbPlayerOutputMode output_mode,
-    SbDecodeTargetGraphicsContextProvider* provider)
+    SbDecodeTargetGraphicsContextProvider* provider,
+    bool bsubdecoder)
     : JobOwner(kDetached),
       video_codec_(video_codec),
       audio_codec_(audio_codec),
       drm_system_(drm_system),
       output_mode_(output_mode),
-      decode_target_graphics_context_provider_(provider) {
+      decode_target_graphics_context_provider_(provider),
+      bsubdecoder_(bsubdecoder) {
   if (audio_codec != kSbMediaAudioCodecNone) {
     audio_sample_info_ = *audio_sample_info;
 
@@ -86,13 +89,25 @@ FilterBasedPlayerWorkerHandler::FilterBasedPlayerWorkerHandler(
   bounds_ = PlayerWorker::Bounds();
 }
 
-bool FilterBasedPlayerWorkerHandler::AllocateDecoders(SbMediaVideoCodec video_codec, SbMediaAudioCodec audio_codec) {
+bool FilterBasedPlayerWorkerHandler::AllocateDecoders(SbMediaVideoCodec video_codec, SbMediaAudioCodec audio_codec,bool bsubdecoder) {
   ::starboard::ScopedLock lock(av_refcount_mutex);
+  if ((bmaindecoder_running && (!bsubdecoder))||(bsubdecoder_running && bsubdecoder ))
+  {
+    SB_LOG(ERROR) << "Tried to init main or sub decoder twice";
+    return false;
+  }
   if (((video_codec != kSbMediaVideoCodecNone) && (num_videos >= max_video_decoders)) ||
       ((audio_codec != kSbMediaAudioCodecNone) && (num_audios >= max_audio_decoders))) {
     SB_LOG(ERROR) << "reached max opened decoder audio:" << num_audios << " video:" << num_videos;
     return false;
   }
+  if (bsubdecoder){
+    bsubdecoder_running = true;
+  }
+  else{
+    bmaindecoder_running = true;
+  }
+
   if (video_codec != kSbMediaVideoCodecNone) {
     num_videos++;
   }
@@ -101,7 +116,19 @@ bool FilterBasedPlayerWorkerHandler::AllocateDecoders(SbMediaVideoCodec video_co
   }
   return true;
 }
-
+bool  FilterBasedPlayerWorkerHandler::GetDecoderType(const char *max_video_capabilities)
+{
+  bool bsubdecoder = false;
+  int width,height,framerate;
+  if (max_video_capabilities == NULL)
+    return  bsubdecoder;
+  int ret = std::sscanf(max_video_capabilities,"width=%d; height=%d; framerate=%d;",&width,&height,&framerate);
+  if ((ret==3)&&(width <= 432)&&(height <= 240)&&(framerate <= 15))
+  {
+    bsubdecoder = true;
+  }
+  return bsubdecoder;
+}
 bool FilterBasedPlayerWorkerHandler::IsPunchoutMode() const {
   return (output_mode_ == kSbPlayerOutputModePunchOut);
 }
@@ -112,6 +139,7 @@ bool FilterBasedPlayerWorkerHandler::Init(
     GetPlayerStateCB get_player_state_cb,
     UpdatePlayerStateCB update_player_state_cb,
     UpdatePlayerErrorCB update_player_error_cb) {
+
   // This function should only be called once.
   SB_DCHECK(update_media_info_cb_ == NULL);
 
@@ -142,7 +170,7 @@ bool FilterBasedPlayerWorkerHandler::Init(
       return false;
     }
 
-    audio_renderer_.reset(new AmlAudioRenderer(audio_codec_, audio_sample_info_, drm_system_));
+    audio_renderer_.reset(new AmlAudioRenderer(audio_codec_, audio_sample_info_, drm_system_,bsubdecoder_));
     if (!audio_renderer_) {
       SB_DLOG(ERROR) << "Failed to create audio renderer";
       return false;
@@ -188,7 +216,7 @@ bool FilterBasedPlayerWorkerHandler::Init(
 
     video_renderer_.reset(
         new AmlVideoRenderer(video_codec_, drm_system_, output_mode_,
-                             decode_target_graphics_context_provider_));
+                             decode_target_graphics_context_provider_,bsubdecoder_));
     if (!video_renderer_) {
       SB_DLOG(ERROR) << "Failed to create video renderer";
       return false;
@@ -450,7 +478,7 @@ void FilterBasedPlayerWorkerHandler::OnPrerolled(SbMediaType media_type) {
   audio_prerolled_ |= media_type == kSbMediaTypeAudio;
   video_prerolled_ |= media_type == kSbMediaTypeVideo;
 
-  if (audio_prerolled_ && (!video_renderer_ || video_prerolled_)) {
+  if ((bsubdecoder_||audio_prerolled_) && (!video_renderer_ || video_prerolled_)) {
     update_player_state_cb_(kSbPlayerStatePresenting);
     Update();
     if (!paused_) {
@@ -471,7 +499,7 @@ void FilterBasedPlayerWorkerHandler::OnEnded(SbMediaType media_type) {
   audio_ended_ |= media_type == kSbMediaTypeAudio;
   video_ended_ |= media_type == kSbMediaTypeVideo;
 
-  if (audio_ended_ && (!video_renderer_ || video_ended_)) {
+  if ((bsubdecoder_ || audio_ended_ )&& (!video_renderer_ || video_ended_)) {
     update_player_state_cb_(kSbPlayerStateEndOfStream);
   }
 }
@@ -501,8 +529,13 @@ void FilterBasedPlayerWorkerHandler::Update() {
     if (!paused_) {
       int nframe_video = (video_renderer_) ? video_renderer_->GetNumFramesBuffered() : AmlAVCodec::MAX_NUM_FRAMES;
       int nframe_audio = (audio_renderer_) ? audio_renderer_->GetNumFramesBuffered() : AmlAVCodec::MAX_NUM_FRAMES;
+      if (bsubdecoder_)
+      {
+        nframe_audio = AmlAVCodec::MAX_NUM_FRAMES;
+      }
       if (!underflow_pause) {
-        if ((nframe_video < 30) || (nframe_audio *20 < 100)) {
+        if ((nframe_video <= 0) || (nframe_audio  <= 0)) {
+        // only when video or audio buffer was empty , we tried to pause it.
           SB_LOG(WARNING) << "buffer underflow, audio:" << nframe_audio << " video:" << nframe_video;
           if (audio_renderer_) audio_renderer_->GetNumFramesBuffered(true);
           GetMediaTimeProvider()->Pause();
@@ -514,7 +547,8 @@ void FilterBasedPlayerWorkerHandler::Update() {
         }
       } else {
         //if ((nframe_video >= AmlAVCodec::MAX_NUM_FRAMES) && (nframe_audio >= AmlAVCodec::MAX_NUM_FRAMES)) {
-        if ((nframe_video >= AmlAVCodec::MAX_NUM_FRAMES) && (nframe_audio * 20 >= 500)) {
+        //in MSE test items, cobalt only send out 23 audio frame before we start to play stream.
+        if ((nframe_video >= AmlAVCodec::MAX_NUM_FRAMES) && (nframe_audio  >= 20)) {
           SB_LOG(WARNING) << "underflow recover, audio:" << nframe_audio << " video:" << nframe_video;
           GetMediaTimeProvider()->Play();
           if (video_renderer_) {
@@ -546,11 +580,18 @@ void FilterBasedPlayerWorkerHandler::Stop() {
   }
   {
     ::starboard::ScopedLock lock(av_refcount_mutex);
+
     if (video_renderer) {
       num_videos--;
     }
     if (audio_renderer_) {
       num_audios--;
+    }
+    if (bsubdecoder_){
+      bsubdecoder_running  = false;
+    }
+    else{
+      bmaindecoder_running = false;
     }
   }
   video_renderer.reset();

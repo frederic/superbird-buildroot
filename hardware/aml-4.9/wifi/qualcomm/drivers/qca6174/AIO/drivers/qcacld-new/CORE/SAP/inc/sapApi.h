@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -98,6 +98,8 @@ when           who                what, where, why
 #define       MAX_ACL_MAC_ADDRESS          32
 #define       AUTO_CHANNEL_SELECT          0
 #define       MAX_ASSOC_IND_IE_LEN         255
+#define       MAX_ASSOC_REQ_IE_LEN         2000
+#define       ASSOC_REQ_IE_OFFSET          4
 
 #define       MAX_NAME_SIZE                64
 #define       MAX_TEXT_SIZE                32
@@ -194,6 +196,9 @@ typedef enum {
     eSAP_ACS_SCAN_SUCCESS_EVENT,
     eSAP_ACS_CHANNEL_SELECTED,
     eSAP_ECSA_CHANGE_CHAN_IND,
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+    eSAP_CHANNEL_SWITCH_NOTIFICATION,
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
 } eSapHddEvent;
 
 typedef enum {
@@ -267,13 +272,15 @@ typedef struct sap_StationAssocIndication_s {
     eCsrEncryptionType negotiatedMCEncryptionType;
     tANI_BOOLEAN fAuthRequired;
     uint8_t      ecsa_capable;
+    uint32_t owe_ie_len;
+    uint8_t *owe_ie;
 } tSap_StationAssocIndication;
 
 typedef struct sap_StationAssocReassocCompleteEvent_s {
     v_MACADDR_t  staMac;
     v_U8_t       staId;
     v_U8_t       status;
-    v_U8_t       ies[MAX_ASSOC_IND_IE_LEN];
+    v_U8_t       *ies;
     v_U16_t      iesLen;
     v_U32_t      statusCode;
     eSapAuthType SapAuthType;
@@ -546,7 +553,14 @@ typedef struct sap_Config {
     v_U8_t          channel;         /* Operation channel */
     uint8_t         sec_ch;
     uint16_t         vht_channel_width;
-    uint16_t         ch_width_orig;
+    /* record value of "enum nl80211_chan_width" from usr */
+    uint32_t        ch_width_orig_usr;
+    /* convert to value of "tSirMacHTChannelWidth" per ch_width_orig_usr */
+    tSirMacHTChannelWidth ch_width_orig;
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    uint16_t         ch_width_24g_orig;
+    uint16_t         ch_width_5g_orig;
+#endif
     v_U8_t          max_num_sta;     /* maximum number of STAs in station table */
     v_U8_t          dtim_period;     /* dtim interval */
     v_U8_t          num_accept_mac;
@@ -558,6 +572,7 @@ typedef struct sap_Config {
     v_U8_t          RSNEncryptType;
     v_U8_t          mcRSNEncryptType;
     eSapAuthType    authType;
+    tCsrAuthList    akm_list;
     v_BOOL_t        privacy;
     v_BOOL_t        UapsdEnable;
     v_BOOL_t        fwdWPSPBCProbeReq;
@@ -584,6 +599,8 @@ typedef struct sap_Config {
 #endif
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
     v_U8_t          cc_switch_mode;
+    bool            band_switch_enable;
+    bool            ap_p2pclient_concur_enable;
 #endif
 
     v_U16_t    probeRespIEsBufferLen;
@@ -733,6 +750,9 @@ typedef struct sSapDfsInfo
     bool               dfs_beacon_tx_enhanced;
     uint16_t           reduced_beacon_interval;
     enum sub20_chan_switch_mode  sub20_switch_mode;
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+    v_U8_t              csaSwitchCount;
+#endif
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList
@@ -1074,7 +1094,8 @@ WLANSAP_Start
     v_PVOID_t  pvosGCtx,
     tVOS_CON_MODE mode,
     uint8_t *addr,
-    uint32_t *session_id
+    uint32_t *session_id,
+    bool reinit
 );
 
 /*==========================================================================
@@ -2480,6 +2501,19 @@ WLANSAP_ACS_CHSelect(v_PVOID_t pvosGCtx,
 eCsrPhyMode
 wlansap_get_phymode(v_PVOID_t pctx);
 
+/**
+ * wlansap_update_owe_info() - Update OWE info
+ * @sap_ctx: sap context
+ * @peer: peer mac
+ * @ie: IE from hostapd
+ * @ie_len: IE length
+ * @owe_status: status from hostapd
+ *
+ * Return: QDF_STATUS
+ */
+VOS_STATUS wlansap_update_owe_info(v_PVOID_t sap_ctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status);
 VOS_STATUS wlansap_set_tx_leakage_threshold(tHalHandle hal,
 			uint16 tx_leakage_threshold);
 
@@ -2514,6 +2548,7 @@ eHalStatus sapRoamSessionCloseCallback(void *pContext);
 #ifdef __cplusplus
  }
 #endif
-
-
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+eHalStatus wlansap_channel_compare(tHalHandle hHal, uint8_t channel, bool *equal);
+#endif
 #endif /* #ifndef WLAN_QCT_WLANSAP_H */

@@ -57,6 +57,7 @@
 
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 #include <linux/amlogic/media/vout/vdac_dev.h>
+#include <linux/amlogic/aml_dtvdemod.h>
 
 
 MODULE_PARM_DESC(debug_aml, "\n\t\t Enable frontend debug information");
@@ -74,7 +75,7 @@ module_param(std_lock_timeout, int, 0644);
 /*0.001for field,0.002 for performance
  *0.04: new method of tl1 dvbc channel fast search(Hisense project)
  */
-static char *demod_version = "V0.04";
+static char *demod_version = "V0.04: solve stuck issue";
 
 
 int aml_demod_debug = DBG_INFO;
@@ -507,6 +508,9 @@ static ssize_t info_show(struct class *cls,
 	int strength = 0;
 
 	pos += snprintf(buf+pos, size-pos, "dtv demod info:\n");
+	pos += snprintf(buf+pos, size-pos, "version:%s\n", demod_version);
+	pos += snprintf(buf+pos, size-pos, "atsc rst done: %d\n",
+			dtvdd_devp->atsc_rst_done);
 
 	switch (demod_mode_para) {
 	case AML_DVBC:
@@ -673,6 +677,48 @@ static int amdemod_qam(enum fe_modulation qam)
 	return 2;
 }
 
+static int amdemod_check_8vsb_rst(void)
+{
+	int ret = 0;
+	union atsc_cntl_reg_0x20 val;
+
+	/* only for tm2, first time of pwr on,
+	 * reset after signal locked
+	 * for lock event, 0x79 is safe for reset
+	 */
+	if (dtvdd_devp->atsc_rst_done == 0) {
+		if (dtvdd_devp->atsc_rst_needed) {
+			val.bits = atsc_read_reg_v4(ATSC_CNTR_REG_0X20);
+			val.b.cpu_rst = 1;
+			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, val.bits);
+			val.b.cpu_rst = 0;
+			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, val.bits);
+			dtvdd_devp->atsc_rst_done = 1;
+			ret = 0;
+			PR_ATSC("reset done\n");
+		}
+
+		if (atsc_read_reg_v4(0x2e) >= 0x79) {
+			dtvdd_devp->atsc_rst_needed = 1;
+			ret = 0;
+			PR_ATSC("need reset\n");
+		} else {
+			dtvdd_devp->atsc_rst_wait_cnt++;
+			PR_ATSC("wait cnt: %d\n",
+				dtvdd_devp->atsc_rst_wait_cnt);
+		}
+
+		if ((dtvdd_devp->atsc_rst_wait_cnt >= 3) &&
+		    (atsc_read_reg_v4(0x2e) >= 0x76)) {
+			dtvdd_devp->atsc_rst_done = 1;
+			ret = 1;
+		}
+	} else if (atsc_read_reg_v4(0x2e) >= 0x76)
+		ret = 1;
+
+	return ret;
+}
+
 static int amdemod_stat_islock(/*struct aml_fe_dev *dev,*/ int mode)
 {
 	struct aml_demod_sts demod_sts;
@@ -707,15 +753,17 @@ static int amdemod_stat_islock(/*struct aml_fe_dev *dev,*/ int mode)
 			if ((atsc_read_iqr_reg() >> 16) == 0x1f)
 				ret = 1;
 		} else if (atsc_mode == VSB_8) {
-			if (is_ic_ver(IC_VER_TL1) || is_ic_ver(IC_VER_TM2)) {
+			if (is_ic_ver(IC_VER_TL1)) {
 				if (atsc_read_reg_v4(0x2e) >= 0x76)
 					ret = 1;
+			} else if (is_meson_tm2_cpu()) {
+				ret = amdemod_check_8vsb_rst();
 			} else {
-			atsc_fsm = atsc_read_reg(0x0980);
-			PR_DBGL("atsc status [%x]\n", atsc_fsm);
-			/*return atsc_read_reg(0x0980) >= 0x79;*/
-			if (atsc_read_reg(0x0980) >= 0x79)
-				ret = 1;
+				atsc_fsm = atsc_read_reg(0x0980);
+				PR_DBGL("atsc status [%x]\n", atsc_fsm);
+
+				if (atsc_read_reg(0x0980) >= 0x79)
+					ret = 1;
 			}
 		} else {
 			atsc_fsm = atsc_read_reg(0x0980);
@@ -1657,7 +1705,7 @@ static int gxtv_demod_atsc_set_frontend(struct dvb_frontend *fe)
 	struct aml_demod_dvbc param_j83b;
 	int temp_freq = 0;
 	union ATSC_DEMOD_REG_0X6A_BITS Val_0x6a;
-	union ATSC_CNTR_REG_0X20_BITS Val_0x20;
+	union atsc_cntl_reg_0x20 val;
 	int nco_rate;
 	/*[0]: specturm inverse(1),normal(0); [1]:if_frequency*/
 	unsigned int tuner_freq[2] = {0};
@@ -1666,6 +1714,7 @@ static int gxtv_demod_atsc_set_frontend(struct dvb_frontend *fe)
 	memset(&param_j83b, 0, sizeof(param_j83b));
 	if (!demod_thread)
 		return 0;
+
 	freq_p = c->frequency / 1000;
 	PR_INFO("c->modulation is %d,freq_p is %d, atsc_flag is %d\n",
 		c->modulation, freq_p, atsc_flag);
@@ -1755,11 +1804,11 @@ static int gxtv_demod_atsc_set_frontend(struct dvb_frontend *fe)
 
 			/*for timeshift mosaic issue*/
 			atsc_write_reg_v4(0x12, 0x18);
-			Val_0x20.bits = atsc_read_reg_v4(ATSC_CNTR_REG_0X20);
-			Val_0x20.b.cpu_rst = 1;
-			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, Val_0x20.bits);
-			Val_0x20.b.cpu_rst = 0;
-			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, Val_0x20.bits);
+			val.bits = atsc_read_reg_v4(ATSC_CNTR_REG_0X20);
+			val.b.cpu_rst = 1;
+			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, val.bits);
+			val.b.cpu_rst = 0;
+			atsc_write_reg_v4(ATSC_CNTR_REG_0X20, val.bits);
 			usleep_range(5000, 5001);
 		} else {
 			if (atsc_flag != VSB_8)
@@ -2081,6 +2130,7 @@ static int gxtv_demod_atsc_tune(struct dvb_frontend *fe, bool re_tune,
 
 	PR_ATSC("%s:\n", __func__);
 	*delay = HZ/2;
+
 	if (re_tune) {
 		dtvdd_devp->en_detect = 1; /*fist set*/
 		/*c->delivery_system = aml_demod_delivery_sys;*/
@@ -2471,6 +2521,7 @@ static int gxtv_demod_dtmb_read_status_old
 	if (is_dtmb_ver(IC_DTMB_V2)) {
 		s = dtmb_check_status_gxtv(fe);
 	} else if (is_dtmb_ver(IC_DTMB_V3)) {
+		dtmb_bch_check();
 		if (!is_ic_ver(IC_VER_TL1) && !is_ic_ver(IC_VER_TM2))
 			s = dtmb_check_status_txl(fe);
 	} else {
@@ -4925,7 +4976,7 @@ static struct dvb_frontend_ops aml_dtvdm_tm2_ops = {
 
 };
 
-struct dvb_frontend *aml_dtvdm_attach(const struct amlfe_exp_config *config)
+struct dvb_frontend *aml_dtvdm_attach(const struct demod_config *config)
 {
 	int ic_version = get_ic_ver();
 

@@ -4747,6 +4747,11 @@ F:	Documentation/networking/phy.txt
 F:	drivers/of/of_mdio.c
 F:	drivers/of/of_net.c
 
+EXFAT FILE SYSTEM
+M:	Valdis Kletnieks <valdis.kletnieks@vt.edu>
+S:	Maintained
+F:	fs/exfat/
+
 EXT2 FILE SYSTEM
 M:	Jan Kara <jack@suse.com>
 L:	linux-ext4@vger.kernel.org
@@ -13506,9 +13511,7 @@ F: drivers/amlogic/ddr_tool/ddr_port_desc.c
 
 AMLOGIC driver for dmc protection
 M: Tao Zeng <tao.zeng@amlogic.com>
-F: drivers/amlogic/ddr_tool/dmc_g12.c
-F: drivers/amlogic/ddr_tool/dmc_gx.c
-F: drivers/amlogic/ddr_tool/dmc_monitor.c
+F: drivers/amlogic/ddr_tool/*
 F: include/linux/amlogic/dmc_monitor.h
 F: include/linux/amlogic/ddr_port.h
 
@@ -13547,11 +13550,10 @@ F: arch/arm/include/asm/kasan.h
 F: arch/arm/mm/kasan_init.c
 
 HDMITX OUTPUT DRIVER
-M:	Yi Zhou <yi.zhou@amlogic.com>
-M:      Zongdong Jiao <zongdong.jiao@amlogic.com>
-M:	Kaifu Hu <kaifu.hu@amlogic.com>
+M:  Zongdong Jiao <zongdong.jiao@amlogic.com>
+M:	Zhengrong Zhu <zhengrong.zhu@amlogic.com>
 S:	Maintained
-F:	drivers/amlogic/media/vout/hdmitx/*
+F:	drivers/amlogic/media/vout/hdmitx/
 F:	drivers/amlogic/media/vout/hdmitx/hdcp/*
 F:	include/linux/amlogic/media/vout/hdmi_tx/*
 F:	drivers/amlogic/esm/*
@@ -13613,6 +13615,7 @@ F:	arch/arm64/boot/dts/amlogic/gxm_q200_2g.dts
 
 AMLOGIC multimedia
 M:	Nanxin Qin <nanxin.qin@amlogic.com>
+M:	Tao Guo <tao.guo@amlogic.com>
 F:	drivers/amlogic/media/common/arch/registers/*
 F:	drivers/amlogic/media/common/canvas/*
 F:	drivers/amlogic/media/common/codec_mm/*
@@ -13873,6 +13876,11 @@ F: drivers/amlogic/media/video_processor/video_dev/common/vfutil.c
 AMLOGIC SPICC DRIVER
 M: Neil Armstrong <narmstrong@baylibre.com>
 F: drivers/spi/spi-meson-spicc.c
+M: Sunny Luo <sunny.luo@amlogic.com>
+F: drivers/amlogic/spicc/sspicc.c
+F: drivers/amlogic/spicc/vmem.c
+F: include/linux/amlogic/vmem.h
+F: Documentation/devicetree/bindings/amlogic/spi-meson.txt
 
 AMLOGIC BT/WIFI
 M: Rongjun Chen <rongjun.chen@amlogic.com>
@@ -14019,7 +14027,6 @@ M: Zhe Wang <zhe.wang@amlogic.com>
 F: sound/soc/amlogic/meson/*
 F: sound/soc/amlogic/auge/*
 F: sound/soc/codecs/amlogic/*
-F: sound/soc/codecs/amlogic/tas575x.c
 F: include/dt-bindings/clock/amlogic,axg-audio-clk.h
 
 AMLOGIC Security Support
@@ -14371,6 +14378,7 @@ F:      drivers/amlogic/media/vout/vout_serve/vout_func.c
 F:      drivers/amlogic/media/vout/vout_serve/vout_func.h
 F:	drivers/amlogic/media/vout/vout_serve/vout_reg.h
 F:	drivers/amlogic/media/vout/vout_serve/dummy_lcd.c
+F:	drivers/amlogic/media/vout/vout_serve/dummy_venc.c
 
 AMLOGIC GPIO IRQ
 M: Xingyu Chen <xingyu.chen@amlogic.com>
@@ -14482,7 +14490,14 @@ F:	drivers/amlogic/media/vout/lcd/lcd_extern/mipi_TL050FHV02CT.c
 AMLOGIC ATV DEMOD DRIVER
 M:      nengwen.chen <nengwen.chen@amlogic.com>
 F:      drivers/amlogic/atv_demod/*
+
+AMLOGIC DVB COMPAT DRIVER
+M:      nengwen.chen <nengwen.chen@amlogic.com>
+F:      drivers/amlogic/dvb/*
 F:      include/linux/amlogic/aml_atvdemod.h
+F:      include/linux/amlogic/aml_dtvdemod.h
+F:      include/linux/amlogic/aml_tuner.h
+F:      include/linux/amlogic/aml_demod_common.h
 
 AMLOGIC ADD EXT MIPI DEFAULT DRIVER
 M:      Weiming Liu <weiming.liu@amlogic.com>
@@ -14723,6 +14738,7 @@ F:	sound/soc/amlogic/auge/frhdmirx_hw.c
 F:	sound/soc/amlogic/auge/frhdmirx_hw.h
 F:	sound/soc/amlogic/auge/*
 
+
 AMLOGIC LCD DRIVERS
 M:	Evoke Zhang <evoke.zhang@amlogic.com>
 F:	arch\arm\boot\dts\amlogic\mesontl1_pxp-panel.dtsi
@@ -14856,15 +14872,21 @@ AMLOGIC SM1 CLOCK DRIVERS
 M:	Shunzhou Jiang <shunzhou.jiang@amlogic.com>
 F:	drivers/amlogic/clk/sm1/*
 
-AMLOGIC SM1 AND AXG DTS
+AMLOGIC ADD LDIM DRIVER, SM1 AND AXG DTS
 M:	shaochan.liu <shaochan.liu@amlogic.com>
 F:	arch/arm64/boot/dts/amlogic/mesonsm1_skt-panel.dtsi
 F:	arch/arm/boot/dts/amlogic/mesonsm1_skt-panel.dtsi
 F:	arch/arm64/boot/dts/amlogic/mesonaxg_skt-panel.dtsi
 F:	arch/arm/boot/dts/amlogic/mesonaxg_skt-panel.dtsi
-F:	drivers/amlogic/media/vout/spi/
-F:	include/linux/amlogic/media/vout/lcd/lcd_spi.h
 F:	arch/arm64/boot/dts/amlogic/lcd_spi_g12a.dtsi
+F:	arch/arm64/boot/dts/amlogic/mesontm2_t962x3_t312.dtsi
+F:	arch/arm/boot/dts/amlogic/mesontm2_t962x3_t312.dtsi
+F:	drivers/amlogic/media/vout/backlight/aml_ldim/iw7027_he_bl.c
+F:	drivers/amlogic/media/vout/backlight/aml_ldim/iw7038.c
+F:	drivers/amlogic/media/vout/peripheral_lcd/
+F:	include/linux/amlogic/media/vout/peripheral_lcd.h
+F:	arch/arm/boot/dts/amlogic/mesonaxg_s420-per_lcd.dtsi
+F:	arch/arm64/boot/dts/amlogic/mesonaxg_s420-per_lcd.dtsi
 
 AMLOGIC SM1 POWER CTRL DRIVERS
 M:	Shunzhou Jiang <shunzhou.jiang@amlogic.com>
@@ -15141,6 +15163,14 @@ M:	Jihong Sui <jihong.sui@amlogic.com>
 F:	drivers/amlogic/media/deinterlace/di_pqa.h
 F:	drivers/amlogic/media/di_local/*
 
+AMLOGIC ADD DI_MULTI_V3 DRIVER
+M:	qianqian cai <qianqian.cai@amlogic.com>
+F:	drivers/amlogic/media/di_multi_v3/*
+
+AMLOGIC DEINTERLACE DRIVER
+M:	qianqian cai <qianqian.cai@amlogic.com>
+F:	include/linux/amlogic/media/di/di.h
+
 AMLOGIC ADD DI_MULTI DRIVER
 M:	Jihong Sui <jihong.sui@amlogic.com>
 F:	drivers/amlogic/media/di_multi/*
@@ -15209,3 +15239,124 @@ F:  arch/arm/boot/dts/amlogic/partition_sbr_gva.dtsi
 F:  arch/arm/boot/dts/amlogic/tm2_t962e2_ab311_gva_sbr.dts
 F:  arch/arm64/boot/dts/amlogic/partition_sbr_gva.dtsi
 F:  arch/arm64/boot/dts/amlogic/tm2_t962e2_ab311_gva_sbr.dts
+
+AMLOGIC V4L HEADFILE
+M: Nanxin Qin <Nanxin.Qin@amlogic.com>
+F: include/linux/amlogic/media/video_sink/v4lvideo_ext.h
+
+AMLOGIC POWER DOMAIN DRIVER
+M:	Zhiqiang Liang <zhiqiang.liang@amlogic.com>
+F: 	drivers/amlogic/power/power_domain.c
+
+AMLOGIC TM2 BUILDROOR DTS
+M:  Guofeng Tang <Guofeng.Tang@amlogic.com>
+F:  arch/arm/boot/dts/amlogic/tm2_t962e2_ab311_buildroot.dts
+F:  arch/arm/boot/dts/amlogic/tm2_t962e2_ab311_drm_buildroot.dts
+F:  arch/arm/boot/dts/amlogic/tm2_t962x3_ab301_buildroot.dts
+F:  arch/arm/boot/dts/amlogic/tm2_t962x3_ab301_drm_buildroot.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_t962e2_ab311_buildroot.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_t962e2_ab311_drm_buildroot.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_t962x3_ab301_buildroot.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_t962x3_ab301_drm_buildroot.dts
+
+AMLOGIC TM2 DSP MAILBOX DRIVER
+M: shunzhou jiang <shunzhou.jiang@amlogic.com>
+F: drivers/amlogic/mailbox/meson_mhu_dsp.c
+F: drivers/amlogic/mailbox/meson_mhu_dsp.h
+F: drivers/amlogic/mailbox/scpi_protocol_dsp.c
+
+AMLOGIC SM1/G12A BL40 HEADER
+M: shunzhou jiang <shunzhou.jiang@amlogic.com>
+F: drivers/amlogic/firmware/bl40_module.h
+
+AMLOGIC LUT_DMA DRIVER
+M:  PengCheng Chen <pengcheng.chen@amlogic.com>
+F: arch/arm64/configs/meson64_defconfig
+F: arch/arm/configs/meson64_a32_defconfig
+F: arch/arm/boot/dts/amlogic/mesontm2_revb.dtsi
+F: arch/arm/boot/dts/amlogic/tm2_revb_pxp.dts
+F: arch/arm64/boot/dts/amlogic/mesontm2_revb.dtsi
+F: arch/arm64/boot/dts/amlogic/tm2_revb_pxp.dts
+F:  drivers/amlogic/media/common/Kconfig
+F:  drivers/amlogic/media/common/Makefile
+F:  drivers/amlogic/media/common/lut_dma/Kconfig
+F:  drivers/amlogic/media/common/lut_dma/Makefile
+F:  drivers/amlogic/media/common/lut_dma/lut_dma_io.c
+F:  drivers/amlogic/media/common/lut_dma/lut_dma_io.h
+F:  drivers/amlogic/media/common/lut_dma/lut_dma_mgr.c
+F:  drivers/amlogic/media/common/lut_dma/lut_dma_mgr.h
+F:  include/linux/amlogic/media/lut_dma/lut_dma.h
+
+AMLOGIC DRM DRIVER
+M:  Dezhi Kong <dezhi.kong@amlogic.com>
+F:  drivers/amlogic/drm/vpu-hw/meson_vpu_video_wrapper.c
+F:  drivers/amlogic/drm/vpu-hw/meson_vpu_video_wrapper.h
+
+AMLOGIC TM2_REVB DTS
+M:  changqing gao <changqing.gao@amlogic.com>
+F:  arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab311.dts
+F:  arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab319.dts
+F:  arch/arm/boot/dts/amlogic/tm2_revb_t962x3_ab301.dts
+F:  arch/arm/boot/dts/amlogic/tm2_revb_t962x3_ab309.dts
+F:  arch/arm/boot/dts/amlogic/tm2_revb_t962x3_t312.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_revb_t962e2_ab311.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_revb_t962e2_ab319.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_revb_t962x3_ab301.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_revb_t962x3_ab309.dts
+F:  arch/arm64/boot/dts/amlogic/tm2_revb_t962x3_t312.dts
+
+AMLOGIC TM2_REVB PANEL DTSI
+M: Evoke Zhang <evoke.zhang@amlogic.com>
+F: arch/arm/boot/dts/amlogic/mesontm2_revb_t962x3_ab301-panel.dtsi
+F: arch/arm/boot/dts/amlogic/mesontm2_revb_t962x3_ab309-panel.dtsi
+F: arch/arm/boot/dts/amlogic/mesontm2_revb_t962x3_t312-panel.dtsi
+F: arch/arm64/boot/dts/amlogic/mesontm2_revb_t962x3_ab301-panel.dtsi
+F: arch/arm64/boot/dts/amlogic/mesontm2_revb_t962x3_ab309-panel.dtsi
+F: arch/arm64/boot/dts/amlogic/mesontm2_revb_t962x3_t312-panel.dtsi
+
+AMLOGIC ION
+M: Dezhi Kong <dezhi.kong@amlogic.com>
+F:  drivers/staging/android/ion/ion_secure_heap.c
+
+AMLOGIC DECODE RESOURCE MANAGE
+M: Baoguo Chen <baoguo.chen@amlogic.com>
+F: drivers/amlogic/media/common/resource_mgr/*
+
+AMLOGIC DEINTERLACE DRIVER
+M:      Jihong Sui <jihong.sui@amlogic.com>
+F:      drivers/amlogic/media/deinterlace/di_afbc.h
+F:      drivers/amlogic/media/deinterlace/di_afbc.c
+
+AMLOGIC UVM
+M:     Ao Xu <ao.xu@amlogic.com>
+F:     drivers/amlogic/media/common/uvm/
+
+AMLOGIC TM2_REVB BUILDROOT DTS
+M: Blance Tang <guofeng.tang@amlogic.com>
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab311_buildroot.dts
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab311_drm_buildroot.dts
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962x3_ab301_buildroot.dts
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962x3_ab301_drm_buildroot.dts
+F:arch/arm64/boot/dts/amlogic/tm2_revb_t962e2_ab311_buildroot.dts
+F:arch/arm64/boot/dts/amlogic/tm2_revb_t962e2_ab311_sbr.dts
+F:arch/arm64/boot/dts/amlogic/tm2_revb_t962x3_ab301_buildroot.dts
+F:arch/arm64/boot/dts/amlogic/tm2_revb_t962e2_ab311_gva_sbr.dts
+
+MLOGIC TM2_REVB BUILDROOT DTS
+M: Bing Jiang <bing.jiang@amlogic.com>
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab311_sbr.dts
+F:arch/arm/boot/dts/amlogic/tm2_revb_t962e2_ab311_gva_sbr.dts
+
+AMLOGIC VDETECT DRIVER
+M:	Renjiang Han <renjiang.han@amlogic.com>
+F:  drivers/amlogic/media/video_processor/vdetect/vdetect.c
+F:  include/linux/amlogic/media/vdetect/vdetect.h
+
+AMLOGIC VIDEO DRIVER
+M:  Pengcheng Chen <pengcheng.chen@amlogic.com>
+F:  drivers/amlogic/media/video_sink/video_trace.h
+
+AMLOGIC VPP AIPQ
+M:	Renjiang Han <renjiang.han@amlogic.com>
+F:  drivers/amlogic/media/video_sink/vpp_pq_process.c
+F:  drivers/amlogic/media/video_sink/vpp_pq.h

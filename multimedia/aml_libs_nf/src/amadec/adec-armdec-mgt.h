@@ -42,6 +42,7 @@ struct audio_decoder_operations
 	    int extradata_size;      ///< extra data size
            char extradata[AUDIO_EXTRA_DATA_SIZE];
 	    int NchOriginal;
+	    int lfepresent;
 };
 
 enum AVSampleFormat {

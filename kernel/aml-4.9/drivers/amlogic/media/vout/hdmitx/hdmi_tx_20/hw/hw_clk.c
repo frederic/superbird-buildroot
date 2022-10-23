@@ -190,6 +190,7 @@ void hdmitx_set_cts_hdcp22_clk(struct hdmitx_dev *hdev)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 	default:
 		hd_write_reg(P_HHI_HDCP22_CLK_CNTL, 0x01000100);
 	break;
@@ -468,6 +469,7 @@ static void set_hpll_clk_out(unsigned int clk)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		set_g12a_hpll_clk_out(frac_rate, clk);
 		break;
 	default:
@@ -487,6 +489,7 @@ static void set_hpll_sspll(enum hdmi_vic vic)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		set_hpll_sspll_g12a(vic);
 		break;
 	case MESON_CPU_ID_GXBB:
@@ -534,6 +537,7 @@ static void set_hpll_od1(unsigned int div)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		set_hpll_od1_g12a(div);
 		break;
 	default:
@@ -574,6 +578,7 @@ static void set_hpll_od2(unsigned int div)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		set_hpll_od2_g12a(div);
 		break;
 	default:
@@ -616,6 +621,7 @@ static void set_hpll_od3(unsigned int div)
 		set_hpll_od3_g12a(div);
 		break;
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		set_hpll_od3_g12a(div);
 		/* new added in TM2 */
 		hd_set_reg_bits(P_HHI_LVDS_TX_PHY_CNTL1, 1, 29, 1);
@@ -747,6 +753,7 @@ static void set_hdmi_tx_pixel_div(unsigned int div)
 	hd_set_reg_bits(P_HHI_HDMI_CLK_CNTL, div, 16, 4);
 	hd_set_reg_bits(P_HHI_VID_CLK_CNTL2, 1, 5, 1);
 }
+
 static void set_encp_div(unsigned int div)
 {
 	div = check_div(div);
@@ -883,6 +890,12 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_24[] = {
 	{{HDMIV_2560x1600p60hz,
 	  HDMI_VIC_END},
 		3485000, 1, 1, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
+	{{HDMIV_3440x1440p60hz,
+	  HDMI_VIC_END},
+		3197500, 1, 1, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
+	{{HDMIV_2400x1200p90hz,
+	  HDMI_VIC_END},
+		5600000, 2, 1, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
 };
 
 /* For colordepth 10bits */
@@ -1011,6 +1024,29 @@ static struct hw_enc_clk_val_group setting_3dfp_enc_clk_val[] = {
 		3450000, 1, 2, 2, VID_PLL_DIV_5, 1, 1, 1, -1},
 };
 
+static void set_hdmitx_fe_clk(struct hdmitx_dev *hdev)
+{
+	unsigned int tmp = 0;
+	enum hdmi_vic vic = hdev->cur_VIC;
+
+	if (hdev->chip_type < MESON_CPU_ID_TM2B)
+		return;
+
+	hd_set_reg_bits(P_HHI_VID_CLK_CNTL2, 1, 9, 1);
+
+	switch (vic) {
+	case HDMI_720x480i60_16x9:
+	case HDMI_720x576i50_16x9:
+		tmp = (hd_read_reg(P_HHI_VID_CLK_DIV) >> 28) & 0xf;
+		break;
+	default:
+		tmp = (hd_read_reg(P_HHI_VID_CLK_DIV) >> 24) & 0xf;
+		break;
+	}
+
+	hd_set_reg_bits(P_HHI_HDMI_CLK_CNTL, tmp, 20, 4);
+}
+
 static void hdmitx_set_clk_(struct hdmitx_dev *hdev)
 {
 	int i = 0;
@@ -1108,6 +1144,7 @@ next:
 		set_encp_div(p_enc[j].encp_div);
 		hdmitx_enable_encp_clk(hdev);
 	}
+	set_hdmitx_fe_clk(hdev);
 }
 
 static int likely_frac_rate_mode(char *m)

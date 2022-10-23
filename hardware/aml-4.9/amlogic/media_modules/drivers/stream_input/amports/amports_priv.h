@@ -17,7 +17,7 @@
 
 #ifndef AMPORTS_PRIV_HEAD_HH
 #define AMPORTS_PRIV_HEAD_HH
-#include "../parser/streambuf.h"
+#include "../amports/streambuf.h"
 #include "../../common/media_clock/switch/amports_gate.h"
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/registers/register.h>

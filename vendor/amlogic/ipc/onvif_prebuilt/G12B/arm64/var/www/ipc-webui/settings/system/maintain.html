@@ -1,0 +1,42 @@
+<?php
+require '../../common.php';
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+    <title>System-Maintain</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <script src="/scripts/echarts.min.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+
+<body>
+<form class="layui-form layui-form-pane" id="form_maintain" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item">
+        <fieldset class="layui-elem-field layui-field-title" style="margin-top: 30px;">
+            <legend class="locale">Reboot</legend>
+        </fieldset>
+        <div class="layui-input-inline">
+            <button class="layui-btn layui-btn-radius layui-btn-warm locale" id="reboot">Reboot</button>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <fieldset class="layui-elem-field layui-field-title" style="margin-top: 30px;">
+            <legend class="locale">Recovery</legend>
+        </fieldset>
+        <div class="layui-input-inline">
+            <button class="layui-btn layui-btn-radius layui-btn-danger locale" id="factory_reset">Factory Reset</button>
+        </div>
+    </div>
+</form>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="maintain.js" type="application/javascript"></script>
+<script> translate_html(); </script>
+</body>
+</html>

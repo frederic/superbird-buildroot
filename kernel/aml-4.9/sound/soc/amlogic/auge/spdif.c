@@ -32,13 +32,14 @@
 #include <sound/control.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
+#include <sound/asoundef.h>
 
 #include "ddr_mngr.h"
 #include "spdif_hw.h"
-#include "spdif_match_table.c"
 #include "resample.h"
 #include "resample_hw.h"
 #include "spdif.h"
+#include "spdif_match_table.c"
 
 #define DRV_NAME "snd_spdif"
 
@@ -113,6 +114,9 @@ struct aml_spdif {
 	int pc_last;
 	int pd_last;
 
+	/* output audio codec type */
+	enum aud_codec_types codec_type;
+
 	/* mixer control vals */
 	bool mute;
 	enum SPDIF_SRC spdifin_src;
@@ -159,6 +163,16 @@ static const char *const spdifin_samplerate[] = {
 	"176400",
 	"192000"
 };
+
+int spdifout_get_lane_mask_version(int id)
+{
+	int ret = SPDIFOUT_LANE_MASK_V1;
+
+	if (spdif_priv[id] && spdif_priv[id]->chipinfo)
+		ret = spdif_priv[id]->chipinfo->spdifout_lane_mask;
+
+	return ret;
+}
 
 static int spdifin_samplerate_get_enum(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
@@ -223,6 +237,15 @@ static int spdifin_check_audio_type(void)
 	int pc = spdifin_get_audio_type();
 	int audio_type = 0;
 	int i;
+	bool is_raw = spdifin_get_ch_status0to31() & IEC958_AES0_NONAUDIO;
+
+	/*
+	 * Raw->pcm case, the HW Pc & Pd would keep the value.
+	 * So we need check channel status first.
+	 * If it's non-pcm audio, then get the audio type from Pc reg.
+	 */
+	if (!is_raw)
+		return 0;
 
 	for (i = 0; i < total_num; i++) {
 		if (pc == type_texts[i].pc) {
@@ -242,37 +265,6 @@ static int spdifin_audio_type_get_enum(
 {
 	ucontrol->value.enumerated.item[0] =
 		spdifin_check_audio_type();
-
-	return 0;
-}
-
-static int aml_audio_set_spdif_mute(struct snd_kcontrol *kcontrol,
-					struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_dai *dai = snd_kcontrol_chip(kcontrol);
-	struct aml_spdif *p_spdif = snd_soc_dai_get_drvdata(dai);
-	struct pinctrl_state *state = NULL;
-	bool mute = !!ucontrol->value.integer.value[0];
-
-	if (IS_ERR_OR_NULL(p_spdif->pin_ctl)) {
-		pr_err("%s(), no pinctrl", __func__);
-		return 0;
-	}
-	if (mute) {
-		state = pinctrl_lookup_state
-			(p_spdif->pin_ctl, "spdif_pins_mute");
-
-		if (!IS_ERR_OR_NULL(state))
-			pinctrl_select_state(p_spdif->pin_ctl, state);
-	} else {
-		state = pinctrl_lookup_state
-			(p_spdif->pin_ctl, "spdif_pins");
-
-		if (!IS_ERR_OR_NULL(state))
-			pinctrl_select_state(p_spdif->pin_ctl, state);
-	}
-
-	p_spdif->mute = mute;
 
 	return 0;
 }
@@ -333,6 +325,41 @@ static void aml_spdif_platform_shutdown(struct platform_device *pdev)
 
 }
 
+static int spdif_format_get_enum(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dai *dai = snd_kcontrol_chip(kcontrol);
+	struct aml_spdif *p_spdif = snd_soc_dai_get_drvdata(dai);
+
+	if (!p_spdif)
+		return -1;
+
+	ucontrol->value.enumerated.item[0] = p_spdif->codec_type;
+
+	return 0;
+}
+
+static int spdif_format_set_enum(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dai *dai = snd_kcontrol_chip(kcontrol);
+	struct aml_spdif *p_spdif = snd_soc_dai_get_drvdata(dai);
+	int index = ucontrol->value.enumerated.item[0];
+
+	if (!p_spdif)
+		return -1;
+
+	if (index >= 10) {
+		pr_err("bad parameter for spdif format set\n");
+		return -1;
+	}
+	p_spdif->codec_type = index;
+
+	return 0;
+}
+
 static int aml_audio_get_spdif_mute(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -343,6 +370,38 @@ static int aml_audio_get_spdif_mute(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
+
+static int aml_audio_set_spdif_mute(struct snd_kcontrol *kcontrol,
+				    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dai *dai = snd_kcontrol_chip(kcontrol);
+	struct aml_spdif *p_spdif = snd_soc_dai_get_drvdata(dai);
+	struct pinctrl_state *state = NULL;
+	bool mute = !!ucontrol->value.integer.value[0];
+
+	if (IS_ERR_OR_NULL(p_spdif->pin_ctl)) {
+		pr_err("%s(), no pinctrl", __func__);
+		return 0;
+	}
+	if (mute) {
+		state = pinctrl_lookup_state
+			(p_spdif->pin_ctl, "spdif_pins_mute");
+
+		if (!IS_ERR_OR_NULL(state))
+			pinctrl_select_state(p_spdif->pin_ctl, state);
+	} else {
+		state = pinctrl_lookup_state
+			(p_spdif->pin_ctl, "spdif_pins");
+
+		if (!IS_ERR_OR_NULL(state))
+			pinctrl_select_state(p_spdif->pin_ctl, state);
+	}
+
+	p_spdif->mute = mute;
+
+	return 0;
+}
+
 static const char *const spdifin_src_texts[] = {
 	"spdifin pad", "spdifout", "N/A", "HDMIRX"
 };
@@ -465,7 +524,7 @@ static const struct snd_kcontrol_new snd_spdif_controls[] = {
 				NULL),
 
 	SOC_ENUM_EXT("Audio spdif format",
-				spdif_format_enum,
+				aud_codec_type_enum,
 				spdif_format_get_enum,
 				spdif_format_set_enum),
 
@@ -954,18 +1013,37 @@ static int aml_spdif_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct aml_spdif *p_spdif = runtime->private_data;
 	unsigned int start_addr, end_addr, int_addr;
+	unsigned int period, threshold;
 
 	start_addr = runtime->dma_addr;
-	end_addr = start_addr + runtime->dma_bytes - 8;
-	int_addr = frames_to_bytes(runtime, runtime->period_size) / 8;
+	end_addr = start_addr + runtime->dma_bytes - FIFO_BURST;
+	period	 = frames_to_bytes(runtime, runtime->period_size);
+	int_addr = period / FIFO_BURST;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		struct frddr *fr = p_spdif->fddr;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, fr->fifo_depth);
+		threshold /= 2;
+		/* Use all the fifo */
+		aml_frddr_set_fifos(fr, fr->fifo_depth, threshold);
 
 		aml_frddr_set_buf(fr, start_addr, end_addr);
 		aml_frddr_set_intrpt(fr, int_addr);
 	} else {
 		struct toddr *to = p_spdif->tddr;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, to->fifo_depth);
+		threshold /= 2;
+		aml_toddr_set_fifos(to, threshold);
 
 		aml_toddr_set_buf(to, start_addr, end_addr);
 		aml_toddr_set_intrpt(to, int_addr);
@@ -1205,6 +1283,7 @@ static int aml_dai_spdif_prepare(
 	struct aml_spdif *p_spdif = snd_soc_dai_get_drvdata(cpu_dai);
 	unsigned int bit_depth = 0;
 	unsigned int fifo_id = 0;
+	int separated = 0;
 
 	bit_depth = snd_pcm_format_width(runtime->format);
 
@@ -1228,22 +1307,27 @@ static int aml_dai_spdif_prepare(
 		fifo_id = aml_frddr_get_fifo_id(fr);
 		aml_frddr_set_format(fr,
 			runtime->channels,
+			runtime->rate,
 			bit_depth - 1,
 			spdifout_get_frddr_type(bit_depth));
 		aml_frddr_select_dst(fr, dst);
-		aml_frddr_set_fifos(fr, 0x40, 0x20);
 
 		/* check channel status info, and set them */
-		spdif_get_channel_status_info(&chsts, runtime->rate);
+		iec_get_channel_status_info(&chsts,
+					    p_spdif->codec_type,
+					    runtime->rate);
 		spdif_set_channel_status_info(&chsts, p_spdif->id);
 
 		/* TOHDMITX_CTRL0
 		 * Both spdif_a/spdif_b would notify to hdmitx
 		 */
-		spdifout_to_hdmitx_ctrl(p_spdif->id);
-		/* notify to hdmitx */
-		spdif_notify_to_hdmitx(substream);
-
+		if (p_spdif->chipinfo)
+			separated = p_spdif->chipinfo->separate_tohdmitx_en;
+		spdifout_to_hdmitx_ctrl(separated, p_spdif->id);
+		if (get_spdif_to_hdmitx_id() == p_spdif->id) {
+			/* notify to hdmitx */
+			spdif_notify_to_hdmitx(substream, p_spdif->codec_type);
+		}
 	} else {
 		struct toddr *to = p_spdif->tddr;
 		struct toddr_fmt fmt;
@@ -1283,7 +1367,6 @@ static int aml_dai_spdif_prepare(
 		fmt.rate       = runtime->rate;
 		aml_toddr_select_src(to, SPDIFIN);
 		aml_toddr_set_format(to, &fmt);
-		aml_toddr_set_fifos(to, 0x40);
 #ifdef __SPDIFIN_INSERT_CHNUM__
 		aml_toddr_insert_chanum(to);
 #endif
@@ -1407,7 +1490,7 @@ static void aml_set_spdifclk(struct aml_spdif *p_spdif)
 		unsigned int mul = 4;
 		int ret;
 
-		if (spdif_is_4x_clk()) {
+		if (raw_is_4x_clk(p_spdif->codec_type)) {
 			pr_debug("set 4x audio clk for 958\n");
 			p_spdif->sysclk_freq *= 4;
 		} else {
@@ -1666,6 +1749,9 @@ static int aml_spdif_platform_probe(struct platform_device *pdev)
 		aml_spdif->chipinfo = p_spdif_chipinfo;
 
 		spdif_reenable = p_spdif_chipinfo->same_src_spdif_reen;
+
+		if (p_spdif_chipinfo->sample_mode_filter_en)
+			aml_spdifin_sample_mode_filter_en();
 	} else
 		dev_warn_once(dev,
 			"check whether to update spdif chipinfo\n");

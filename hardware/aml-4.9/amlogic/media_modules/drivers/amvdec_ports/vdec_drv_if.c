@@ -24,7 +24,6 @@
 #include "vdec_drv_if.h"
 #include "aml_vcodec_dec.h"
 #include "vdec_drv_base.h"
-#include "aml_vcodec_dec_pm.h"
 
 const struct vdec_common_if *get_h264_dec_comm_if(void);
 const struct vdec_common_if *get_hevc_dec_comm_if(void);
@@ -83,8 +82,9 @@ int vdec_if_decode(struct aml_vcodec_ctx *ctx, struct aml_vcodec_mem *bs,
 	int ret = 0;
 
 	if (bs) {
-		if ((bs->dma_addr & 63) != 0) {
-			aml_v4l2_err("bs dma_addr should 64 byte align");
+		if ((bs->addr & 63) != 0) {
+			v4l_dbg(ctx, V4L_DEBUG_CODEC_ERROR,
+				"bs dma_addr should 64 byte align\n");
 			return -EINVAL;
 		}
 	}

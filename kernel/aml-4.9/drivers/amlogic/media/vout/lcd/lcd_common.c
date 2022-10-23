@@ -417,9 +417,12 @@ void lcd_vbyone_pinmux_set(int status)
 }
 
 static char *lcd_tcon_pinmux_str[] = {
-	"tcon",
-	"tcon_off",
-	"none",
+	"tcon_p2p",       /* 0 */
+	"tcon_p2p_usit",  /* 1 */
+	"tcon_p2p_off",   /* 2 */
+	"tcon_mlvds",     /* 3 */
+	"tcon_mlvds_off", /* 4 */
+	"none",           /* 5 */
 };
 
 void lcd_tcon_pinmux_set(int status)
@@ -428,11 +431,25 @@ void lcd_tcon_pinmux_set(int status)
 	struct lcd_config_s *pconf;
 	unsigned int index;
 
+	if (!lcd_drv)
+		return;
 	if (lcd_debug_print_flag)
 		LCDPR("%s: %d\n", __func__, status);
 
 	pconf = lcd_drv->lcd_config;
-	index = (status) ? 0 : 1;
+	switch (pconf->lcd_basic.lcd_type) {
+	case LCD_P2P:
+		if (pconf->lcd_control.p2p_config->p2p_type == P2P_USIT)
+			index = (status) ? 1 : 2;
+		else
+			index = (status) ? 0 : 2;
+		break;
+	case LCD_MLVDS:
+		index = (status) ? 3 : 4;
+		break;
+	default:
+		return;
+	}
 
 	if (pconf->pinmux_flag == index) {
 		LCDPR("pinmux %s is already selected\n",
@@ -850,66 +867,6 @@ void lcd_timing_init_config(struct lcd_config_s *pconf)
 	}
 }
 
-#if 0
-/* change frame_rate for different vmode */
-int lcd_vmode_change(struct lcd_config_s *pconf)
-{
-	unsigned int pclk = pconf->lcd_timing.lcd_clk_dft; /* avoid offset */
-	unsigned char type = pconf->lcd_timing.fr_adjust_type;
-	unsigned int h_period = pconf->lcd_basic.h_period;
-	unsigned int v_period = pconf->lcd_basic.v_period;
-	unsigned int sync_duration_num = pconf->lcd_timing.sync_duration_num;
-	unsigned int sync_duration_den = pconf->lcd_timing.sync_duration_den;
-
-	/* frame rate adjust */
-	switch (type) {
-	case 1: /* htotal adjust */
-		h_period = ((pclk / v_period) * sync_duration_den * 10) /
-				sync_duration_num;
-		h_period = (h_period + 5) / 10; /* round off */
-		if (pconf->lcd_basic.h_period != h_period) {
-			LCDPR("%s: adjust h_period %u -> %u\n",
-				__func__, pconf->lcd_basic.h_period, h_period);
-			pconf->lcd_basic.h_period = h_period;
-			/* check clk frac update */
-			pclk = (h_period * v_period) / sync_duration_den *
-				sync_duration_num;
-			if (pconf->lcd_timing.lcd_clk != pclk)
-				pconf->lcd_timing.lcd_clk = pclk;
-		}
-		break;
-	case 2: /* vtotal adjust */
-		v_period = ((pclk / h_period) * sync_duration_den * 10) /
-				sync_duration_num;
-		v_period = (v_period + 5) / 10; /* round off */
-		if (pconf->lcd_basic.v_period != v_period) {
-			LCDPR("%s: adjust v_period %u -> %u\n",
-				__func__, pconf->lcd_basic.v_period, v_period);
-			pconf->lcd_basic.v_period = v_period;
-			/* check clk frac update */
-			pclk = (h_period * v_period) / sync_duration_den *
-				sync_duration_num;
-			if (pconf->lcd_timing.lcd_clk != pclk)
-				pconf->lcd_timing.lcd_clk = pclk;
-		}
-		break;
-	case 0: /* pixel clk adjust */
-	default:
-		pclk = (h_period * v_period) / sync_duration_den *
-			sync_duration_num;
-		if (pconf->lcd_timing.lcd_clk != pclk) {
-			LCDPR("%s: adjust pclk %u.%03uMHz -> %u.%03uMHz\n",
-				__func__, (pconf->lcd_timing.lcd_clk / 1000000),
-				((pconf->lcd_timing.lcd_clk / 1000) % 1000),
-				(pclk / 1000000), ((pclk / 1000) % 1000));
-			pconf->lcd_timing.lcd_clk = pclk;
-		}
-		break;
-	}
-
-	return 0;
-}
-#else
 int lcd_vmode_change(struct lcd_config_s *pconf)
 {
 	unsigned char type = pconf->lcd_timing.fr_adjust_type;
@@ -959,32 +916,7 @@ int lcd_vmode_change(struct lcd_config_s *pconf)
 			}
 		}
 		break;
-	case 4: /* hdmi mode */
-		if ((duration_num / duration_den) == 59) {
-			/* pixel clk adjust */
-			pclk = (h_period * v_period) /
-				duration_den * duration_num;
-			if (pconf->lcd_timing.lcd_clk != pclk)
-				pconf->lcd_timing.clk_change =
-					LCD_CLK_PLL_CHANGE;
-		} else {
-			/* htotal adjust */
-			h_period = ((pclk / v_period) * duration_den * 100) /
-					duration_num;
-			h_period = (h_period + 99) / 100; /* round off */
-			if (pconf->lcd_basic.h_period != h_period) {
-				/* check clk frac update */
-				pclk = (h_period * v_period) / duration_den *
-					duration_num;
-				if (pconf->lcd_timing.lcd_clk != pclk) {
-					pconf->lcd_timing.clk_change =
-						LCD_CLK_FRAC_UPDATE;
-				}
-			}
-		}
-		break;
 	case 3: /* free adjust, use min/max range to calculate */
-	default:
 		v_period = ((pclk / h_period) * duration_den * 100) /
 			duration_num;
 		v_period = (v_period + 99) / 100; /* round off */
@@ -1037,6 +969,33 @@ int lcd_vmode_change(struct lcd_config_s *pconf)
 			}
 		}
 		break;
+	case 4: /* hdmi mode */
+		if ((duration_num / duration_den) == 59) {
+			/* pixel clk adjust */
+			pclk = (h_period * v_period) /
+				duration_den * duration_num;
+			if (pconf->lcd_timing.lcd_clk != pclk)
+				pconf->lcd_timing.clk_change =
+					LCD_CLK_PLL_CHANGE;
+		} else {
+			/* htotal adjust */
+			h_period = ((pclk / v_period) * duration_den * 100) /
+					duration_num;
+			h_period = (h_period + 99) / 100; /* round off */
+			if (pconf->lcd_basic.h_period != h_period) {
+				/* check clk frac update */
+				pclk = (h_period * v_period) / duration_den *
+					duration_num;
+				if (pconf->lcd_timing.lcd_clk != pclk) {
+					pconf->lcd_timing.clk_change =
+						LCD_CLK_FRAC_UPDATE;
+				}
+			}
+		}
+		break;
+	default:
+		LCDERR("%s: invalid fr_adjust_type: %d\n", __func__, type);
+		return 0;
 	}
 
 	if (pconf->lcd_basic.v_period != v_period) {
@@ -1069,7 +1028,6 @@ int lcd_vmode_change(struct lcd_config_s *pconf)
 
 	return 0;
 }
-#endif
 
 void lcd_clk_change(struct lcd_config_s *pconf)
 {

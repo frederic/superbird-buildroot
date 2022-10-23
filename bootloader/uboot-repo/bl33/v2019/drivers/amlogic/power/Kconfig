@@ -1,2 +1,0 @@
-config SECURE_POWER_CONTROL
-    bool "Amlogic device MEM_PD control"

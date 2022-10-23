@@ -70,6 +70,10 @@ EOF
     exit 1
 }
 
+## Globals
+readonly ALLOWED_BL30_SIZES=( 58368 66560 )
+## /Globals
+
 check_file() {
     if [ ! -f "$2" ]; then echo Error: Unable to open $1: \""$2"\"; exit 1 ; fi
 }
@@ -180,7 +184,7 @@ sign_bl2() {
     local bl2_payload_size=$(wc -c < ${input})
     trace "BL2 size specified $bl2size"
     trace "Input BL2 payload size $bl2_payload_size"
-    if [ $bl2size -lt $(($bl2_payload_size + 4096)) ]; then
+    if [ $bl2size -ne $(($bl2_payload_size + 4096)) ]; then
         echo Error: invalid bl2/bl30 input file size $bl2_payload_size
         exit 1
     fi
@@ -672,7 +676,7 @@ is_android9_img() {
 
     if [ "$inmagic" == "414e44524f494421" ]; then
       inmagic=$(xxd -p -seek 40 -l 4 $input)
-      if [ "$inmagic" == "01000000" ]; then
+      if [ "$inmagic" == "01000000" ] || [ "$inmagic" == "02000000" ]; then
         echo True
       else
         echo False
@@ -1827,9 +1831,25 @@ create_signed_bl() {
         cp $TMP/bl2.bin.out $TMP/bl2.bin.sig
     fi
 
-    local bl30finalsize=66560
     # Sign/encrypt BL30 payload using bl2 functions
     local bl30hdr_i="$bl30hdr"
+    local bl30_payload_size=$(wc -c < ${bl30})
+    local bl30size=0
+    for i in "${ALLOWED_BL30_SIZES[@]}" ; do
+        if [[ $bl30_payload_size -le $(( $i - 4096 )) ]]; then
+            bl30size=$i
+            break
+        fi
+    done
+    if [[ $bl30size -eq 0 ]]; then
+        echo Error: invalid bl30 payload size $bl30_payload_size
+        exit 1
+    fi
+    if [[ $bl30_payload_size -lt $(( $bl30size - 4096 )) ]]; then
+        cp "$bl30" "$TMP/padded_bl30"
+        pad_file "$TMP/padded_bl30"  $(( $bl30size - 4096 ))
+        bl30="$TMP/padded_bl30"
+    fi
     if [ "$bl30hdr" == "" ]; then
         bl30hdr_i="$TMP/bl30.hdri"
         # No pre-signed header given. Create one.
@@ -1840,14 +1860,14 @@ create_signed_bl() {
             --bl2-key-0 "$bl30key" --bl2-key-1 "$bl30key" \
             --bl2-key-2 "$bl30key" --bl2-key-3 "$bl30key" \
             --bl2-key "$bl30key" \
-            --bl2-size $bl30finalsize \
+            --bl2-size $bl30size \
             --arb-cvn $bl30_arb_cvn \
             --sig-ver $sigver --key-hash-ver $keyhashver
     fi
     sign_bl2 -i $bl30 -o $TMP/bl30.bin.out \
         --bl2-hdr "$bl30hdr_i" \
         --bl2-key $bl30key \
-        --bl2-size $bl30finalsize \
+        --bl2-size $bl30size \
         $( [ -n "$bl30aesiv" ] && echo -n "--iv $bl30aesiv" ) \
         --sig-ver $sigver --key-hash-ver $keyhashver
 
@@ -1857,12 +1877,12 @@ create_signed_bl() {
         #internal_encrypt $TMP/bl30.bin.out $TMP/bl30.bin.sig $bl2aeskey $TMP/zeroiv
         # scp needs to decrypt in 2KB chunks:
         if [ -f $TMP/bl30.bin.sig ]; then rm -f $TMP/bl30.bin.sig ; fi
-        for i in $(seq 0 $(( $bl30finalsize / 2048 )) ); do
+        for i in $(seq 0 $(( $bl30size / 2048 )) ); do
             dd if=$TMP/bl30.bin.out of=$TMP/pt skip=$i bs=2048 count=1 >& /dev/null
             internal_encrypt $TMP/pt $TMP/ct $bl2aeskey $TMP/zeroiv
             cat $TMP/ct >> $TMP/bl30.bin.sig
         done
-        if [ $(wc -c < $TMP/bl30.bin.sig) -ne $bl30finalsize ]; then
+        if [ $(wc -c < $TMP/bl30.bin.sig) -ne $bl30size ]; then
             echo Internal error, bl30.bin.sig size
             exit 1;
         fi
@@ -2081,7 +2101,7 @@ cleanup() {
     bl32.bin.sig bl32key.bin bl33.bin.img bl33.bin.sig bl33key.bin
     bl2aesiv
     bl.bin bl.hdr bl.hdr.sig blpad.bin bl-pl.sha bl2.hdri bl30.hdri
-    bl32.img-info
+    bl32.img-info padded_bl30
     fip.hdr fip.hdr.out fip.hdr.sig kernelkey.bin keydata
     nonce.bin rootkey0.bin rootkey0.sha rootkey1.bin rootkey1.sha
     rootkey2.bin rootkey2.sha rootkey3.bin rootkey3.sha rootkey.bin

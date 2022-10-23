@@ -12,10 +12,21 @@ SCRIPT_PATH=${SCRIPT_PATH:-$(dirname $(readlink -f $0))}
 # Path to sign-boot-g12a util
 TOOL_PATH=${TOOL_PATH:-$(dirname $(readlink -f $0))}
 
-#source ${TOOL_PATH}/build.sh
+USE_TOOL_SCRIPT_VERSION=false
+case "$(uname)" in
+    CYGWIN*|MINGW32*|MSYS*)
+        USE_TOOL_SCRIPT_VERSION=true
+        echo Detected Windows OS
+        ;;
+esac
+if $USE_TOOL_SCRIPT_VERSION; then
+    CREATE_HEADER_TOOL=${TOOL_PATH}/create-header.sh
+else
+    CREATE_HEADER_TOOL=${TOOL_PATH}/sign-boot-g12a
+fi
 
 # Temporary files directory
-if [ -z "$TMP" ]; then
+if [ "$TMP" == "/tmp" ] || [ -z "$TMP" ]; then
     TMP=${SCRIPT_PATH}/tmp
 fi
 
@@ -70,13 +81,15 @@ EOF
     exit 1
 }
 
-check_file() {
-    if [ ! -f "$2" ]; then echo Error: Unable to open $1: \""$2"\"; exit 1 ; fi
-}
-
 ## Globals
 readonly ALLOWED_BL30_SIZES=( 58368 64512 )
 ## /Globals
+
+keyhashver_min=2
+
+check_file() {
+    if [ ! -f "$2" ]; then echo Error: Unable to open $1: \""$2"\"; exit 1 ; fi
+}
 
 # Hash root/bl2 RSA keys'.  sha256(n[keylen] + e)
 # $1: key hash version
@@ -882,6 +895,7 @@ create_fip() {
     local bl31_info=""
     local bl32_info=""
     local bl33=""
+    local bl40=""
     local bl30key=""
     local bl31key=""
     local bl32key=""
@@ -941,6 +955,8 @@ create_fip() {
                 bl32_info="${argv[$i]}" ;;
             --bl33)
                 bl33="${argv[$i]}" ;;
+            --bl40)
+                bl40="${argv[$i]}" ;;
             --bl30-key)
                 bl30key="${argv[$i]}" ;;
             --bl31-key)
@@ -1079,6 +1095,9 @@ create_fip() {
     check_file bl31_info "$bl31_info"
     check_file bl32_info "$bl32_info"
     check_file bl33 "$bl33"
+    if [ -n "$bl40" ]; then
+        check_file bl40 "$bl40"
+    fi
     check_file bl30key "$bl30key"
     check_file bl31key "$bl31key"
     check_file bl32key "$bl32key"
@@ -1143,6 +1162,7 @@ create_fip() {
         --bl32-aes-key $bl32aeskey --bl32-aes-iv $bl32aesiv \
         --bl33 $bl33 --bl33-key $TMP/bl33key.bin \
         --bl33-aes-key $bl33aeskey --bl33-aes-iv $bl33aesiv \
+        $( [ -n "$bl40" ] && echo -n "--bl40 $bl40" ) \
         --bl31-info $bl31_info --bl32-info $bl32_info \
         --kernel-key $TMP/kernelkey.bin \
         --kernel-aes-key $kernelaeskey --kernel-aes-iv $kernelaesiv \
@@ -1406,7 +1426,7 @@ sign_bl2_hdr() {
     hash_rsa_bin $keyhashver "$TMP/bl2key.bin" $keylen "$TMP/bl2key.sha"
 
     # Create bl2 header
-    ${TOOL_PATH}/sign-boot-g12a --create-bl2-header \
+    ${CREATE_HEADER_TOOL} --create-bl2-header \
             -r $keylen \
             --root-key "$TMP/rootkey.bin" \
             --root-key-idx $rootkeyidx \
@@ -1468,6 +1488,7 @@ create_signed_bl() {
     local bl31=""
     local bl32=""
     local bl33=""
+    local bl40=""
     local ddrfw1=""
     local ddrfw1_sha=""
     local ddrfw2=""
@@ -1553,6 +1574,8 @@ create_signed_bl() {
                 bl32="${argv[$i]}" ;;
             --bl33)
                 bl33="${argv[$i]}" ;;
+            --bl40)
+                bl40="${argv[$i]}" ;;
             --bl2-hdr)
                 bl2hdr="${argv[$i]}" ;;
             --bl30-hdr)
@@ -1684,6 +1707,9 @@ create_signed_bl() {
         check_file bl32 "$bl32"
     fi
     check_file bl33 "$bl33"
+    if [ "$bl40" != "" ]; then
+        check_file bl40 "$bl40"
+    fi
 
     if [ "$(is_img_format $bl31)" != "True" ]; then
         echo Error. Expected .img format for \"$bl31\"
@@ -1991,6 +2017,8 @@ create_signed_bl() {
         --bl33-key     $bl33key \
         --bl33-aes-key $bl33aeskey \
         --bl33-aes-iv  $bl33aesiv \
+        $( [ ! -z "$bl40" ] && \
+            echo -n "--bl40 $bl40" ) \
         $( [ ! -z "$kernelkey" ] && \
             echo -n "--kernel-key $kernelkey " ) \
         $( [ ! -z "$kernelaeskey" ] && \
@@ -2022,6 +2050,9 @@ create_signed_bl() {
 
     cat $TMP/bl2.bin.sig $TMP/fip.hdr.sig $TMP/ddr.fw.bin $TMP/bl30.bin.sig $TMP/bl31.bin.sig \
         $TMP/bl32.bin.sig $TMP/bl33.bin.sig > $output
+    if [ "$bl40" != "" ]; then
+        cat "$bl40" >> "$output"
+    fi
 
     echo
     echo Created signed bootloader $output successfully
@@ -2034,6 +2065,167 @@ create_signed_bl() {
 		--bl31-cvn $bl31_arb_cvn \
 		--bl32-cvn $bl32_arb_cvn \
 		--bl33-cvn $bl33_arb_cvn
+}
+
+create_signed_bl40() {
+    local bl40hdr=""
+    local bl40=""
+    local rootkey=""
+    local rootkeyidx="0"
+    local rootkey0=""
+    local rootkey1=""
+    local bl40key=""
+    local bl40aeskey=""
+    local bl40aesiv=""
+    local encryptFIPbl3x=false
+    local bl40_arb_cvn="0"
+    local output=""
+    local sigver=""
+    local keyhashver=""
+    local marketid="0"
+    local argv=("$@")
+    local i=0
+    local size=0
+    local soc="g12a"
+
+    # Parse args
+    i=0
+    while [ $i -lt $# ]; do
+        arg="${argv[$i]}"
+        i=$((i + 1))
+        case "$arg" in
+            --soc)
+                soc="${argv[$i]}" ;;
+            --root-key)
+                rootkey="${argv[$i]}" ;;
+            --root-key-idx)
+                rootkeyidx="${argv[$i]}" ;;
+            --root-key-0)
+                rootkey0="${argv[$i]}" ;;
+            --root-key-1)
+                rootkey1="${argv[$i]}" ;;
+            --bl40)
+                bl40="${argv[$i]}" ;;
+            --bl40-hdr)
+                bl40hdr="${argv[$i]}" ;;
+            --bl40-key)
+                bl40key="${argv[$i]}" ;;
+            --bl40-aes-key)
+                bl40aeskey="${argv[$i]}" ;;
+            --bl40-aes-iv)
+                bl40aesiv="${argv[$i]}" ;;
+            -e)
+                if [ "${argv[$i]}" == "FIPbl3x" ]; then
+                    # encrypted bl2, FIP, bl3x
+                    encryptFIPbl3x=true
+                fi
+                if [ "${argv[$i]}" == "none" ]; then
+                    # unencrypted bl2, FIP, bl3x
+                    encryptFIPbl3x=false
+                fi
+                ;;
+            --bl40-arb-cvn)
+                bl40_arb_cvn="${argv[$i]}" ;;
+            --sig-ver)
+                sigver="${argv[$i]}" ;;
+            --key-hash-ver)
+                keyhashver="${argv[$i]}" ;;
+            --marketid)
+                marketid="${argv[$i]}" ;;
+            -o)
+                output="${argv[$i]}" ;;
+            *)
+                echo "Unknown option $arg"; exit 1 ;;
+        esac
+        i=$((i + 1))
+    done
+    # Verify args
+    #set_soc "$soc"
+
+    if [ -z "$keyhashver" ]; then
+        keyhashver=$keyhashver_min
+    fi
+    if [ "$keyhashver" -lt $keyhashver_min ]; then
+        echo Error: bad key hash ver; exit 1
+    fi
+
+    check_file bl40 "$bl40"
+
+    check_file bl40key "$bl40key"
+    if $encryptFIPbl3x; then
+        if [ "$bl40aeskey" != "" ]; then
+            check_file bl40aeskey "$bl40aeskey"
+            check_file bl40aesiv "$bl40aesiv"
+        fi
+    fi
+    if [ -z "$sigver" ]; then
+        sigver=1
+    fi
+    if [ "$keyhashver" != "2" ] && [ "$keyhashver" != "3" ]; then
+        echo Error: bad key hash ver; exit 1
+    fi
+
+    if [ -z "$output" ]; then echo Error: Missing output file option -o ; exit 1; fi
+
+    bl40_align_size=$(aligned_size "$bl40" 0 16)
+    cp $bl40 $TMP/bl40.bin.aligned
+    pad_file $TMP/bl40.bin.aligned $bl40_align_size
+    bl40_aligned=$TMP/bl40.bin.aligned
+    bl40_size=$(($bl40_align_size + 4096))
+    # Sign/encrypt BL30 payload using bl2 functions
+    local bl40hdr_i="$bl40hdr"
+    if [ "$bl40hdr" == "" ]; then
+        check_file rootkey "$rootkey"
+        if [ "$rootkeyidx" -lt 0 ] || [ "$rootkeyidx" -gt 2 ]; then
+            echo "Error invalid root-key-idx: $rootkeyidx.";
+            exit 1;
+        fi
+        check_file rootkey0 "$rootkey0"
+        check_file rootkey1 "$rootkey1"
+
+        bl40hdr_i="$TMP/bl40.hdri"
+        # No pre-signed header given. Create one.
+        sign_bl2_hdr -o "$bl40hdr_i" \
+            --root-key "$rootkey" --root-key-idx "$rootkeyidx" \
+            --root-key-0 "$rootkey0" --root-key-1 "$rootkey1" \
+            --root-key-2 "$rootkey0" --root-key-3 "$rootkey1" \
+            --bl2-key-0 "$bl40key" --bl2-key-1 "$bl40key" \
+            --bl2-key-2 "$bl40key" --bl2-key-3 "$bl40key" \
+            --bl2-key "$bl40key" \
+            --bl2-size $bl40_size \
+            --arb-cvn $bl40_arb_cvn \
+            --sig-ver $sigver --key-hash-ver $keyhashver
+    fi
+    sign_bl2 -i $bl40_aligned -o $TMP/bl40.bin.out \
+        --bl2-hdr "$bl40hdr_i" \
+        --bl2-key $bl40key \
+        --bl2-size $bl40_size \
+        $( [ -n "$bl40aesiv" ] && echo -n "--iv $bl40aesiv" ) \
+        --sig-ver $sigver --key-hash-ver $keyhashver
+
+    if $encryptFIPbl3x; then
+        # bl40 encryption enable is based on a fuse bit, so use the 'encryptFIPbl3x' flag
+        dd if=/dev/zero of=$TMP/zeroiv bs=16 count=1 >& /dev/null
+        #internal_encrypt $TMP/bl40.bin.out $TMP/bl40.bin.sig $bl2aeskey $TMP/zeroiv
+        # scp needs to decrypt in 2KB chunks:
+        if [ -f $TMP/bl40.bin.sig ]; then rm -f $TMP/bl40.bin.sig ; fi
+        openssl dgst -sha256 -out $TMP/realbl40key -binary $bl40aeskey
+        for i in $(seq 0 $(( $bl40_size / 2048 )) ); do
+            dd if=$TMP/bl40.bin.out of=$TMP/pt skip=$i bs=2048 count=1 >& /dev/null
+            internal_encrypt $TMP/pt $TMP/ct $TMP/realbl40key $TMP/zeroiv
+            cat $TMP/ct >> $TMP/bl40.bin.sig
+        done
+        if [ $(wc -c < $TMP/bl40.bin.sig) -ne $bl40_size ]; then
+            echo Internal error, bl40.bin.sig size
+            exit 1;
+        fi
+    else
+        cp $TMP/bl40.bin.out $TMP/bl40.bin.sig
+    fi
+
+    cat $TMP/bl40.bin.sig > $output
+    echo
+    echo Created signed bootloader $output successfully
 }
 
 parse_main() {
@@ -2056,6 +2248,9 @@ parse_main() {
                 break ;;
             --create-signed-bl)
                 create_signed_bl "${argv[@]:$((i + 1))}"
+                break ;;
+            --create-signed-bl40)
+                create_signed_bl40 "${argv[@]:$((i + 1))}"
                 break ;;
             --sign-kernel)
                 sign_kernel "${argv[@]:$((i + 1))}"
@@ -2081,7 +2276,7 @@ cleanup() {
     bl32.bin.sig bl32key.bin bl33.bin.img bl33.bin.sig bl33key.bin
     bl2aesiv
     bl.bin bl.hdr bl.hdr.sig blpad.bin bl-pl.sha bl2.hdri bl30.hdri
-    bl32.img-info
+    bl32.img-info padded_bl30
     fip.hdr fip.hdr.out fip.hdr.sig kernelkey.bin keydata
     nonce.bin rootkey0.bin rootkey0.sha rootkey1.bin rootkey1.sha
     rootkey2.bin rootkey2.sha rootkey3.bin rootkey3.sha rootkey.bin
@@ -2091,7 +2286,8 @@ cleanup() {
     bl30key.pub  bl31key.pub  bl32key.pub  bl33key.pub  kernelkey.pub
     rootkey0.pub  rootkey1.pub  rootkey2.pub  rootkey3.pub  rootkey.pub
     fip.hdr.bin fip.payload.bin bl3x.payload.bin bl3x.bin ddrfw*.padded* ddrfw*.hdr ddr.fw.bin
-    kern.hdr  kern.hdr.sig  kern-pl.bin  kern-pl.sha pt ct"
+    kern.hdr  kern.hdr.sig  kern-pl.bin  kern-pl.sha pt ct
+    bl40.bin.out  bl40.bin.sig  bl40.hdri  realbl40key bl40.bin.aligned"
     for i in $tmpfiles ; do
         rm -f $TMP/$i
     done

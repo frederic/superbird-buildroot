@@ -1,0 +1,180 @@
+<?php
+include "../common.php";
+check_session("../login/login.html");
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log View</title>
+    <style type="text/css">
+        .logview {
+            height: 85vh;
+            width: 90%;
+            margin-top: 20px;
+            margin-left: 20px;
+            overflow: scroll;
+            overflow-x: hidden;
+            box-shadow: #3F3F3F 1px 1px 3px;
+            border: 1px solid #555;
+            padding: 10px;
+        }
+        .logview, p {
+            font-family: monospace;
+            background-color: #2F4056;
+            color: #D0D0D0;
+            font-size: smaller;
+        }
+        .logview, error {
+            font-family: monospace;
+            color: darkred;
+            font-size: smaller;
+        }
+        .logview, warn {
+            font-family: monospace;
+            color: #FFB800;
+            font-size: smaller;
+        }
+        .logview, info {
+            font-family: monospace;
+            color: #00C0F7;
+            font-size: smaller;
+        }
+        .logview, debug {
+            font-family: monospace;
+            color: #1684AF;
+            font-size: smaller;
+        }
+        .logview, verbose {
+            font-family: monospace;
+            color: #92B8B1;
+            font-size: smaller;
+        }
+    </style>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+<body>
+<form class="layui-form layui-form-pane" id="form_ipc_log_view" style="margin-top: 25px; height:auto; width:100%">
+    <div class="layui-fluid">
+        <div class="layui-col-md8">
+            <div class="layui-form-item" style="margin-left: 20px">
+                <div class="layui-inline">
+                    <label class="layui-form-label locale">Refresh Interval</label>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-input-inline">
+                        <div id="interval" class="demo-slider"></div>
+                    </div>
+                </div>
+                <div class="layui-inline">
+                    <div class="layui-form-mid layui-word-aux locale">seconds</div>
+                </div>
+                <div class="layui-inline" style="margin-left: 50px">
+                    <button class="layui-btn locale" id="reload">Reload</button>
+                    <button class="layui-btn locale" id="pause">Pause</button>
+                    <button class="layui-btn locale" id="clear">Clear</button>
+                </div>
+                <div id="loading" class="layui-inline" style="display: none">
+                    <div class="layui-layer-loading layui-layer-ico16" style="background-color: white; border: none;"></div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="logview" id="div_log">
+                    <p id="log"></p>
+                </div>
+            </div>
+        </div>
+        <div class="layui-col-md4">
+            <fieldset class="layui-elem-field">
+                <legend class="locale">Debug Setting</legend>
+                <div class="layui-field-box">
+                    <div class="layui-card">
+                        <div class="layui-card-body">
+                            <div class="layui-input-inline">
+                                <select id="debug-module" lay-search></select>
+                            </div>
+                            <div class="layui-input-inline">
+                                <select id="debug-level"></select>
+                            </div>
+                            <div><br/></div>
+                            <div class="layui-input-inline">
+                                <input type="checkbox" lay-skin="primary" id="debug-cust-check">
+                            </div>
+                            <div class="layui-input-inline">
+                                <input type="text" class="layui-input layui-disabled" id="debug-cust-level" disabled>
+                            </div>
+                        </div>
+                        <label id="debug-log-level" style="font-size: 5px"></label>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="start-debug">Start</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="stop-debug">Stop</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="download-debug">Download</button>
+                        <label id="debug-log-filesize"></label>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset class="layui-elem-field">
+                <legend class="locale">Trace Setting</legend>
+                <div class="layui-field-box">
+                    <div class="layui-card">
+                        <div class="layui-card-body">
+                            <div class="layui-input-inline">
+                                <select id="trace-module" lay-search></select>
+                            </div>
+                            <div class="layui-input-inline">
+                                <select id="trace-level"></select>
+                            </div>
+                            <div><br/></div>
+                            <div class="layui-input-inline">
+                                <input type="checkbox" lay-skin="primary" id="trace-cust-check">
+                            </div>
+                            <div class="layui-input-inline">
+                                <input type="text" class="layui-input layui-disabled" id="trace-cust-level" disabled>
+                            </div>
+                        </div>
+                        <label id="trace-log-level" style="font-size: 5px"></label>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="start-trace">Start</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="stop-trace">Stop</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="download-trace">Download</button>
+                        <label id="trace-log-filesize"></label>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset class="layui-elem-field">
+                <legend class="locale">Pipeline Graph</legend>
+                <div class="layui-field-box">
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="gen-graph">Generate</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="view-graph">View</button>
+                    </div>
+                    <div class="layui-input-inline">
+                        <button class="layui-btn locale" id="download-graph">Download</button>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+</form>
+
+<script> translate_html(); </script>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script type="application/javascript" src="log.js"></script>
+</body>
+</html>
+

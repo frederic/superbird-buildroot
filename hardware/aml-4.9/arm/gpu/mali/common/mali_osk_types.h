@@ -19,6 +19,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <linux/version.h>
+#include <linux/timer.h>
 
 /**
  * @addtogroup uddapi Unified Device Driver (UDD) APIs
@@ -398,7 +400,12 @@ typedef struct _mali_osk_notification_t_struct {
 typedef void (*_mali_osk_timer_callback_t)(void *arg);
 
 /** @brief Private type for Timer Callback Objects */
-typedef struct _mali_osk_timer_t_struct _mali_osk_timer_t;
+typedef struct _mali_osk_timer_t_struct {
+	struct timer_list timer;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)	
+	unsigned long data;
+#endif
+}_mali_osk_timer_t;
 /** @} */ /* end group _mali_osk_timer */
 
 

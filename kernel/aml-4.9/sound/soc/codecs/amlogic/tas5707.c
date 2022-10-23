@@ -201,6 +201,7 @@ static const struct snd_kcontrol_new tas5707_snd_controls[] = {
 	SOC_SINGLE("Ch1 Switch", DDX_SOFT_MUTE, 0, 1, 1),
 	SOC_SINGLE("Ch2 Switch", DDX_SOFT_MUTE, 1, 1, 1),
 	SOC_SINGLE("Shutdown Switch", DDX_SYS_CTL_2, 6, 1, 1),
+	SOC_SINGLE("Mute", DDX_SYS_CTL_2, 6, 1, 1),
 	SOC_SINGLE_RANGE("Fine Master Volume", DDX_CHANNEL3_VOL, 0,
 			   0x80, 0x83, 0),
 	SOC_SINGLE_BOOL_EXT("Set EQ Enable", 0,

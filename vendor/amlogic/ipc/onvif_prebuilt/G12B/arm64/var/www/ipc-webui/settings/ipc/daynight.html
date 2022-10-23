@@ -1,0 +1,73 @@
+<?php
+require "../../common.php";
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+    <title>IPC-DAY-NIGHT</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+</head>
+
+<body>
+
+<form class="layui-form layui-form-pane" id="form_daynight" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Switch Mode</label>
+            </div>
+            <div class="layui-inline">
+                <select name="mode" lay-filter="mode" id="mode"></select>
+            </div>
+        </div>
+    </div>
+    <div id="div_schedule" style="display: none">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">Begin</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <input type="text" id="schedule_begin" name="schedule_begin" class="layui-input"></input>
+                </div>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label locale">End</label>
+            </div>
+            <div class="layui-inline">
+                <div class="layui-input-inline">
+                    <input type="text" id="schedule_end" name="schedule_end" class="layui-input"></input>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item" id="div_delay" style="display: none">
+        <div class="layui-inline">
+            <label class="layui-form-label locale">Filter Delay</label>
+        </div>
+        <div class="layui-inline">
+            <div class="layui-input-inline">
+                <div id="delay" class="demo-slider"></div>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item" style="margin-left:50px">
+        <button class="layui-btn locale" id="submit" lay-filter="submit">Submit</button>
+        <button class="layui-btn layui-btn-danger locale" id="reset">Reset</button>
+    </div>
+</form>
+
+<script> translate_html(); </script>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="daynight.js" type="application/javascript"></script>
+</body>
+</html>

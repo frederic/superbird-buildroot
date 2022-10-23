@@ -30,8 +30,8 @@
 
 #include <linux/amlogic/media/utils/vdec_reg.h>
 #include "../amports/amports_priv.h"
-#include "streambuf.h"
-#include "streambuf_reg.h"
+#include "../amports/streambuf.h"
+#include "../amports/streambuf_reg.h"
 #include <linux/delay.h>
 #include "rmparser.h"
 

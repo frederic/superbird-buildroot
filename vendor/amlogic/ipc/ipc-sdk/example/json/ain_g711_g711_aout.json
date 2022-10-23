@@ -1,0 +1,31 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: ACodecG711,
+    param:
+    {
+      codec: ulaw
+    }
+  },
+  {
+    type: ACodecG711,
+    param:
+    {
+      codec: s16le
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

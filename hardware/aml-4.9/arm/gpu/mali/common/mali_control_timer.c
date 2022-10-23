@@ -64,13 +64,17 @@ _mali_osk_errcode_t mali_control_timer_init(void)
 			MALI_DEBUG_PRINT(2, ("Mali GPU Timer: %u\n", mali_control_timeout));
 		}
 	}
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+	mali_control_timer = _mali_osk_timer_init(mali_control_timer_callback);
+#else
 	mali_control_timer = _mali_osk_timer_init();
+#endif
 	if (NULL == mali_control_timer) {
 		return _MALI_OSK_ERR_FAULT;
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 	_mali_osk_timer_setcallback(mali_control_timer, mali_control_timer_callback, NULL);
-
+#endif
 	return _MALI_OSK_ERR_OK;
 }
 

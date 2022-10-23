@@ -18,6 +18,7 @@ source "drivers/amlogic/media/video_processor/ppmgr/Kconfig"
 source "drivers/amlogic/media/video_processor/ionvideo/Kconfig"
 source "drivers/amlogic/media/video_processor/pic_dev/Kconfig"
 source "drivers/amlogic/media/video_processor/videosync/Kconfig"
+source "drivers/amlogic/media/video_processor/vdetect/Kconfig"
 endif
 
 endmenu

@@ -109,7 +109,6 @@ function build_blx_src() {
 
 function build_blx() {
 	# build each blx
-	mkdir -p ${FIP_BUILD_FOLDER}
 
 	# switch bl31 version
 	switch_bl31 ${CUR_SOC}
@@ -119,19 +118,53 @@ function build_blx() {
 
 	# build loop
 	for loop in ${!BLX_NAME[@]}; do
-		dbg "BIN_PATH[${loop}]: ${BIN_PATH[loop]}"
-		if [ "null" == ${BIN_PATH[loop]} ]; then
+		dbg "BIN_PATH[${loop}]: ${BIN_PATH[$loop]}"
+		if [ "null" == ${BIN_PATH[$loop]} ]; then
 			get_blx_bin ${loop}
-		elif [ "source" == ${BIN_PATH[loop]} ]; then
+		elif [ "source" == ${BIN_PATH[$loop]} ]; then
 			dbg "Build blx source code..."
-			build_blx_src ${BLX_NAME[loop]} ${BLX_SRC_FOLDER[loop]} ${FIP_BUILD_FOLDER} ${CUR_SOC}
+			build_blx_src ${BLX_NAME[$loop]} ${BLX_SRC_FOLDER[$loop]} ${FIP_BUILD_FOLDER} ${CUR_SOC}
 		else
-			if [ ! -e ${BIN_PATH[loop]} ]; then
-				echo "Error: ${BIN_PATH[loop]} doesn't exist... abort"
+			if [ ! -e ${BIN_PATH[$loop]} ]; then
+				echo "Error: ${BIN_PATH[$loop]} doesn't exist... abort"
 				exit -1
 			else
-				cp ${BIN_PATH[loop]} ${FIP_BUILD_FOLDER} -f
-				echo "Get ${BLX_NAME[$loop]} from ${BIN_PATH[loop]}... done"
+				if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ] && \
+				   [ -n "${BLX_IMG_NAME[$loop]}" ] && \
+				   [ "NULL" != "${BLX_IMG_NAME[$loop]}" ]; then
+					cp ${BIN_PATH[$loop]} ${FIP_BUILD_FOLDER}/${BLX_IMG_NAME[$loop]} -f
+				elif [[ -n "${BLX_IMG_NAME[$loop]}" && "NULL" != "${BLX_BIN_NAME[$loop]}" ]]; then
+					cp ${BIN_PATH[$loop]} ${FIP_BUILD_FOLDER}/${BLX_BIN_NAME[$loop]} -f
+				else
+					cp ${BIN_PATH[$loop]} ${FIP_BUILD_FOLDER} -f
+				fi
+
+				echo "Get ${BLX_NAME[$loop]} from ${BIN_PATH[$loop]}... done"
+			fi
+		fi
+
+		# start to check the blx firmware
+		if [ "bl32" == "${BLX_NAME[$loop]}" ]; then
+			# no bl32/bin are exported for users
+			check_bypass=y
+		else
+			check_bypass=n
+		fi
+
+		if [ "y" != "${check_bypass}" ]; then
+			if [ "NULL" != "${BLX_BIN_NAME[$loop]}" ] && \
+			   [ -n "${BLX_BIN_NAME[$loop]}" ] && \
+			   [ "NULL" == "${BLX_IMG_NAME[$loop]}" ] && \
+			   [ ! -f ${FIP_BUILD_FOLDER}/${BLX_BIN_NAME[$loop]} ]; then
+				echo "Error ${BLX_NAME[$loop]}: ${FIP_BUILD_FOLDER}/${BLX_BIN_NAME[$loop]} doesn't exit... abort"
+				exit -1
+			fi
+			if [ "y" == "${CONFIG_FIP_IMG_SUPPORT}" ] && \
+			   [ -n "${BLX_IMG_NAME[$loop]}" ] && \
+			   [ "NULL" != "${BLX_IMG_NAME[$loop]}" ] && \
+			   [ ! -f ${FIP_BUILD_FOLDER}/${BLX_IMG_NAME[$loop]} ]; then
+				echo "Error ${BLX_NAME[$loop]}: ${FIP_BUILD_FOLDER}/${BLX_IMG_NAME[$loop]} doesn't exit... abort"
+				exit -1
 			fi
 		fi
 	done
@@ -191,6 +224,9 @@ function build() {
 	# must source under main function, all sub function can use these variables
 	# but if source in sub-function, only sub-function(or sub-sub..) can use them
 	source ${FIP_FOLDER}${CUR_SOC}/variable_soc.sh
+
+	# compile fip tools for ddr_parse and map_tool
+	prepare_tools
 
 	# source soc package script
 	source ${FIP_FOLDER}${CUR_SOC}/build.sh
@@ -363,6 +399,13 @@ function bin_path_parser() {
 			--bl32)
 				update_bin_path 3 "${argv[@]:$((i))}"
 				continue ;;
+      --bl40)
+				update_bin_path 4 "${argv[@]:$((i))}"
+				continue ;;
+      --sign-bl40)
+				update_bin_path 4 "${argv[@]:$((i))}"
+				CONFIG_SIGN_BL40=1
+				continue ;;
 			--update-bl2)
 				update_bin_path 0 "source"
 				continue ;;
@@ -379,6 +422,26 @@ function bin_path_parser() {
 				CONFIG_DDR_FW=1
 				export CONFIG_DDR_FW
 				continue ;;
+			--cas)
+				cas="${argv[$i]}"
+				#limit the "--cas xxx" only works for g12a
+				if [ "${CUR_SOC}" == "g12a" ] ||
+					( [ "${cas}" == "vmx" ] && [ "${CUR_SOC}" == "gxl" ] ); then
+					CONFIG_CAS=${cas}
+				fi
+				if [[ "${CONFIG_CAS}" == "irdeto" || \
+					  "${CONFIG_CAS}" == "vmx" || \
+					  "${CONFIG_CAS}" == "nagra" ]]; then
+					CONFIG_AML_SIGNED_UBOOT=y
+					export CONFIG_AML_SIGNED_UBOOT
+				fi
+				if [ "${CONFIG_CAS}" == "vmx" ]; then
+					dbg "Loading CAS VMX config"
+					source fip/config_cas_vmx.sh
+				fi
+				echo "CAS: ${cas},${CONFIG_CAS}"
+				export CONFIG_CAS
+				continue ;;
 			--systemroot)
 				CONFIG_SYSTEM_AS_ROOT=systemroot
 				echo "export CONFIG_SYSTEM_AS_ROOT"
@@ -388,6 +451,11 @@ function bin_path_parser() {
 				CONFIG_AVB2=avb2
 				echo "export CONFIG_AVB2"
 				export CONFIG_AVB2=avb2
+				continue ;;
+			--avb2-fipkey)
+				CONFIG_AVB2_KPUB_FROM_FIP=1
+				echo "export CONFIG_AVB2_KPUB_FROM_FIP"
+				export CONFIG_AVB2_KPUB_FROM_FIP=1
 				continue ;;
 				*)
 		esac

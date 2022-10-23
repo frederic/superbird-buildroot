@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
+#include <linux/mmc/core.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sd.h>
 #include <linux/mmc/slot-gpio.h>
@@ -43,6 +44,7 @@
 #include <linux/amlogic/aml_sd_emmc_internal.h>
 #include <linux/time.h>
 #include <linux/random.h>
+#include "../../thermal/thermal_core.h"
 
 int aml_fixdiv_calc(unsigned int *fixdiv, struct clock_lay_t *clk)
 {
@@ -108,6 +110,19 @@ int aml_fixdiv_calc(unsigned int *fixdiv, struct clock_lay_t *clk)
 
 	pr_debug("fixdiv = %d\n", *fixdiv);
 	return ret;
+}
+
+void aml_emmc_erase_timeout(struct work_struct *work)
+{
+	struct amlsd_host *host =
+		container_of(work, struct amlsd_host, timeout.work);
+
+	pr_err("erase eMMC timeout\n");
+	/* stop eMMC controller */
+	writel((readl(host->base + SD_EMMC_START) & ~(1 << 1)),
+		host->base + SD_EMMC_START);
+	/* release request */
+	meson_mmc_request_done(host->mmc, host->mrq);
 }
 
 int meson_mmc_clk_init_v3(struct amlsd_host *host)
@@ -274,6 +289,7 @@ static int meson_mmc_clk_set_rate_v3(struct mmc_host *mmc,
 				ret = clk_set_rate(src0_clk, 792000000);
 				if (ret)
 					pr_warn("not set tl1-gp0\n");
+				host->gp0_enable = 1;
 			}
 			pr_warn("set rate clkin2>>>>>>>>clk:%lu\n",
 						clk_get_rate(src0_clk));
@@ -407,7 +423,8 @@ static void aml_sd_emmc_set_timing_v3(struct amlsd_platform *pdata,
 	} else if (timing == MMC_TIMING_SD_HS) {
 		if (aml_card_type_non_sdio(pdata)
 			|| (host->data->chip_type == MMC_CHIP_TXLX)
-			|| (host->data->chip_type == MMC_CHIP_G12A))
+			|| (host->data->chip_type == MMC_CHIP_G12A)
+			|| (host->data->chip_type == MMC_CHIP_TM2_B))
 			clkc->core_phase = para->sd_hs.core_phase;
 		if (pdata->calc_f) {
 			clkc->core_phase = para->calc.core_phase;
@@ -591,6 +608,12 @@ irqreturn_t meson_mmc_irq_thread_v3(int irq, void *dev_id)
 		/* WARN_ON(aml_sd_emmc_desc_check(host)); */
 		pr_debug("%s %d cmd:%d\n",
 				__func__, __LINE__, mrq->cmd->opcode);
+		if ((mrq->cmd->opcode == MMC_ERASE)
+			&& ((mrq->cmd->arg == MMC_SECURE_ERASE_ARG)
+			|| (mrq->cmd->arg == MMC_SECURE_TRIM2_ARG))) {
+			if (delayed_work_pending(&host->timeout))
+				cancel_delayed_work_sync(&host->timeout);
+		}
 		host->error_flag = 0;
 		if (mrq->cmd->data &&  mrq->cmd->opcode) {
 			xfer_bytes = mrq->data->blksz*mrq->data->blocks;
@@ -622,6 +645,9 @@ irqreturn_t meson_mmc_irq_thread_v3(int irq, void *dev_id)
 	case HOST_DAT_TIMEOUT_ERR:
 	case HOST_RSP_CRC_ERR:
 	case HOST_DAT_CRC_ERR:
+		if (host->is_tunning == 0)
+			pr_info("%s %d %s: cmd:%d\n", __func__, __LINE__,
+				mmc_hostname(host->mmc), mrq->cmd->opcode);
 		if (mrq->cmd->data) {
 			dma_unmap_sg(mmc_dev(host->mmc), mrq->cmd->data->sg,
 				mrq->cmd->data->sg_len,
@@ -717,6 +743,9 @@ static int aml_sd_emmc_cali_v3(struct mmc_host *mmc,
 		cmd.arg = MMC_RANDOM_OFFSET;
 	else if (!strcmp(pattern, MMC_DTB_NAME))
 		cmd.arg = MMC_DTB_OFFSET;
+	else if (!strcmp(pattern, MMC_TUNING_NAME))
+		cmd.arg = MMC_TUNING_OFFSET;
+
 	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
 
 	stop.opcode = MMC_STOP_TRANSMISSION;
@@ -862,6 +891,7 @@ RETRY:
 	/*****test start*************/
 	udelay(5);
 	host->is_tunning = 1;
+	host->cmd_retune = 0;
 	if (line_x < 9)
 		aml_sd_emmc_cali_v3(mmc,
 			MMC_READ_MULTIPLE_BLOCK,
@@ -869,6 +899,7 @@ RETRY:
 	else
 		aml_sd_emmc_cmd_v3(mmc);
 	host->is_tunning = 0;
+	host->cmd_retune = 1;
 	udelay(1);
 	eyetest_log = readl(host->base + SD_EMMC_EYETEST_LOG);
 
@@ -1143,14 +1174,14 @@ static u32 scan_emmc_cmd_win(struct mmc_host *mmc, int send_status)
 		for (j = 0; j < repeat_times; j++) {
 			if (send_status)
 				err = emmc_send_cmd(mmc,
-						MMC_SEND_STATUS,
-						1 << 16,
-						MMC_RSP_R1 | MMC_CMD_AC);
+					   MMC_SEND_STATUS,
+					   1 << 16,
+					   MMC_RSP_R1 | MMC_CMD_AC);
 			else
 				err = single_read_cmd_for_scan(mmc,
-					MMC_READ_SINGLE_BLOCK,
-					host->blk_test, 512, 1,
-					offset);
+					 MMC_READ_SINGLE_BLOCK,
+					 host->blk_test, 512, 1,
+					 offset);
 			if (!err)
 				str[i]++;
 			else
@@ -1313,6 +1344,8 @@ static int emmc_ds_manual_sht(struct mmc_host *mmc)
 		host->cmd_retune = 1;
 		host->find_win = 1;
 	}
+
+	gintf3->ds_sht_m = 0;
 	for (i = 0; i < 64; i++) {
 		host->is_tunning = 1;
 		err = emmc_test_bus(mmc);
@@ -1376,7 +1409,6 @@ static int emmc_ds_manual_sht(struct mmc_host *mmc)
 
 static void aml_emmc_hs400_general(struct mmc_host *mmc)
 {
-
 	update_all_line_eyetest(mmc);
 	emmc_ds_core_align(mmc);
 	update_all_line_eyetest(mmc);
@@ -1389,10 +1421,22 @@ static void aml_emmc_hs400_general(struct mmc_host *mmc)
 
 static void aml_emmc_hs400_tl1(struct mmc_host *mmc)
 {
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct amlsd_host *host = pdata->host;
+	u32 intf3 = readl(host->base + SD_EMMC_INTF3);
+
+	if (host->data->chip_type == MMC_CHIP_TM2_B) {
+		intf3 = readl(host->base + SD_EMMC_INTF3);
+		intf3 |= (1<<22);
+		writel(intf3, (host->base + SD_EMMC_INTF3));
+		pdata->intf3 = intf3;
+	}
+
 	set_emmc_cmd_delay(mmc, 1);
 	tl1_emmc_line_timing(mmc);
 	emmc_ds_manual_sht(mmc);
 	set_emmc_cmd_delay(mmc, 0);
+	return;
 }
 
 static int emmc_data_alignment(struct mmc_host *mmc, int best_size)
@@ -1610,7 +1654,7 @@ static unsigned long _test_fixed_adj(struct amlsd_platform *pdata,
 }
 
 static u32 _find_fixed_adj_mid(unsigned long map,
-		u32 adj, u32 div)
+		u32 adj, u32 div, u32 core_phase)
 {
 	u32 left, right, mid, size = 0;
 
@@ -1622,6 +1666,8 @@ static u32 _find_fixed_adj_mid(unsigned long map,
 			left, right, mid, size);
 	if ((size >= 3) && ((mid < right) || (mid > left))) {
 		mid = (adj + (size - 1) / 2 + (size - 1) % 2) % div;
+		if ((mid == (core_phase - 1)) && (div == 5))
+			return NO_FIXED_ADJ_MID;
 		return mid;
 	}
 	return NO_FIXED_ADJ_MID;
@@ -1667,6 +1713,8 @@ static u32 _find_fixed_adj_valid_win(struct amlsd_platform *pdata,
 	unsigned long prev_map[1] = {0};
 	unsigned long tmp[1] = {0};
 	unsigned long dst[1] = {0};
+	struct para_e *para = &(pdata->host->data->sdmmc);
+	u32 cop = para->hs2.core_phase;
 
 	div = (div == AML_FIXED_ADJ_MIN) ?
 			AML_FIXED_ADJ_MIN : AML_FIXED_ADJ_MAX;
@@ -1689,9 +1737,14 @@ static u32 _find_fixed_adj_valid_win(struct amlsd_platform *pdata,
 					fir_adj, div);
 			pr_adj_info(">>>>>>>>prev_map_range",
 					*prev_map, fir_adj, div);
-			ret = _find_fixed_adj_mid(*prev_map, fir_adj, div);
+			ret = _find_fixed_adj_mid(*prev_map, fir_adj, div, cop);
 			if (ret != NO_FIXED_ADJ_MID) {
-				set_fixed_adj_line_delay(0, pdata);
+		/* pre adj=core phase-1="hole"&&200MHZ,all line delay+step*/
+				if (((ret - 1) == (cop - 1)) && (div == 5))
+					set_fixed_adj_line_delay(
+					AML_FIXED_ADJ_STEP, pdata);
+				else
+					set_fixed_adj_line_delay(0, pdata);
 				return ret;
 			}
 
@@ -1704,9 +1757,15 @@ static u32 _find_fixed_adj_valid_win(struct amlsd_platform *pdata,
 		*prev_map = *cur_map;
 		*cur_map = _swap_fixed_adj_win(*cur_map, fir_adj, div);
 		pr_adj_info(">>>>>>>>cur_map_range", *cur_map, fir_adj, div);
-		ret = _find_fixed_adj_mid(*cur_map, fir_adj, div);
-		if (ret != NO_FIXED_ADJ_MID)
+		ret = _find_fixed_adj_mid(*cur_map, fir_adj, div, cop);
+		if (ret != NO_FIXED_ADJ_MID) {
+		/* pre adj=core phase-1="hole"&&200MHZ, all line delay+step */
+			if (((ret - 1) == (cop - 1)) && (div == 5)) {
+				step += AML_FIXED_ADJ_STEP;
+				set_fixed_adj_line_delay(step, pdata);
+			}
 			return ret;
+		}
 	}
 
 	pr_info("[%s][%d] no fixed adj\n", __func__, __LINE__);
@@ -1862,7 +1921,8 @@ tunning:
 	} else if ((best_win_size < clk_div)
 			&& (clk_div <= AML_FIXED_ADJ_MAX)
 			&& (clk_div >= AML_FIXED_ADJ_MIN)
-			&& !all_flag) {
+			&& !all_flag
+			&& (host->data->chip_type != MMC_CHIP_TM2_B)) {
 		adj_delay_find = _find_fixed_adj_valid_win(pdata,
 				tuning_data, opcode, fixed_adj_map, clk_div);
 	} else if (best_win_size == clk_div) {
@@ -2320,6 +2380,8 @@ int aml_mmc_execute_tuning_v3(struct mmc_host *mmc, u32 opcode)
 		err = _aml_sd_emmc_execute_tuning(mmc, opcode,
 					&tuning_data, adj_win_start);
 	} else {
+		if (host->data->chip_type == MMC_CHIP_TM2_B)
+			return 0;
 		intf3 = readl(host->base + SD_EMMC_INTF3);
 		intf3 |= (1<<22);
 		writel(intf3, (host->base + SD_EMMC_INTF3));
@@ -2336,17 +2398,188 @@ int aml_mmc_execute_tuning_v3(struct mmc_host *mmc, u32 opcode)
 		readl(host->base + SD_EMMC_INTF3));
 	return err;
 }
+
+static long long _para_checksum_calc(struct aml_tuning_para *para)
+{
+	int i = 0;
+	int size = sizeof(struct aml_tuning_para) - 6 * sizeof(unsigned int);
+	unsigned int *buffer;
+	long long checksum = 0;
+
+	if (!para)
+		return 1;
+
+	size = size >> 2;
+	buffer = (unsigned int *)para;
+	while (i < size)
+		checksum += buffer[i++];
+
+	return checksum;
+}
+
+/*
+ * read tuning para from reserved partition
+ * and copy it to pdata->para
+ */
+int aml_read_tuning_para(struct mmc_host *mmc)
+{
+	int off, blk;
+	int ret;
+	int para_size;
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct amlsd_host *host = pdata->host;
+
+	if (pdata->save_para == 0)
+		return 0;
+
+	para_size = sizeof(struct aml_tuning_para);
+	blk = (para_size - 1) / 512 + 1;
+	off = MMC_TUNING_OFFSET;
+
+	if (blk == 1)
+		ret = single_read_cmd_for_scan(mmc,
+					       MMC_READ_SINGLE_BLOCK,
+					       host->blk_test, 512,
+					       blk, off);
+	else
+		ret = aml_sd_emmc_cali_v3(mmc,
+					  MMC_READ_MULTIPLE_BLOCK,
+					  host->blk_test, 512, blk,
+					  MMC_TUNING_NAME);
+	if (ret) {
+		pr_info("read tuning parameter failed\n");
+		return ret;
+	}
+
+	memcpy(&pdata->para, host->blk_test, para_size);
+	return ret;
+}
+
+/*set para on controller register*/
+static void aml_set_tuning_para(struct mmc_host *mmc)
+{
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct amlsd_host *host = pdata->host;
+	struct aml_tuning_para *para = &pdata->para;
+	int temp_index;
+	u32 delay1, delay2, intf3;
+
+	temp_index = para->temperature / 10000;
+	delay1 = pdata->para.hs4[temp_index].delay1;
+	delay2 = pdata->para.hs4[temp_index].delay2;
+	intf3 = pdata->para.hs4[temp_index].intf3;
+
+	writel(delay1, host->base + SD_EMMC_DELAY1_V3);
+	writel(delay2, host->base + SD_EMMC_DELAY2_V3);
+	writel(intf3, host->base + SD_EMMC_INTF3);
+}
+
+/*save parameter on mmc_host pdata*/
+static void aml_save_tuning_para(struct mmc_host *mmc)
+{
+	unsigned int checksum;
+	int temp_index;
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct amlsd_host *host = pdata->host;
+	struct aml_tuning_para *para = &pdata->para;
+
+	u32 delay1 = readl(host->base + SD_EMMC_DELAY1_V3);
+	u32 delay2 = readl(host->base + SD_EMMC_DELAY2_V3);
+	u32 intf3 = readl(host->base + SD_EMMC_INTF3);
+
+	if (pdata->save_para == 0)
+		return;
+
+	temp_index = para->temperature / 10000;
+	if (para->temperature < 0 || temp_index > 6) {
+		para->update = 0;
+		return;
+	}
+
+	pdata->para.hs4[temp_index].delay1 = delay1;
+	pdata->para.hs4[temp_index].delay2 = delay2;
+	pdata->para.hs4[temp_index].intf3 = intf3;
+	pdata->para.hs4[temp_index].flag = 1;
+	pdata->para.magic = 0x00487e44; /*E~K\0*/
+	pdata->para.version = 1;
+
+	checksum = _para_checksum_calc(para);
+	pdata->para.checksum = checksum;
+}
+
+/*
+ * check if tuning parameter is exist
+ * check if temperature is in the 0~69
+ * check if the parameter has been tuning
+ *		under the current temperature
+ * check if the data had been broken by  checksum
+ *
+ * if all four condition above is yes, the tuning parameter
+ *		could be use directly
+ * otherwise retunning and save parameter
+ */
+static int aml_para_is_exist(struct mmc_host *mmc)
+{
+	int temperature;
+	int temp_index;
+	unsigned int checksum;
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct aml_tuning_para *para = &pdata->para;
+
+	if (pdata->save_para == 0)
+		return 0;
+
+	temperature = thermal_get_temp_by_index(0);
+	if (temperature == -1) {
+		para->update = 0;
+		pr_info("get temperature failed\n");
+		return 0;
+	}
+
+	pr_info("current temperature is %d\n", temperature);
+	temp_index = temperature  / 10000;
+	para->temperature = temperature;
+	para->update = 1;
+	/* temperature range is 0 ~ 69 */
+	if (temperature < 0 || temp_index > 6) {
+		pr_info("temperature is out of normal range\n");
+		return 0;
+	}
+
+	if (para->hs4[temp_index].flag == 0) {
+		pr_info("current temperature %d degree not tuning yet\n",
+			temperature / 1000);
+		return 0;
+	}
+
+	checksum = _para_checksum_calc(para);
+	if (checksum != para->checksum) {
+		pr_info("warning: checksum is not match\n");
+		return 0;
+	}
+	para->update = 0;
+
+	return 1;
+}
+
 int aml_post_hs400_timming(struct mmc_host *mmc)
 {
 	struct amlsd_platform *pdata = mmc_priv(mmc);
 	struct amlsd_host *host = pdata->host;
+
 	aml_sd_emmc_clktest(mmc);
+	if (aml_para_is_exist(mmc)) {
+		aml_set_tuning_para(mmc);
+		return 0;
+	}
 	if (host->data->chip_type == MMC_CHIP_G12B)
 		aml_emmc_hs400_Revb(mmc);
 	else if (host->data->chip_type >= MMC_CHIP_TL1)
 		aml_emmc_hs400_tl1(mmc);
 	else
 		aml_emmc_hs400_general(mmc);
+
+	aml_save_tuning_para(mmc);
 	return 0;
 }
 
@@ -2358,6 +2591,57 @@ ssize_t emmc_scan_cmd_win(struct device *dev,
 
 	mmc_claim_host(mmc);
 	scan_emmc_cmd_win(mmc, 0);
+	mmc_release_host(mmc);
+	return sprintf(buf, "%s\n", "Emmc scan command window.\n");
+}
+
+static void scan_emmc_tx_win(struct mmc_host *mmc)
+{
+	struct amlsd_platform *pdata = mmc_priv(mmc);
+	struct amlsd_host *host = pdata->host;
+	u32 vclk = readl(host->base + SD_EMMC_CLOCK_V3);
+	u32 clk_bak = vclk;
+	struct sd_emmc_clock_v3 *clkc = (struct sd_emmc_clock_v3 *)&(vclk);
+	u32 i, j, err;
+	int repeat_times = 100;
+	char str[64] = {0};
+
+	aml_sd_emmc_cali_v3(mmc, MMC_READ_MULTIPLE_BLOCK,
+				host->blk_test, 512, 40, MMC_PATTERN_NAME);
+	host->cmd_retune = 0;
+	host->is_tunning = 1;
+	for (i = clkc->tx_delay; i < 64; i++) {
+		aml_emmc_hs400_tl1(mmc);
+		for (j = 0; j < repeat_times; j++) {
+			err = mmc_write_internal(mmc->card, MMC_PATTERN_OFFSET,
+					40, host->blk_test);
+			if (!err)
+				str[i]++;
+			else
+				break;
+		}
+		clkc->tx_delay += 1;
+		writel(vclk, host->base + SD_EMMC_CLOCK_V3);
+		pr_debug("tx_delay: 0x%x, send cmd %d times success %d times, is ok\n",
+				clkc->tx_delay, repeat_times, str[i]);
+	}
+	host->is_tunning = 0;
+	host->cmd_retune = 1;
+
+	writel(clk_bak, host->base + SD_EMMC_CLOCK_V3);
+	emmc_search_cmd_delay(str, repeat_times);
+	pr_info(">>>>>>>>>>>>>>>>>>>>this is tx window>>>>>>>>>>>>>>>>>>>>>>\n");
+	emmc_show_cmd_window(str, repeat_times);
+}
+
+ssize_t emmc_scan_tx_win(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct amlsd_host *host = dev_get_drvdata(dev);
+	struct mmc_host *mmc = host->mmc;
+
+	mmc_claim_host(mmc);
+	scan_emmc_tx_win(mmc);
 	mmc_release_host(mmc);
 	return sprintf(buf, "%s\n", "Emmc scan command window.\n");
 }

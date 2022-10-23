@@ -33,6 +33,7 @@ int pending_submit_wrapper(struct mali_session_data *session_data, _mali_uk_pend
 
 int mem_alloc_wrapper(struct mali_session_data *session_data, _mali_uk_alloc_mem_s __user *uargs);
 int mem_free_wrapper(struct mali_session_data *session_data, _mali_uk_free_mem_s __user *uargs);
+int meson_mem_start_wrapper(struct mali_session_data *session_data, _meson_update_video_texture_s __user *uargs);
 int mem_bind_wrapper(struct mali_session_data *session_data, _mali_uk_bind_mem_s __user *uargs);
 int mem_unbind_wrapper(struct mali_session_data *session_data, _mali_uk_unbind_mem_s __user *uargs);
 int mem_cow_wrapper(struct mali_session_data *session_data, _mali_uk_cow_mem_s __user *uargs);

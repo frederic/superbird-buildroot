@@ -43,6 +43,7 @@ _mali_osk_errcode_t _mali_ukk_mem_allocate(_mali_uk_alloc_mem_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_free(_mali_uk_free_mem_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_bind(_mali_uk_bind_mem_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_unbind(_mali_uk_unbind_mem_s *args);
+_mali_osk_errcode_t _meson_update_video_texture(_meson_update_video_texture_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_cow(_mali_uk_cow_mem_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_cow_modify_range(_mali_uk_cow_modify_range_s *args);
 _mali_osk_errcode_t _mali_ukk_mem_usage_get(_mali_uk_profiling_memory_usage_get_s *args);

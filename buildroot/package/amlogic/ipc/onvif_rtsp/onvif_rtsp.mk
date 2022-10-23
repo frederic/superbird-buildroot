@@ -20,8 +20,10 @@ define ONVIF_RTSP_BUILD_CMDS
 endef
 
 define ONVIF_RTSP_INSTALL_TARGET_CMDS
+	mkdir -p $(TARGET_DIR)/etc/ipc
 	$(INSTALL) -D -m 755 $(@D)/onvif_rtsp $(TARGET_DIR)/usr/bin/
-	$(INSTALL) -D -m 755 $(ONVIF_RTSP_PKGDIR)/S91onvif_rtsp $(TARGET_DIR)/etc/init.d/
+	$(INSTALL) -D -m 755 $(@D)/startup.sh $(TARGET_DIR)/etc/init.d/S91onvif_rtsp
+	$(INSTALL) -D -m 644 $(@D)/config.json $(TARGET_DIR)/etc/ipc/
 endef
 
 $(eval $(generic-package))

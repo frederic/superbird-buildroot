@@ -1061,6 +1061,7 @@ for G12A, set osd2 matrix(10bit) RGB2YUV
 	}
 }
 
+#if 0
  /*
 for G12A, set osd2 matrix(10bit) RGB2YUV
  */
@@ -1136,7 +1137,7 @@ static void set_osd3_rgb2yuv(bool on)
 		VPP_PR("g12a/b osd3 matrix rgb2yuv..............\n");
 	}
 }
-
+#endif
 static void set_viu2_osd_matrix_rgb2yuv(bool on)
 {
 	int *m = RGB709_to_YUV709l_coeff;
@@ -1572,7 +1573,7 @@ static void amvecm_cp_hdr_info(struct master_display_info_s *hdr_data)
 	hdr_data->white_point[0] = bt2020_white_point[0];
 	hdr_data->white_point[1] = bt2020_white_point[1];
 	/* default luminance */
-	hdr_data->luminance[0] = 5000 * 10000;
+	hdr_data->luminance[0] = 1000 * 10000;
 	hdr_data->luminance[1] = 50;
 
 	/* content_light_level */
@@ -1584,29 +1585,26 @@ static void amvecm_cp_hdr_info(struct master_display_info_s *hdr_data)
 
 void hdr_tx_pkt_cb(void)
 {
-	int sdr_mode = 0;
+	int hdr_policy = 0;
 	struct master_display_info_s hdr_data;
 	struct hdr_info *hdrinfo;
-	// const char *sdr_mode_env = getenv("sdr2hdr");
+	const char *hdr_policy_env = getenv("hdr_policy");
 
-	// if (sdr_mode_env == NULL)
-	// 	return;
+	if (hdr_policy_env == NULL)
+		return;
 
-	// sdr_mode = simple_strtoul(sdr_mode_env, NULL, 10);
+	hdr_policy = simple_strtoul(hdr_policy_env, NULL, 10);
 	hdrinfo = hdmitx_get_rx_hdr_info();
-	if (hdrinfo && !hdrinfo->hdr_sup_eotf_smpte_st_2084)
-		sdr_mode = 2;
 
-	// follow source HDR_BYPASS
 	if ((hdrinfo && hdrinfo->hdr_sup_eotf_smpte_st_2084) &&
-		(sdr_mode == 2)) {
+		(hdr_policy == 0)) {
 		hdr_func(OSD1_HDR, SDR_HDR);
 		hdr_func(VD1_HDR, SDR_HDR);
 		amvecm_cp_hdr_info(&hdr_data);
 		hdmitx_set_drm_pkt(&hdr_data);
 	}
 
-	//VPP_PR("sdr_mode = %d\n", sdr_mode);
+	VPP_PR("hdr_policy = %d\n", hdr_policy);
 	if (hdrinfo)
 		VPP_PR("Rx hdr_info.hdr_sup_eotf_smpte_st_2084 = %d\n",
 			hdrinfo->hdr_sup_eotf_smpte_st_2084);
@@ -1657,28 +1655,13 @@ void vpp_init(void)
 		set_vpp_bitdepth();
 	} else if (is_osd_high_version()) {
 		/* osd1: rgb->yuv limit,osd2: rgb2yuv limit,osd3: rgb2yuv limit*/
-		if (get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_TM2) {
-			/* tm2: osd out is yuv */
-			set_osd1_rgb2yuv(1);
-			set_osd2_rgb2yuv(1);
-			set_osd3_rgb2yuv(1);
-		} else {
-			/* g12a ~ sm1: osd out is rgb */
-			set_vpp_osd2_rgb2yuv(1);
-		}
-		#if 0
-		set_osd1_rgb2yuv(1);
-		set_osd2_rgb2yuv(1);
 
-		if ((get_cpu_id().family_id != MESON_CPU_MAJOR_ID_TL1))
-			set_osd3_rgb2yuv(1);
-		#endif
+		/* >= g12a: osd out is rgb */
+		set_vpp_osd2_rgb2yuv(1);
+
 		/* set vpp data path to u12 */
 		set_vpp_bitdepth();
-		if ((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12A) ||
-			(get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B) ||
-			 (get_cpu_id().family_id == MESON_CPU_MAJOR_ID_TL1) ||
-			 (get_cpu_id().family_id == MESON_CPU_MAJOR_ID_SM1))
+		if (get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12A)
 			hdr_func(OSD1_HDR, HDR_BYPASS);
 	} else {
 		/* set dummy data default YUV black */

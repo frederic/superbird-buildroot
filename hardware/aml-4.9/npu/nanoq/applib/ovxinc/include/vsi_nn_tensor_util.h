@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -319,6 +319,34 @@ OVXLIB_API vsi_status vsi_nn_CopyDataToTensor
     uint8_t             * data
     );
 
+/**
+ * Flush Handle
+ * If you swap the handle of the tensor, you should flush it.
+ *
+ * @param[in] tensor Tensor handle.
+ *
+ * @return VSI_SUCCESS on success, or error core otherwise.
+ */
+OVXLIB_API vsi_status vsi_nn_FlushHandle
+    (
+    vsi_nn_tensor_t      * tensor
+    );
+
+/**
+ * Get Tensor Handle
+ * Get the handle of the tensor
+ *
+ * @param[in] tensor Tensor.
+ * @param[out] ptr The handle of the tensor.
+ *
+ * @return VSI_SUCCESS on success, or error core otherwise.
+ */
+OVXLIB_API vsi_status vsi_nn_GetTensorHandle
+    (
+    vsi_nn_tensor_t      * tensor,
+    void** ptr
+    );
+
 OVXLIB_API vsi_status vsi_nn_CopyRawDataToTensor
     (
     vsi_nn_graph_t*         graph,
@@ -370,6 +398,14 @@ OVXLIB_API void vsi_nn_TransposeTensor
     uint32_t       * as_shape
     );
 
+OVXLIB_API void vsi_nn_PermuteTensor
+    (
+    vsi_nn_graph_t  * graph,
+    vsi_nn_tensor_t * tensor,
+    uint32_t       * perm,
+    uint32_t         dim_num
+    );
+
 OVXLIB_API vsi_bool vsi_nn_CalcReshapeTensor
     (
     vsi_nn_tensor_t * input,
@@ -393,7 +429,7 @@ OVXLIB_API vsi_bool vsi_nn_ReshapeTensor
  * @param[in] tensor Tensor handle.
  * @return Element number of the tensor.
  */
-OVXLIB_API vsi_nn_size_t vsi_nn_GetElementNum
+OVXLIB_API uint32_t vsi_nn_GetElementNum
     (
     vsi_nn_tensor_t * tensor
     );
@@ -498,8 +534,15 @@ OVXLIB_API vsi_status vsi_nn_SwapTensorHandle
     vsi_nn_tensor_t * tensor0,
     vsi_nn_tensor_t * tensor1
     );
+    
+OVXLIB_API vsi_status vsi_nn_SwapInputBuffer
+    (
+   vsi_nn_tensor_t * tensor,
+    void* new_buffer,
+   vsi_nn_graph_t *graph
+    );
 
-OVXLIB_API vsi_nn_size_t vsi_nn_vxGetTensorElementNum
+OVXLIB_API uint32_t vsi_nn_vxGetTensorElementNum
     (
     vsi_nn_tensor_attr_t *attr
     );
@@ -540,11 +583,37 @@ OVXLIB_API uint32_t vsi_nn_GetOffsetByCoords
     uint32_t *coords
     );
 
+/**
+ * Create a tensor with attr and default value
+ * the tensor content will be initialized with default value
+ *
+ * @param[in] graph Graph handle.
+ * @param[in] tensor attr.
+ * @param[in] default value to be assigned to tensor content.
+ *
+ * @return new tensor on success, or NULL otherwise.
+ */
 OVXLIB_API vsi_nn_tensor_t * vsi_nn_CreateTensorWithDefault
     (
     vsi_nn_graph_t       * graph,
     vsi_nn_tensor_attr_t * attr,
     float                  defualt_value
+    );
+
+/**
+ * Fill tensor with specified value
+ *
+ * @param[in] graph Graph handle.
+ * @param[in] target tensor.
+ * @param[in] value to be assigned to tensor content.
+ *
+ * @return VSI_SUCCESS on success, or error core otherwise.
+ */
+vsi_status vsi_nn_FillTensorWithValue
+    (
+    vsi_nn_graph_t       * graph,
+    vsi_nn_tensor_t      * tensor,
+    float                  value
     );
 
 void vsi_nn_print_node_io
@@ -560,6 +629,67 @@ vsi_nn_tensor_t *vsi_nn_reshape_tensor
     vsi_nn_tensor_t * input,
     uint32_t        * shape,
     uint32_t          dim_num
+    );
+
+/**
+ * OVXLIB internal tensor util api
+ * A wrapper api for OpenVX vxCopyTensorPatch
+ * Allows the application to copy a view patch from/into an tensor object .
+ *
+ * @param[in] tensor OpenVX Tensor handle.
+ * @param[in] attr OVXLIB Tensor attr.
+ * @param[in] user_ptr The address of the memory location where to store the requested data.
+ * @param[in] start View start region.
+ * @param[in] end View end region.
+ * @param[in] stride Array of user memory strides in each dimension.
+ * @param[in] usage This declares the effect of the copy with regard to the tensor object
+ *            support VX_READ_ONLY or VX_WRITE_ONLY
+ * @param[in] user_memory_type A, refer vx_memory_type_e
+ * @return VSI_SUCCESS on success, or error core otherwise.
+ */
+vsi_status vsi_nn_copy_tensor_veiw_patch
+    (
+    vx_tensor tensor,
+    vsi_nn_tensor_attr_t *attr,
+    void *user_ptr,
+    uint32_t *start,
+    uint32_t *end,
+    uint32_t *stride,
+    vsi_enum usage,
+    vsi_enum user_memory_type
+    );
+
+/**
+ * OVXLIB internal tensor util api
+ * A wrapper api for OpenVX vxCopyTensorPatch
+ * Allows the application to copy whole tensor patch from/into an tensor object.
+ *
+ * @param[in] tensor OpenVX Tensor handle.
+ * @param[in] attr OVXLIB Tensor attr.
+ * @param[in] user_ptr The address of the memory location where to store the requested data.
+ * @param[in] usage This declares the effect of the copy with regard to the tensor object
+ *            support VX_READ_ONLY or VX_WRITE_ONLY
+ * @return VSI_SUCCESS on success, or error core otherwise.
+ */
+vsi_status vsi_nn_copy_tensor_patch
+    (
+    vx_tensor tensor,
+    vsi_nn_tensor_attr_t *attr,
+    void * user_ptr,
+    vsi_enum usage
+    );
+
+/**
+ * OVXLIB internal tensor util api
+ * Rotate 180 degrees in width*height*channel dims for weights data
+ *
+ * @param[in] graph Graph handle.
+ * @param[in] weights tensor.
+ */
+void vsi_nn_reshuffle_weight_data
+    (
+    vsi_nn_graph_t  * graph,
+    vsi_nn_tensor_t * weights
     );
 
 #ifdef __cplusplus

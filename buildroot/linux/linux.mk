@@ -6,7 +6,12 @@
 
 LINUX_VERSION = $(call qstrip,$(BR2_LINUX_KERNEL_VERSION))
 LINUX_LICENSE = GPL-2.0
-LINUX_LICENSE_FILES = COPYING
+ifeq ($(BR2_LINUX_KERNEL_LATEST_VERSION),y)
+LINUX_LICENSE_FILES = \
+	COPYING \
+	LICENSES/preferred/GPL-2.0 \
+	LICENSES/exceptions/Linux-syscall-note
+endif
 
 define LINUX_HELP_CMDS
 	@echo '  linux-menuconfig       - Run Linux kernel menuconfig'
@@ -33,8 +38,9 @@ LINUX_SITE_METHOD = hg
 else ifeq ($(BR2_LINUX_KERNEL_CUSTOM_SVN),y)
 LINUX_SITE = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_REPO_URL))
 LINUX_SITE_METHOD = svn
-else ifeq ($(BR2_LINUX_KERNEL_LATEST_CIP_VERSION),y)
-LINUX_SITE = git://git.kernel.org/pub/scm/linux/kernel/git/cip/linux-cip.git
+else ifeq ($(BR2_LINUX_KERNEL_LATEST_CIP_VERSION)$(BR2_LINUX_KERNEL_LATEST_CIP_RT_VERSION),y)
+LINUX_SOURCE = linux-cip-$(LINUX_VERSION).tar.gz
+LINUX_SITE = https://git.kernel.org/pub/scm/linux/kernel/git/cip/linux-cip.git/snapshot
 else ifneq ($(findstring -rc,$(LINUX_VERSION)),)
 # Since 4.12-rc1, -rc kernels are generated from cgit. This also works for
 # older -rc kernels.
@@ -63,8 +69,17 @@ BR_NO_CHECK_HASH_FOR += $(notdir $(LINUX_PATCHES))
 # be directories in the patch list (unlike for other packages).
 LINUX_PATCH = $(filter ftp://% http://% https://%,$(LINUX_PATCHES))
 
+# while the kernel is built for the target, the build may need various
+# host libraries depending on config (and version), so use
+# HOST_MAKE_ENV here. In particular, this ensures that our
+# host-pkgconf will look for host libraries and not target ones.
+LINUX_MAKE_ENV = \
+	$(HOST_MAKE_ENV) \
+	BR_BINARIES_DIR=$(BINARIES_DIR)
+
 LINUX_INSTALL_IMAGES = YES
-LINUX_DEPENDENCIES = host-kmod
+LINUX_DEPENDENCIES = host-kmod \
+	$(if $(BR2_PACKAGE_INTEL_MICROCODE),intel-microcode)
 
 # Starting with 4.16, the generated kconfig paser code is no longer
 # shipped with the kernel sources, so we need flex and bison, but
@@ -99,7 +114,7 @@ LINUX_DEPENDENCIES += host-openssl
 endif
 
 ifeq ($(BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF),y)
-LINUX_DEPENDENCIES += host-elfutils
+LINUX_DEPENDENCIES += host-elfutils host-pkgconf
 endif
 
 # If host-uboot-tools is selected by the user, assume it is needed to
@@ -176,6 +191,11 @@ ifeq ($(BR2_PACKAGE_AML_TOUCH),y)
 	LINUX_DEPENDENCIES += aml_touch
 endif
 
+SYSROOT_ARCH=$(KERNEL_ARCH)
+ifeq ($(BR2_arm),y)
+	SYSROOT_ARCH=$(ARCH)
+endif
+
 ifneq ($(ARCH_XTENSA_OVERLAY_FILE),)
 define LINUX_XTENSA_OVERLAY_EXTRACT
 	$(call arch-xtensa-overlay-extract,$(@D),linux)
@@ -184,16 +204,14 @@ LINUX_POST_EXTRACT_HOOKS += LINUX_XTENSA_OVERLAY_EXTRACT
 LINUX_EXTRA_DOWNLOADS += $(ARCH_XTENSA_OVERLAY_URL)
 endif
 
+# We don't want to run depmod after installing the kernel. It's done in a
+# target-finalize hook, to encompass modules installed by packages.
 LINUX_MAKE_FLAGS = \
 	HOSTCC="$(HOSTCC) $(HOST_CFLAGS) $(HOST_LDFLAGS)" \
 	ARCH=$(KERNEL_ARCH) \
 	INSTALL_MOD_PATH=$(TARGET_DIR) \
 	CROSS_COMPILE="$(TARGET_KERNEL_CROSS)" \
 	DEPMOD=$(HOST_DIR)/sbin/depmod
-
-LINUX_MAKE_ENV = \
-	$(TARGET_MAKE_ENV) \
-	BR_BINARIES_DIR=$(BINARIES_DIR)
 
 ifeq ($(BR2_REPRODUCIBLE),y)
 LINUX_MAKE_ENV += \
@@ -345,6 +363,12 @@ define LINUX_TRY_PATCH_TIMECONST
 endef
 LINUX_POST_PATCH_HOOKS += LINUX_TRY_PATCH_TIMECONST
 
+BR2_PACKAGE_AML_LINUX_PATCHDIR=$(BR2_PACKAGE_AML_KERNEL_PATCHDIR)
+define LINUX_APPLY_AML_PATCHES
+	test -d $(BR2_PACKAGE_AML_LINUX_PATCHDIR) && $(APPLY_PATCHES) $(@D) $(BR2_PACKAGE_AML_LINUX_PATCHDIR) \* || true
+endef
+LINUX_POST_PATCH_HOOKS = LINUX_APPLY_AML_PATCHES
+
 LINUX_KERNEL_CUSTOM_LOGO_PATH = $(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH))
 ifneq ($(LINUX_KERNEL_CUSTOM_LOGO_PATH),)
 LINUX_DEPENDENCIES += host-imagemagick
@@ -411,8 +435,22 @@ define LINUX_KCONFIG_FIXUP_CMDS
 		$(call KCONFIG_DISABLE_OPT,$(opt),$(@D)/.config)
 	)
 	$(LINUX_FIXUP_CONFIG_ENDIANNESS)
-        $(if $(BR2_arm)$(BR2_armeb),
-                $(call KCONFIG_ENABLE_OPT,CONFIG_AEABI,$(@D)/.config))
+	$(if $(BR2_arm)$(BR2_armeb),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_AEABI,$(@D)/.config))
+	$(if $(BR2_powerpc)$(BR2_powerpc64)$(BR2_powerpc64le),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_PPC_DISABLE_WERROR,$(@D)/.config))
+	$(if $(BR2_ARC_PAGE_SIZE_4K),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_ARC_PAGE_SIZE_4K,$(@D)/.config)
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_8K,$(@D)/.config)
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_16K,$(@D)/.config))
+	$(if $(BR2_ARC_PAGE_SIZE_8K),
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_4K,$(@D)/.config)
+		$(call KCONFIG_ENABLE_OPT,CONFIG_ARC_PAGE_SIZE_8K,$(@D)/.config)
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_16K,$(@D)/.config))
+	$(if $(BR2_ARC_PAGE_SIZE_16K),
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_4K,$(@D)/.config)
+		$(call KCONFIG_DISABLE_OPT,CONFIG_ARC_PAGE_SIZE_8K,$(@D)/.config)
+		$(call KCONFIG_ENABLE_OPT,CONFIG_ARC_PAGE_SIZE_16K,$(@D)/.config))
 	$(if $(BR2_TARGET_ROOTFS_CPIO),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_BLK_DEV_INITRD,$(@D)/.config))
         # As the kernel gets compiled before root filesystems are
@@ -432,7 +470,10 @@ define LINUX_KCONFIG_FIXUP_CMDS
 		$(call KCONFIG_ENABLE_OPT,CONFIG_DEVTMPFS,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_DEVTMPFS_MOUNT,$(@D)/.config))
 	$(if $(BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV),
-		$(call KCONFIG_ENABLE_OPT,CONFIG_INOTIFY_USER,$(@D)/.config))
+		$(call KCONFIG_ENABLE_OPT,CONFIG_INOTIFY_USER,$(@D)/.config)
+		$(call KCONFIG_ENABLE_OPT,CONFIG_FHANDLE,$(@D)/.config))
+	$(if $(BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_MDEV),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_NET,$(@D)/.config))
 	$(if $(BR2_PACKAGE_AUDIT),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_NET,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_AUDIT,$(@D)/.config))
@@ -470,8 +511,9 @@ define LINUX_KCONFIG_FIXUP_CMDS
 	$(if $(BR2_PACKAGE_XTABLES_ADDONS),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_NETFILTER_ADVANCED,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_NF_CONNTRACK,$(@D)/.config)
-		$(call KCONFIG_ENABLE_OPT,CONFIG_NF_CONNTRACK_MARK,$(@D)/.config))
-	$(if $(BR2_PACKAGE_WIREGUARD),
+		$(call KCONFIG_ENABLE_OPT,CONFIG_NF_CONNTRACK_MARK,$(@D)/.config)
+		$(call KCONFIG_ENABLE_OPT,CONFIG_NF_NAT,$(@D)/.config))
+	$(if $(BR2_PACKAGE_WIREGUARD_LINUX_COMPAT),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_INET,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_NET,$(@D)/.config)
 		$(call KCONFIG_ENABLE_OPT,CONFIG_NET_FOU,$(@D)/.config)
@@ -479,10 +521,11 @@ define LINUX_KCONFIG_FIXUP_CMDS
 		$(call KCONFIG_ENABLE_OPT,CONFIG_CRYPTO_MANAGER,$(@D)/.config))
 	$(if $(BR2_LINUX_KERNEL_APPENDED_DTB),
 		$(call KCONFIG_ENABLE_OPT,CONFIG_ARM_APPENDED_DTB,$(@D)/.config))
-	$(if $(BR2_LINUX_KERNEL_IRCUT),
-		$(call KCONFIG_ENABLE_OPT,CONFIG_AMLOGIC_IRCUT,$(@D)/.config))
 	$(if $(BR2_PACKAGE_KERNEL_MODULE_IMX_GPU_VIV),
 		$(call KCONFIG_DISABLE_OPT,CONFIG_MXC_GPU_VIV,$(@D)/.config))
+	$(if $(BR2_PACKAGE_COBALT),
+	$(call KCONFIG_ENABLE_OPT,CONFIG_AMLOGIC_SND_SPLIT_MODE_MMAP,$(@D)/.config)
+	$(call KCONFIG_ENABLE_OPT,CONFIG_SYSVIPC,$(@D)/.config))
 
 	# Add extra configurations here
 	$(call KCONFIG_ENABLE_OPT,CONFIG_TMPFS_POSIX_ACL,$(@D)/.config)
@@ -618,21 +661,23 @@ endif
 endif
 
 # Compilation. We make sure the kernel gets rebuilt when the
-# configuration has changed.
+# configuration has changed. We call the 'all' and
+# '$(LINUX_TARGET_NAME)' targets separately because calling them in
+# the same $(MAKE) invocation has shown to cause parallel build
+# issues.
 define LINUX_BUILD_CMDS
 	$(foreach dts,$(call qstrip,$(BR2_LINUX_KERNEL_CUSTOM_DTS_PATH)), \
 		cp -f $(dts) $(LINUX_ARCH_PATH)/boot/dts/
 	)
+	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) all
 	$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) $(LINUX_TARGET_NAME)
-	@if grep -q "CONFIG_MODULES=y" $(@D)/.config; then \
-		$(LINUX_MAKE_ENV) $(MAKE) $(LINUX_MAKE_FLAGS) -C $(@D) modules ; \
-	fi
 	for km in $(LINUX_RDEPENDENCIES); do \
 		rm -rf $(BUILD_DIR)/$${km}-* ;\
 	done
 	$(if $(BR2_LINUX_KERNEL_AMLOGIC_DTD_STRIP), $(LINUX_STRIP_DTD))
 	$(LINUX_BUILD_DTB)
 	$(LINUX_APPEND_DTB)
+	$(LINUX_MAKE_ENV) $(MAKE) ARCH=$(SYSROOT_ARCH) -C $(@D) headers_install INSTALL_HDR_PATH=$(STAGING_DIR)/usr
 endef
 
 ifeq ($(BR2_LINUX_KERNEL_APPENDED_DTB),y)
@@ -646,7 +691,7 @@ else
 # Otherwise, just install the unique image generated by the kernel
 # build process.
 define LINUX_INSTALL_IMAGE
-	$(INSTALL) -m 0644 -D $(LINUX_IMAGE_PATH) $(1)/$(LINUX_IMAGE_NAME)
+	$(INSTALL) -m 0644 -D $(LINUX_IMAGE_PATH) $(1)/$(notdir $(LINUX_IMAGE_NAME))
 endef
 endif
 
@@ -691,16 +736,36 @@ define LINUX_INSTALL_TARGET_CMDS
 	$(LINUX_INSTALL_HOST_TOOLS)
 endef
 
+## Run depmod in a target-finalize hook, to encompass modules installed by
+## packages.
+define LINUX_RUN_DEPMOD
+	if grep -q "CONFIG_MODULES=y" $(LINUX_DIR)/.config; then \
+		$(HOST_DIR)/sbin/depmod -a -b $(TARGET_DIR) $(LINUX_VERSION_PROBED); \
+	fi
+endef
+#Blance 2020-4-21, run additional depmod will cause wifi driver auto load, which is not expected
+#LINUX_TARGET_FINALIZE_HOOKS += LINUX_RUN_DEPMOD
+
 # Include all our extensions.
 #
 # Note: our package infrastructure uses the full-path of the last-scanned
 # Makefile to determine what package we're currently defining, using the
-# last directory component in the path. As such, including other Makefile,
-# like below, before we call one of the *-package macro is usally not
-# working.
-# However, since the files we include here are in the same directory as
-# the current Makefile, we are OK. But this is a hard requirement: files
-# included here *must* be in the same directory!
+# last directory component in the path. Additionally, the full path of
+# the package directory is also stored in _PKGDIR (e.g. to find patches)
+#
+# As such, including other Makefiles, like below, before we call one of
+# the *-package macros usually doesn't work.
+#
+# However, by including the in-tree extensions after the ones from the
+# br2-external trees, we're back to the situation where the last Makefile
+# scanned *is* included from the correct directory.
+#
+# NOTE: this is very fragile, and extra care must be taken to ensure that
+# we always end up with an in-tree included file. That's mostly OK, because
+# we do have in-tree linux-extensions.
+#
+include $(sort $(wildcard $(foreach ext,$(BR2_EXTERNAL_DIRS), \
+	$(ext)/linux/linux-ext-*.mk)))
 include $(sort $(wildcard linux/linux-ext-*.mk))
 
 LINUX_PATCH_DEPENDENCIES += $(foreach ext,$(LINUX_EXTENSIONS),\

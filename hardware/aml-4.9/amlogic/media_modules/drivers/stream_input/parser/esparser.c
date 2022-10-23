@@ -35,11 +35,11 @@
 
 #include "../../frame_provider/decoder/utils/vdec.h"
 #include <linux/amlogic/media/utils/vdec_reg.h>
-#include "streambuf_reg.h"
-#include "streambuf.h"
+#include "../amports/streambuf_reg.h"
+#include "../amports/streambuf.h"
 #include "esparser.h"
 #include "../amports/amports_priv.h"
-#include "thread_rw.h"
+#include "../amports/thread_rw.h"
 
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 
@@ -153,8 +153,7 @@ static inline u32 buf_wp(u32 type)
 	return wp;
 }
 
-static ssize_t _esparser_write(const char __user *buf,
-		size_t count, struct stream_buf_s *stbuf, int isphybuf)
+static int esparser_stbuf_write(struct stream_buf_s *stbuf, const u8 *buf, u32 count)
 {
 	size_t r = count;
 	const char __user *p = buf;
@@ -166,6 +165,7 @@ static ssize_t _esparser_write(const char __user *buf,
 	dma_addr_t dma_addr = 0;
 	u32 type = stbuf->type;
 
+	VDEC_PRINT_FUN_LINENO(__func__, __LINE__);
 	if (type == BUF_TYPE_HEVC)
 		parser_type = PARSER_VIDEO;
 	else if (type == BUF_TYPE_VIDEO)
@@ -178,7 +178,7 @@ static ssize_t _esparser_write(const char __user *buf,
 	wp = buf_wp(type);
 
 	if (r > 0) {
-		if (isphybuf)
+		if (stbuf->is_phybuf)
 			len = count;
 		else {
 			len = min_t(size_t, r, (size_t) FETCHBUF_SIZE);
@@ -206,7 +206,7 @@ static ssize_t _esparser_write(const char __user *buf,
 				PARSER_AUTOSEARCH, ES_CTRL_BIT,
 				ES_CTRL_WID);
 
-		if (isphybuf) {
+		if (stbuf->is_phybuf) {
 			u32 buf_32 = (unsigned long)buf & 0xffffffff;
 			WRITE_PARSER_REG(PARSER_FETCH_ADDR, buf_32);
 		} else {
@@ -216,7 +216,7 @@ static ssize_t _esparser_write(const char __user *buf,
 		}
 
 		search_done = 0;
-		if (!(isphybuf & TYPE_PATTERN)) {
+		if (!(stbuf->drm_flag & TYPE_PATTERN)) {
 			WRITE_PARSER_REG(PARSER_FETCH_CMD,
 				(7 << FETCH_ENDIAN) | len);
 			WRITE_PARSER_REG(PARSER_FETCH_ADDR, search_pattern_map);
@@ -226,6 +226,7 @@ static ssize_t _esparser_write(const char __user *buf,
 			WRITE_PARSER_REG(PARSER_FETCH_CMD,
 				(7 << FETCH_ENDIAN) | (len + 512));
 		}
+
 		ret = wait_event_interruptible_timeout(wq, search_done != 0,
 			HZ / 5);
 		if (ret == 0) {
@@ -237,7 +238,7 @@ static ssize_t _esparser_write(const char __user *buf,
 			} else {
 				pr_info("W Timeout, but fetch ok,");
 				pr_info("type %d len=%d,wpdiff=%d, isphy %x\n",
-				 type, len, wp - buf_wp(type), isphybuf);
+				 type, len, wp - buf_wp(type), stbuf->is_phybuf);
 			}
 		} else if (ret < 0)
 			return -ERESTARTSYS;
@@ -250,7 +251,15 @@ static ssize_t _esparser_write(const char __user *buf,
 		audio_data_parsed += len;
 
 	threadrw_update_buffer_level(stbuf, len);
+	VDEC_PRINT_FUN_LINENO(__func__, __LINE__);
+
 	return len;
+}
+
+static ssize_t _esparser_write(const char __user *buf,
+		size_t count, struct stream_buf_s *stbuf, int isphybuf)
+{
+	return esparser_stbuf_write(stbuf, buf, count);
 }
 
 static ssize_t _esparser_write_s(const char __user *buf,
@@ -393,6 +402,8 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 	u32 parser_sub_rp;
 	bool first_use = false;
 	/* #if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8 */
+	VDEC_PRINT_FUN_LINENO(__func__, __LINE__);
+
 	if (has_hevc_vdec() && (buf->type == BUF_TYPE_HEVC))
 		pts_type = PTS_TYPE_HEVC;
 	else
@@ -504,6 +515,11 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 			/* set stream_fetch_enable */
 			SET_VREG_MASK(HEVC_STREAM_CONTROL, 1);
 
+			if (buf->no_parser) {
+				/*set endian for non-parser mode */
+				SET_VREG_MASK(HEVC_STREAM_CONTROL, 7 << 4);
+			}
+
 			/* set stream_buffer_hole with 256 bytes */
 			SET_VREG_MASK(HEVC_STREAM_FIFO_CTL, (1 << 29));
 		} else {
@@ -518,7 +534,10 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 			vdec->input.start);
 		WRITE_PARSER_REG(PARSER_VIDEO_END_PTR,
 			vdec->input.start + vdec->input.size - 8);
-		if (vdec_single(vdec)) {
+
+		if (vdec_single(vdec) || (vdec_get_debug_flags() & 0x2)) {
+			if (vdec_get_debug_flags() & 0x2)
+				pr_info("%s %d\n", __func__, __LINE__);
 			CLEAR_PARSER_REG_MASK(PARSER_ES_CONTROL,
 				ES_VID_MAN_RD_PTR);
 
@@ -596,6 +615,7 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 			pr_info("esparser_init: irq register failed.\n");
 			goto Err_2;
 		}
+		VDEC_PRINT_FUN_LINENO(__func__, __LINE__);
 
 		WRITE_PARSER_REG(PARSER_INT_STATUS, 0xffff);
 		WRITE_PARSER_REG(PARSER_INT_ENABLE,
@@ -603,6 +623,7 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 					   PARSER_INT_HOST_EN_BIT);
 	}
 	mutex_unlock(&esparser_mutex);
+
 	if (!(vdec_get_debug_flags() & 1) &&
 		!codec_mm_video_tvp_enabled()) {
 		int block_size = (buf->type == BUF_TYPE_AUDIO) ?
@@ -616,6 +637,7 @@ s32 esparser_init(struct stream_buf_s *buf, struct vdec_s *vdec)
 			(buf->type == BUF_TYPE_AUDIO) ? 1 : 0);
 			/*manul mode for audio*/
 	}
+
 	return 0;
 
 Err_2:
@@ -747,7 +769,7 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 	struct drm_info tmpmm;
 	struct drm_info *drm = &tmpmm;
 	u32 res = 0;
-	int isphybuf = 0;
+	int drm_flag = 0;
 	unsigned long realbuf;
 
 	if (buf == NULL || count == 0)
@@ -771,7 +793,7 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 		/* buf only has drminfo not have esdata; */
 		realbuf = drm->drm_phy;
 		realcount = drm->drm_pktsize;
-		isphybuf = drm->drm_flag;
+		drm_flag = drm->drm_flag;
 		/* DRM_PRNT("drm_get_rawdata
 		 *onlydrminfo drm->drm_hasesdata[0x%x]
 		 * stbuf->type %d buf[0x%x]\n",
@@ -784,14 +806,14 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 		}
 		realcount = drm->drm_pktsize;
 		realbuf = (unsigned long)buf + sizeof(struct drm_info);
-		isphybuf = 0;
+		drm_flag = 0;
 		/* DRM_PRNT("drm_get_rawdata
 		 *   drminfo+es drm->drm_hasesdata[0x%x]
 		 * stbuf->type %d\n",drm->drm_hasesdata,stbuf->type);
 		 */
 	} else {		/* buf is hwhead; */
 		realcount = count;
-		isphybuf = 0;
+		drm_flag = 0;
 		realbuf = (unsigned long)buf;
 		/* DRM_PRNT("drm_get_rawdata
 		 *  drm->drm_hasesdata[0x%x]
@@ -803,6 +825,8 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 	len = realcount;
 	count = realcount;
 	totalcount = realcount;
+	stbuf->drm_flag = drm_flag;
+	stbuf->is_phybuf = drm_flag ? 1 : 0;
 
 	while (len > 0) {
 		if (stbuf->type != BUF_TYPE_SUBTITLE
@@ -820,7 +844,7 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 
 		if (stbuf->type != BUF_TYPE_AUDIO)
 			r = _esparser_write((const char __user *)realbuf, len,
-					stbuf, isphybuf);
+					stbuf, drm_flag);
 		else
 			r = _esparser_write_s((const char __user *)realbuf, len,
 					stbuf);
@@ -849,6 +873,11 @@ ssize_t drm_write(struct file *file, struct stream_buf_s *stbuf,
 		mutex_unlock(&esparser_mutex);
 	}
 
+	if ((drm->drm_flag & TYPE_DRMINFO) && (drm->drm_hasesdata == 0)) {
+		havewritebytes = sizeof(struct drm_info);
+	} else if (drm->drm_hasesdata == 1) {
+		havewritebytes += sizeof(struct drm_info);
+	}
 	return havewritebytes;
 }
 EXPORT_SYMBOL(drm_write);
@@ -894,6 +923,9 @@ ssize_t esparser_write_ex(struct file *file,
 	len = min_t(u32, len, count);
 
 	mutex_lock(&esparser_mutex);
+
+	if (flags & 1)
+		stbuf->is_phybuf = true;
 
 	if (stbuf->type == BUF_TYPE_AUDIO)
 		r = _esparser_write_s(buf, len, stbuf);
@@ -969,3 +1001,43 @@ void esparser_sub_reset(void)
 
 	spin_unlock_irqrestore(&lock, flags);
 }
+
+static int esparser_stbuf_init(struct stream_buf_s *stbuf,
+			       struct vdec_s *vdec)
+{
+	int ret = -1;
+
+	ret = stbuf_init(stbuf, vdec);
+	if (ret)
+		goto out;
+
+	ret = esparser_init(stbuf, vdec);
+	if (!ret)
+		stbuf->flag |= BUF_FLAG_IN_USE;
+out:
+	return ret;
+}
+
+static void esparser_stbuf_release(struct stream_buf_s *stbuf)
+{
+	esparser_release(stbuf);
+
+	stbuf_release(stbuf);
+}
+
+static struct stream_buf_ops esparser_stbuf_ops = {
+	.init	= esparser_stbuf_init,
+	.release = esparser_stbuf_release,
+	.write	= esparser_stbuf_write,
+	.get_wp	= parser_get_wp,
+	.set_wp	= parser_set_wp,
+	.get_rp	= parser_get_rp,
+	.set_rp	= parser_set_rp,
+};
+
+struct stream_buf_ops *get_esparser_stbuf_ops(void)
+{
+	return &esparser_stbuf_ops;
+}
+EXPORT_SYMBOL(get_esparser_stbuf_ops);
+

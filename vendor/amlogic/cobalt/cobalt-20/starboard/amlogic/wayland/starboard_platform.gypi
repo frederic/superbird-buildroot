@@ -18,6 +18,7 @@
     'starboard_platform_sources': [
       '<(DEPTH)/third_party/starboard/amlogic/wayland/main.cc',
       '<(DEPTH)/third_party/starboard/amlogic/wayland/system_get_property.cc',
+      '<(DEPTH)/third_party/starboard/amlogic/wayland/system_sign_with_certification_secret_key.cc',
       '<(DEPTH)/third_party/starboard/amlogic/wayland/player_output_mode_supported.cc',
       '<(DEPTH)/third_party/starboard/amlogic/wayland/window_internal.cc',
       '<(DEPTH)/third_party/starboard/amlogic/wayland/dev_input.cc',

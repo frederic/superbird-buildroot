@@ -1,4 +1,0 @@
-config EFUSE
-	bool "AML EFUSE Support"
-	help
-	  Enable support for the Amlogic EFUSE controller.

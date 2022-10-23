@@ -3,11 +3,6 @@
 #include <dhd_linux.h>
 #include <linux/gpio.h>
 
-#ifdef CUSTOMER_HW_PLATFORM
-#include <plat/sdhci.h>
-#define	sdmmc_channel	sdmmc_device_mmc0
-#endif /* CUSTOMER_HW_PLATFORM */
-
 #if defined(BUS_POWER_RESTORE) && defined(BCMSDIO)
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
@@ -29,6 +24,7 @@ static int gpio_wl_host_wake = -1; // WL_HOST_WAKE is output pin of WLAN module
 #include <linux/amlogic/aml_gpio_consumer.h>
 extern int wifi_irq_trigger_level(void);
 extern u8 *wifi_get_mac(void);
+extern u8 *wifi_get_ap_mac(void);
 #endif
 extern  void sdio_reinit(void);
 extern void set_usb_bt_power(int is_power);
@@ -42,9 +38,9 @@ extern int wifi_irq_num(void);
 static int
 dhd_wlan_set_power(int on
 #ifdef BUS_POWER_RESTORE
-				   , wifi_adapter_info_t *adapter
+, wifi_adapter_info_t *adapter
 #endif /* BUS_POWER_RESTORE */
-				  )
+)
 {
 	int err = 0;
 
@@ -171,8 +167,10 @@ static int dhd_wlan_set_carddetect(int present)
 #endif
 #elif defined(BCMPCIE)
 		printf("======== Card detection to remove PCIE card! ========\n");
+#ifdef CUSTOMER_HW_AMLOGIC
 		extern_wifi_set_enable(0);
 		mdelay(200);
+#endif
 #endif
 	}
 #endif /* BUS_POWER_RESTORE */
@@ -180,33 +178,73 @@ static int dhd_wlan_set_carddetect(int present)
 	return err;
 }
 
-static int dhd_wlan_get_mac_addr(unsigned char *buf)
+static int dhd_wlan_get_mac_addr(unsigned char *buf
+#ifdef CUSTOM_MULTI_MAC
+	, char *name
+#endif
+)
 {
 	int err = 0;
 
-	printf("======== %s ========\n", __FUNCTION__);
 #ifdef EXAMPLE_GET_MAC
 	/* EXAMPLE code */
-	{
+#ifdef CUSTOM_MULTI_MAC
+	if (!strcmp("wlan1", name)) {
 		struct ether_addr ea_example = {{0x00, 0x11, 0x22, 0x33, 0x44, 0xFF}};
 		bcopy((char *)&ea_example, buf, sizeof(struct ether_addr));
 	}
+#endif /* CUSTOM_MULTI_MAC */
+	{
+		struct ether_addr ea_example = {{0x02, 0x11, 0x22, 0x33, 0x44, 0x55}};
+		bcopy((char *)&ea_example, buf, sizeof(struct ether_addr));
+	}
 #endif /* EXAMPLE_GET_MAC */
+
+#ifdef CUSTOMER_HW_AMLOGIC
+#ifdef CUSTOM_MULTI_MAC
+	if (!strcmp("wlan1", name)) {
+#ifdef CUSTOM_AP_MAC
+		bcopy((char *)wifi_get_ap_mac(), buf, sizeof(struct ether_addr));
+		if (buf[0] == 0xff) {
+			printf("custom wifi ap mac is not set\n");
+			err = -1;
+		} else
+			printf("custom wifi ap mac-addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+				buf[0], buf[1], buf[2],
+				buf[3], buf[4], buf[5]);
+#else
+		err = -1;
+#endif
+	} else
+#endif
+	{
+		bcopy((char *)wifi_get_mac(), buf, sizeof(struct ether_addr));
+		if (buf[0] == 0xff) {
+			printf("custom wifi mac is not set\n");
+			err = -1;
+		} else
+			printf("custom wifi mac-addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+				buf[0], buf[1], buf[2],
+				buf[3], buf[4], buf[5]);
+	}
+#endif
+
 #ifdef EXAMPLE_GET_MAC_VER2
 	/* EXAMPLE code */
 	{
-		char macpad[56] = {
-			0x00, 0xaa, 0x9c, 0x84, 0xc7, 0xbc, 0x9b, 0xf6,
-			0x02, 0x33, 0xa9, 0x4d, 0x5c, 0xb4, 0x0a, 0x5d,
-			0xa8, 0xef, 0xb0, 0xcf, 0x8e, 0xbf, 0x24, 0x8a,
-			0x87, 0x0f, 0x6f, 0x0d, 0xeb, 0x83, 0x6a, 0x70,
-			0x4a, 0xeb, 0xf6, 0xe6, 0x3c, 0xe7, 0x5f, 0xfc,
-			0x0e, 0xa7, 0xb3, 0x0f, 0x00, 0xe4, 0x4a, 0xaf,
-			0x87, 0x08, 0x16, 0x6d, 0x3a, 0xe3, 0xc7, 0x80
-		};
-		bcopy(macpad, buf + 6, sizeof(macpad));
+		char macpad[56]= {
+		0x00,0xaa,0x9c,0x84,0xc7,0xbc,0x9b,0xf6,
+		0x02,0x33,0xa9,0x4d,0x5c,0xb4,0x0a,0x5d,
+		0xa8,0xef,0xb0,0xcf,0x8e,0xbf,0x24,0x8a,
+		0x87,0x0f,0x6f,0x0d,0xeb,0x83,0x6a,0x70,
+		0x4a,0xeb,0xf6,0xe6,0x3c,0xe7,0x5f,0xfc,
+		0x0e,0xa7,0xb3,0x0f,0x00,0xe4,0x4a,0xaf,
+		0x87,0x08,0x16,0x6d,0x3a,0xe3,0xc7,0x80};
+		bcopy(macpad, buf+6, sizeof(macpad));
 	}
 #endif /* EXAMPLE_GET_MAC_VER2 */
+
+	printf("======== %s err=%d ========\n", __FUNCTION__, err);
 
 	return err;
 }
@@ -230,9 +268,9 @@ struct cntry_locales_custom brcm_wlan_translate_nodfs_table[] = {
 
 static void *dhd_wlan_get_country_code(char *ccode
 #ifdef CUSTOM_FORCE_NODFS_FLAG
-									   , u32 flags
+	, u32 flags
 #endif
-									  )
+)
 {
 	struct cntry_locales_custom *locales;
 	int size;
@@ -265,7 +303,7 @@ struct resource dhd_wlan_resources[] = {
 		.start	= 0, /* Dummy */
 		.end	= 0, /* Dummy */
 		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_SHAREABLE
-		| IORESOURCE_IRQ_HIGHLEVEL, /* Dummy */
+			| IORESOURCE_IRQ_HIGHLEVEL, /* Dummy */
 	},
 };
 
@@ -307,7 +345,7 @@ int dhd_wlan_init_gpio(void)
 		err = gpio_request(gpio_wl_reg_on, "WL_REG_ON");
 		if (err < 0) {
 			printf("%s: gpio_request(%d) for WL_REG_ON failed\n",
-				   __FUNCTION__, gpio_wl_reg_on);
+				__FUNCTION__, gpio_wl_reg_on);
 			gpio_wl_reg_on = -1;
 		}
 	}
@@ -317,20 +355,20 @@ int dhd_wlan_init_gpio(void)
 		err = gpio_request(gpio_wl_host_wake, "bcmdhd");
 		if (err < 0) {
 			printf("%s: gpio_request(%d) for WL_HOST_WAKE failed\n",
-				   __FUNCTION__, gpio_wl_host_wake);
+				__FUNCTION__, gpio_wl_host_wake);
 			return -1;
 		}
 		err = gpio_direction_input(gpio_wl_host_wake);
 		if (err < 0) {
 			printf("%s: gpio_direction_input(%d) for WL_HOST_WAKE failed\n",
-				   __FUNCTION__, gpio_wl_host_wake);
+				__FUNCTION__, gpio_wl_host_wake);
 			gpio_free(gpio_wl_host_wake);
 			return -1;
 		}
 		host_oob_irq = gpio_to_irq(gpio_wl_host_wake);
 		if (host_oob_irq < 0) {
 			printf("%s: gpio_to_irq(%d) for WL_HOST_WAKE failed\n",
-				   __FUNCTION__, gpio_wl_host_wake);
+				__FUNCTION__, gpio_wl_host_wake);
 			gpio_free(gpio_wl_host_wake);
 			return -1;
 		}
@@ -363,7 +401,7 @@ int dhd_wlan_init_gpio(void)
 	dhd_wlan_resources[0].start = dhd_wlan_resources[0].end = host_oob_irq;
 	dhd_wlan_resources[0].flags = host_oob_irq_flags;
 	printf("%s: WL_HOST_WAKE=%d, oob_irq=%d, oob_irq_flags=0x%x\n", __FUNCTION__,
-		   gpio_wl_host_wake, host_oob_irq, host_oob_irq_flags);
+		gpio_wl_host_wake, host_oob_irq, host_oob_irq_flags);
 #endif /* CUSTOMER_OOB */
 	printf("%s: WL_REG_ON=%d\n", __FUNCTION__, gpio_wl_reg_on);
 

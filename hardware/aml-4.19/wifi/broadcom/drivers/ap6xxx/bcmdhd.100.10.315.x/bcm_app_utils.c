@@ -3,7 +3,7 @@
  * Contents are wifi-specific, used by any kernel or app-level
  * software that might want wifi things as it grows.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -87,9 +87,9 @@ cca_per_chan_summary(cca_congest_channel_req_t *input, cca_congest_channel_req_t
 
 	if (percent) {
 		avg->secs[0].duration = totals.duration / avg->num_secs;
-		avg->secs[0].congest_ibss = totals.congest_ibss * 100 / totals.duration;
-		avg->secs[0].congest_obss = totals.congest_obss * 100 / totals.duration;
-		avg->secs[0].interference = totals.interference * 100 / totals.duration;
+		avg->secs[0].congest_ibss = totals.congest_ibss * 100/totals.duration;
+		avg->secs[0].congest_obss = totals.congest_obss * 100/totals.duration;
+		avg->secs[0].interference = totals.interference * 100/totals.duration;
 	} else {
 		avg->secs[0].duration = totals.duration / avg->num_secs;
 		avg->secs[0].congest_ibss = totals.congest_ibss / avg->num_secs;
@@ -255,7 +255,7 @@ cca_analyze(cca_congest_channel_req_t *input[], int num_chans, uint flags, chans
 		}
 	}
 	*answer = input[winner]->chanspec;
-f_exit:
+	f_exit:
 	free(bitmap);	/* free the allocated memory for bitmap */
 	return ret_val;
 }
@@ -951,9 +951,9 @@ wl_cntbuf_to_xtlv_format(void *ctx, void *cntbuf, int buflen, uint32 corerev)
 
 	/* Check if the max idx in the struct exceeds the boundary of uint8 */
 	if (NUM_OF_CNT_IN_WL_CNT_VER_6_T > ((uint8)(-1) + 1) ||
-			NUM_OF_CNT_IN_WL_CNT_VER_11_T > ((uint8)(-1) + 1)) {
+		NUM_OF_CNT_IN_WL_CNT_VER_11_T > ((uint8)(-1) + 1)) {
 		printf("wlcntverXXt_to_wlcntwlct and src_max_idx need"
-			   " to be of uint16 instead of uint8\n");
+			" to be of uint16 instead of uint8\n");
 		res = BCME_ERROR;
 		goto exit;
 	}
@@ -962,8 +962,8 @@ wl_cntbuf_to_xtlv_format(void *ctx, void *cntbuf, int buflen, uint32 corerev)
 	src_max_idx = (cntinfo->datalen - OFFSETOF(wl_cnt_info_t, data)) / sizeof(uint32);
 	if (src_max_idx > (uint8)(-1)) {
 		printf("wlcntverXXt_to_wlcntwlct and src_max_idx need"
-			   " to be of uint16 instead of uint8\n"
-			   "Try updating wl utility to the latest.\n");
+			" to be of uint16 instead of uint8\n"
+			"Try updating wl utility to the latest.\n");
 		src_max_idx = (uint8)(-1);
 	}
 
@@ -1010,7 +1010,7 @@ wl_cntbuf_to_xtlv_format(void *ctx, void *cntbuf, int buflen, uint32 corerev)
 	memset(cntbuf, 0, buflen);
 
 	res = bcm_pack_xtlv_buf_from_mem(&xtlvbuf_p, &xtlvbuflen,
-									 xtlv_desc, BCM_XTLV_OPTION_ALIGN32);
+		xtlv_desc, BCM_XTLV_OPTION_ALIGN32);
 	cntinfo->datalen = (buflen - xtlvbuflen);
 exit:
 #ifdef BCMDRIVER

@@ -4,6 +4,8 @@ source "../multimedia/amaudio/Config.in"
 source "../multimedia/audiocapture/Config.in"
 source "../multimedia/mediasupport/Config.in"
 source "../multimedia/dolby_atmos_release/Config.in"
+source "../multimedia/dolby_ms12_release/Config.in"
+source "../multimedia/v4l2-uvm-test/Config.in"
 
 # Gstreamer 0.10.x & Plugins
 source "../multimedia/gst-fluendo-mpegdemux/Config.in"

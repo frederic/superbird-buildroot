@@ -151,5 +151,41 @@ struct meson_drm_format_info {
 	u8 alpha_replace;
 };
 
-const struct meson_drm_format_info *meson_drm_format_info(u32 format);
+enum osd_blk_mode_e {
+	BLOCK_MODE_2BIT_PER_PIXEL = 0,
+	BLOCK_MODE_4BIT_PER_PIXEL,
+	BLOCK_MODE_8BIT_PER_PIXEL,
+	BLOCK_MODE_422,
+	BLOCK_MODE_16BIT,
+	BLOCK_MODE_32BIT,
+	BLOCK_MODE_24BIT = 7,
+	/*bellow is for afbc mode*/
+	BLOCK_MODE_R8 = 0,
+	BLOCK_MODE_YUV422_8BIT,
+	BLOCK_MODE_RGB565,
+	BLOCK_MODE_RGBA5551,
+	BLOCK_MODE_RGBA4444,
+	BLOCK_MODE_RGBA8888,
+	BLOCK_MODE_RGB888 = 7,
+	BLOCK_MODE_YUV422_10BIT,
+	BLOCK_MODE_RGBA1010102,
+};
+
+enum osd_color_matrix_e {
+	/*for 16bit:blk-mode=BLOCK_MODE_16BIT*/
+	COLOR_MATRIX_655 = 0,
+	COLOR_MATRIX_844,
+	COLOR_MATRIX_565 = 4,
+	/*for 32bit:blk-mode=BLOCK_MODE_32BIT*/
+	COLOR_MATRIX_RGBA8888 = 0,
+	COLOR_MATRIX_ARGB8888,
+	COLOR_MATRIX_ABGR8888,
+	COLOR_MATRIX_BGRA8888,
+	/*for 24bit:blk-mode=BLOCK_MODE_24BIT*/
+	COLOR_MATRIX_RGB888 = 0,
+	COLOR_MATRIX_BGR888 = 5,
+};
+
+const struct meson_drm_format_info *meson_drm_format_info(u32 format,
+							  bool afbc_en);
 #endif

@@ -18,6 +18,7 @@
 #include <linux/amlogic/iomap.h>
 #include <linux/math64.h>
 
+#include "resample.h"
 #include "resample_hw.h"
 #include "resample_hw_coeff.h"
 #include "regs.h"
@@ -46,6 +47,44 @@ static u32 resample_coef_parameters_table[7][5] = {
 };
 
 #ifdef AA_FILTER_DEBUG
+/* only can read sam coeff on tm2_revB */
+void check_ram_coeff_aa(enum resample_idx id, int len,
+			unsigned int *params)
+{
+	int i;
+	unsigned int *p = params;
+	unsigned int val = 0;
+
+	new_resample_write(id, AUDIO_RSAMP_SINC_COEF_ADDR,
+			   SINC8_FILTER_COEF_ADDR);
+
+	for (i = 0; i < len; i++, p++) {
+		val = new_resample_read(id, AUDIO_RSAMP_AA_COEF_DATA);
+		if (val != *p)
+			pr_err("error ram coeff read[%d]:0x%08x, write:0x%08x\n",
+			       i, val, *p);
+	}
+}
+
+/* only can read sam coeff on tm2_revB */
+void check_ram_coeff_sinc(enum resample_idx id, int len,
+			  unsigned int *params)
+{
+	int i;
+	unsigned int *p = params;
+	unsigned int val = 0;
+
+	new_resample_write(id, AUDIO_RSAMP_SINC_COEF_ADDR,
+			   SINC8_FILTER_COEF_ADDR);
+
+	for (i = 0; i < len; i++, p++) {
+		val = new_resample_read(id, AUDIO_RSAMP_SINC_COEF_DATA);
+		if (val != *p)
+			pr_err("error ram coeff read[%d]:0x%08x, write:0x%08x\n",
+			       i, val, *p);
+	}
+}
+
 void new_resample_set_ram_coeff_aa(enum resample_idx id, int len,
 				   unsigned int *params)
 {
@@ -55,6 +94,8 @@ void new_resample_set_ram_coeff_aa(enum resample_idx id, int len,
 	new_resample_write(id, AUDIO_RSAMP_AA_COEF_ADDR, AA_FILTER_COEF_ADDR);
 	for (i = 0; i < len; i++, p++)
 		new_resample_write(id, AUDIO_RSAMP_AA_COEF_DATA, *p);
+
+	check_ram_coeff_aa(id, len, params);
 }
 #endif
 
@@ -68,6 +109,10 @@ void new_resample_set_ram_coeff_sinc(enum resample_idx id, int len,
 			   SINC8_FILTER_COEF_ADDR);
 	for (i = 0; i < len; i++, p++)
 		new_resample_write(id, AUDIO_RSAMP_SINC_COEF_DATA, *p);
+
+#ifdef AA_FILTER_DEBUG
+	check_ram_coeff_sinc(id, len, params);
+#endif
 }
 
 void new_resample_init_param(enum resample_idx id)
@@ -155,6 +200,13 @@ void new_resampleA_set_format(enum resample_idx id, int channel, int bits)
 	/* channel num */
 	new_resample_update_bits(id, AUDIO_RSAMP_CTRL2, 0x3f << 24,
 				 channel << 24);
+
+	/* bit 0-7: chnum_max */
+	if (get_resample_enable_chnum_sync(id))
+		audiobus_update_bits(EE_AUDIO_RSAMP_A_CHSYNC_CTRL,
+				     0x7F << 0,
+				     (channel - 1) << 0);
+
 	/* bit width */
 	new_resample_update_bits(id, AUDIO_RSAMP_CTRL1, 0x1f << 13,
 				 reg_val << 13);
@@ -187,6 +239,13 @@ void new_resampleB_set_format(enum resample_idx id, int output_sr)
 	/* channel num */
 	new_resample_update_bits(id, AUDIO_RSAMP_CTRL2, 0x3f << 24,
 				 2 << 24); /* always two channel for loopback */
+
+	/* bit 0-7: chnum_max */
+	if (get_resample_enable_chnum_sync(RESAMPLE_B))
+		audiobus_update_bits(EE_AUDIO_RSAMP_B_CHSYNC_CTRL,
+				     0x7F << 0,
+				     (2 - 1) << 0);
+
 	/* bit width */
 	new_resample_update_bits(id, AUDIO_RSAMP_CTRL1, 0x1f << 13,
 				 31 << 13); /* tdmin_lb is always 32bit */
@@ -366,4 +425,16 @@ int resample_set_hw_pause_thd(enum resample_idx id, unsigned int thd)
 			1 << 24 | thd << 11);
 
 	return 0;
+}
+
+void aml_resample_chsync_enable(enum resample_idx id)
+{
+	int offset =
+		EE_AUDIO_RSAMP_B_CHSYNC_CTRL - EE_AUDIO_RSAMP_A_CHSYNC_CTRL;
+	int reg = EE_AUDIO_RSAMP_A_CHSYNC_CTRL + offset * id;
+
+	/* bit 31: enable */
+	audiobus_update_bits(reg,
+			     0x1 << 31,
+			     0x1 << 31);
 }

@@ -45,6 +45,7 @@ typedef enum {
 
 typedef struct {
     EncHandle                   handle;
+    TestEncConfig               testEncConfig;
     char                        inputPath[MAX_FILE_PATH];
     EncOpenParam                encOpenParam;
     Int32                       rotAngle;
@@ -135,6 +136,7 @@ static BOOL AllocateFrameBuffer(ComponentImpl* com) {
     EncOpenParam            encOpenParam = ctx->encOpenParam;
     Uint32                  fbWidth = 0;
     Uint32                  fbHeight = 0;
+    Uint32                  sourceFbHeight = 0;
     Uint32                  fbStride = 0;
     Uint32                  fbSize = 0;
     SRC_FB_TYPE             srcFbType = SRC_FB_TYPE_YUV;
@@ -164,14 +166,15 @@ static BOOL AllocateFrameBuffer(ComponentImpl* com) {
     if (SRC_FB_TYPE_YUV == srcFbType) {
         mapType = LINEAR_FRAME_MAP;
     }
-    fbStride = CalcStride(fbWidth, fbHeight, (FrameBufferFormat)encOpenParam.srcFormat, encOpenParam.cbcrInterleave, mapType, FALSE);
-    fbSize = VPU_GetFrameBufSize(ctx->handle, encOpenParam.coreIdx, fbStride, fbHeight, mapType, (FrameBufferFormat)encOpenParam.srcFormat, encOpenParam.cbcrInterleave, pDramConfig);
+    sourceFbHeight = fbHeight;
+    fbStride = CalcStride(fbWidth, sourceFbHeight, (FrameBufferFormat)encOpenParam.srcFormat, encOpenParam.cbcrInterleave, mapType, FALSE);
+    fbSize = VPU_GetFrameBufSize(ctx->handle, encOpenParam.coreIdx, fbStride, sourceFbHeight, mapType, (FrameBufferFormat)encOpenParam.srcFormat, encOpenParam.cbcrInterleave, pDramConfig);
 
     fbAllocInfo.format  = (FrameBufferFormat)encOpenParam.srcFormat;
     fbAllocInfo.cbcrInterleave = encOpenParam.cbcrInterleave;
     fbAllocInfo.mapType = mapType;
     fbAllocInfo.stride  = fbStride;
-    fbAllocInfo.height  = fbHeight;
+    fbAllocInfo.height  = sourceFbHeight;
     fbAllocInfo.size    = fbSize;
     fbAllocInfo.type    = FB_TYPE_PPU;
     fbAllocInfo.num     = ctx->fbCount.srcFbNum;
@@ -244,7 +247,7 @@ static BOOL AllocateFrameBuffer(ComponentImpl* com) {
     return TRUE;
 }
 
-static BOOL PrepareYuvFeeder(ComponentImpl* com, BOOL* done) 
+static BOOL PrepareYuvFeeder(ComponentImpl* com, BOOL* done)
 {
     CNMComponentParamRet    ret;
     YuvFeederContext*       ctx = (YuvFeederContext*)com->context;
@@ -293,7 +296,7 @@ static BOOL PrepareYuvFeeder(ComponentImpl* com, BOOL* done)
     // The empty input queue of the sink port occurs a hangup problem in this example.
     while (Queue_Dequeue(com->sinkPort.inputQ) != NULL);
     for (i = 0; i < com->sinkPort.inputQ->size; i++) {
-        PortContainerYuv defaultData; 
+        PortContainerYuv defaultData;
 
         osal_memset(&defaultData, 0x00, sizeof(PortContainerYuv));
         defaultData.srcFbIndex   = -1;
@@ -314,7 +317,7 @@ static BOOL PrepareYuvFeeder(ComponentImpl* com, BOOL* done)
     return TRUE;
 }
 
-static BOOL ExecuteYuvFeeder(ComponentImpl* com, PortContainer* in, PortContainer* out) 
+static BOOL ExecuteYuvFeeder(ComponentImpl* com, PortContainer* in, PortContainer* out)
 {
     YuvFeederContext*   ctx          = (YuvFeederContext*)com->context;
     EncOpenParam*       encOpenParam = &ctx->encOpenParam;
@@ -380,7 +383,7 @@ static void ReleaseYuvFeeder(ComponentImpl* com)
     }
 }
 
-static BOOL DestroyYuvFeeder(ComponentImpl* com) 
+static BOOL DestroyYuvFeeder(ComponentImpl* com)
 {
     YuvFeederContext* ctx = (YuvFeederContext*)com->context;
 
@@ -391,9 +394,9 @@ static BOOL DestroyYuvFeeder(ComponentImpl* com)
     return TRUE;
 }
 
-static Component CreateYuvFeeder(ComponentImpl* com, CNMComponentConfig* componentParam) 
+static Component CreateYuvFeeder(ComponentImpl* com, CNMComponentConfig* componentParam)
 {
-    YuvFeederContext*   ctx; 
+    YuvFeederContext*   ctx;
 
     com->context = osal_malloc(sizeof(YuvFeederContext));
     ctx          = (YuvFeederContext*)com->context;
@@ -404,6 +407,7 @@ static Component CreateYuvFeeder(ComponentImpl* com, CNMComponentConfig* compone
         com->numSinkPortQueue = ctx->encOpenParam.sourceBufCount;//set requested sourceBufCount
 
 
+    ctx->testEncConfig               = componentParam->testEncConfig;
     ctx->productID = componentParam->testEncConfig.productId;
 
     return (Component)com;

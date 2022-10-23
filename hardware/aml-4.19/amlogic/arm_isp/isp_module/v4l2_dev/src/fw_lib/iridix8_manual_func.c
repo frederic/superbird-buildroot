@@ -65,6 +65,31 @@ static void iridix_update_sbuf( iridix_fsm_const_ptr_t p_fsm )
     }
 }
 
+static void iridix_ext_param_update(iridix_fsm_const_ptr_t p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct iridix_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_IRIDIX_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to calculate iridix ext");
+        return;
+    }
+
+    acamera_isp_iridix_svariance_write(p_fsm->cmn.isp_base, p_result.svariance);
+    acamera_isp_iridix_bright_pr_write(p_fsm->cmn.isp_base, p_result.bright_pr);
+    acamera_isp_iridix_contrast_write(p_fsm->cmn.isp_base, p_result.contrast);
+}
+
 static void iridix_mointor_frame_end( iridix_fsm_ptr_t p_fsm )
 {
 
@@ -94,6 +119,8 @@ void iridix_fsm_process_interrupt( iridix_fsm_const_ptr_t p_fsm, uint8_t irq_eve
 
         if ( ACAMERA_FSM2CTX_PTR( p_fsm )->stab.global_manual_iridix == 0 ) {
             acamera_isp_iridix_gain_gain_write( p_fsm->cmn.isp_base, iridix_global_DG );
+
+            iridix_ext_param_update(p_fsm);
         }
         diff_iridix_DG = ( ( (int32_t)iridix_global_DG ) << 8 ) / ( int32_t )( p_fsm->iridix_global_DG_prev );
         ( (iridix_fsm_ptr_t)p_fsm )->iridix_global_DG_prev = iridix_global_DG; // already applyied gain
@@ -152,7 +179,6 @@ void iridix_fsm_process_interrupt( iridix_fsm_const_ptr_t p_fsm, uint8_t irq_eve
             iridix_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &( (iridix_fsm_t *)p_fsm )->cmn );
             iridix_flow.flow_state = MON_ALG_FLOW_STATE_APPLIED;
             acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_IRIDIX_FLOW, &iridix_flow, sizeof( iridix_flow ) );
-            LOG( LOG_INFO, "Iridix8 flow: APPLIED: frame_id_tracking: %d, cur frame_id: %u.", iridix_flow.frame_id_tracking, iridix_flow.frame_id_current );
             ( (iridix_fsm_ptr_t)p_fsm )->frame_id_tracking = 0;
         }
 
@@ -212,7 +238,7 @@ int iridix_set_tracking_frame_id( iridix_fsm_ptr_t p_fsm, uint32_t frame_id )
 {
     // check whether previous frame_id_tracking finished.
     if ( p_fsm->frame_id_tracking ) {
-        LOG( LOG_INFO, "Iridix flow: Overwrite: prev frame_id_tracking: %d, new: %u.", p_fsm->frame_id_tracking, frame_id );
+        LOG( LOG_DEBUG, "Iridix flow: Overwrite: prev frame_id_tracking: %d, new: %u.", p_fsm->frame_id_tracking, frame_id );
     }
 
     p_fsm->frame_id_tracking = frame_id;
@@ -224,7 +250,6 @@ int iridix_set_tracking_frame_id( iridix_fsm_ptr_t p_fsm, uint32_t frame_id )
     iridix_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
     iridix_flow.flow_state = MON_ALG_FLOW_STATE_INPUT_READY;
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_IRIDIX_FLOW, &iridix_flow, sizeof( iridix_flow ) );
-    LOG( LOG_INFO, "Iridix8 flow: INPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", iridix_flow.frame_id_tracking, iridix_flow.frame_id_current );
 
     return 0;
 }
@@ -246,7 +271,6 @@ void iridix_set_new_param( iridix_fsm_ptr_t p_fsm, sbuf_iridix_t *p_sbuf_iridix 
     iridix_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
     iridix_flow.flow_state = MON_ALG_FLOW_STATE_OUTPUT_READY;
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_IRIDIX_FLOW, &iridix_flow, sizeof( iridix_flow ) );
-    LOG( LOG_INFO, "Iridix8 flow: OUTPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", iridix_flow.frame_id_tracking, iridix_flow.frame_id_current );
 
     p_fsm->is_output_ready = 1;
 }

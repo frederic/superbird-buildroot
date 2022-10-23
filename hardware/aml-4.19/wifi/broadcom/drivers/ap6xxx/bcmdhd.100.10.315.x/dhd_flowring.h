@@ -6,7 +6,7 @@
  * Provides type definitions and function prototypes used to create, delete and manage flow rings at
  * high level.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -29,7 +29,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_flowring.h 761412 2018-05-08 05:34:36Z $
+ * $Id: dhd_flowring.h 786596 2018-10-26 22:54:51Z $
  */
 
 /****************
@@ -61,10 +61,7 @@
 #define FLOW_RING_STATUS_STA_FREEING    7
 
 #define DHD_FLOWRING_RX_BUFPOST_PKTSZ	2048
-/* Maximum Mu MIMO frame size */
-#ifdef WL_MONITOR
-#define DHD_MAX_MON_FLOWRING_RX_BUFPOST_PKTSZ	4096
-#endif /* WL_MONITOR */
+#define DHD_FLOWRING_RX_BUFPOST_PKTSZ_MAX 4096
 
 #define DHD_FLOW_PRIO_AC_MAP		0
 #define DHD_FLOW_PRIO_TID_MAP		1
@@ -80,8 +77,24 @@
 #define DHD_IF_ROLE(pub, idx)		(((if_flow_lkup_t *)(pub)->if_flow_lkup)[idx].role)
 #define DHD_IF_ROLE_AP(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_AP)
 #define DHD_IF_ROLE_STA(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_STA)
+#define DHD_IF_ROLE_P2PGC(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_P2P_CLIENT)
 #define DHD_IF_ROLE_P2PGO(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_P2P_GO)
 #define DHD_IF_ROLE_WDS(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_WDS)
+#define DHD_IF_ROLE_IBSS(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_IBSS)
+#ifdef WL_NAN
+#define DHD_IF_ROLE_NAN(pub, idx)	(DHD_IF_ROLE(pub, idx) == WLC_E_IF_ROLE_NAN)
+#else
+#define DHD_IF_ROLE_NAN(pub, idx)	(FALSE)
+#endif /* WL_NAN */
+#define DHD_IF_ROLE_AWDL(pub, idx)	(FALSE)
+
+#define DHD_IF_ROLE_GENERIC_STA(pub, idx) \
+	(DHD_IF_ROLE_STA(pub, idx) || DHD_IF_ROLE_P2PGC(pub, idx) || DHD_IF_ROLE_WDS(pub, idx))
+
+#define DHD_IF_ROLE_MULTI_CLIENT(pub, idx) \
+	(DHD_IF_ROLE_AP(pub, idx) || DHD_IF_ROLE_P2PGO(pub, idx) || DHD_IF_ROLE_AWDL(pub, idx) ||\
+		DHD_IF_ROLE_NAN(pub, idx))
+
 #define DHD_FLOW_RING(dhdp, flowid) \
 	(flow_ring_node_t *)&(((flow_ring_node_t *)((dhdp)->flow_ring_table))[flowid])
 
@@ -202,6 +215,9 @@ typedef struct flow_ring_node {
 #ifdef IDLE_TX_FLOW_MGMT
 	uint64		last_active_ts; /* contains last active timestamp */
 #endif /* IDLE_TX_FLOW_MGMT */
+#ifdef DHD_HP2P
+	bool	hp2p_ring;
+#endif /* DHD_HP2P */
 } flow_ring_node_t;
 
 typedef flow_ring_node_t flow_ring_table_t;
@@ -238,16 +254,16 @@ extern void * dhd_flow_queue_dequeue(dhd_pub_t *dhdp, flow_queue_t *queue);
 extern void dhd_flow_queue_reinsert(dhd_pub_t *dhdp, flow_queue_t *queue, void *pkt);
 
 extern void dhd_flow_ring_config_thresholds(dhd_pub_t *dhdp, uint16 flowid,
-		int queue_budget, int cumm_threshold, void *cumm_ctr,
-		int l2cumm_threshold, void *l2cumm_ctr);
+                          int queue_budget, int cumm_threshold, void *cumm_ctr,
+                          int l2cumm_threshold, void *l2cumm_ctr);
 extern int  dhd_flow_rings_init(dhd_pub_t *dhdp, uint32 num_flow_rings);
 
 extern void dhd_flow_rings_deinit(dhd_pub_t *dhdp);
 
 extern int dhd_flowid_update(dhd_pub_t *dhdp, uint8 ifindex, uint8 prio,
-							 void *pktbuf);
+                void *pktbuf);
 extern int dhd_flowid_debug_create(dhd_pub_t *dhdp, uint8 ifindex,
-								   uint8 prio, char *sa, char *da, uint16 *flowid);
+	uint8 prio, char *sa, char *da, uint16 *flowid);
 extern int dhd_flowid_find_by_ifidx(dhd_pub_t *dhdp, uint8 ifidex, uint16 flowid);
 
 extern void dhd_flowid_free(dhd_pub_t *dhdp, uint8 ifindex, uint16 flowid);
@@ -256,15 +272,15 @@ extern void dhd_flow_rings_delete(dhd_pub_t *dhdp, uint8 ifindex);
 extern void dhd_flow_rings_flush(dhd_pub_t *dhdp, uint8 ifindex);
 
 extern void dhd_flow_rings_delete_for_peer(dhd_pub_t *dhdp, uint8 ifindex,
-		char *addr);
+                char *addr);
 
 /* Handle Interface ADD, DEL operations */
 extern void dhd_update_interface_flow_info(dhd_pub_t *dhdp, uint8 ifindex,
-		uint8 op, uint8 role);
+                uint8 op, uint8 role);
 
 /* Handle a STA interface link status update */
 extern int dhd_update_interface_link_status(dhd_pub_t *dhdp, uint8 ifindex,
-		uint8 status);
+                uint8 status);
 extern int dhd_flow_prio_map(dhd_pub_t *dhd, uint8 *map, bool set);
 extern int dhd_update_flow_prio_map(dhd_pub_t *dhdp, uint8 map);
 

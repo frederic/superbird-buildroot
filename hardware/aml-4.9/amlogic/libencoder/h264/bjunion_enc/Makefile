@@ -1,11 +1,18 @@
+#export CROSS_CC_PREFIX=aarch64-linux-gnu-
+#export CC=$(CROSS_CC_PREFIX)gcc
+#export CXX=$(CROSS_CC_PREFIX)g++
+#export AR=$(CROSS_CC_PREFIX)ar
+
 CFLAGS +=-O2 -fPIC
 CFLAGS += -g
-LDFLAGS += -lm -lrt -shared
+#LDFLAGS +=  -L./h264bitstream/.libs -lh264bitstream -lm -lrt -shared
+LDFLAGS += -lh264bitstream -lm -lrt -shared
 
 SUFFIXES += .d
 NODEPS := clean distclean
 
 C_SRCS := $(wildcard *.c) $(wildcard enc/gx_enc_fast/*.c)
+
 C_OBJS := $(C_SRCS:%.c=%.o)
 
 CXX_SRCS := $(wildcard *.cpp) $(wildcard enc/gx_enc_fast/*.cpp)
@@ -15,7 +22,7 @@ DEPFILES := $(patsubst %c,%d,$(C_SRCS))
 DEPFILES += $(patsubst %cpp,%d,$(CXX_SRCS))
 
 
-INC = -I./include -I./enc/gx_enc_fast  -I.
+INC = -I./include -I./enc/gx_enc_fast -I. -Ih264bitstream
 TARGET = libvpcodec.so
 
 all: $(TARGET)

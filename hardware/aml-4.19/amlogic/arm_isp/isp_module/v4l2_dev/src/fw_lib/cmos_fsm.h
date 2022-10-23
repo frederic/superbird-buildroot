@@ -33,6 +33,12 @@ typedef const struct _cmos_fsm_t *cmos_fsm_const_ptr_t;
 
 #define API_OTAE_ITERATION_COUNT ( 15 )
 
+typedef enum _cmos_partition_lut_index_ {
+    PARTITION_LUT_BALANED_INDEX = 0,
+    PARTITION_LUT_INTEGRATION_PRIORITY_INDEX = 1,
+    PARTITION_LUT_INDEX_MAX,
+} cmos_partition_lut_index_t;
+
 #if FILTER_LONG_INT_TIME
 typedef struct _it_long_hist_t {
     uint32_t v[FILTER_LONG_INT_TIME];
@@ -170,6 +176,8 @@ struct _cmos_fsm_t {
     /* previous FrameStart FrameID */
     uint32_t prev_fs_frame_id;
     uint32_t prev_dgain_frame_id;
+
+    uint32_t exp_lut[SYSTEM_EXPOSURE_PARTITION_VALUE_COUNT];
 };
 
 

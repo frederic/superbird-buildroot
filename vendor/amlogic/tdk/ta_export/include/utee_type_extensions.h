@@ -27,6 +27,8 @@
 #ifndef UTEE_TYPE_EXTENSIONS_H
 #define UTEE_TYPE_EXTENSIONS_H
 
+#include <tee_internal_api.h>
+
 #define TEE_EXTEND_VDEC_GET_INFO                        0
 #define TEE_EXTEND_VDEC_MMAP                            2
 #define TEE_EXTEND_VDEC_MUNMAP                          3
@@ -84,6 +86,61 @@
 #define TEE_EXTEND_TVP_SET_VIDEO_LAYER                  56
 #define TEE_EXTEND_TVP_GET_VIDEO_LAYER                  57
 #define TEE_EXTEND_TVP_INIT                             58
+#define TEE_EXTEND_MUTEX                                59
+#define TEE_EXTEND_CRYPTO_RUN                           60
+#define TEE_EXTEND_CRYPTO_SET_KEY_IV                    61
+#define TEE_EXTEND_SHM_MMAP                             62
+#define TEE_EXTEND_SHM_MUNMAP                           63
+#define TEE_EXTEND_READ_REG                             64
+#define TEE_EXTEND_WRITE_REG                            65
+#define TEE_EXTEND_UPDATE_MVN                           66
+#define TEE_EXTEND_READ_RNG_POOL                        67
+#define TEE_EXTEND_TVP_SET_AUDIO_MUTE                   68
+#define TEE_EXTEND_DESC_SET_ALGO                        69
+#define TEE_EXTEND_DESC_SET_MODE                        70
+#define TEE_EXTEND_WM_SET_PARA_LAST                     71
+#define TEE_EXTEND_HDMI_GET_STATE                       72
+#define TEE_EXTEND_CALLBACK                             73
+#define TEE_EXTEND_CRYPTO_AE_DECRYPT_WITH_DERIVED_KWRAP 74
+#define TEE_EXTEND_CRYPTO_AE_DECRYPT_WITH_DERIVED_KSECRET 75
+#define TEE_EXTEND_MAILBOX_SEND_CMD                     76
+#define TEE_EXTEND_KL_MSR_LUT                           77
+#define TEE_EXTEND_KL_MSR_ECW_TWO_LAYER                 78
+#define TEE_EXTEND_KL_MSR_ECW_TWO_LAYER_WITH_TF         79
+#define TEE_EXTEND_KL_MSR_PVR_THREE_LAYER               80
+#define TEE_EXTEND_KL_MSR_LOAD_CCCK                     81
+#define TEE_EXTEND_CIPHER_DECRYPT_WITH_KWRAP            82
+#define TEE_EXTEND_TVP_OPEN_CHAN                        83
+#define TEE_EXTEND_TVP_CLOSE_CHAN                       84
+#define TEE_EXTEND_TVP_BIND_CHAN                        85
+#define TEE_EXTEND_KM_SET_BOOT_PARAMS                   86
+#define TEE_EXTEND_KM_GET_BOOT_PARAMS                   87
+#define TEE_EXTEND_CRYPTO_RUN_EXT                       88
+#define TEE_EXTEND_TIMER_CREATE                         89
+#define TEE_EXTEND_TIMER_DESTROY                        90
+#define TEE_EXTEND_ASYMM_PUBKEY_DECRYPT                 91
+#define TEE_EXTEND_VDEC_MMAP_CACHED                     92
+#define TEE_EXTEND_CIPHER_ENCRYPT_WITH_KWRAP            93
+
+
+// For CFG_VMX_240_COMPAT:
+#define TEE_EXTEND_TVP_ENTER_VMX_2017_240               33
+#define TEE_EXTEND_TVP_GET_VIDEO_SIZE_VMX_2017_240      35
+#define TEE_EXTEND_TVP_SET_VIDEO_LAYER_VMX_2017_240     37
+#define TEE_EXTEND_CALLBACK_VMX_2017_240                38
+#define TEE_EXTEND_CRYPTO_RUN_VMX_2017_240              40
+#define TEE_EXTEND_CRYPTO_SET_KEY_IV_VMX_2017_240       41
+#define TEE_EXTEND_SHM_MMAP_VMX_2017_240                42
+#define TEE_EXTEND_SHM_MUNMAP_VMX_2017_240              43
+#define TEE_EXTEND_READ_REG_VMX_2017_240                44
+#define TEE_EXTEND_WRITE_REG_VMX_2017_240               45
+#define TEE_EXTEND_UPDATE_MVN_VMX_2017_240              46
+#define TEE_EXTEND_READ_RNG_POOL_VMX_2017_240           47
+#define TEE_EXTEND_TVP_SET_AUDIO_MUTE_VMX_2017_240      48
+#define TEE_EXTEND_DESC_SET_DVR_INFO_VMX_2017_240       49
+#define TEE_EXTEND_DESC_IS_DVR_VMX_2017_240             50
+#define TEE_EXTEND_CALLBACK_V1                          58
+
 
 struct tee_vdec_info_param {
 	paddr_t pa;
@@ -91,9 +148,20 @@ struct tee_vdec_info_param {
 };
 
 #define TEE_TVP_POOL_MAX_COUNT	4
-struct tee_tvp_init_param {
-	size_t count;
-	struct tee_vdec_info_param p[TEE_TVP_POOL_MAX_COUNT];
+struct tee_tvp_open_chan_param {
+	uint32_t cfg;
+	struct tee_vdec_info_param input;
+	struct tee_vdec_info_param output[TEE_TVP_POOL_MAX_COUNT];
+	TEE_Tvp_Handle handle;
+};
+
+struct tee_tvp_close_chan_param {
+	TEE_Tvp_Handle handle;
+};
+
+struct tee_tvp_bind_chan_param {
+	TEE_Tvp_Handle handle;
+	TEE_UUID uuid;
 };
 
 struct tee_vdec_mmap_param {
@@ -149,6 +217,11 @@ struct tee_hdcp_get_state_param {
 	uint32_t auth;
 };
 
+struct tee_hdmi_get_state_param {
+	uint32_t state;
+	uint32_t reserved;
+};
+
 struct tee_hdcp_load_key_param {
 	uint32_t mode;
 	uint8_t *keybuf;
@@ -168,6 +241,10 @@ struct tee_tvp_video_layer_param {
 	uint32_t video_layer;
 	uint32_t enable;
 	uint32_t flags;
+};
+
+struct tee_tvp_audio_mute_param {
+	uint32_t mute;
 };
 
 struct tee_asymm_sign_padding_param {
@@ -209,12 +286,11 @@ struct tee_memset_param {
 	uint32_t size;
 };
 
-#if defined(CFG_WATERMARK_VERIMATRIX)
 typedef struct {
 	void *para;
 	uint32_t para_len;
+	uint8_t svc_idx;
 } tee_vxwm_param;
-#endif
 
 struct tee_video_fw_param {
 	void *firmware;
@@ -224,18 +300,24 @@ struct tee_video_fw_param {
 };
 
 struct tee_kl_cr_param {
-	unsigned char  kl_num;
-	unsigned char  __padding[7];
-	unsigned char  cr[16];/* in: challenge-nonce, out:response-dnonce */
-	unsigned char  ekn1[16];/* ekn-1 (e.g. ek2 for 3-key ladder) */
+	uint8_t rk_cfg_idx;
+	uint8_t ek[16];
+	uint8_t nonce[16];
+	uint8_t dnonce[16];
 };
 
-struct tee_kl_run_param {
+struct tee_kl_run_param_v1 {
 	unsigned int   dest;
 	unsigned char  kl_num;
 	unsigned char  kl_levels;
 	unsigned char  __padding[6];
 	unsigned char  keys[7][16];
+};
+
+struct tee_kl_run_param {
+	uint8_t levels;
+	uint8_t rk_cfg_idx;
+	uint8_t eks[7][16];
 };
 
 struct tee_desc_alloc_channel_param {
@@ -253,6 +335,18 @@ struct tee_desc_reset_param {
 	int all;
 };
 
+struct tee_desc_set_algo_param {
+	int dsc_no;
+	int fd;
+	int algo;
+};
+
+struct tee_desc_set_mode_param {
+	int dsc_no;
+	int fd;
+	int mode;
+};
+
 struct tee_desc_set_pid_param {
 	int dsc_no;
 	int fd;
@@ -267,9 +361,24 @@ struct tee_desc_set_key_param {
 	uint32_t key_type;
 };
 
+struct tee_kl_req_ecw_param {
+	struct req_ecw ecw;
+};
+
+struct tee_kl_etask_lut_param {
+	struct req_etask_lut lut;
+};
+
+
 struct tee_desc_set_output_param {
 	int module;
 	int output;
+};
+
+struct tee_desc_dvr_info_param {
+	uint8_t svc_idx;
+	uint8_t pid_count;
+	uint16_t pids[8];
 };
 
 struct tee_storage_obj_access_param {
@@ -340,7 +449,6 @@ struct tee_storage_obj_close_param {
 	unsigned long obj;
 };
 
-#if defined(CFG_WATERMARK_NEXGUARD)
 typedef struct {
 	void *pxEmbedder;
 	uint32_t xSeed;
@@ -382,6 +490,112 @@ typedef struct {
 	void *pxEmbedder;
 	bool xIsEnabled;
 } ngwm_set_24bit_mode_param;
-#endif
+
+struct tee_callback_param {
+	uint32_t client_id;
+	uint32_t context_id;
+	uint32_t func_id;
+	uint32_t cmd_id;
+	uint32_t ret_size;
+	uint8_t *in_buff;
+	uint32_t in_size;
+	uint8_t *out_buff;
+	uint32_t out_size;
+};
+
+struct tee_mutex_param {
+	uint32_t lock;
+};
+
+struct tee_crypto_run_param {
+	char alg[64];  //CRYPTO_MAX_ALG_NAME
+	uint8_t *srcaddr;
+	uint32_t datalen;
+	uint8_t *dstaddr;
+	uint8_t *keyaddr;
+	uint32_t keysize;
+	uint8_t *ivaddr;
+	uint8_t dir;
+	uint8_t thread;
+	uint8_t __padding[2];
+};
+
+struct tee_crypto_set_key_iv_param {
+	uint32_t threadidx;
+	uint32_t *in;
+	uint32_t len;
+	uint8_t swap;
+	uint8_t __padding[3];
+	uint32_t from_kl;
+	uint32_t dest_idx;
+};
+
+struct tee_shm_param {
+	uint32_t pa;
+	uint32_t va;
+	uint32_t size;
+};
+
+struct tee_read_reg_param {
+	uint32_t reg;
+	uint32_t val;
+};
+
+struct tee_write_reg_param {
+	uint32_t reg;
+	uint32_t val;
+};
+
+struct tee_update_mvn_param {
+	uint32_t type;
+	uint32_t flag;
+	uint32_t check;
+};
+
+struct tee_mailbox_param {
+	uint32_t command;
+	uint8_t *inbuf;
+	uint32_t inlen;
+	uint8_t *outbuf;
+	uint32_t outlen;
+	uint32_t response;
+};
+
+struct tee_cipher_encrypt_with_kwrap_param {
+	const uint8_t *iv;
+	uint32_t iv_len;
+	const uint8_t *src;
+	uint32_t src_len;
+	uint8_t *dst;
+	uint32_t *dst_len;
+};
+
+struct tee_cipher_decrypt_with_kwrap_param {
+	const uint8_t *iv;
+	uint32_t iv_len;
+	const uint8_t *src;
+	uint32_t src_len;
+	uint8_t *dst;
+	uint32_t *dst_len;
+};
+
+#define SHA256_DIGEST_SIZE 32
+struct tee_km_boot_params{
+	uint32_t device_locked;
+	uint32_t verified_boot_state;
+	uint8_t verified_boot_key[SHA256_DIGEST_SIZE];
+	uint8_t verified_boot_hash[SHA256_DIGEST_SIZE];
+};
+
+struct tee_read_rng_pool_param {
+	uint8_t *out;
+	uint32_t size;
+};
+
+struct tee_timer_param {
+	uint32_t handle;
+	uint32_t timeout;
+	uint32_t flags;
+};
 
 #endif /* UTEE_TYPE_EXTENSIONS_H */

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,9 @@
 *****************************************************************************/
 #ifndef _VSI_NN_MATH_H
 #define _VSI_NN_MATH_H
+
 #include <math.h>
+#include <stdlib.h>
 #include "vsi_nn_types.h"
 
 #ifdef __cplusplus
@@ -31,18 +33,55 @@ extern "C" {
 #endif
 
 #define vsi_nn_abs(x)               (((x) < 0)    ? -(x) :  (x))
-#define vsi_nn_max(a,b)             ((a > b) ? a : b)
-#define vsi_nn_min(a,b)             ((a < b) ? a : b)
+#define vsi_nn_max(a,b)             (((a) > (b)) ? (a) : (b))
+#define vsi_nn_min(a,b)             (((a) < (b)) ? (a) : (b))
 #define vsi_nn_clamp(x, min, max)   (((x) < (min)) ? (min) : \
                                  ((x) > (max)) ? (max) : (x))
 #define vsi_nn_float_compare(a,b,diff) (vsi_nn_abs((a) - (b)) < (diff) ? TRUE : FALSE)
+#define vsi_abs(x)                  vsi_nn_abs(x)
+#define vsi_clamp(x, min, max)      vsi_nn_clamp(x, min, max)
+#define vsi_rtne(x)                 vsi_rint(x)
 
 #define VSI_NN_FLOAT32_INF          (0x7F800000)
 #define VSI_NN_FLOAT32_NAN          (0x7FC00000)
 #define VSI_NN_FLOAT64_INF          (0x7FF0000000000000)
 #define VSI_NN_FLOAT64_NAN          (0x7FF8000000000000)
 
+
+#define DEFINE_ARRAY_TYPE( NAME, TYPE ) \
+    typedef struct { \
+        size_t size; \
+        TYPE data[0]; \
+    } vsi_##NAME##_array_t; \
+    static inline vsi_##NAME##_array_t * vsi_##NAME##_array_create( size_t size ) { \
+        vsi_##NAME##_array_t * array = (vsi_##NAME##_array_t *)malloc( \
+                sizeof(vsi_##NAME##_array_t) + sizeof(TYPE) * size ); \
+        array->size = size; \
+        return array; \
+    } \
+    static inline void vsi_##NAME##_array_release( vsi_##NAME##_array_t ** array ) \
+        { \
+            if( array && *array ) { \
+                free( *array ); \
+                *array = NULL; \
+            } \
+        }
+DEFINE_ARRAY_TYPE( int, int32_t )
+DEFINE_ARRAY_TYPE( float, float )
+
+#undef DEFINE_ARRAY_TYPE
+
 OVXLIB_API void vsi_nn_Transpose
+    (
+    uint8_t  * dst,
+    uint8_t  * data,
+    uint32_t * shape,
+    uint32_t   dim_num,
+    uint32_t * perm,
+    vsi_nn_type_e type
+    );
+
+OVXLIB_API void vsi_nn_Permute
     (
     uint8_t  * dst,
     uint8_t  * data,

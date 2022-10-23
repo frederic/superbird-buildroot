@@ -60,6 +60,28 @@ struct _noise_reduction_fsm_t {
     uint32_t temper_diff_coeff;
 };
 
+struct cnr_ext_param_t {
+    uint32_t gain;
+    uint32_t delta_factor;
+    uint32_t umean1_thd;
+    uint32_t umean1_off;
+    uint32_t umean1_slope;
+    uint32_t umean2_thd;
+    uint32_t umean2_off;
+    uint32_t umean2_slope;
+    uint32_t vmean1_thd;
+    uint32_t vmean1_off;
+    uint32_t vmean1_slope;
+    uint32_t vmean2_thd;
+    uint32_t vmean2_off;
+    uint32_t vmean2_slope;
+    uint32_t uv_delta1_thd;
+    uint32_t uv_delta1_off;
+    uint32_t uv_delta1_slope;
+    uint32_t uv_delta2_thd;
+    uint32_t uv_delta2_off;
+    uint32_t uv_delta2_slope;
+};
 
 void noise_reduction_fsm_clear( noise_reduction_fsm_ptr_t p_fsm );
 

@@ -16,7 +16,6 @@ PORTAUDIO_DEPENDENCIES = \
 	$(if $(BR2_PACKAGE_PORTAUDIO_ALSA),alsa-lib)
 
 PORTAUDIO_CONF_OPTS = \
-	--enable-debug-output \
 	$(if $(BR2_PACKAGE_PORTAUDIO_ALSA),--with-alsa,--without-alsa) \
 	$(if $(BR2_PACKAGE_PORTAUDIO_OSS),--with-oss,--without-oss) \
 	$(if $(BR2_PACKAGE_PORTAUDIO_CXX),--enable-cxx,--disable-cxx)

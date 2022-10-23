@@ -74,6 +74,28 @@ int mem_free_wrapper(struct mali_session_data *session_data, _mali_uk_free_mem_s
 	return 0;
 }
 
+int meson_mem_start_wrapper(struct mali_session_data *session_data, _meson_update_video_texture_s __user *uargs)
+{
+	_meson_update_video_texture_s kargs;
+	_mali_osk_errcode_t err;
+
+	MALI_CHECK_NON_NULL(uargs, -EINVAL);
+	MALI_CHECK_NON_NULL(session_data, -EINVAL);
+
+	if (0 != copy_from_user(&kargs, uargs, sizeof(_meson_update_video_texture_s))) {
+		return -EFAULT;
+	}
+	kargs.ctx = (uintptr_t)session_data;
+
+	err = _meson_update_video_texture(&kargs);
+
+	if (_MALI_OSK_ERR_OK != err) {
+		return map_errcode(err);
+	}
+
+	return 0;
+}
+
 int mem_bind_wrapper(struct mali_session_data *session_data, _mali_uk_bind_mem_s __user *uargs)
 {
 	_mali_uk_bind_mem_s kargs;

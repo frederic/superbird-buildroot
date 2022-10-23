@@ -48,7 +48,6 @@ static int isp_vb2_queue_setup( struct vb2_queue *vq, const struct v4l2_format *
     //unsigned int size;
     int i;
     LOG( LOG_INFO, "Enter id:%d, cnt: %lu.", pstream->stream_id, cnt++ );
-    LOG( LOG_INFO, "vq: %p, *nplanes: %u.", vq, *nplanes );
 
     // get current format
     if ( isp_v4l2_stream_get_format( pstream, &vfmt ) < 0 ) {
@@ -62,17 +61,14 @@ static int isp_vb2_queue_setup( struct vb2_queue *vq, const struct v4l2_format *
              fmt, fmt->fmt.pix.width, fmt->fmt.pix.height, fmt->fmt.pix.sizeimage );
 #endif
 
-    LOG( LOG_INFO, "vq->num_buffers: %u vq->type:%u.", vq->num_buffers, vq->type );
     if ( vq->num_buffers + *nbuffers < 3 )
         *nbuffers = 3 - vq->num_buffers;
 
     if ( vfmt.type == V4L2_BUF_TYPE_VIDEO_CAPTURE ) {
         *nplanes = 1;
         sizes[0] = vfmt.fmt.pix.sizeimage;
-        LOG( LOG_INFO, "nplanes: %u, size: %u", *nplanes, sizes[0] );
     } else if ( vfmt.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE ) {
         *nplanes = vfmt.fmt.pix_mp.num_planes;
-        LOG( LOG_INFO, "nplanes: %u", *nplanes );
         for ( i = 0; i < vfmt.fmt.pix_mp.num_planes; i++ ) {
             sizes[i] = vfmt.fmt.pix_mp.plane_fmt[i].sizeimage;
             LOG( LOG_INFO, "size: %u", sizes[i] );
@@ -90,8 +86,6 @@ static int isp_vb2_queue_setup( struct vb2_queue *vq, const struct v4l2_format *
      * alloc_ctxs array.
      */
 
-    LOG( LOG_INFO, "nbuffers: %u, nplanes: %u", *nbuffers, *nplanes );
-
     return 0;
 }
 
@@ -102,7 +96,7 @@ static int isp_vb2_buf_prepare( struct vb2_buffer *vb )
     static unsigned long cnt = 0;
     struct v4l2_format vfmt;
     int i;
-    LOG( LOG_INFO, "Enter id:%d, cnt: %lu.", pstream->stream_id, cnt++ );
+    LOG( LOG_DEBUG, "Enter id:%d, cnt: %lu.", pstream->stream_id, cnt++ );
 
     // get current format
     if ( isp_v4l2_stream_get_format( pstream, &vfmt ) < 0 ) {
@@ -119,7 +113,6 @@ static int isp_vb2_buf_prepare( struct vb2_buffer *vb )
         }
 
         vb2_set_plane_payload( vb, 0, size );
-        LOG( LOG_INFO, "single plane payload set %d", size );
     } else if ( vfmt.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE ) {
         for ( i = 0; i < vfmt.fmt.pix_mp.num_planes; i++ ) {
             size = vfmt.fmt.pix_mp.plane_fmt[i].sizeimage;
@@ -128,7 +121,6 @@ static int isp_vb2_buf_prepare( struct vb2_buffer *vb )
                 return -EINVAL;
             }
             vb2_set_plane_payload( vb, i, size );
-            LOG( LOG_INFO, "i:%d payload set %d", i, size );
         }
     }
 
@@ -342,7 +334,7 @@ static void isp_frame_buff_queue(void *stream, isp_v4l2_buffer_t *buf, unsigned 
         (s_type == V4L2_STREAM_TYPE_DS1)) {
         rc = isp_vb_to_tframe(pstream, &f_buff, buf);
         if (rc != 0) {
-           LOG( LOG_INFO, "isp vb to tframe is error.");
+           LOG( LOG_ERR, "isp vb to tframe is error.");
            return;
         }
 
@@ -353,7 +345,7 @@ static void isp_frame_buff_queue(void *stream, isp_v4l2_buffer_t *buf, unsigned 
     if (s_type == V4L2_STREAM_TYPE_DS2) {
         rc = isp_vb_to_tframe(pstream, &f_buff, buf);
         if (rc != 0) {
-           LOG( LOG_INFO, "isp vb to tframe is error.");
+           LOG( LOG_ERR, "isp vb to tframe is error.");
            return;
         }
         am_sc_api_dma_buffer(&f_buff, index);
@@ -389,10 +381,8 @@ void isp_autocap_buf_queue(isp_v4l2_stream_t *pstream, isp_v4l2_buffer_t *buf)
 		default:
 			return;
 	}
-		
-	autocap_pushbuf(pstream->ctx_id, d_type, f_buff, pstream); 	
-	
-	LOG( LOG_INFO, "isp_vb2_buf_queue: %x", f_buff.primary.address);
+
+	autocap_pushbuf(pstream->ctx_id, d_type, f_buff, pstream);
 }
 #endif
 
@@ -407,11 +397,11 @@ static void isp_vb2_buf_queue( struct vb2_buffer *vb )
 #endif
     static unsigned long cnt = 0;
 
-    LOG( LOG_INFO, "Enter id:%d, cnt: %lu.", pstream->stream_id, cnt++ );
+    LOG( LOG_DEBUG, "Enter id:%d, cnt: %lu.", pstream->stream_id, cnt++ );
 
     spin_lock( &pstream->slock );
     list_add_tail( &buf->list, &pstream->stream_buffer_list );
-#ifdef AUTOWRITE_MODULES_V4L2_API	
+#ifdef AUTOWRITE_MODULES_V4L2_API
 	if(autocap_get_mode(pstream->ctx_id) == AUTOCAP_MODE0)
 		isp_autocap_buf_queue(pstream, buf);
 #endif
@@ -443,8 +433,6 @@ int isp_vb2_queue_init( struct vb2_queue *q, struct mutex *mlock, isp_v4l2_strea
 
     //all stream multiplanar
     q->type = pstream->cur_v4l2_fmt.type;
-
-    LOG( LOG_INFO, "vb2 init for stream:%d type: %u.", pstream->stream_id, q->type );
 
     if (pstream->stream_id == V4L2_STREAM_TYPE_FR ||
             pstream->stream_id == V4L2_STREAM_TYPE_DS1) {

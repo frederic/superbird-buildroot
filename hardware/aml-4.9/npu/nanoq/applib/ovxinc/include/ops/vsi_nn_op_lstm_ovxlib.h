@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -60,6 +60,12 @@ enum
     LSTM_INPUT_LAYERNORM_C  = 22,
     LSTM_INPUT_LAYERNORM_O  = 23,
 
+    LSTM_INPUT_AUX_INPUT    = 24,
+    LSTM_INPUT_AUX_WEIGHT_I2I = 25,
+    LSTM_INPUT_AUX_WEIGHT_I2F = 26,
+    LSTM_INPUT_AUX_WEIGHT_I2C = 27,
+    LSTM_INPUT_AUX_WEIGHT_I2O = 28,
+
     LSTM_INPUT_CNT,
 
     LSTM_OUTPUT_OUTPUT      = 0,
@@ -85,11 +91,11 @@ typedef struct _vsi_nn_lstm_ovxlib_param
 
     float cell_clip;
     float proj_clip;
-    vsi_nn_lstmunit_activation_e activation;
+    vsi_nn_activation_e activation;
     float forget_bias;
     vsi_bool time_major;
     vsi_nn_dtype_t internal_dtype[LSTMUNIT_QUANTIZE_PARAM_COUNT];
-    vsi_nn_lstmunit_activation_e recurrent_activation;
+    vsi_nn_activation_e recurrent_activation;
     vsi_bool return_sequences;
     uint32_t weights; /* compatible with LSTM, NOT used */
 } vsi_nn_lstm_ovxlib_param;

@@ -501,9 +501,9 @@ void Get_I_Picture_Header(struct avs2_decoder *avs2_dec)
 				get_param(rpm_param->p.num_to_remove_cur,
 				"num of removed picture");
 #ifdef SANITY_CHECK
-			if (hd->curr_RPS.num_to_remove > 8)	{
-				hd->curr_RPS.num_to_remove = 8;
-				pr_info("Warning, %s: num_to_remove %d beyond range, force to 8\n",
+			if (hd->curr_RPS.num_to_remove > MAXREF)	{
+				hd->curr_RPS.num_to_remove = MAXREF;
+				pr_info("Warning, %s: num_to_remove %d beyond range, force to MAXREF\n",
 					__func__, hd->curr_RPS.num_to_remove);
 			}
 #endif
@@ -691,9 +691,9 @@ void Get_PB_Picture_Header(struct avs2_decoder *avs2_dec)
 				rpm_param->p.num_to_remove_cur,
 				"num of removed picture");
 #ifdef SANITY_CHECK
-			if (hd->curr_RPS.num_to_remove > 8)	{
-				hd->curr_RPS.num_to_remove = 8;
-				pr_info("Warning, %s: num_to_remove %d beyond range, force to 8\n",
+			if (hd->curr_RPS.num_to_remove > MAXREF)	{
+				hd->curr_RPS.num_to_remove = MAXREF;
+				pr_info("Warning, %s: num_to_remove %d beyond range, force to MAXREF\n",
 					__func__, hd->curr_RPS.num_to_remove);
 			}
 #endif

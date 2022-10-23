@@ -202,11 +202,15 @@ typedef struct {
     int handle;        ///< codec device handler
     int extradata_size;      ///< extra data size
     char extradata[AUDIO_EXTRA_DATA_SIZE];
-	int SessionID;
-	int dspdec_not_supported;//check some profile that audiodsp decoder can not support,we switch to arm decoder	
-	int droppcm_flag;				// drop pcm flag, if switch audio (1)
-	int automute;
+    int SessionID;
+    int dspdec_not_supported;//check some profile that audiodsp decoder can not support,we switch to arm decoder
+    int droppcm_flag;				// drop pcm flag, if switch audio (1)
+    int automute;
+    unsigned int has_video;
+    int associate_dec_supported;//support associate or not
+    int mixing_level;
 } arm_audio_info;
+
 
  typedef struct {
     int valid;               ///< audio extradata valid(1) or invalid(0), set by dsp
@@ -258,6 +262,7 @@ struct adec_status {
 #define    ACODEC_FMT_APE    20
 #define    ACODEC_FMT_EAC3    21 
 #define    ACODEC_FMT_WIFIDISPLAY 22
+#define    ACODEC_FMT_DRA 23
 #define    ACODEC_FMT_TRUEHD 25
 #define    ACODEC_FMT_MPEG1  26  //AFORMAT_MPEG-->mp3,AFORMAT_MPEG1-->mp1,AFROMAT_MPEG2-->mp2
 #define    ACODEC_FMT_MPEG2  27

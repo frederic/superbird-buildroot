@@ -103,7 +103,7 @@ SbDrmStatus CdmStatusToSbDrmStatus(const wv3cdm::Status status) {
     case wv3cdm::kNoKey:
     case wv3cdm::kKeyUsageBlockedByPolicy:
     case wv3cdm::kRangeError:
-    case wv3cdm::kDeferred:
+    //case wv3cdm::kDeferred:
     case wv3cdm::kUnexpectedError:
       return kSbDrmStatusUnknownError;
     default:
@@ -265,6 +265,22 @@ void DrmSystemWidevine::GenerateSessionUpdateRequest(
     SB_NOTREACHED();
   }
 
+  if (!cdm_->isProvisioned() && bProvision_) // do provision first , pending server certification
+  {
+    std::string message;
+    auto status = cdm_->getProvisioningRequest(&message);
+    if (status == wv3cdm::kSuccess) {
+      SetTicket(kFirstSbDrmSessionId, ticket);
+      SendSessionUpdateRequest(kSbDrmSessionRequestTypeIndividualizationRequest,
+                             kFirstSbDrmSessionId, message);
+      GenerateSessionUpdateRequestData request_data = {  kSbDrmTicketInvalid , init_type, init_str};
+      pending_generate_session_update_requests_.push_back(request_data);
+      bProvision_ = false;
+    }
+    return;
+  }
+
+
   if (!is_server_certificate_set_) {
     // When privacy mode is on and server certificate hasn't been set yet for
     // the current playback, save the requests and send a server certificate
@@ -291,6 +307,14 @@ void DrmSystemWidevine::UpdateSession(int ticket,
   const std::string str_key(static_cast<const char*>(key), key_size);
 
   wv3cdm::Status status;
+ if(!bProvision_) // without provision, handle it , then try to do service certifiction
+  {
+    auto status = cdm_->handleProvisioningResponse(str_key);
+    SB_LOG(INFO) << "handleProvisioningResponse status " << status;
+    bProvision_ = (status == wv3cdm::kSuccess);
+    SendServerCertificateRequest(kSbDrmTicketInvalid);
+    return;
+  }
   if (!pending_generate_session_update_requests_.empty()) {
     status = ProcessServerCertificateResponse(str_key);
     SB_LOG(INFO) << "session:" << sb_drm_session_id << " ticket:" << ticket
@@ -339,7 +363,7 @@ void DrmSystemWidevine::UpdateServerCertificate(int ticket,
   SB_DCHECK(thread_checker_.CalledOnValidThread());
   const std::string str_certificate(static_cast<const char*>(certificate),
                                     certificate_size);
-  wv3cdm::Status status = cdm_->setServiceCertificate(str_certificate);
+    wv3cdm::Status status = cdm_->setServiceCertificate(wv3cdm::kAllServices, str_certificate);
 
   SB_LOG(INFO) << " ticket:" << ticket << " UpdateServerCertificate status " << status;
 
@@ -402,7 +426,7 @@ OEMCryptoResult DrmSystemWidevine::CopyBuffer(uint8_t *out_buffer, const uint8_t
 #endif
 //  OEMCryptoResult result = OEMCrypto_CopyBuffer(data_addr, data_length, &bd, subsample_flags);
   decltype(&OEMCrypto_CopyBuffer) oemCopyBuffer = (decltype(&OEMCrypto_CopyBuffer))widevine_symbols->CopyBuffer;
-  OEMCryptoResult result = oemCopyBuffer(data_addr, data_length, &bd, subsample_flags);
+  OEMCryptoResult result = oemCopyBuffer(0, data_addr, data_length, &bd, subsample_flags);
 //  SB_LOG(ERROR) << "OEMCrypto_CopyBuffer return " << result;
   if ((result == OEMCrypto_ERROR_BUFFER_TOO_LARGE) &&
       (data_length > chunk_size)) {
@@ -423,7 +447,7 @@ OEMCryptoResult DrmSystemWidevine::CopyBuffer(uint8_t *out_buffer, const uint8_t
       bd2.buffer.secure.offset += pos;
 //      result = OEMCrypto_CopyBuffer(data_addr + pos, lentocopy, &bd2,
 //                                    subsample_flags);
-      result = oemCopyBuffer(data_addr + pos, lentocopy, &bd2,
+      result = oemCopyBuffer(0,data_addr + pos, lentocopy, &bd2,
                                     subsample_flags);
       if (result != OEMCrypto_SUCCESS) {
         SB_LOG(ERROR) << "CopyBuffer vir:" << (void *)data_addr
@@ -444,7 +468,55 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
   const SbDrmSampleInfo* drm_info = buffer->drm_info();
 
   if (drm_info == NULL || drm_info->initialization_vector_size == 0) {
+    //clr stream
+    if (wvcdm_session_id_clearstream.length() <= 0)
+      return kRetry;
+    std::vector<uint8_t> initialization_vector(16,16);
+    wv3cdm::InputBuffer input;
+    input.data = buffer->data();
+    input.data_length = buffer->size();
+    input.block_offset = 0;
+    input.key_id = 0;
+    input.key_id_length = 0;;
+    input.iv = initialization_vector.data();
+    input.iv_length = static_cast<uint32_t>(initialization_vector.size());
+    input.is_video = (buffer->sample_type() == kSbMediaTypeVideo);
+
+    wv3cdm::OutputBuffer output;
+#if defined(COBALT_WIDEVINE_OPTEE)
+    std::vector<uint8_t> output_data;
+    if ((buffer->sample_type() == kSbMediaTypeVideo) && (decoder_) &&
+      (decoder_->IsTvpMode())) {
+      output.data_length = buffer->size();
+      output.data = decoder_->GetSecMem(output.data_length);
+      if (output.data == NULL) {
+        SB_LOG(ERROR) << "Can't allocate memory in TVP mode, size " << output.data_length;
+        return kFailure;
+      }
+      output.is_secure = true;
+      output_data.assign(sizeof(drminfo_t), 0);
+      drminfo_t *drminfo = (drminfo_t *)&output_data[0];
+      drminfo->drm_level = DRM_LEVEL1;
+      drminfo->drm_pktsize = buffer->size();
+      drminfo->drm_hasesdata = 0;
+      drminfo->drm_phy = (unsigned int)((size_t)(output.data));
+      drminfo->drm_flag = TYPE_DRMINFO | TYPE_PATTERN;
+    } else {
+    // audio use L3
+    output_data.resize(buffer->size());
+    output.data = output_data.data();
+    output.data_length = output_data.size();
+  }
+#endif
+    input.encryption_scheme = wv3cdm::EncryptionScheme::kClear;
+    wv3cdm::Status status = cdm_->decrypt(wvcdm_session_id_clearstream,input, output);
+
+    buffer->SetDecryptedContent(output_data.data(), output_data.size());
+    if(status != wv3cdm::kSuccess) {
+        return kFailure;
+    }
     return kSuccess;
+
   }
 
   // Adapt |buffer| and |drm_info| to a |cdm::InputBuffer|.
@@ -518,10 +590,16 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
         return kFailure;
       }
 
+#if defined(SECMEM_V2)
+      input.data += subsample.clear_byte_count;
+      output.data_offset += subsample.clear_byte_count;
+      input.first_subsample = false;
+#else
       input.data += subsample.clear_byte_count;
       output.data += subsample.clear_byte_count;
       output.data_length -= subsample.clear_byte_count;
       input.first_subsample = false;
+#endif
     }
 
     if (subsample.encrypted_byte_count) {
@@ -542,11 +620,14 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
                                          drm_info->identifier_size);
         return kFailure;
       }
-
+#if defined(SECMEM_V2)
+      input.data += subsample.encrypted_byte_count;
+      output.data_offset += subsample.encrypted_byte_count;
+#else
       input.data += subsample.encrypted_byte_count;
       output.data += subsample.encrypted_byte_count;
       output.data_length -= subsample.encrypted_byte_count;
-
+#endif
       input.block_offset += subsample.encrypted_byte_count;
       input.block_offset %= 16;
 
@@ -590,6 +671,7 @@ void DrmSystemWidevine::GenerateSessionUpdateRequestInternal(
     if (is_first_session) {
       first_wvcdm_session_id_ = wvcdm_session_id;
     }
+    wvcdm_session_id_clearstream = wvcdm_session_id;
     SetTicket(WvdmSessionIdToSbDrmSessionId(wvcdm_session_id), ticket);
     SB_DLOG(INFO) << "Calling generateRequest()";
     status = cdm_->generateRequest(wvcdm_session_id, init_data_type,
@@ -600,10 +682,10 @@ void DrmSystemWidevine::GenerateSessionUpdateRequestInternal(
     // following if statement will incorrectly assume that there is a follow-up
     // license request automatically generated after the individualization is
     // finished, which won't happen.
-    SB_DCHECK(status != wv3cdm::kDeferred);
+    //SB_DCHECK(status != wv3cdm::kDeferred);
   }
 
-  if (status != wv3cdm::kSuccess && status != wv3cdm::kDeferred) {
+  if (status != wv3cdm::kSuccess && status != wv3cdm::kUnexpectedError) {
     // Reset ticket before invoking user-provided callback to indicate that
     // no session update request is pending.
     SetTicket(WvdmSessionIdToSbDrmSessionId(wvcdm_session_id),
@@ -651,10 +733,10 @@ void DrmSystemWidevine::onMessage(const std::string& wvcdm_session_id,
       // Not used, onDirectIndividualizationRequest() will be called instead.
       SB_NOTREACHED();
       break;
-    case wv3cdm::kLicenseSub:
+    //case wv3cdm::kLicenseSub:
       // For loading sub licenses from embedded key data, not used.
-      SB_NOTREACHED();
-      break;
+    //  SB_NOTREACHED();
+    //  break;
   }
 }
 
@@ -791,11 +873,11 @@ wv3cdm::Status DrmSystemWidevine::ProcessServerCertificateResponse(
   SB_DCHECK(thread_checker_.CalledOnValidThread());
   is_server_certificate_set_ = false;
   std::string certificate;
-  auto status = cdm_->parseServiceCertificateResponse(response, &certificate);
+  auto status = cdm_->parseAndLoadServiceCertificateResponse(wv3cdm::kAllServices,response, &certificate);
   if (status != wv3cdm::kSuccess) {
     return status;
   }
-  status = cdm_->setServiceCertificate(certificate);
+  status = cdm_->setServiceCertificate(wv3cdm::kAllServices,certificate);
   is_server_certificate_set_ = (status == wv3cdm::kSuccess);
   return status;
 }

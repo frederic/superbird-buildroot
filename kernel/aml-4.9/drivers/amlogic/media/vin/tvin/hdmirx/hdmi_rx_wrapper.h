@@ -60,6 +60,7 @@ enum fsm_states_e {
 	FSM_SIG_WAIT_STABLE,
 	FSM_SIG_STABLE,
 	FSM_SIG_READY,
+	FSM_NULL,
 };
 
 enum err_code_e {
@@ -115,6 +116,8 @@ enum dumpinfo_e {
 
 /* signal */
 extern int force_vic;
+extern bool already_start_dec;
+extern bool vpp_mute_enable;
 extern enum tvin_sig_fmt_e hdmirx_hw_get_fmt(void);
 extern void rx_main_state_machine(void);
 extern void rx_err_monitor(void);
@@ -141,5 +144,15 @@ extern void rx_tmds_data_capture(void);
 extern void dump_state(int enable);
 extern void hdmirx_init_params(void);
 void fs_mode_init(void);
+void set_video_mute(bool on);
+void __attribute__((weak))set_video_mute(bool on)
+{
+}
+
+int get_video_mute(void);
+int __attribute__((weak))get_video_mute(void)
+{
+	return 0;
+}
 #endif
 

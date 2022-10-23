@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -147,6 +147,72 @@ v_PVOID_t WLANSAP_Open(v_PVOID_t  pvosGCtx)
     return pSapCtx;
 }// WLANSAP_Open
 
+static VOS_STATUS wlansap_owe_init(ptSapContext sap_ctx)
+{
+	vos_list_init(&sap_ctx->owe_pending_assoc_ind_list);
+
+	return VOS_STATUS_SUCCESS;
+}
+
+static void wlansap_owe_cleanup(ptSapContext sap_ctx)
+{
+	tHalHandle hHal;
+	struct owe_assoc_ind *owe_assoc_ind;
+	struct sSirSmeAssocInd *assoc_ind = NULL;
+	vos_list_node_t *node = NULL, *next_node = NULL;
+	VOS_STATUS status;
+
+	if (!sap_ctx) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid SAP context");
+		return;
+	}
+
+	hHal = (tHalHandle)VOS_GET_HAL_CB(sap_ctx->pvosGCtx);
+	if (!hHal) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "%s: Invalid MAC context from pvosGCtx", __func__);
+		return;
+	}
+
+	if (VOS_STATUS_SUCCESS !=
+	    vos_list_peek_front(&sap_ctx->owe_pending_assoc_ind_list,
+				&node)) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Failed to find assoc ind list");
+		return;
+	}
+
+	while (node) {
+		vos_list_peek_next(&sap_ctx->owe_pending_assoc_ind_list,
+				   node, &next_node);
+		owe_assoc_ind = container_of(node, struct owe_assoc_ind,
+					     node);
+		status = vos_list_remove_node(
+					   &sap_ctx->owe_pending_assoc_ind_list,
+					   node);
+		if (status == VOS_STATUS_SUCCESS) {
+			assoc_ind = owe_assoc_ind->assoc_ind;
+			vos_mem_free(owe_assoc_ind);
+			assoc_ind->owe_ie = NULL;
+			assoc_ind->owe_ie_len = 0;
+			assoc_ind->owe_status = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+			status = sme_update_owe_info(hHal, assoc_ind);
+			vos_mem_free(assoc_ind);
+		} else {
+			VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+				  "Failed to remove assoc ind");
+		}
+		node = next_node;
+		next_node = NULL;
+	}
+}
+
+static void wlansap_owe_deinit(ptSapContext sap_ctx)
+{
+	vos_list_destroy(&sap_ctx->owe_pending_assoc_ind_list);
+}
+
 /**
  * WLANSAP_Start() - wlan start SAP.
  * @pCtx: Pointer to the global cds context; a handle to SAP's
@@ -171,7 +237,8 @@ WLANSAP_Start
     v_PVOID_t pCtx,
     tVOS_CON_MODE mode,
     uint8_t *addr,
-    uint32_t *session_id
+    uint32_t *session_id,
+    bool reinit
 )
 {
     ptSapContext pSapCtx = NULL;
@@ -217,6 +284,14 @@ WLANSAP_Start
     vos_mem_copy(pSapCtx->self_mac_addr, addr, VOS_MAC_ADDR_SIZE);
     vos_event_init(&pSapCtx->sap_session_opened_evt);
     vos_event_init(&pSapCtx->sap_session_closed_evt);
+
+    if (!reinit) {
+        if (!VOS_IS_STATUS_SUCCESS(wlansap_owe_init(pSapCtx))) {
+            VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                      "SAP OWE init fail");
+            return VOS_STATUS_E_FAULT;
+        }
+    }
 
     // Now configure the auth type in the roaming profile. To open.
     pSapCtx->csrRoamProfile.negotiatedAuthType = eCSR_AUTH_TYPE_OPEN_SYSTEM; // open is the default
@@ -349,6 +424,8 @@ WLANSAP_Close
                    "%s: Invalid SAP pointer from pCtx", __func__);
         return VOS_STATUS_E_FAULT;
     }
+    wlansap_owe_cleanup(pSapCtx);
+    wlansap_owe_deinit(pSapCtx);
 
     /* Cleanup SAP control block. */
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "WLANSAP_Close");
@@ -360,6 +437,171 @@ WLANSAP_Close
 
     return VOS_STATUS_SUCCESS;
 }/* WLANSAP_Close */
+
+#define DH_OUI_TYPE	(0x20)
+/**
+ * wlansap_validate_owe_ie() - validate OWE IE
+ * @ie: IE buffer
+ * @remaining_ie_len: remaining IE length
+ *
+ * Return: validated IE length, negative for failure
+ */
+static int wlansap_validate_owe_ie(const uint8_t *ie, uint32_t remaining_ie_len)
+{
+	uint8_t ie_id, ie_len, ie_ext_id = 0;
+
+	if (remaining_ie_len < 2) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "IE too short");
+		return -EINVAL;
+	}
+
+	ie_id = ie[0];
+	ie_len = ie[1];
+
+	/* IEs that we are expecting in OWE IEs
+	 * - RSN IE
+	 * - DH IE
+	 */
+	switch (ie_id) {
+	case DOT11F_EID_RSN:
+		if (ie_len < DOT11F_IE_RSN_MIN_LEN ||
+		    ie_len > DOT11F_IE_RSN_MAX_LEN) {
+			VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+				  "Invalid RSN IE len %d", ie_len);
+			return -EINVAL;
+		}
+		ie_len += 2;
+		break;
+	case DOT11F_EID_DH_PARAMETER_ELEMENT:
+		ie_ext_id = ie[2];
+		if (ie_ext_id != DH_OUI_TYPE) {
+			VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+				  "Invalid DH IE ID %d", ie_ext_id);
+			return -EINVAL;
+		}
+		if (ie_len < DOT11F_IE_DH_PARAMETER_ELEMENT_MIN_LEN ||
+		    ie_len > DOT11F_IE_DH_PARAMETER_ELEMENT_MAX_LEN) {
+			VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+				  "Invalid DH IE len %d", ie_len);
+			return -EINVAL;
+		}
+		ie_len += 2;
+		break;
+	default:
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid IE %d", ie_id);
+		return -EINVAL;
+	}
+
+	if (ie_len > remaining_ie_len) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid IE len");
+		return -EINVAL;
+	}
+
+	return ie_len;
+}
+
+/**
+ * wlansap_validate_owe_ies() - validate OWE IEs
+ * @ie: IE buffer
+ * @ie_len: IE length
+ *
+ * Return: true if validated
+ */
+static bool wlansap_validate_owe_ies(const uint8_t *ie, uint32_t ie_len)
+{
+	const uint8_t *remaining_ie = ie;
+	uint32_t remaining_ie_len = ie_len;
+	int validated_len;
+	bool validated = true;
+
+	while (remaining_ie_len) {
+		validated_len = wlansap_validate_owe_ie(remaining_ie,
+							remaining_ie_len);
+		if (validated_len < 0) {
+			validated = false;
+			break;
+		}
+		remaining_ie += validated_len;
+		remaining_ie_len -= validated_len;
+	}
+
+	return validated;
+}
+
+VOS_STATUS wlansap_update_owe_info(v_PVOID_t pctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status)
+{
+	ptSapContext sap_ctx;
+	tHalHandle hal;
+	struct owe_assoc_ind *owe_assoc_ind;
+	struct sSirSmeAssocInd *assoc_ind = NULL;
+	vos_list_node_t *node = NULL, *next_node = NULL;
+	VOS_STATUS status = VOS_STATUS_SUCCESS;
+
+	sap_ctx = VOS_GET_SAP_CB(pctx);
+	if (!sap_ctx) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+			  "%s: Invalid SAP pointer from pCtx", __func__);
+		return VOS_STATUS_E_FAULT;
+	}
+	if (!wlansap_validate_owe_ies(ie, ie_len)) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+			  "Invalid OWE IE");
+		return VOS_STATUS_E_FAULT;
+	}
+
+	hal = (tHalHandle)VOS_GET_HAL_CB(sap_ctx->pvosGCtx);
+	if (!hal) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+			  "%s: Invalid MAC context from pvosGCtx", __func__);
+		return VOS_STATUS_E_FAULT;
+	}
+	if (VOS_STATUS_SUCCESS !=
+		vos_list_peek_front(&sap_ctx->owe_pending_assoc_ind_list,
+				    &next_node)) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+			  "Failed to find assoc ind list");
+		return VOS_STATUS_E_FAULT;
+	}
+
+	do {
+		node = next_node;
+		owe_assoc_ind = container_of(node, struct owe_assoc_ind,
+					     node);
+		if (vos_mem_compare(peer,
+				    owe_assoc_ind->assoc_ind->peerMacAddr,
+				    VOS_MAC_ADDR_SIZE)) {
+			status = vos_list_remove_node(
+					   &sap_ctx->owe_pending_assoc_ind_list,
+					   node);
+			if (status != VOS_STATUS_SUCCESS) {
+				VOS_TRACE(VOS_MODULE_ID_SAP,
+					  VOS_TRACE_LEVEL_INFO_HIGH,
+					  "Failed to remove assoc ind");
+				return status;
+			}
+			assoc_ind = owe_assoc_ind->assoc_ind;
+			vos_mem_free(owe_assoc_ind);
+			break;
+		}
+	} while (VOS_STATUS_SUCCESS ==
+		 vos_list_peek_next(&sap_ctx->owe_pending_assoc_ind_list,
+				    node, &next_node));
+
+	if (assoc_ind) {
+		assoc_ind->owe_ie = ie;
+		assoc_ind->owe_ie_len = ie_len;
+		assoc_ind->owe_status = owe_status;
+		status = sme_update_owe_info(hal, assoc_ind);
+		vos_mem_free(assoc_ind);
+	}
+
+	return status;
+}
 
 /*----------------------------------------------------------------------------
  * Utility Function implementations
@@ -664,6 +906,11 @@ WLANSAP_SetScanAcsChannelParams(tsap_Config_t *pConfig,
     pSapCtx->dfs_mode = pConfig->acs_dfs_mode;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
     pSapCtx->cc_switch_mode = pConfig->cc_switch_mode;
+    pSapCtx->band_switch_enable = pConfig->band_switch_enable;
+    pSapCtx->ap_p2pclient_concur_enable =
+            pConfig->ap_p2pclient_concur_enable;
+    pSapCtx->ch_width_24g_orig = pConfig->ch_width_24g_orig;
+    pSapCtx->ch_width_5g_orig = pConfig->ch_width_5g_orig;
 #endif
     pSapCtx->scanBandPreference = pConfig->scanBandPreference;
     pSapCtx->acsBandSwitchThreshold = pConfig->acsBandSwitchThreshold;
@@ -785,6 +1032,11 @@ WLANSAP_StartBss
         pSapCtx->ch_width_orig = pConfig->ch_width_orig;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
         pSapCtx->cc_switch_mode = pConfig->cc_switch_mode;
+        pSapCtx->band_switch_enable = pConfig->band_switch_enable;
+        pSapCtx->ap_p2pclient_concur_enable =
+                pConfig->ap_p2pclient_concur_enable;
+        pSapCtx->ch_width_24g_orig = pConfig->ch_width_24g_orig;
+        pSapCtx->ch_width_5g_orig = pConfig->ch_width_5g_orig;
 #endif
         pSapCtx->scanBandPreference = pConfig->scanBandPreference;
         pSapCtx->acsBandSwitchThreshold = pConfig->acsBandSwitchThreshold;
@@ -1701,6 +1953,14 @@ WLANSAP_SetChannelChangeWithCsa(v_PVOID_t pvosGCtx, v_U32_t targetChannel)
                           targetChannel);
              return VOS_STATUS_E_FAULT;
          }
+#endif
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+        if (VOS_FALSE == vos_is_chan_ok_for_dnbs((uint8_t)targetChannel)) {
+            VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                       FL("Channel switch to %u is not allowed due to dnbs"),
+                          targetChannel);
+             return VOS_STATUS_E_FAULT;
+        }
 #endif
         /*
          * Post a CSA IE request to SAP state machine with
@@ -4172,4 +4432,43 @@ wlansap_set_invalid_session(v_PVOID_t pctx)
 
 	return VOS_STATUS_SUCCESS;
 }
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+/*
+ * wlansap_channel_compare() - compare the given channel to SAP's channel
+ * @hHal: handle to the hal
+ * @channel: the given channel to be compared
+ * @equal: the output param, true if equal, false if not equal
+ *
+ * This function compare the given channel to the SAP or P2P GO's operating
+ * channel, set the param equal to true if the given channel is same as SAP or
+ * P2P GO's operating channel, set the param equal to false if the given channel
+ * is not same as SAP or P2P GO's operating channel or there's no SAP or P2P GO.
+ *
+ * Return: eHalStatus
+ */
+eHalStatus wlansap_channel_compare(tHalHandle hHal, uint8_t channel, bool *equal)
+{
+	uint8_t intf = 0;
+	ptSapContext pSapContext;
 
+	tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+
+	if (!pMac)
+		return eHAL_STATUS_FAILURE;
+
+	for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++) {
+		if (((VOS_STA_SAP_MODE == pMac->sap.sapCtxList[intf].sapPersona) ||
+			(VOS_P2P_GO_MODE == pMac->sap.sapCtxList[intf].sapPersona)) &&
+			pMac->sap.sapCtxList[intf].pSapContext != NULL) {
+				pSapContext =
+					(ptSapContext)pMac->sap.sapCtxList [intf].pSapContext;
+				if (pSapContext->channel == (uint32_t)channel) {
+					*equal = true;
+					return eHAL_STATUS_SUCCESS;
+				}
+			}
+	}
+	*equal = false;
+	return eHAL_STATUS_SUCCESS;
+}
+#endif

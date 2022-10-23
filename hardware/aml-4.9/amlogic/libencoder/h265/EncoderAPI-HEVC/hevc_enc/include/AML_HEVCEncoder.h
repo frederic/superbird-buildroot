@@ -53,8 +53,8 @@ typedef struct HEVCEncParams_s {
     HEVCLevel level; /* level of the bitstream to be compliant with*/
     HEVCTier tier; /* tier of the bitstream to be compliant with*/
 
-    int width; /* width of an input frame in pixel */
-    int height; /* height of an input frame in pixel */
+    uint32 width; /* width of an input frame in pixel */
+    uint32 height; /* height of an input frame in pixel */
 
     int num_ref_frame; /* number of reference frame used */
     int num_slice_group; /* number of slice group */

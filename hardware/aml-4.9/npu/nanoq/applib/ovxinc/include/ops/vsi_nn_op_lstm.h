@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -45,7 +45,7 @@ typedef struct _vsi_nn_lstm_param
 
     float cell_clip;
     float proj_clip;
-    vsi_nn_lstmunit_activation_e activation;
+    vsi_nn_activation_e activation;
     float forget_bias;
 
     uint32_t weights;

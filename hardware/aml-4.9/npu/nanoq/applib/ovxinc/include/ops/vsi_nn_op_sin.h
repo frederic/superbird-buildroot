@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -27,56 +27,18 @@
 #include "vsi_nn_types.h"
 
 
-enum {
-    TENSOR_SIN_INPUT,
-
-    TENSOR_SIN_INPUTS_COUNT,
-
-    TENSOR_SIN_OUTPUT = 0,
-
-    TENSOR_SIN_OUTUTS_COUNT,
-
-    TENSOR_SIN_PARAM_COUT = TENSOR_SIN_INPUTS_COUNT + TENSOR_SIN_OUTUTS_COUNT,
-};
-
-enum {
-    TENSOR_SIN_CPU_KERNEL,
-
-    TENSOR_SIN_F16TOF16_KERNEL,
-    TENSOR_SIN_F16TOI16_KERNEL,
-    TENSOR_SIN_F16TOI8_KERNEL,
-    TENSOR_SIN_F16TOU8_KERNEL,
-    TENSOR_SIN_I16TOI16_KERNEL,
-    TENSOR_SIN_I16TOF16_KERNEL,
-    TENSOR_SIN_I8TOI8_KERNEL,
-    TENSOR_SIN_I8TOF16_KERNEL,
-    TENSOR_SIN_U8TOU8_KERNEL,
-    TENSOR_SIN_U8TOF16_KERNEL,
-
-    TENSOR_SIN_F16TOF16_2D_KERNEL,
-    TENSOR_SIN_F16TOI16_2D_KERNEL,
-    TENSOR_SIN_F16TOI8_2D_KERNEL,
-    TENSOR_SIN_F16TOU8_2D_KERNEL,
-    TENSOR_SIN_I16TOI16_2D_KERNEL,
-    TENSOR_SIN_I16TOF16_2D_KERNEL,
-    TENSOR_SIN_I8TOI8_2D_KERNEL,
-    TENSOR_SIN_I8TOF16_2D_KERNEL,
-    TENSOR_SIN_U8TOU8_2D_KERNEL,
-    TENSOR_SIN_U8TOF16_2D_KERNEL,
-
-    TENSOR_SIN_KERNEL_COUNTS,
-};
-
 #define _VSI_NN_SIN_LOCAL_TENSOR_NUM 2
 
 typedef struct _vsi_nn_sin_lcl_data
 {
     vx_tensor   local_tensor[_VSI_NN_SIN_LOCAL_TENSOR_NUM];
+    uint32_t    hash_idx;
+    vsi_bool    execute_on_sw;
 } vsi_nn_sin_lcl_data;
 
 typedef struct _vsi_nn_sin_param
 {
-    /* exp layer local data structure */
+    /* sin layer local data structure */
     vsi_nn_sin_lcl_data local;
 } vsi_nn_sin_param;
 

@@ -53,6 +53,7 @@ struct aml_datmos_param {
     char dapcustomize[CONFIG_MAX];
     bool b_dap_customize;
     char inputpcm_config[CONFIG_MAX];
+    bool b_iec61937_align;
 };
 
 typedef enum
@@ -143,6 +144,16 @@ int cleanup_atmos_func(struct aml_datmos_param *datmos_handle);
  */
 int datmos_decoder_dynamic_param_set_patch(aml_dec_t *aml_dec);
 extern aml_dec_func_t aml_datmos_func;
+
+/*
+ *@brief set "-iec61937_align <0-1>" func
+ * input params:
+ *          struct audio_hw_device *dev: audio_hw_device handle
+ *
+ * return value:
+ *          void
+ */
+void datmos_set_iec61937_align_param(struct audio_hw_device *dev);
 #endif
 
 #endif//end of _AML_DATMOS_API_H_

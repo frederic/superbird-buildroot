@@ -153,12 +153,13 @@ enum tvafe_adc_ch_e {
 };
 
 enum tvafe_cpu_type {
-	CPU_TYPE_TXL  = 0,
-	CPU_TYPE_TXLX = 1,
-	CPU_TYPE_GXLX = 2,
-	CPU_TYPE_TL1  = 3,
-	CPU_TYPE_TM2  = 4,
-	CPU_TYPE_MAX,
+	TVAFE_CPU_TYPE_TXL  = 0,
+	TVAFE_CPU_TYPE_TXLX = 1,
+	TVAFE_CPU_TYPE_GXLX = 2,
+	TVAFE_CPU_TYPE_TL1  = 3,
+	TVAFE_CPU_TYPE_TM2  = 4,
+	TVAFE_CPU_TYPE_TM2_B  = 5,
+	TVAFE_CPU_TYPE_MAX,
 };
 
 #define TVAFE_PQ_CONFIG_NUM_MAX    20

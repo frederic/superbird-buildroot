@@ -19,6 +19,7 @@
 #define _AMLFRONTEND_H
 /**/
 #include "depend.h" /**/
+#include <linux/amlogic/cpu_version.h>
 
 #define KERNEL_4_9_EN		1
 
@@ -217,11 +218,6 @@ struct poll_machie_s {
 
 
 };
-struct amlfe_exp_config {
-	/*config by aml_fe ?*/
-	/* */
-	int set_mode;
-};
 
 struct amldtvdemod_device_s {
 
@@ -280,6 +276,12 @@ struct amldtvdemod_device_s {
 #endif
 	const struct amlfe_exp_config *afe_cfg;
 	struct dentry *demod_root;
+
+	/* only for tm2,first time of pwr on,reset after signal locked begin */
+	unsigned int atsc_rst_needed;
+	unsigned int atsc_rst_done;
+	unsigned int atsc_rst_wait_cnt;
+	/* only for tm2,first time of pwr on,reset after signal locked end */
 };
 extern struct amldtvdemod_device_s *dtvdd_devp;	/**/
 

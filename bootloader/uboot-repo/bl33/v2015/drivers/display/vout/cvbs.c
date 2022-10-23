@@ -17,82 +17,61 @@
  *
 */
 #include <common.h>
+#include <malloc.h>
 #include <asm/arch/io.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/cpu.h>
 #include <asm/cpu_id.h>
 #include "cvbs_regs.h"
 #include "cvbs_config.h"
+#include "cvbs.h"
+#include "vdac.h"
 
 /*----------------------------------------------------------------------------*/
-// global variables
-enum CVBS_MODE_e
-{
-	VMODE_PAL,
-	VMODE_NTSC,
-	VMODE_PAL_M,
-	VMODE_PAL_N,
-	VMODE_NTSC_M,
-	VMODE_MAX
-};
-
-struct cvbs_vdac_data_s {
-	unsigned int vdac_ctrl0_en;
-	unsigned int vdac_ctrl0_dis;
-	unsigned int vdac_ctrl1_en;
-	unsigned int vdac_ctrl1_dis;
+static struct cvbs_drv_s cvbs_drv = {
+	.vdac_data = NULL,
 };
 
 static struct cvbs_vdac_data_s vdac_data_default = {
-	.vdac_ctrl0_en = 0x1,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0x0,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_gxl = {
-	.vdac_ctrl0_en = 0xb0001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0xb,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_txl = {
-	.vdac_ctrl0_en = 0x620001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 8,
-	.vdac_ctrl1_dis = 0,
+	.vref_adj = 0x2,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_g12a = {
-	.vdac_ctrl0_en = 0x906001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0x10,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_g12b = {
-	.vdac_ctrl0_en = 0x8f6001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0xf,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_sm1 = {
-	.vdac_ctrl0_en = 0x906001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0xf,
+	.gsw = 0x0,
 };
 
 static struct cvbs_vdac_data_s vdac_data_tl1 = {
-	.vdac_ctrl0_en = 0x906001,
-	.vdac_ctrl0_dis = 0,
-	.vdac_ctrl1_en = 0,
-	.vdac_ctrl1_dis = 8,
+	.vref_adj = 0x10,
+	.gsw = 0x0,
 };
 
-static struct cvbs_vdac_data_s *cvbs_vdac_data;
+static struct cvbs_vdac_data_s vdac_data_tm2 = {
+	.vref_adj = 0x10,
+	.gsw = 0x0,
+};
+
 unsigned int cvbs_mode = VMODE_MAX;
 /*bit[0]: 0=vid_pll, 1=gp0_pll*/
 /*bit[1]: 0=vid2_clk, 1=vid1_clk*/
@@ -102,16 +81,18 @@ unsigned int cvbs_mode = VMODE_MAX;
 /*path 3:gp0_pll vid1_clk*/
 static unsigned int s_enci_clk_path = 0;
 
+
 /*----------------------------------------------------------------------------*/
 // interface for registers of soc
 
-#define REG_OFFSET_VCBUS(reg)       (((reg) << 2))
-#define REG_OFFSET_CBUS(reg)		(((reg) << 2))
+#define REG_OFFSET_VCBUS(reg)    (((reg) << 2))
+#define REG_OFFSET_CBUS(reg)     (((reg) << 2))
 
 /* memory mapping */
-#define REG_ADDR_HIU(reg)           (reg + 0L)
-#define REG_ADDR_VCBUS(reg)         (REG_BASE_VCBUS + REG_OFFSET_VCBUS(reg))
-#define REG_ADDR_CBUS(reg)			(REG_BASE_CBUS + REG_OFFSET_CBUS(reg))
+#define REG_ADDR_HIU(reg)        (reg + 0L)
+#define REG_ADDR_VCBUS(reg)      (REG_BASE_VCBUS + REG_OFFSET_VCBUS(reg))
+#define REG_ADDR_CBUS(reg)       (REG_BASE_CBUS + REG_OFFSET_CBUS(reg))
+
 
 static unsigned int cvbs_get_hiu_logic_addr(unsigned int addr_offset)
 {
@@ -180,11 +161,6 @@ static int cvbs_set_vcbus_bits(unsigned int addr_offset, unsigned int value, uns
 		(((value)&((1L<<(len))-1)) << (start))));
 	return 0;
 }
-#if 0
-static int cvbs_get_vcbus_bits(unsigned int addr_offset, unsigned int start, unsigned int len)
-{
-	return (cvbs_read_vcbus(addr_offset) >> (start)) & ((1L << (len)) - 1);}
-#endif
 
 /*----------------------------------------------------------------------------*/
 // interface for cpu id checking
@@ -299,41 +275,24 @@ int cvbs_set_bist(char* bist_mode)
 }
 
 /*----------------------------------------------------------------------------*/
-// configuration for vdac pin of the soc.
-// config vdac path:
-//	0 : close
-//	1 : enci
-//	2 : atv
-//	3 : passthrough
 int cvbs_set_vdac(int status)
 {
-	switch (status)
-	{
+	switch (status) {
 	case 0:// close vdac
-	if (cvbs_vdac_data) {
-		cvbs_write_hiu(HHI_VDAC_CNTL0, cvbs_vdac_data->vdac_ctrl0_dis);
-		cvbs_write_hiu(HHI_VDAC_CNTL1, cvbs_vdac_data->vdac_ctrl1_dis);
-	} else {
-		printf("cvbs ERROR:need run cvbs init.\n");
-	}
-	break;
+		if (cvbs_drv.vdac_data)
+			vdac_enable(0, VDAC_MODULE_CVBS_OUT);
+		else
+			printf("cvbs ERROR:need run cvbs init.\n");
+		break;
 	case 1:// from enci to vdac
 		cvbs_set_vcbus_bits(VENC_VDAC_DACSEL0, 0, 5, 1);
-	if (cvbs_vdac_data) {
-		cvbs_write_hiu(HHI_VDAC_CNTL0, cvbs_vdac_data->vdac_ctrl0_en);
-		cvbs_write_hiu(HHI_VDAC_CNTL1, cvbs_vdac_data->vdac_ctrl1_en);
-	} else {
-		printf("cvbs ERROR:need run cvbs init.\n");
-	}
-		break;
-	case 2:// from atv to vdac
-		cvbs_set_vcbus_bits(VENC_VDAC_DACSEL0, 1, 5, 1);
-		cvbs_write_hiu(HHI_VDAC_CNTL0, 1);
-		cvbs_write_hiu(HHI_VDAC_CNTL1, 0);
-		break;
-	case 3:// from cvbs_in passthrough to cvbs_out with vdac disabled
-		cvbs_write_hiu(HHI_VDAC_CNTL0, 0x400);
-		cvbs_write_hiu(HHI_VDAC_CNTL1, 8);
+		if (cvbs_drv.vdac_data) {
+			vdac_vref_adj(cvbs_drv.vdac_data->vref_adj);
+			vdac_gsw_adj(cvbs_drv.vdac_data->gsw);
+			vdac_enable(1, VDAC_MODULE_CVBS_OUT);
+		} else {
+			printf("cvbs ERROR:need run cvbs init.\n");
+		}
 		break;
 	default:
 		break;
@@ -776,137 +735,83 @@ static int cvbs_config_clock(void)
 	return 0;
 }
 
+static void cvbs_disable_clock(void)
+{
+	cvbs_set_hiu_bits(HHI_VID_CLK_CNTL2, 0, 4, 1);
+	cvbs_set_hiu_bits(HHI_VID_CLK_CNTL2, 0, 0, 1);
+}
+
 /*----------------------------------------------------------------------------*/
 // configuration for enci
-static void cvbs_write_vcbus_array(struct reg_s *s)
+static void cvbs_performance_enhancement(int mode)
 {
-	if (s == NULL)
-		return ;
+	const struct reg_s *s = NULL;
+	struct performance_config_s *perfconf = NULL;
+	int i = 0;
 
-	while (s && (MREG_END_MARKER != s->reg))
-	{
+	switch (mode) {
+	case VMODE_PAL:
+		perfconf = &cvbs_drv.perf_conf_pal;
+		break;
+	case VMODE_NTSC:
+	case VMODE_NTSC_M:
+		perfconf = &cvbs_drv.perf_conf_ntsc;
+		break;
+	default:
+		break;
+	}
+	if (!perfconf)
+		return;
+
+	if (!perfconf->reg_table) {
+		printf("no performance table\n");
+		return;
+	}
+
+	i = 0;
+	s = perfconf->reg_table;
+	while (i < perfconf->reg_cnt) {
+		cvbs_write_vcbus(s->reg, s->val);
+		//printf("vcbus reg[0x%04x] = 0x%08x\n", s->reg, s->val);
+
+		s++;
+		i++;
+	}
+
+	printf("%s\n", __func__);
+}
+
+static int cvbs_config_enci(int vmode)
+{
+	const struct reg_s *s = NULL;
+
+	switch (vmode) {
+	case VMODE_PAL:
+		s = &tvregs_576cvbs_enc[0];
+		break;
+	case VMODE_NTSC:
+	case VMODE_NTSC_M:
+		s = &tvregs_480cvbs_enc[0];
+		break;
+	case VMODE_PAL_M:
+		s = &tvregs_pal_m_enc[0];
+		break;
+	case VMODE_PAL_N:
+		s = &tvregs_pal_n_enc[0];
+		break;
+	default:
+		break;
+	}
+	if (s == NULL)
+		return -1;
+
+	while ((s->reg != MREG_END_MARKER)) {
 		cvbs_write_vcbus(s->reg, s->val);
 		//printf("reg[0x%.2x] = 0x%.4x\n", s->reg, s->val);
 		s ++;
 	}
-	return ;
-}
 
-#ifdef CONFIG_CVBS_PERFORMANCE_COMPATIBILITY_SUPPORT
-
-void cvbs_performance_config(void)
-{
-	int actived = CONFIG_CVBS_PERFORMANCE_ACTIVED;
-	char buf[8];
-
-	sprintf(buf, "%d", actived);
-	setenv("cvbs_drv", buf);
-
-	return ;
-}
-
-static void cvbs_performance_enhancement(int mode, unsigned int index)
-{
-	unsigned int max = 0;
-	unsigned int type = 0;
-	const struct reg_s *s = NULL;
-
-	if (VMODE_PAL != mode && VMODE_PAL_M != mode && VMODE_PAL_N != mode)
-		return;
-
-	if (0xff == index)
-		return;
-
-	if (check_cpu_type(MESON_CPU_MAJOR_ID_M8B)) {
-		max = sizeof(tvregs_576cvbs_performance_m8b)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_m8b[index];
-		type = 1;
-	} else if (check_cpu_type(MESON_CPU_MAJOR_ID_M8M2)) {
-		max = sizeof(tvregs_576cvbs_performance_m8m2)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_m8m2[index];
-		type = 2;
-	} else if (check_cpu_type(MESON_CPU_MAJOR_ID_M8)) {
-		max = sizeof(tvregs_576cvbs_performance_m8)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_m8[index];
-		type = 3;
-	} else if (check_cpu_type(MESON_CPU_MAJOR_ID_GXBB)) {
-		max = sizeof(tvregs_576cvbs_performance_gxbb)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_gxbb[index];
-		type = 4;
-	} else if (check_cpu_type(MESON_CPU_MAJOR_ID_GXTVBB)) {
-		max = sizeof(tvregs_576cvbs_performance_gxtvbb)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_gxtvbb[index];
-		type = 5;
-	} else if (is_meson_g12a_cpu() ||
-			is_meson_g12b_cpu() ||
-			is_meson_sm1_cpu()) {
-		max = sizeof(tvregs_576cvbs_performance_g12a)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_g12a[index];
-		type = 9;
-	} else if (is_meson_gxlx_cpu()) {
-		max = sizeof(tvregs_576cvbs_performance_905l)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_905l[index];
-		type = 7;
-	} else if (is_equal_after_meson_cpu(MESON_CPU_MAJOR_ID_TXL)) {
-		max = sizeof(tvregs_576cvbs_performance_txl)
-			/ sizeof(struct reg_s *);
-		index = (index >= max) ? 0 : index;
-		s = tvregs_576cvbs_performance_txl[index];
-		type = 8;
-	} else if (is_equal_after_meson_cpu(MESON_CPU_MAJOR_ID_GXL)) {
-		if (is_meson_gxl_package_905L()) {
-			max = sizeof(tvregs_576cvbs_performance_905l)
-				/ sizeof(struct reg_s *);
-			index = (index >= max) ? 0 : index;
-			s = tvregs_576cvbs_performance_905l[index];
-			type = 7;
-		} else {
-			max = sizeof(tvregs_576cvbs_performance_905x)
-				/ sizeof(struct reg_s *);
-			index = (index >= max) ? 0 : index;
-			s = tvregs_576cvbs_performance_905x[index];
-			type = 6;
-		}
-	}
-
-	printf("cvbs performance type = %d, table = %d\n", type, index);
-	cvbs_write_vcbus_array((struct reg_s*)s);
-
-	return;
-}
-
-#endif
-
-static int cvbs_config_enci(int vmode)
-{
-	unsigned int index = CONFIG_CVBS_PERFORMANCE_ACTIVED;
-
-	if (VMODE_PAL == vmode)
-		cvbs_write_vcbus_array((struct reg_s*)&tvregs_576cvbs_enc[0]);
-	else if (VMODE_NTSC == vmode)
-		cvbs_write_vcbus_array((struct reg_s*)&tvregs_480cvbs_enc[0]);
-	else if (VMODE_NTSC_M == vmode)
-		cvbs_write_vcbus_array((struct reg_s*)&tvregs_480cvbs_enc[0]);
-	else if (VMODE_PAL_M == vmode)
-		cvbs_write_vcbus_array((struct reg_s*)&tvregs_pal_m_enc[0]);
-	else if (VMODE_PAL_N == vmode)
-		cvbs_write_vcbus_array((struct reg_s*)&tvregs_pal_n_enc[0]);
-
-	cvbs_performance_enhancement(vmode, index);
+	cvbs_performance_enhancement(vmode);
 
 	return 0;
 }
@@ -946,6 +851,11 @@ int cvbs_set_vmode(char* vmode_name)
 		cvbs_config_clock();
 		cvbs_set_vdac(1);
 		return 0;
+	} else if (!strncmp(vmode_name, "disable", strlen("disable"))) {
+		cvbs_set_vdac(0);
+		cvbs_write_vcbus(ENCI_VIDEO_EN, 0);
+		cvbs_disable_clock();
+		return 0;
 	} else {
 		printf("[%s] is invalid for cvbs.\n", vmode_name);
 		return -1;
@@ -978,6 +888,171 @@ void cvbs_show_valid_vmode(void)
 	return;
 }
 
+static unsigned char cvbs_get_trimming_version(unsigned int flag)
+{
+	unsigned char version = 0xff;
+
+	if ((flag & 0xf0) == 0xa0)
+		version = 5;
+	else if ((flag & 0xf0) == 0x40)
+		version = 2;
+	else if ((flag & 0xc0) == 0x80)
+		version = 1;
+	else if ((flag & 0xc0) == 0x00)
+		version = 0;
+	return version;
+}
+
+static unsigned int cvbs_config_vdac(unsigned int value)
+{
+	unsigned char version = 0;
+	unsigned int cfg_valid, gsw_cfg;
+
+	version = cvbs_get_trimming_version((value >> 8) & 0xff);
+	/* flag 1/0 for validity of vdac config */
+	if ((version == 1) || (version == 2) || (version == 5)) {
+		cfg_valid = 1;
+		gsw_cfg = value & 0x7;
+	} else {
+		cfg_valid = 0;
+		gsw_cfg = 0xffff;
+	}
+	if (cfg_valid) {
+		printf("cvbs: %s: cvbs trimming 0x%x: %d.v%d, 0x%x\n",
+			__func__, value, cfg_valid, version, gsw_cfg);
+	}
+
+	return gsw_cfg;
+}
+
+static char *cvbsout_performance_str[] = {
+	"performance", /* default for pal */
+	"performance_pal",
+	"performance_ntsc",
+};
+
+static void cvbs_get_config(void)
+{
+#ifdef CONFIG_OF_LIBFDT
+	char *dt_addr = NULL;
+	int parent_offset;
+	char *propdata;
+	const char *str;
+	struct reg_s *s;
+	unsigned int i, j, temp, cnt;
+
+#ifdef CONFIG_DTB_MEM_ADDR
+	dt_addr = (char *)CONFIG_DTB_MEM_ADDR;
+#else
+	dt_addr = (char *)0x01000000;
+#endif
+	if (fdt_check_header(dt_addr) < 0)
+		return;
+
+	parent_offset = fdt_path_offset(dt_addr, "/cvbsout");
+	if (parent_offset < 0) {
+		printf("not find /cvbsout node: %s\n",
+			fdt_strerror(parent_offset));
+		return;
+	}
+
+	/* clk_path */
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "clk_path", NULL);
+	if (propdata) {
+		s_enci_clk_path = be32_to_cpup((u32*)propdata);
+		printf("cvbs: find clk_path: 0x%x\n", s_enci_clk_path);
+	}
+
+	/* vdac config */
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "vdac_config", NULL);
+	if (propdata) {
+		temp = cvbs_config_vdac(be32_to_cpup((u32*)propdata));
+		if (temp < 0xff)
+			cvbs_drv.vdac_data->gsw = temp;
+	}
+
+	/* performance */
+	str = cvbsout_performance_str[1];
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, str, NULL);
+	if (propdata == NULL) {
+		str = cvbsout_performance_str[0];
+		propdata = (char *)fdt_getprop(dt_addr, parent_offset, str, NULL);
+		if (propdata == NULL)
+			goto cvbs_performance_config_ntsc;
+	}
+	cnt = 0;
+	while (cnt < CVBS_PERFORMANCE_CNT_MAX) {
+		j = 2 * cnt;
+		temp = be32_to_cpup((((u32*)propdata)+j));
+		if (temp == MREG_END_MARKER) /* ending */
+			break;
+		cnt++;
+	}
+	if (cnt >= CVBS_PERFORMANCE_CNT_MAX)
+		cnt = 0;
+	if (cnt > 0) {
+		printf("cvbs: find performance_pal config\n");
+		cvbs_drv.perf_conf_pal.reg_table = malloc(sizeof(struct reg_s) * cnt);
+		if (cvbs_drv.perf_conf_pal.reg_table == NULL) {
+			printf("cvbs: error: failed to alloc %s table\n", str);
+			cnt = 0;
+		}
+		memset(cvbs_drv.perf_conf_pal.reg_table, 0, (sizeof(struct reg_s) * cnt));
+		cvbs_drv.perf_conf_pal.reg_cnt = cnt;
+
+		i = 0;
+		s = cvbs_drv.perf_conf_pal.reg_table;
+		while (i < cvbs_drv.perf_conf_pal.reg_cnt) {
+			j = 2 * i;
+			s->reg = be32_to_cpup((((u32*)propdata)+j));
+			s->val = be32_to_cpup((((u32*)propdata)+j+1));
+			/* printf("%p: 0x%04x = 0x%x\n", s, s->reg, s->val); */
+
+			s++;
+			i++;
+		}
+	}
+
+cvbs_performance_config_ntsc:
+	str = cvbsout_performance_str[2];
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, str, NULL);
+	if (propdata == NULL)
+		return;
+	cnt = 0;
+	while (cnt < CVBS_PERFORMANCE_CNT_MAX) {
+		j = 2 * cnt;
+		temp = be32_to_cpup((((u32*)propdata)+j));
+		if (temp == MREG_END_MARKER) /* ending */
+			break;
+		cnt++;
+	}
+	if (cnt >= CVBS_PERFORMANCE_CNT_MAX)
+		cnt = 0;
+	if (cnt > 0) {
+		printf("cvbs: find performance_ntsc config\n");
+		cvbs_drv.perf_conf_ntsc.reg_table = malloc(sizeof(struct reg_s) * cnt);
+		if (cvbs_drv.perf_conf_ntsc.reg_table == NULL) {
+			printf("cvbs: error: failed to alloc %s table\n", str);
+			cnt = 0;
+		}
+		memset(cvbs_drv.perf_conf_ntsc.reg_table, 0, (sizeof(struct reg_s) * cnt));
+		cvbs_drv.perf_conf_ntsc.reg_cnt = cnt;
+
+		i = 0;
+		s = cvbs_drv.perf_conf_ntsc.reg_table;
+		while (i < cvbs_drv.perf_conf_ntsc.reg_cnt) {
+			j = 2 * i;
+			s->reg = be32_to_cpup((((u32*)propdata)+j));
+			s->val = be32_to_cpup((((u32*)propdata)+j+1));
+			/* printf("%p: 0x%04x = 0x%x\n", s, s->reg, s->val); */
+
+			s++;
+			i++;
+		}
+	}
+#endif
+}
+
 void vdac_data_config(void)
 {
 	printf("cvbs: cpuid:0x%x\n", get_cpu_id().family_id);
@@ -985,27 +1060,30 @@ void vdac_data_config(void)
 	case MESON_CPU_MAJOR_ID_GXL:
 	case MESON_CPU_MAJOR_ID_GXM:
 	case MESON_CPU_MAJOR_ID_GXLX:
-		cvbs_vdac_data = &vdac_data_gxl;
+		cvbs_drv.vdac_data = &vdac_data_gxl;
 		break;
 	case MESON_CPU_MAJOR_ID_TXL:
 	case MESON_CPU_MAJOR_ID_TXHD:
 	case MESON_CPU_MAJOR_ID_TXLX:
-		cvbs_vdac_data = &vdac_data_txl;
+		cvbs_drv.vdac_data = &vdac_data_txl;
 		break;
 	case MESON_CPU_MAJOR_ID_G12A:
-		cvbs_vdac_data = &vdac_data_g12a;
+		cvbs_drv.vdac_data = &vdac_data_g12a;
 		break;
 	case MESON_CPU_MAJOR_ID_G12B:
-		cvbs_vdac_data = &vdac_data_g12b;
+		cvbs_drv.vdac_data = &vdac_data_g12b;
 		break;
 	case MESON_CPU_MAJOR_ID_SM1:
-		cvbs_vdac_data = &vdac_data_sm1;
+		cvbs_drv.vdac_data = &vdac_data_sm1;
 		break;
 	case MESON_CPU_MAJOR_ID_TL1:
-		cvbs_vdac_data = &vdac_data_tl1;
+		cvbs_drv.vdac_data = &vdac_data_tl1;
+		break;
+	case MESON_CPU_MAJOR_ID_TM2:
+		cvbs_drv.vdac_data = &vdac_data_tm2;
 		break;
 	default:
-		cvbs_vdac_data = &vdac_data_default;
+		cvbs_drv.vdac_data = &vdac_data_default;
 		break;
 	}
 
@@ -1015,9 +1093,8 @@ void vdac_data_config(void)
 void cvbs_init(void)
 {
 	vdac_data_config();
-#ifdef CONFIG_CVBS_PERFORMANCE_COMPATIBILITY_SUPPORT
-	cvbs_performance_config();
-#endif
+	vdac_ctrl_config_probe();
+	cvbs_get_config();
 
 	return;
 }

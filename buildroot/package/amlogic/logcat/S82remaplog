@@ -1,0 +1,8 @@
+#!/bin/sh
+	rm /dev/log
+	mkdir /dev/log
+	ln -s /dev/log_main /dev/log/main
+	ln -s /dev/log_system /dev/log/system
+	ln -s /dev/log_radio /dev/log/radio
+	ln -s /dev/log_events /dev/log/events
+	chmod 773 /dev/log_*

@@ -306,6 +306,31 @@ MALI_STATIC_INLINE mali_bool mali_timeline_is_point_released(struct mali_timelin
 }
 
 /**
+ * Check if the tracker that the point relate to has been released.  A point is released if the tracker is not on the timeline.
+ * @param timeline Timeline.
+ * @param point Point on timeline.
+ * @return MALI_TRUE if the tracker has been release, MALI_FALSE if not.
+ */
+MALI_STATIC_INLINE mali_bool mali_timeline_is_tracker_released(struct mali_timeline *timeline, mali_timeline_point point)
+{
+	struct mali_timeline_tracker *tracker;
+	
+	MALI_DEBUG_ASSERT_POINTER(timeline);
+	MALI_DEBUG_ASSERT(MALI_TIMELINE_NO_POINT != point);
+
+	tracker = timeline->tracker_tail;
+
+	while (NULL != tracker) {
+		if (point == tracker->point)
+			return MALI_FALSE;
+		tracker = tracker->timeline_next;
+	}
+
+	return MALI_TRUE;
+}
+
+
+/**
  * Check if a point is valid.  A point is valid if is on the timeline or has been released.
  *
  * @param timeline Timeline.

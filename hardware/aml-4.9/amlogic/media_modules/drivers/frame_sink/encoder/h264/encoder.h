@@ -307,6 +307,7 @@ struct encode_picinfo_s {
 	u32 non_ref_limit;
 	u32 non_ref_cnt;
 #endif
+	u32 color_space;
 };
 
 struct encode_cbr_s {

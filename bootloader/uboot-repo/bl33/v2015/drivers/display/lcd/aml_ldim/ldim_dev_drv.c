@@ -347,14 +347,16 @@ static void aml_ldim_device_config_print(void)
 		"en_gpio_off            = %d\n"
 		"dim_max                = 0x%03x\n"
 		"dim_min                = 0x%03x\n"
-		"region_num             = %d\n\n",
+		"region_num             = %d\n\n"
+		"device_count             = %d\n\n",
 		ldim_dev_config->name,
 		ldim_dev_config->en_gpio,
 		ldim_dev_config->en_gpio_on,
 		ldim_dev_config->en_gpio_off,
 		ldim_dev_config->dim_min,
 		ldim_dev_config->dim_max,
-		ldim_dev_config->bl_regnum);
+		ldim_dev_config->bl_regnum,
+		ldim_dev_config->device_count);
 
 	switch (ldim_dev_config->type) {
 	case LDIM_DEV_TYPE_SPI:
@@ -439,16 +441,22 @@ static char *ldim_pinmux_str[LDIM_PINMUX_MAX] = {
 };
 
 #ifdef CONFIG_OF_LIBFDT
-static int aml_ldim_pinmux_load_from_dts(char *dt_addr, struct ldim_dev_config_s *ldev_conf,
+static int aml_ldim_pinmux_load_from_dts(char *dt_addr,
+		struct ldim_dev_config_s *ldev_conf,
 		const char *str, struct bl_pwm_config_s *bl_pwm)
 {
 	int parent_offset;
-	char *propdata;
-	char propname[30];
+	char *propname, *propdata;
 	int i, temp, len = 0;
 	int ret = 0;
 
 	/* get pinmux */
+	propname = (char *)malloc(30);
+	if (!propname) {
+		LDIMERR("%s: propname malloc failed\n", __func__);
+		return -1;
+	}
+	memset(propname, 0, 30);
 	sprintf(propname, "/pinmux/%s", str);
 	parent_offset = fdt_path_offset(dt_addr, propname);
 	if (parent_offset < 0) {
@@ -457,62 +465,64 @@ static int aml_ldim_pinmux_load_from_dts(char *dt_addr, struct ldim_dev_config_s
 		bl_pwm->pinmux_set[0][1] = 0x0;
 		bl_pwm->pinmux_clr[0][0] = LCD_PINMUX_END;
 		bl_pwm->pinmux_clr[0][1] = 0x0;
+		free(propname);
 		return -1;
-	} else {
-		propdata = (char *)fdt_getprop(dt_addr, parent_offset, "amlogic,setmask", &len);
-		if (propdata == NULL) {
-			LDIMERR("failed to get amlogic,setmask\n");
-			bl_pwm->pinmux_set[0][0] = LCD_PINMUX_END;
-			bl_pwm->pinmux_set[0][1] = 0x0;
-		} else {
-			temp = len / 8;
-			for (i = 0; i < temp; i++) {
-				bl_pwm->pinmux_set[i][0] = be32_to_cpup((((u32*)propdata)+2*i));
-				bl_pwm->pinmux_set[i][1] = be32_to_cpup((((u32*)propdata)+2*i+1));
-			}
-			if (temp < (LCD_PINMUX_NUM - 1)) {
-				bl_pwm->pinmux_set[temp][0] = LCD_PINMUX_END;
-				bl_pwm->pinmux_set[temp][1] = 0x0;
-			}
-		}
+	}
+	free(propname);
 
-		propdata = (char *)fdt_getprop(dt_addr, parent_offset, "amlogic,clrmask", &len);
-		if (propdata == NULL) {
-			LDIMERR("failed to get amlogic,clrmask\n");
-			bl_pwm->pinmux_clr[0][0] = LCD_PINMUX_END;
-			bl_pwm->pinmux_clr[0][1] = 0x0;
-		} else {
-			temp = len / 8;
-			for (i = 0; i < temp; i++) {
-				bl_pwm->pinmux_clr[i][0] = be32_to_cpup((((u32*)propdata)+2*i));
-				bl_pwm->pinmux_clr[i][1] = be32_to_cpup((((u32*)propdata)+2*i+1));
-			}
-			if (temp < (LCD_PINMUX_NUM - 1)) {
-				bl_pwm->pinmux_clr[temp][0] = LCD_PINMUX_END;
-				bl_pwm->pinmux_clr[temp][1] = 0x0;
-			}
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "amlogic,setmask", &len);
+	if (propdata == NULL) {
+		LDIMERR("failed to get amlogic,setmask\n");
+		bl_pwm->pinmux_set[0][0] = LCD_PINMUX_END;
+		bl_pwm->pinmux_set[0][1] = 0x0;
+	} else {
+		temp = len / 8;
+		for (i = 0; i < temp; i++) {
+			bl_pwm->pinmux_set[i][0] = be32_to_cpup((((u32*)propdata)+2*i));
+			bl_pwm->pinmux_set[i][1] = be32_to_cpup((((u32*)propdata)+2*i+1));
 		}
-		if (lcd_debug_print_flag) {
-			i = 0;
-			while (i < LCD_PINMUX_NUM) {
-				if (bl_pwm->pinmux_set[i][0] == LCD_PINMUX_END)
-					break;
-				LDIMPR("%s set: %d, 0x%08x\n",
-					str,
-					bl_pwm->pinmux_set[i][0],
-					bl_pwm->pinmux_set[i][1]);
-				i++;
-			}
-			i = 0;
-			while (i < LCD_PINMUX_NUM) {
-				if (bl_pwm->pinmux_clr[i][0] == LCD_PINMUX_END)
-					break;
-				LDIMPR("%s clr: %d, 0x%08x\n",
-					str,
-					bl_pwm->pinmux_clr[i][0],
-					bl_pwm->pinmux_clr[i][1]);
-				i++;
-			}
+		if (temp < (LCD_PINMUX_NUM - 1)) {
+			bl_pwm->pinmux_set[temp][0] = LCD_PINMUX_END;
+			bl_pwm->pinmux_set[temp][1] = 0x0;
+		}
+	}
+
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "amlogic,clrmask", &len);
+	if (propdata == NULL) {
+		LDIMERR("failed to get amlogic,clrmask\n");
+		bl_pwm->pinmux_clr[0][0] = LCD_PINMUX_END;
+		bl_pwm->pinmux_clr[0][1] = 0x0;
+	} else {
+		temp = len / 8;
+		for (i = 0; i < temp; i++) {
+			bl_pwm->pinmux_clr[i][0] = be32_to_cpup((((u32*)propdata)+2*i));
+			bl_pwm->pinmux_clr[i][1] = be32_to_cpup((((u32*)propdata)+2*i+1));
+		}
+		if (temp < (LCD_PINMUX_NUM - 1)) {
+			bl_pwm->pinmux_clr[temp][0] = LCD_PINMUX_END;
+			bl_pwm->pinmux_clr[temp][1] = 0x0;
+		}
+	}
+	if (lcd_debug_print_flag) {
+		i = 0;
+		while (i < LCD_PINMUX_NUM) {
+			if (bl_pwm->pinmux_set[i][0] == LCD_PINMUX_END)
+				break;
+			LDIMPR("%s set: %d, 0x%08x\n",
+				str,
+				bl_pwm->pinmux_set[i][0],
+				bl_pwm->pinmux_set[i][1]);
+			i++;
+		}
+		i = 0;
+		while (i < LCD_PINMUX_NUM) {
+			if (bl_pwm->pinmux_clr[i][0] == LCD_PINMUX_END)
+				break;
+			LDIMPR("%s clr: %d, 0x%08x\n",
+				str,
+				bl_pwm->pinmux_clr[i][0],
+				bl_pwm->pinmux_clr[i][1]);
+			i++;
 		}
 	}
 
@@ -614,6 +624,8 @@ static int aml_ldim_pinmux_load(char *dt_addr, struct aml_ldim_driver_s *ldim_dr
 
 	/* analog_pwm */
 	bl_pwm = &ldim_drv->ldev_conf->analog_pwm_config;
+	if (bl_pwm->pwm_port >= BL_PWM_MAX)
+		return 0;
 	str = ldim_pinmux_str[2];
 	switch (ldim_drv->ldev_conf->pinctrl_ver) {
 	case 0:
@@ -630,14 +642,20 @@ static int aml_ldim_pinmux_load(char *dt_addr, struct aml_ldim_driver_s *ldim_dr
 }
 
 #ifdef CONFIG_OF_LIBFDT
-static int aml_ldim_dev_init_table_dynamic_size_load_dts(char *dtaddr,
+int aml_ldim_dev_init_table_dynamic_size_load_dts(char *dtaddr,
 		int nodeoffset, struct ldim_dev_config_s *ldconf, int flag)
 {
 	unsigned char cmd_size, type;
 	int i = 0, j, max_len;
 	unsigned char *table;
-	char propname[20];
-	char *propdata;
+	char *propname, *propdata;
+
+	propname = (char *)malloc(30);
+	if (!propname) {
+		LDIMERR("%s: propname malloc failed\n", __func__);
+		return -1;
+	}
+	memset(propname, 0, 30);
 
 	if (flag) {
 		table = ldconf->init_on;
@@ -650,7 +668,7 @@ static int aml_ldim_dev_init_table_dynamic_size_load_dts(char *dtaddr,
 	}
 	if (table == NULL) {
 		LDIMERR("%s init_table is null\n", propname);
-		return 0;
+		goto init_table_dynamic_dts_ok;
 	}
 
 	propdata = (char *)fdt_getprop(dtaddr, nodeoffset, propname, NULL);
@@ -658,7 +676,7 @@ static int aml_ldim_dev_init_table_dynamic_size_load_dts(char *dtaddr,
 		LDIMERR("%s: get %s failed\n", ldconf->name, propname);
 		table[0] = LCD_EXT_CMD_TYPE_END;
 		table[1] = 0;
-		return -1;
+		goto init_table_dynamic_dts_failed;
 	}
 
 	while ((i + 1) < max_len) {
@@ -674,7 +692,7 @@ static int aml_ldim_dev_init_table_dynamic_size_load_dts(char *dtaddr,
 			LDIMERR("%s: %s cmd_size out of support\n", ldconf->name, propname);
 			table[i] = LCD_EXT_CMD_TYPE_END;
 			table[i+1] = 0;
-			return -1;
+			goto init_table_dynamic_dts_failed;
 		}
 		for (j = 0; j < cmd_size; j++)
 			table[i+2+j] = (unsigned char)(be32_to_cpup((((u32*)propdata)+i+2+j)));
@@ -687,17 +705,29 @@ init_table_dynamic_dts_next:
 	else
 		ldconf->init_off_cnt = i + 2;
 
+init_table_dynamic_dts_ok:
+	free(propname);
 	return 0;
+
+init_table_dynamic_dts_failed:
+	free(propname);
+	return -1;
 }
 
-static int aml_ldim_dev_init_table_fixed_size_load_dts(char *dtaddr,
+int aml_ldim_dev_init_table_fixed_size_load_dts(char *dtaddr,
 		int nodeoffset, struct ldim_dev_config_s *ldconf, int flag)
 {
 	unsigned char cmd_size;
 	int i = 0, j, max_len;
 	unsigned char *table;
-	char propname[20];
-	char *propdata;
+	char *propname, *propdata;
+
+	propname = (char *)malloc(30);
+	if (!propname) {
+		LDIMERR("%s: propname malloc failed\n", __func__);
+		return -1;
+	}
+	memset(propname, 0, 30);
 
 	cmd_size = ldconf->cmd_size;
 	if (flag) {
@@ -711,7 +741,7 @@ static int aml_ldim_dev_init_table_fixed_size_load_dts(char *dtaddr,
 	}
 	if (table == NULL) {
 		LDIMPR("%s init_table is null\n", propname);
-		return 0;
+		goto init_table_fixed_dts_ok;
 	}
 
 	propdata = (char *)fdt_getprop(dtaddr, nodeoffset, propname, NULL);
@@ -726,7 +756,7 @@ static int aml_ldim_dev_init_table_fixed_size_load_dts(char *dtaddr,
 		if ((i + cmd_size) > max_len) {
 			LDIMERR("%s: %s cmd_size out of support\n", ldconf->name, propname);
 			table[i] = LCD_EXT_CMD_TYPE_END;
-			return -1;
+			goto init_table_fixed_dts_failed;
 		}
 		for (j = 0; j < cmd_size; j++)
 			table[i+j] = (unsigned char)(be32_to_cpup((((u32*)propdata)+i+j)));
@@ -741,14 +771,19 @@ static int aml_ldim_dev_init_table_fixed_size_load_dts(char *dtaddr,
 	else
 		ldconf->init_off_cnt = i + cmd_size;
 
+init_table_fixed_dts_ok:
+	free(propname);
 	return 0;
+
+init_table_fixed_dts_failed:
+	free(propname);
+	return -1;
 }
 
-static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
+int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 {
 	int parent_offset, child_offset;
-	char propname[30];
-	char *propdata;
+	char *propname, *propdata;
 	char *p;
 	const char *str;
 	int temp;
@@ -812,6 +847,12 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 	}
 
 	/* get device config */
+	propname = (char *)malloc(30);
+	if (!propname) {
+		LDIMERR("%s: propname malloc failed\n", __func__);
+		return -1;
+	}
+	memset(propname, 0, 30);
 	sprintf(propname,"/local_dimming_device/ldim_dev_%d", index);
 	child_offset = fdt_path_offset(dt_addr, propname);
 	if (child_offset < 0) {
@@ -820,9 +861,11 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 		if (child_offset < 0) {
 			LDIMERR("not find %s node: %s\n",
 				propname, fdt_strerror(child_offset));
+			free(propname);
 			return -1;
 		}
 	}
+	free(propname);
 
 	propdata = (char *)fdt_getprop(dt_addr, child_offset, "ldim_dev_name", NULL);
 	if (propdata == NULL)
@@ -944,6 +987,14 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 		LDIMPR("type: %d\n", ldim_dev_config->type);
 		}
 
+	propdata = (char *)fdt_getprop(dt_addr, child_offset,
+				       "device_count", NULL);
+	if (propdata == NULL)
+		LDIMERR("failed to get device_count\n");
+	else
+		ldim_dev_config->device_count = be32_to_cpup((u32 *)
+					propdata);
+
 	propdata = (char *)fdt_getprop(dt_addr, child_offset, "ldim_pwm_pinmux_sel", NULL);
 	if (propdata == NULL) {
 		strcpy(ldim_dev_config->pinmux_name, "invalid");
@@ -961,14 +1012,6 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 	case LDIM_DEV_TYPE_SPI:
 		ldim_drv->spi_info = &ldim_spi_info;
 		/* get spi config */
-		/*
-		propdata = (char *)fdt_getprop(dt_addr, parent_offset, "spi_bus_num", NULL);
-		if (propdata == NULL)
-			LDIMERR("failed to get spi_bus_num\n");
-		else
-			ldim_spi_info.bus_num = be32_to_cpup((u32*)propdata);
-		*/
-
 		ldim_spi_info.bus_num = 0; /* fix value */
 		propdata = (char *)fdt_getprop(dt_addr, child_offset, "spi_chip_select", NULL);
 		if (propdata == NULL)
@@ -989,9 +1032,12 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 			ldim_spi_info.mode = be32_to_cpup((u32*)propdata);
 
 		if (lcd_debug_print_flag) {
-			LDIMPR("spi bus_num=%d, chip_select=%d, max_frequency=%d, mode=%d\n",
-				ldim_spi_info.bus_num, ldim_spi_info.chip_select,
-				ldim_spi_info.max_speed_hz, ldim_spi_info.mode);
+			LDIMPR("spi bus_num=%d, chip_select=%d",
+			       ldim_spi_info.bus_num,
+			       ldim_spi_info.chip_select);
+			LDIMPR("max_frequency=%d, mode=%d\n",
+			       ldim_spi_info.max_speed_hz,
+			       ldim_spi_info.mode);
 		}
 
 		propdata = (char *)fdt_getprop(dt_addr, child_offset, "spi_cs_delay", NULL);
@@ -1045,6 +1091,7 @@ static int ldim_dev_get_config_from_dts(char *dt_addr, int index)
 		}
 		if (ret == 0)
 			ldim_dev_config->init_loaded = 1;
+
 		break;
 	case LDIM_DEV_TYPE_I2C:
 		break;
@@ -1094,6 +1141,14 @@ static int ldim_dev_add_driver(struct aml_ldim_driver_s *ldim_drv)
 #ifdef CONFIG_AML_LOCAL_DIMMING_IW7027
 		ret = ldim_dev_iw7027_probe(ldim_drv);
 #endif
+	} else if (strcmp(ldev_conf->name, "iw7027_he") == 0) {
+#ifdef CONFIG_AML_LOCAL_DIMMING_IW7027_HE
+		ret = ldim_dev_iw7027_he_probe(ldim_drv);
+#endif
+	} else if (strcmp(ldev_conf->name, "iw7038") == 0) {
+#ifdef CONFIG_AML_LOCAL_DIMMING_IW7038
+		ret = ldim_dev_iw7038_probe(ldim_drv);
+#endif
 	} else if (strcmp(ldev_conf->name, "ob3350") == 0) {
 #ifdef CONFIG_AML_LOCAL_DIMMING_OB3350
 		ret = ldim_dev_ob3350_probe(ldim_drv);
@@ -1134,6 +1189,14 @@ static int ldim_dev_remove_driver(struct aml_ldim_driver_s *ldim_drv)
 	} else if (strcmp(ldev_conf->name, "iw7027") == 0) {
 #ifdef CONFIG_AML_LOCAL_DIMMING_IW7027
 		ret = ldim_dev_iw7027_remove(ldim_drv);
+#endif
+	} else if (strcmp(ldev_conf->name, "iw7027_he") == 0) {
+#ifdef CONFIG_AML_LOCAL_DIMMING_IW7027_HE
+		ret = ldim_dev_iw7027_he_remove(ldim_drv);
+#endif
+	} else if (strcmp(ldev_conf->name, "iw7038") == 0) {
+#ifdef CONFIG_AML_LOCAL_DIMMING_IW7038
+		ret = ldim_dev_iw7038_probe(ldim_drv);
 #endif
 	} else if (strcmp(ldev_conf->name, "ob3350") == 0) {
 #ifdef CONFIG_AML_LOCAL_DIMMING_OB3350

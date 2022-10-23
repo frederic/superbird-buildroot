@@ -27,6 +27,8 @@
 #undef pr_fmt
 #define pr_fmt(fmt) "meson-mmc: " fmt
 
+#define EMMC_ERASE_TIMEOUT	(40*HZ)
+
 #define AML_FIXED_ADJ_MIN	5
 #define AML_FIXED_ADJ_MAX	6
 #define AML_FIXED_ADJ_STEP	4
@@ -204,6 +206,7 @@ enum mmc_chip_e {
 	MMC_CHIP_G12B = 0x29b,
 	MMC_CHIP_SM1 = 0X2C,
 	MMC_CHIP_TM2 = 0X2D,
+	MMC_CHIP_TM2_B = 0X2E,
 };
 
 struct mmc_phase {
@@ -257,10 +260,40 @@ struct clock_lay_t {
 #define TODLY_MIN_NS	(2)
 #define TODLY_MAX_NS	(14)
 
+struct hs400_para {
+	unsigned int delay1;
+	unsigned int delay2;
+	unsigned int intf3;
+	unsigned int flag;
+};
+
+struct hs200_para {
+	unsigned int adjust;
+};
+
+struct hs_para {
+	unsigned int adjust;
+};
+
+struct aml_tuning_para {
+	unsigned int chip_id[4];
+	unsigned int magic;
+	unsigned int vddee;
+	struct hs400_para hs4[7];
+	struct hs200_para hs2;
+	struct hs_para hs;
+	unsigned int version;
+	unsigned int busmod;
+	unsigned int update;
+	int temperature;
+	long long checksum;
+};
+
 struct amlsd_platform {
 	struct amlsd_host *host;
 	struct mmc_host *mmc;
 	struct list_head sibling;
+	struct aml_tuning_para para;
 	u32 ocr_avail;
 	u32 port;
 #define	 PORT_SDIO_A	 0
@@ -281,6 +314,7 @@ struct amlsd_platform {
 	unsigned int card_capacity;
 	unsigned int tx_phase;
 	unsigned int tx_delay;
+	unsigned int save_para;
 	unsigned int co_phase;
 	unsigned int f_min;
 	unsigned int f_max;
@@ -456,6 +490,7 @@ struct amlsd_host {
 	char cmd_retune;
 	char find_win;
 	char tuning_mode;
+	int gp0_enable;
 	unsigned int is_sduart;
 	unsigned int irq;
 	unsigned int irq_in;
@@ -549,6 +584,8 @@ struct amlsd_host {
 	struct aml_emmc_adjust emmc_adj;
 	struct aml_emmc_rxclk emmc_rxclk;
 	u32 error_flag;
+	unsigned int reg_bak[20];
+	unsigned int resume_clock;
 	/* pre cmd op */
 	unsigned int (*pre_cmd_op)(struct amlsd_host *host,
 		struct mmc_request *mrq, struct sd_emmc_desc_info *desc);

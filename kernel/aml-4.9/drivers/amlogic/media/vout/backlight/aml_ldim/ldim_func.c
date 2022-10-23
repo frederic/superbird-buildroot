@@ -415,6 +415,7 @@ void LD_LUTInit(struct LDReg_s *Reg)
 
 	switch (bl_drv->data->chip_type) {
 	case BL_CHIP_TXLX:
+	case BL_CHIP_TM2:
 		for (i = 0; i < 16; i++) {
 			for (j = 0; j < 16; j++)
 				Remap_lut2[i][j] = LD_remap_lut[i][j * 2] |
@@ -699,6 +700,7 @@ void LD_ConLDReg(struct LDReg_s *Reg)
 
 	switch (bl_drv->data->chip_type) {
 	case BL_CHIP_TXLX:
+	case BL_CHIP_TM2:
 		ConLDReg_TXLX(Reg);
 		break;
 	default:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -51,6 +51,7 @@
 #include "vos_types.h"
 #include "vos_trace.h"
 #include "vos_sched.h"
+#include "wlan_hdd_request_manager.h"
 
 //Ms to Micro Sec
 #define MS_TO_MUS(x)   ((x)*1000)
@@ -165,6 +166,10 @@ static bool hdd_p2p_is_action_type_rsp( const u8 *buf, uint32_t len )
     return FALSE;
 }
 
+struct random_mac_priv {
+	bool set_random_addr;
+};
+
 /**
  * hdd_random_mac_callback() - Callback invoked from wmi layer
  * @set_random_addr: Status of random mac filter set operation
@@ -177,32 +182,20 @@ static bool hdd_p2p_is_action_type_rsp( const u8 *buf, uint32_t len )
  */
 static void hdd_random_mac_callback(bool set_random_addr, void *context)
 {
-	struct random_mac_context *rnd_ctx;
-	hdd_adapter_t *adapter;
+	struct hdd_request *request;
+	struct random_mac_priv *priv;
 
-	if (!context) {
-		hddLog(LOGE, FL("Bad param, pContext"));
+	request = hdd_request_get(context);
+	if (!request) {
+		hddLog(LOGE,FL("invalid request"));
 		return;
 	}
 
-	rnd_ctx = context;
-	adapter = rnd_ctx->adapter;
+	priv = hdd_request_priv(request);
+	priv->set_random_addr = set_random_addr;
 
-	spin_lock(&hdd_context_lock);
-	if ((!adapter) ||
-	    (rnd_ctx->magic != ACTION_FRAME_RANDOM_CONTEXT_MAGIC)) {
-		spin_unlock(&hdd_context_lock);
-		hddLog(VOS_TRACE_LEVEL_WARN,
-		       FL("Invalid context, magic [%08x]"), rnd_ctx->magic);
-		return;
-	}
-
-	rnd_ctx->magic = 0;
-	if (set_random_addr)
-		rnd_ctx->set_random_addr = true;
-
-	complete(&rnd_ctx->random_mac_completion);
-	spin_unlock(&hdd_context_lock);
+	hdd_request_complete(request);
+	hdd_request_put(request);
 }
 
 /**
@@ -214,11 +207,17 @@ static void hdd_random_mac_callback(bool set_random_addr, void *context)
  */
 static bool hdd_set_random_mac(hdd_adapter_t *adapter, uint8_t *random_mac_addr)
 {
-	struct random_mac_context context;
 	hdd_context_t *hdd_ctx;
 	eHalStatus sme_status;
 	unsigned long rc;
+	void *cookie;
 	bool status = false;
+	struct hdd_request     *request;
+	struct random_mac_priv *priv;
+	static const struct hdd_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WAIT_TIME_SET_RND,
+	};
 
 	ENTER();
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -227,32 +226,33 @@ static bool hdd_set_random_mac(hdd_adapter_t *adapter, uint8_t *random_mac_addr)
 		return false;
 	}
 
-	init_completion(&context.random_mac_completion);
-	context.adapter = adapter;
-	context.magic = ACTION_FRAME_RANDOM_CONTEXT_MAGIC;
-	context.set_random_addr = false;
+	request = hdd_request_alloc(&params);
+	if (!request) {
+		hddLog(LOGE, FL("Request allocation failure"));
+		return false;
+	}
+
+	cookie = hdd_request_cookie(request);
 
 	sme_status = sme_set_random_mac(hdd_ctx->hHal, hdd_random_mac_callback,
 				     adapter->sessionId, random_mac_addr,
-				     &context);
+				     cookie);
 
 	if (sme_status != eHAL_STATUS_SUCCESS) {
 		hddLog(LOGE,FL("Unable to set random mac"));
 	} else {
-		rc = wait_for_completion_timeout(&context.random_mac_completion,
-                                    msecs_to_jiffies(WLAN_WAIT_TIME_SET_RND));
-		if (!rc) {
-			hddLog(LOGE,
-			FL("SME timed out while setting random mac"));
+		rc = hdd_request_wait_for_response(request);
+		if (rc) {
+			hddLog(LOGE, FL("SME timed out while setting random mac"));
+		} else {
+			priv = hdd_request_priv(request);
+			status = priv->set_random_addr;
 		}
 	}
 
-	spin_lock(&hdd_context_lock);
-	context.magic = 0;
-	status = context.set_random_addr;
-	spin_unlock(&hdd_context_lock);
-
+	hdd_request_put(request);
 	EXIT();
+
 	return status;
 }
 
@@ -292,16 +292,16 @@ bool hdd_check_random_mac(hdd_adapter_t *adapter, uint8_t *random_mac_addr)
 {
 	uint32_t i = 0;
 
-	spin_lock(&adapter->random_mac_lock);
+	adf_os_spin_lock(&adapter->random_mac_lock);
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 		if ((adapter->random_mac[i].in_use) &&
 		    (!memcmp(adapter->random_mac[i].addr, random_mac_addr,
 			     VOS_MAC_ADDR_SIZE))) {
-			spin_unlock(&adapter->random_mac_lock);
+			adf_os_spin_unlock(&adapter->random_mac_lock);
 			return true;
 		}
 	}
-	spin_unlock(&adapter->random_mac_lock);
+	adf_os_spin_unlock(&adapter->random_mac_lock);
 	return false;
 }
 
@@ -434,7 +434,7 @@ static int32_t hdd_set_action_frame_random_mac(hdd_adapter_t *adapter,
 	hddLog(LOG1, FL("mac_addr: " MAC_ADDRESS_STR " && cookie = %llu"),
 			MAC_ADDR_ARRAY(random_mac_addr), cookie);
 
-	spin_lock(&adapter->random_mac_lock);
+	adf_os_spin_lock(&adapter->random_mac_lock);
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 		if (adapter->random_mac[i].in_use) {
 			in_use_cnt++;
@@ -448,7 +448,7 @@ static int32_t hdd_set_action_frame_random_mac(hdd_adapter_t *adapter,
 		append_ret = append_action_frame_cookie(
 					&adapter->random_mac[i].cookie_list,
 					cookie);
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 
 		if(append_ret == -ENOMEM) {
 			hddLog(LOGE, FL("No Sufficient memory for cookie"));
@@ -466,7 +466,7 @@ static int32_t hdd_set_action_frame_random_mac(hdd_adapter_t *adapter,
 
 	if ((in_use_cnt == MAX_RANDOM_MAC_ADDRS)
 		|| (i == MAX_RANDOM_MAC_ADDRS)) {
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hddLog(LOGE, FL("Reached the limit of Max random addresses"));
 		return -EBUSY;
 	}
@@ -475,21 +475,21 @@ static int32_t hdd_set_action_frame_random_mac(hdd_adapter_t *adapter,
 	action_cookie = allocate_action_frame_cookie(&adapter->random_mac[i].cookie_list,
 					cookie);
 	if(!action_cookie) {
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hddLog(LOGE, FL("No Sufficient memory for cookie"));
 		return -ENOMEM;
 	}
 	vos_mem_copy(adapter->random_mac[i].addr, random_mac_addr,
 		     VOS_MAC_ADDR_SIZE);
 	adapter->random_mac[i].in_use = true;
-	spin_unlock(&adapter->random_mac_lock);
+	adf_os_spin_unlock(&adapter->random_mac_lock);
 	/* Program random mac_addr */
 	if (!hdd_set_random_mac(adapter, adapter->random_mac[i].addr)) {
-		spin_lock(&adapter->random_mac_lock);
+		adf_os_spin_lock(&adapter->random_mac_lock);
 		/* clear the cookie */
 		delete_action_frame_cookie(action_cookie);
 		adapter->random_mac[i].in_use = false;
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hddLog(LOGE, FL("random mac filter set failed for: "
 				MAC_ADDRESS_STR),
 				MAC_ADDR_ARRAY(adapter->random_mac[i].addr));
@@ -527,7 +527,7 @@ static int32_t hdd_reset_action_frame_random_mac(hdd_adapter_t *adapter,
 	hddLog(LOG1, FL("mac_addr: " MAC_ADDRESS_STR " && cookie = %llu"),
 			MAC_ADDR_ARRAY(random_mac_addr), cookie);
 
-	spin_lock(&adapter->random_mac_lock);
+	adf_os_spin_lock(&adapter->random_mac_lock);
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 		if ((adapter->random_mac[i].in_use) &&
 		    (!memcmp(adapter->random_mac[i].addr,
@@ -536,7 +536,7 @@ static int32_t hdd_reset_action_frame_random_mac(hdd_adapter_t *adapter,
 	}
 
 	if (i == MAX_RANDOM_MAC_ADDRS) {
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hddLog(LOGE, FL("trying to delete cookie of random mac-addr"
 				" for which entry is not present"));
 		return -EINVAL;
@@ -546,7 +546,7 @@ static int32_t hdd_reset_action_frame_random_mac(hdd_adapter_t *adapter,
 				    cookie);
 
 	if (!action_cookie) {
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hddLog(LOG1, FL("No cookie matches"));
 		return 0;
 	}
@@ -554,7 +554,7 @@ static int32_t hdd_reset_action_frame_random_mac(hdd_adapter_t *adapter,
 	delete_action_frame_cookie(action_cookie);
 	if (list_empty(&adapter->random_mac[i].cookie_list)) {
 		adapter->random_mac[i].in_use = false;
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hdd_clear_random_mac(adapter, random_mac_addr);
 		hddLog(LOG1, FL("Deleted random mac_addr:"
 				MAC_ADDRESS_STR),
@@ -562,7 +562,7 @@ static int32_t hdd_reset_action_frame_random_mac(hdd_adapter_t *adapter,
 		return 0;
 	}
 
-	spin_unlock(&adapter->random_mac_lock);
+	adf_os_spin_unlock(&adapter->random_mac_lock);
 	return 0;
 }
 
@@ -585,7 +585,7 @@ static int32_t hdd_delete_action_frame_cookie(hdd_adapter_t *adapter,
 
 	hddLog(LOG1, FL("Delete cookie = %llu"), cookie);
 
-        spin_lock(&adapter->random_mac_lock);
+        adf_os_spin_lock(&adapter->random_mac_lock);
         for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 		if (!adapter->random_mac[i].in_use)
 			continue;
@@ -600,18 +600,18 @@ static int32_t hdd_delete_action_frame_cookie(hdd_adapter_t *adapter,
 
 		if (list_empty(&adapter->random_mac[i].cookie_list)) {
 			adapter->random_mac[i].in_use = false;
-			spin_unlock(&adapter->random_mac_lock);
+			adf_os_spin_unlock(&adapter->random_mac_lock);
 			hdd_clear_random_mac(adapter,
 					     adapter->random_mac[i].addr);
 			hddLog(LOG1, FL("Deleted random addr "MAC_ADDRESS_STR),
 				MAC_ADDR_ARRAY(adapter->random_mac[i].addr));
 			return 0;
 		}
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		return 0;
 	}
 
-	spin_unlock(&adapter->random_mac_lock);
+	adf_os_spin_unlock(&adapter->random_mac_lock);
 	hddLog(LOG1, FL("Invalid cookie"));
 	return -EINVAL;
 }
@@ -632,7 +632,7 @@ static void hdd_delete_all_action_frame_cookies(hdd_adapter_t *adapter)
 	struct list_head *n;
 	struct list_head *temp;
 
-	spin_lock(&adapter->random_mac_lock);
+	adf_os_spin_lock(&adapter->random_mac_lock);
 
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 
@@ -650,14 +650,14 @@ static void hdd_delete_all_action_frame_cookies(hdd_adapter_t *adapter)
 		}
 
 		adapter->random_mac[i].in_use = false;
-		spin_unlock(&adapter->random_mac_lock);
+		adf_os_spin_unlock(&adapter->random_mac_lock);
 		hdd_clear_random_mac(adapter, adapter->random_mac[i].addr);
 		hddLog(LOG1, FL("Deleted random addr " MAC_ADDRESS_STR),
 				MAC_ADDR_ARRAY(adapter->random_mac[i].addr));
-		spin_lock(&adapter->random_mac_lock);
+		adf_os_spin_lock(&adapter->random_mac_lock);
 	}
 
-	spin_unlock(&adapter->random_mac_lock);
+	adf_os_spin_unlock(&adapter->random_mac_lock);
 }
 
 static eHalStatus
@@ -668,9 +668,15 @@ wlan_hdd_remain_on_channel_callback(tHalHandle hHal, void* pCtx,
     hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
     hdd_remain_on_chan_ctx_t *pRemainChanCtx;
     hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+    int ret_code;
 
-    if (0 != wlan_hdd_validate_context(hdd_ctx))
-        return eHAL_STATUS_FAILURE;
+    ret_code = wlan_hdd_validate_context(hdd_ctx);
+    if (0 != ret_code) {
+        /* If ssr is inprogress, do not return, resource release is necessary */
+        if (!(-EAGAIN == ret_code && hdd_ctx->isLogpInProgress)) {
+            return eHAL_STATUS_FAILURE;
+        }
+    }
 
     mutex_lock(&cfgState->remain_on_chan_ctx_lock);
     pRemainChanCtx = cfgState->remain_on_chan_ctx;
@@ -736,7 +742,9 @@ wlan_hdd_remain_on_channel_callback(tHalHandle hHal, void* pCtx,
      * after sending any cancel remain on channel event will also
      * ensure that the cancel roc is sent without any delays.
      */
-    schedule_delayed_work(&hdd_ctx->rocReqWork, 0);
+     /* If ssr is inprogress, do not schedule next roc req */
+     if (!hdd_ctx->isLogpInProgress)
+        schedule_delayed_work(&hdd_ctx->rocReqWork, 0);
 
     if ( ( WLAN_HDD_INFRA_STATION == pAdapter->device_mode ) ||
          ( WLAN_HDD_P2P_CLIENT == pAdapter->device_mode ) ||
@@ -1166,12 +1174,18 @@ static int wlan_hdd_execute_remain_on_channel(hdd_adapter_t *pAdapter,
             return -EINVAL;
         }
 
-        if (REMAIN_ON_CHANNEL_REQUEST == pRemainChanCtx->rem_on_chan_request) {
+        mutex_lock(&cfgState->remain_on_chan_ctx_lock);
+        pRemainChanCtx = cfgState->remain_on_chan_ctx;
+        if ((pRemainChanCtx)&&(REMAIN_ON_CHANNEL_REQUEST ==
+            pRemainChanCtx->rem_on_chan_request)) {
+            mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
             if (eHAL_STATUS_SUCCESS != sme_RegisterMgmtFrame(
                                          WLAN_HDD_GET_HAL_CTX(pAdapter),
                                          sessionId, (SIR_MAC_MGMT_FRAME << 2) |
                                         (SIR_MAC_MGMT_PROBE_REQ << 4), NULL, 0))
                 hddLog(LOGE, FL("sme_RegisterMgmtFrame returned failure"));
+        } else {
+               mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
         }
     }
     else if ( ( WLAN_HDD_SOFTAP== pAdapter->device_mode ) ||
@@ -1270,10 +1284,10 @@ static int wlan_hdd_roc_request_enqueue(hdd_adapter_t *adapter,
 	hdd_roc_req->pRemainChanCtx = remain_chan_ctx;
 
 	/* Enqueue this RoC request */
-	spin_lock(&hdd_ctx->hdd_roc_req_q.lock);
+	adf_os_spin_lock(&hdd_ctx->hdd_roc_req_q.lock);
 	status = hdd_list_insert_back(&hdd_ctx->hdd_roc_req_q,
 					&hdd_roc_req->node);
-	spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
+	adf_os_spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
 
 	if (VOS_STATUS_SUCCESS != status) {
 		hddLog(LOGP, FL("Not able to enqueue RoC Req context"));
@@ -1352,14 +1366,14 @@ void wlan_hdd_roc_request_dequeue(struct work_struct *work)
 	 * that any pending roc in the queue will be scheduled
 	 * on the current roc completion by scheduling the work queue.
 	 */
-	spin_lock(&hdd_ctx->hdd_roc_req_q.lock);
+	adf_os_spin_lock(&hdd_ctx->hdd_roc_req_q.lock);
 	if (list_empty(&hdd_ctx->hdd_roc_req_q.anchor)) {
-		spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
+		adf_os_spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
 		return;
 	}
 	status = hdd_list_remove_front(&hdd_ctx->hdd_roc_req_q,
 			(hdd_list_node_t **) &hdd_roc_req);
-	spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
+	adf_os_spin_unlock(&hdd_ctx->hdd_roc_req_q.lock);
 	if (VOS_STATUS_SUCCESS != status) {
 		hddLog(LOG1, FL("unable to remove roc element from list"));
 		return;
@@ -1394,7 +1408,9 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
     hdd_adapter_t *sta_adapter;
     int ret = 0;
     int status = 0;
-
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+    uint8_t channel;
+#endif
     hddLog(LOG1, FL("Device_mode %s(%d)"),
            hdd_device_mode_to_string(pAdapter->device_mode),
            pAdapter->device_mode);
@@ -1425,7 +1441,13 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
         hddLog(LOGE, FL("Connection is in progress"));
         isBusy = VOS_TRUE;
     }
-
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+    channel = vos_freq_to_chan(chan->center_freq);
+    if (!vos_is_chan_ok_for_dnbs(channel)) {
+        hddLog(LOGE, FL("chan-%d is not valid for DNBS"), channel);
+        return 0;
+    }
+#endif
     pRemainChanCtx = vos_mem_malloc(sizeof(hdd_remain_on_chan_ctx_t));
     if (NULL == pRemainChanCtx) {
         hddLog(VOS_TRACE_LEVEL_FATAL,
@@ -1732,13 +1754,13 @@ int __wlan_hdd_cfg80211_cancel_remain_on_channel( struct wiphy *wiphy,
     }
 
     /* Remove RoC request inside queue */
-    spin_lock(&pHddCtx->hdd_roc_req_q.lock);
+    adf_os_spin_lock(&pHddCtx->hdd_roc_req_q.lock);
     list_for_each_safe(tmp, q, &pHddCtx->hdd_roc_req_q.anchor) {
         curr_roc_req = list_entry(tmp, hdd_roc_req_t, node);
         if ((uintptr_t)curr_roc_req->pRemainChanCtx == cookie) {
             status = hdd_list_remove_node(&pHddCtx->hdd_roc_req_q,
                                    (hdd_list_node_t*)curr_roc_req);
-            spin_unlock(&pHddCtx->hdd_roc_req_q.lock);
+            adf_os_spin_unlock(&pHddCtx->hdd_roc_req_q.lock);
             if (status == VOS_STATUS_SUCCESS) {
                 vos_mem_free(curr_roc_req->pRemainChanCtx);
                 vos_mem_free(curr_roc_req);
@@ -1746,7 +1768,7 @@ int __wlan_hdd_cfg80211_cancel_remain_on_channel( struct wiphy *wiphy,
             return 0;
         }
     }
-    spin_unlock(&pHddCtx->hdd_roc_req_q.lock);
+    adf_os_spin_unlock(&pHddCtx->hdd_roc_req_q.lock);
 
     /* FIXME cancel currently running remain on chan.
      * Need to check cookie and cancel accordingly
@@ -1949,6 +1971,7 @@ int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct net_device *dev,
     uint8_t home_ch = 0;
     bool enb_random_mac = false;
     uint32_t mgmt_hdr_len = sizeof(struct ieee80211_hdr_3addr);
+    eHalStatus hal_status;
 
     ENTER();
 
@@ -1976,6 +1999,23 @@ int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct net_device *dev,
     hddLog(LOG1, FL("Device_mode %s(%d) type: %d"),
            hdd_device_mode_to_string(pAdapter->device_mode),
            pAdapter->device_mode, type);
+
+    /* When frame to be transmitted is auth mgmt, then trigger
+     * sme_send_mgmt_tx to send auth frame without need for policy manager.
+     * Where as wlan_cfg80211_mgmt_tx requires roc and requires approval
+     * from policy manager
+     */
+    if ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode ||
+	WLAN_HDD_SOFTAP == pAdapter->device_mode) &&
+        (type == SIR_MAC_MGMT_FRAME &&
+        subType == SIR_MAC_MGMT_AUTH)) {
+        hal_status = sme_send_mgmt_tx(WLAN_HDD_GET_HAL_CTX(pAdapter),
+                                     pAdapter->sessionId, buf, len);
+        if (HAL_STATUS_SUCCESS(hal_status))
+           return 0;
+        else
+           return -EINVAL;
+    }
 
     if (type == SIR_MAC_MGMT_FRAME && subType == SIR_MAC_MGMT_ACTION &&
         len > IEEE80211_MIN_ACTION_SIZE)
@@ -2044,11 +2084,13 @@ int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct net_device *dev,
         mutex_unlock(&cfgState->remain_on_chan_ctx_lock);
     }
 
+#ifndef SUPPORT_P2P_BY_ONE_INTF_WLAN
     if ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) &&
        (type == SIR_MAC_MGMT_FRAME && subType == SIR_MAC_MGMT_PROBE_RSP)) {
         /* Drop Probe response recieved from supplicant in sta mode */
         goto err_rem_channel;
     }
+#endif
 
     //Call sme API to send out a action frame.
     // OR can we send it directly through data path??
@@ -2942,6 +2984,37 @@ struct wireless_dev* __wlan_hdd_add_virtual_intf(
             if (WLAN_HDD_RX_HANDLE_RPS == pHddCtx->cfg_ini->rxhandle)
                 hdd_dp_util_send_rps_ind(pAdapter);
     }
+#ifdef SUPPORT_IFTYPE_P2P_DEVICE_VIF
+    else if (NL80211_IFTYPE_P2P_DEVICE == type) {
+        if (pHddCtx->cfg_ini->isP2pDeviceAddrAdministrated &&
+            !(pHddCtx->cfg_ini->intfMacAddr[0].bytes[0] & 0x02)) {
+            vos_mem_copy(pHddCtx->p2pDeviceAddress.bytes,
+                         pHddCtx->cfg_ini->intfMacAddr[0].bytes,
+                         sizeof(tSirMacAddr));
+
+            /* Generate the P2P Device Address.        This consists of the device's
+             * primary MAC address with the locally administered bit set.
+             */
+            pHddCtx->p2pDeviceAddress.bytes[0] |= 0x02;
+        } else {
+            uint8_t* p2p_dev_addr = wlan_hdd_get_intf_addr(pHddCtx);
+            if (p2p_dev_addr)
+                vos_mem_copy(&pHddCtx->p2pDeviceAddress.bytes[0],
+                             p2p_dev_addr, VOS_MAC_ADDR_SIZE);
+            else {
+                hddLog(VOS_TRACE_LEVEL_FATAL,
+                       FL("Failed to allocate mac_address for p2p_device"));
+                return ERR_PTR(-EINVAL);
+            }
+        }
+
+        pAdapter = hdd_open_adapter(pHddCtx, wlan_hdd_get_session_type(type),
+                                    name, pHddCtx->p2pDeviceAddress.bytes,
+                                    name_assign_type, VOS_TRUE);
+        if (WLAN_HDD_RX_HANDLE_RPS == pHddCtx->cfg_ini->rxhandle)
+            hdd_dp_util_send_rps_ind(pAdapter);
+    }
+#endif
     else
     {
        pAdapter = hdd_open_adapter( pHddCtx, wlan_hdd_get_session_type(type),
@@ -2957,6 +3030,25 @@ struct wireless_dev* __wlan_hdd_add_virtual_intf(
         hddLog(VOS_TRACE_LEVEL_ERROR,"%s: hdd_open_adapter failed",__func__);
         return ERR_PTR(-ENOSPC);
     }
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+    if(pAdapter->device_mode == WLAN_HDD_SOFTAP)
+    {
+	    if(pHddCtx->ch_switch_ctx.chan_sw_timer_initialized == VOS_FALSE)
+	    {
+		    //Initialize the channel switch timer
+		    ret = vos_timer_init(&pHddCtx->ch_switch_ctx.hdd_ap_chan_switch_timer, VOS_TIMER_TYPE_SW,
+				    hdd_hostapd_chan_switch_cb, (v_PVOID_t)pAdapter);
+		    if(!VOS_IS_STATUS_SUCCESS(ret))
+		    {
+			    hddLog(LOGE, FL("Failed to initialize AP channel switch timer!!\n"));
+			    EXIT();
+			    return ERR_PTR(ret);
+		    }
+		    pHddCtx->ch_switch_ctx.chan_sw_timer_initialized = VOS_TRUE;
+	    }
+    }
+#endif //WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+
     EXIT();
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)) || defined(WITH_BACKPORTS)
     return pAdapter->dev->ieee80211_ptr;
@@ -2965,7 +3057,23 @@ struct wireless_dev* __wlan_hdd_add_virtual_intf(
 #endif
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
+					       const char *name,
+					       unsigned char name_assign_type,
+					       enum nl80211_iftype type,
+					       struct vif_params *params)
+{
+	struct wireless_dev *wdev;
+
+	vos_ssr_protect(__func__);
+	wdev = __wlan_hdd_add_virtual_intf(wiphy, name, name_assign_type,
+					   type, &params->flags, params);
+	vos_ssr_unprotect(__func__);
+
+	return wdev;
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 /**
  * wlan_hdd_add_virtual_intf() - Add virtual interface wrapper
  * @wiphy: wiphy pointer
@@ -3095,12 +3203,54 @@ int wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct net_device *dev)
     return ret;
 }
 
+#if defined(WLAN_FEATURE_SAE) && defined(CFG80211_EXTERNAL_AUTH_AP_SUPPORT)
+/**
+ * wlan_hdd_set_rxmgmt_external_auth_flag() - Set the EXTERNAL_AUTH flag
+ * @nl80211_flag: flags to be sent to nl80211 from enum nl80211_rxmgmt_flags
+ *
+ * Set the flag NL80211_RXMGMT_FLAG_EXTERNAL_AUTH if supported.
+ */
+static void
+wlan_hdd_set_rxmgmt_external_auth_flag(enum nl80211_rxmgmt_flags *nl80211_flag)
+{
+	*nl80211_flag |= NL80211_RXMGMT_FLAG_EXTERNAL_AUTH;
+}
+#else
+static void
+wlan_hdd_set_rxmgmt_external_auth_flag(enum nl80211_rxmgmt_flags *nl80211_flag)
+{
+}
+#endif
+
+/**
+ * wlan_hdd_cfg80211_convert_rxmgmt_flags() - Convert RXMGMT value
+ * @nl80211_flag: Flags to be sent to nl80211 from enum nl80211_rxmgmt_flags
+ * @flag: flags set by driver(SME/PE) from enum rxmgmt_flags
+ *
+ * Convert driver internal RXMGMT flag value to nl80211 defined RXMGMT flag
+ * Return: 0 on success, -EINVAL on invalid value
+ */
+static int
+wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
+				       enum nl80211_rxmgmt_flags *nl80211_flag)
+{
+	int ret = -EINVAL;
+
+	if (flag & RXMGMT_FLAG_EXTERNAL_AUTH) {
+		wlan_hdd_set_rxmgmt_external_auth_flag(nl80211_flag);
+		ret = 0;
+	}
+
+	return ret;
+}
+
 void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
                             tANI_U32 nFrameLength,
                             tANI_U8* pbFrames,
                             tANI_U8 frameType,
                             tANI_U32 rxChan,
-                            tANI_S8 rxRssi)
+                            tANI_S8 rxRssi,
+                            enum rxmgmt_flags rx_flags)
 {
     tANI_U16 freq;
     tANI_U16 extend_time;
@@ -3112,6 +3262,7 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
     hdd_remain_on_chan_ctx_t* pRemainChanCtx = NULL;
     hdd_context_t *pHddCtx;
     uint8_t broadcast = 0;
+    enum nl80211_rxmgmt_flags nl80211_flag = 0;
 
     hddLog(VOS_TRACE_LEVEL_INFO, FL("Frame Type = %d Frame Length = %d"),
             frameType, nFrameLength);
@@ -3367,11 +3518,14 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
         }
     }
 
+    if (wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag))
+        hddLog(LOG1, "Failed to convert RXMGMT flags :0x%x to nl80211 format",
+                  rx_flags);
     //Indicate Frame Over Normal Interface
     hddLog( LOG1, FL("Indicate Frame over NL80211 Interface"));
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0)) || defined(WITH_BACKPORTS)
     cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, rxRssi * 100, pbFrames,
-                     nFrameLength, NL80211_RXMGMT_FLAG_ANSWERED);
+                     nFrameLength, NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0))
     cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, rxRssi * 100, pbFrames,
                      nFrameLength, NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);

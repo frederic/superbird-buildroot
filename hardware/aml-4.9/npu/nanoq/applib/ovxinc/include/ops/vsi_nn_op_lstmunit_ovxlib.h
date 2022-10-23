@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -64,11 +64,18 @@ enum
     LSTMUNIT_INPUT_LAYERNORM_C  = 22,
     LSTMUNIT_INPUT_LAYERNORM_O  = 23,
 
+    LSTMUNIT_INPUT_AUX_INPUT      = 24,
+    LSTMUNIT_INPUT_AUX_WEIGHT_I2I = 25,
+    LSTMUNIT_INPUT_AUX_WEIGHT_I2F = 26,
+    LSTMUNIT_INPUT_AUX_WEIGHT_I2C = 27,
+    LSTMUNIT_INPUT_AUX_WEIGHT_I2O = 28,
+
     LSTMUNIT_INPUT_CNT,
 
     LSTMUNIT_OUTPUT_OUTPUT      = 0,
     LSTMUNIT_OUTPUT_H_STATE     = 1,
     LSTMUNIT_OUTPUT_C_STATE     = 2,
+    LSTMUNIT_OUTPUT_SCRATCH     = 3,
 
     LSTMUNIT_OUTPUT_CNT
 };
@@ -222,6 +229,16 @@ enum
     LSTMUNIT_QUANTIZE_PARAM_COUNT
 };
 
+enum
+{
+    LSTMUNIT_QUANTIZE_PARAM_AUX_I2I,
+    LSTMUNIT_QUANTIZE_PARAM_AUX_I2F,
+    LSTMUNIT_QUANTIZE_PARAM_AUX_I2C,
+    LSTMUNIT_QUANTIZE_PARAM_AUX_I2O,
+
+    LSTMUNIT_QUANTIZE_PARAM_AUX_COUNT
+};
+
 typedef struct _vsi_nn_lstmunit_ovxlib_lcl_data_t
 {
     vsi_bool use_cifg;
@@ -230,18 +247,31 @@ typedef struct _vsi_nn_lstmunit_ovxlib_lcl_data_t
     vsi_bool use_projection_bias;
     vsi_bool use_hybrid;
     vsi_bool multi_batch;
+    vsi_bool use_peephole;
 } vsi_nn_lstmunit_ovxlib_lcl_data_t;
 
 typedef struct _vsi_nn_lstmunit_ovxlib_param
 {
-    vsi_nn_lstmunit_ovxlib_lcl_data_t local;
+    union
+    {
+        vsi_nn_lstmunit_ovxlib_lcl_data_t *local;
+        struct { /* for ABI compatible */
+            vsi_bool pad0;
+            vsi_bool pad1;
+            vsi_bool pad2;
+            vsi_bool pad3;
+            vsi_bool pad4;
+            vsi_bool pad5;
+        };
+    };
 
     float cell_clip;
     float proj_clip;
-    vsi_nn_lstmunit_activation_e activation;
+    vsi_nn_activation_e activation;
     float forget_bias;
     vsi_nn_dtype_t internal_dtype[LSTMUNIT_QUANTIZE_PARAM_COUNT];
-    vsi_nn_lstmunit_activation_e recurrent_activation;
+    vsi_nn_activation_e recurrent_activation;
+    vsi_nn_dtype_t *internal_dtype_aux;
 } vsi_nn_lstmunit_ovxlib_param;
 
 #endif

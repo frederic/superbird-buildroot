@@ -1,0 +1,16 @@
+config BR2_PACKAGE_UVC_GADGET
+    bool "aml uvc_gadget"
+    depends on BR2_LINUX_KERNEL
+    select BR2_PACKAGE_IPC_SDK
+    help
+        uvc_gadget
+
+config BR2_PACKAGE_UVC_GADGET_USE_NN
+    bool "aml uvc_gadget build nn"
+    select BR2_PACKAGE_AML_NN_DETECT
+    select BR2_PACKAGE_SQLITE
+    select BR2_PACKAGE_LIBJPEG
+    select BR2_PACKAGE_IPC_PROPERTY
+    default n
+    help
+        uvc_gadget build nn depend

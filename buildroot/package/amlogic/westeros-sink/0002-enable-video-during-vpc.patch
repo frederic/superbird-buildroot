@@ -1,0 +1,58 @@
+From ba8ab96fad7ab37dc03e6cb7230b1f9bacae6d18 Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Wed, 19 Feb 2020 16:15:08 -0800
+Subject: [PATCH 2/2] enable video during vpc
+
+---
+ v4l2/westeros-sink/westeros-sink-soc.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/v4l2/westeros-sink/westeros-sink-soc.c b/v4l2/westeros-sink/westeros-sink-soc.c
+index 7c787c8b..686928ec 100644
+--- a/v4l2/westeros-sink/westeros-sink-soc.c
++++ b/v4l2/westeros-sink/westeros-sink-soc.c
+@@ -849,6 +849,24 @@ void gst_westeros_sink_soc_eos_event( GstWesterosSink *sink )
+    WESTEROS_UNUSED(sink);
+ }
+ 
++int writeSys(const char *path, const char *val) {
++    int fd;
++    if ((fd = open(path, O_RDWR)) < 0) {
++        GST_ERROR("writeSys, open %s error(%s)", path, strerror (errno));
++        return -1;
++
++
++    }
++
++    GST_DEBUG("write %s, val:%s\n", path, val);
++
++    int len = write(fd, val, strlen(val));
++    close(fd);
++    return len;
++
++}
++
++
+ void gst_westeros_sink_soc_set_video_path( GstWesterosSink *sink, bool useGfxPath )
+ {
+    if ( useGfxPath && !sink->soc.captureEnabled )
+@@ -868,6 +886,8 @@ void gst_westeros_sink_soc_set_video_path( GstWesterosSink *sink, bool useGfxPat
+       wl_surface_commit( sink->surface );
+       wl_display_flush(sink->display);
+       wl_display_dispatch_queue_pending(sink->display, sink->queue);
++      writeSys("/sys/class/video/disable_video", "0");
++
+    }
+ }
+ 
+@@ -2446,6 +2466,7 @@ capture_start:
+ 
+    g_print("westeros-sink: frame size %dx%d\n", sink->soc.frameWidth, sink->soc.frameHeight);
+ 
++   writeSys("/sys/class/video/disable_video", "0");
+    for( ; ; )
+    {
+       if ( sink->soc.quitVideoOutputThread )
+-- 
+2.24.1
+

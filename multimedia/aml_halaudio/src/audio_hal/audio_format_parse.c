@@ -486,6 +486,8 @@ audio_format_t andio_type_convert_to_android_audio_format_t(int codec_type)
     case DTSHD:
         return AUDIO_FORMAT_DTS_HD;
     case TRUEHD:
+        return AUDIO_FORMAT_MAT;
+    case PURE_MLP:
         return AUDIO_FORMAT_DOLBY_TRUEHD;
     case LPCM:
         return AUDIO_FORMAT_PCM_16_BIT;
@@ -508,8 +510,10 @@ int android_audio_format_t_convert_to_andio_type(audio_format_t format)
         return  DTS;//DTSCD;
     case AUDIO_FORMAT_DTS_HD:
         return DTSHD;
-    case AUDIO_FORMAT_DOLBY_TRUEHD:
+    case AUDIO_FORMAT_MAT:
         return TRUEHD;
+    case AUDIO_FORMAT_DOLBY_TRUEHD:
+        return PURE_MLP;
     case AUDIO_FORMAT_PCM:
         return LPCM;
     default:

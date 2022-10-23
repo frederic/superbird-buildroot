@@ -33,27 +33,27 @@ ifeq ($(BR2_aarch64), y)
 NPU_INSTALL_TARGETS_CMDS = \
 	$(INSTALL) -m 0755 $(@D)/build/sdk/drivers/galcore.ko $(NPU_KO_INSTALL_DIR); \
 	$(INSTALL) -m 0755 $(@D)/sharelib/lib64/* $(NPU_SO_INSTALL_DIR); \
-	$(INSTALL) -m 0755 $(@D)/nnapi/lib/lib64/* $(NPU_SO_INSTALL_DIR); \
+	$(INSTALL) -m 0755 $(@D)/nnsdk/lib/lib64/* $(NPU_SO_INSTALL_DIR); \
 	if [ -n "$(BR2_PACKAGE_NPU_NBG_IMAGE)" ]; then \
 		$(INSTALL) -m 0644 $(@D)/NBG/$(BR2_PACKAGE_NPU_NBG_IMAGE) \
 			$(BINARIES_DIR)/NBG.img; \
 	fi
-NNAPI_SO_PATH=$(@D)/nnapi/lib/lib64
+NNSDK_SO_PATH=$(@D)/nnsdk/lib/lib64
 else
 NPU_INSTALL_TARGETS_CMDS = \
 	$(INSTALL) -m 0755 $(@D)/build/sdk/drivers/galcore.ko $(NPU_KO_INSTALL_DIR); \
 	$(INSTALL) -m 0755 $(@D)/sharelib/lib32/* $(NPU_SO_INSTALL_DIR); \
-	$(INSTALL) -m 0755 $(@D)/nnapi/lib/lib32/* $(NPU_SO_INSTALL_DIR); \
+	$(INSTALL) -m 0755 $(@D)/nnsdk/lib/lib32/* $(NPU_SO_INSTALL_DIR); \
 	if [ -n "$(BR2_PACKAGE_NPU_NBG_IMAGE)" ]; then \
 		$(INSTALL) -m 0644 $(@D)/NBG/$(BR2_PACKAGE_NPU_NBG_IMAGE) \
 			$(BINARIES_DIR)/NBG.img; \
 	fi
-NNAPI_SO_PATH=$(@D)/nnapi/lib/lib32
+NNSDK_SO_PATH=$(@D)/nnsdk/lib/lib32
 endif
 
 define NPU_INSTALL_STAGING_CMDS
-    $(INSTALL) -D -m 0644 $(@D)/nnapi/include/* $(STAGING_DIR)/usr/include/ \
-    $(INSTALL) -m 0644 $(NNAPI_SO_PATH)/* $(NPU_SO_INSTALL_DIR);
+    $(INSTALL) -D -m 0644 $(@D)/nnsdk/include/* $(STAGING_DIR)/usr/include/ \
+    $(INSTALL) -m 0644 $(NNSDK_SO_PATH)/* $(NPU_SO_INSTALL_DIR);
 endef
 
 

@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver - Android related functions
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_android.h 768773 2018-06-21 08:38:23Z $
+ * $Id: wl_android.h 794110 2018-12-12 05:03:21Z $
  */
 
 #ifndef _wl_android_
@@ -71,7 +71,7 @@ typedef struct _compat_android_wifi_priv_cmd {
 #define ANDROID_ERROR_LEVEL	(1 << 0)
 #define ANDROID_TRACE_LEVEL	(1 << 1)
 #define ANDROID_INFO_LEVEL	(1 << 2)
-#define ANDROID_EVENT_LEVEL	(1 << 3)
+#define ANDROID_SCAN_LEVEL	(1 << 3)
 #define ANDROID_DBG_LEVEL	(1 << 4)
 #define ANDROID_MSG_LEVEL	(1 << 0)
 
@@ -97,12 +97,17 @@ int wl_handle_private_cmd(struct net_device *net, char *command, u32 cmd_len);
 int wl_ext_iapsta_attach_netdev(struct net_device *net, int ifidx, uint8 bssidx);
 int wl_ext_iapsta_attach_name(struct net_device *net, int ifidx);
 int wl_ext_iapsta_dettach_netdev(struct net_device *net, int ifidx);
-u32 wl_ext_iapsta_update_channel(dhd_pub_t *dhd, struct net_device *dev, u32 channel);
+int wl_ext_iapsta_update_net_device(struct net_device *net, int ifidx);
 int wl_ext_iapsta_alive_preinit(struct net_device *dev);
 int wl_ext_iapsta_alive_postinit(struct net_device *dev);
 int wl_ext_iapsta_attach(dhd_pub_t *pub);
 void wl_ext_iapsta_dettach(dhd_pub_t *pub);
-bool wl_ext_check_mesh_creating(struct net_device *net);
+#ifdef WL_CFG80211
+u32 wl_ext_iapsta_update_channel(dhd_pub_t *dhd, struct net_device *dev, u32 channel);
+void wl_ext_iapsta_update_iftype(struct net_device *net, int ifidx, int wl_iftype);
+void wl_ext_iapsta_ifadding(struct net_device *net, int ifidx);
+bool wl_ext_iapsta_mesh_creating(struct net_device *net);
+#endif
 extern int op_mode;
 #endif
 typedef struct bcol_gtk_para {
@@ -111,20 +116,33 @@ typedef struct bcol_gtk_para {
 	char ptk[64];
 	char replay[8];
 } bcol_gtk_para_t;
+#define ACS_FW_BIT		(1<<0)
+#define ACS_DRV_BIT		(1<<1)
 #if defined(WL_EXT_IAPSTA) || defined(USE_IW)
+typedef enum WL_EVENT_PRIO {
+	PRIO_EVENT_IAPSTA,
+	PRIO_EVENT_ESCAN,
+	PRIO_EVENT_WEXT
+}wl_event_prio_t;
 s32 wl_ext_event_attach(struct net_device *dev, dhd_pub_t *dhdp);
 void wl_ext_event_dettach(dhd_pub_t *dhdp);
 int wl_ext_event_attach_netdev(struct net_device *net, int ifidx, uint8 bssidx);
 int wl_ext_event_dettach_netdev(struct net_device *net, int ifidx);
 int wl_ext_event_register(struct net_device *dev, dhd_pub_t *dhd,
-	uint32 event, void *cb_func, void *data);
+	uint32 event, void *cb_func, void *data, wl_event_prio_t prio);
 void wl_ext_event_deregister(struct net_device *dev, dhd_pub_t *dhd,
 	uint32 event, void *cb_func);
 void wl_ext_event_send(void *params, const wl_event_msg_t * e, void *data);
 #endif
+int wl_ext_autochannel(struct net_device *dev, uint acs, uint32 band);
 int wl_android_ext_priv_cmd(struct net_device *net, char *command, int total_len,
 	int *bytes_written);
 void wl_ext_get_sec(struct net_device *dev, int ifmode, char *sec, int total_len);
+bool wl_ext_check_scan(struct net_device *dev, dhd_pub_t *dhdp);
+#if defined(WL_CFG80211) || defined(WL_ESCAN)
+void wl_ext_user_sync(struct dhd_pub *dhd, int ifidx, bool lock);
+bool wl_ext_event_complete(struct dhd_pub *dhd, int ifidx);
+#endif
 enum wl_ext_status {
 	WL_EXT_STATUS_DISCONNECTING = 0,
 	WL_EXT_STATUS_DISCONNECTED,
@@ -212,6 +230,8 @@ s32 wl_netlink_send_msg(int pid, int type, int seq, const void *data, size_t siz
  * restrict max number to 10 as maximum cmd string size is 255
  */
 #define MAX_NUM_MAC_FILT        10
+#define	WL_GET_BAND(ch)	(((uint)(ch) <= CH_MAX_2G_CHANNEL) ?	\
+	WLC_BAND_2G : WLC_BAND_5G)
 
 int wl_android_set_ap_mac_list(struct net_device *dev, int macmode, struct maclist *maclist);
 #ifdef WL_BCNRECV
@@ -220,7 +240,27 @@ extern int wl_android_bcnrecv_config(struct net_device *ndev, char *data,
 extern int wl_android_bcnrecv_stop(struct net_device *ndev, uint reason);
 extern int wl_android_bcnrecv_resume(struct net_device *ndev);
 extern int wl_android_bcnrecv_suspend(struct net_device *ndev);
+extern int wl_android_bcnrecv_event(struct net_device *ndev,
+		uint attr_type, uint status, uint reason, uint8 *data, uint data_len);
 #endif /* WL_BCNRECV */
+#ifdef WL_CAC_TS
+#define TSPEC_UPLINK_DIRECTION (0 << 5)	/* uplink direction traffic stream */
+#define TSPEC_DOWNLINK_DIRECTION (1 << 5)	/* downlink direction traffic stream */
+#define TSPEC_BI_DIRECTION (3 << 5)	/* bi direction traffic stream */
+#define TSPEC_EDCA_ACCESS (1 << 7)	/* EDCA access policy */
+#define TSPEC_UAPSD_PSB (1 << 2)		/* U-APSD power saving behavior */
+#define TSPEC_TSINFO_TID_SHIFT 1		/* TID Shift */
+#define TSPEC_TSINFO_PRIO_SHIFT 3		/* PRIO Shift */
+#define TSPEC_MAX_ACCESS_CATEGORY 3
+#define TSPEC_MAX_USER_PRIO	7
+#define TSPEC_MAX_DIALOG_TOKEN	255
+#define TSPEC_MAX_SURPLUS_BW 12410
+#define TSPEC_MIN_SURPLUS_BW 11210
+#define TSPEC_MAX_MSDU_SIZE 1520
+#define TSPEC_DEF_MEAN_DATA_RATE 120000
+#define TSPEC_DEF_MIN_PHY_RATE 6000000
+#define TSPEC_DEF_DIALOG_TOKEN 7
+#endif /* WL_CAC_TS */
 
 /* terence:
  * BSSCACHE: Cache bss list

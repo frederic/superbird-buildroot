@@ -127,10 +127,10 @@ static void restore_mutex_in_dead(MUTEX_HANDLE *mutex)
 #endif
     if (mutex_value == (int)0xdead10cc) // destroy by device driver
     {
-            pthread_mutexattr_t mutexattr;
-            pthread_mutexattr_init(&mutexattr);
-            pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
-            pthread_mutex_init(mutex, &mutexattr);
+        pthread_mutexattr_t mutexattr;
+        pthread_mutexattr_init(&mutexattr);
+        pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
+        pthread_mutex_init(mutex, &mutexattr);
     }
 }
 
@@ -797,7 +797,7 @@ int vdi_clear_memory(u32 core_idx, PhysicalAddress addr, int len, int endian)
 {
     vdi_info_t *vdi;
     vpudrv_buffer_t vdb;
-	unsigned long offset;
+    unsigned long offset;
 
     int i;
     Uint8*  zero;
@@ -842,6 +842,60 @@ int vdi_clear_memory(u32 core_idx, PhysicalAddress addr, int len, int endian)
     vdb.phys_addr = addr;
     vdb.size = len;
     vdi_flush_memory(core_idx, &vdb);
+    return len;
+}
+
+int vdi_set_memory(u32 core_idx, PhysicalAddress addr, int len, int endian, Uint32 data)
+{
+    vdi_info_t *vdi;
+    vpudrv_buffer_t vdb;
+    unsigned long offset;
+
+    int i;
+    Uint8*  zero;
+
+#ifdef SUPPORT_MULTI_CORE_IN_ONE_DRIVER
+    core_idx = 0;
+#endif
+
+    if (core_idx >= MAX_NUM_VPU_CORE)
+        return -1;
+    if (endian > VDI_ENDIAN_MAX) return -1;
+
+    vdi = &s_vdi_info[core_idx];
+
+    if (!vdi || vdi->vpu_fd == -1 || vdi->vpu_fd == 0x00)
+        return -1;
+
+    osal_memset(&vdb, 0x00, sizeof(vpudrv_buffer_t));
+
+    for (i=0; i<MAX_VPU_BUFFER_POOL; i++)
+    {
+        if (vdi->vpu_buffer_pool[i].inuse == 1)
+        {
+            vdb = vdi->vpu_buffer_pool[i].vdb;
+            if (addr >= vdb.phys_addr && addr < (vdb.phys_addr + vdb.size))
+                break;
+        }
+    }
+
+    if (!vdb.size) {
+        VLOG(ERR, "address 0x%08x is not mapped address!!!\n", (int)addr);
+        return -1;
+    }
+
+    zero = (Uint8*)osal_malloc(len);
+    osal_memset((void*)zero, data, len);
+
+    offset = addr - (unsigned long)vdb.phys_addr;
+    osal_memcpy((void *)((unsigned long)vdb.virt_addr+offset), zero, len);
+
+    osal_free(zero);
+
+    vdb.phys_addr = addr;
+    vdb.size = len;
+    vdi_flush_memory(core_idx, &vdb);
+
     return len;
 }
 

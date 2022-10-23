@@ -1,7 +1,7 @@
 /*
  * BCMSDH Function Driver for the native SDIO/MMC driver in the Linux Kernel
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Proprietary,Open:>>
  *
- * $Id: bcmsdh_sdmmc.c 766268 2018-06-07 06:44:55Z $
+ * $Id: bcmsdh_sdmmc.c 782528 2018-09-28 12:15:40Z $
  */
 #include <typedefs.h>
 
@@ -92,11 +92,6 @@ static void IRQHandlerF2(struct sdio_func *func);
 static int sdioh_sdmmc_get_cisaddr(sdioh_info_t *sd, uint32 regaddr);
 #if defined(ENABLE_INSMOD_NO_FW_LOAD) && !defined(BUS_POWER_RESTORE)
 extern int sdio_reset_comm(struct mmc_card *card);
-#else
-int sdio_reset_comm(struct mmc_card *card)
-{
-	return 0;
-}
 #endif
 #ifdef GLOBAL_SDMMC_INSTANCE
 extern PBCMSDH_SDMMC_INSTANCE gInstance;
@@ -173,10 +168,10 @@ sdioh_sdmmc_card_enablefuncs(sdioh_info_t *sd)
 
 	/* Get the Card's function CIS (for each function) */
 	for (fbraddr = SDIOD_FBR_STARTADDR, func = 1;
-			func <= sd->num_funcs; func++, fbraddr += SDIOD_FBR_SIZE) {
+	     func <= sd->num_funcs; func++, fbraddr += SDIOD_FBR_SIZE) {
 		sd->func_cis_ptr[func] = sdioh_sdmmc_get_cisaddr(sd, SDIOD_FBR_CISPTR_0 + fbraddr);
 		sd_info(("%s: Function %d CIS Ptr = 0x%x\n",
-				 __FUNCTION__, func, sd->func_cis_ptr[func]));
+		         __FUNCTION__, func, sd->func_cis_ptr[func]));
 	}
 
 	sd->func_cis_ptr[0] = sd->com_cis_ptr;
@@ -260,7 +255,7 @@ sdioh_attach(osl_t *osh, struct sdio_func *func)
 	sdio_release_host(sd->func[2]);
 	if (err_ret) {
 		sd_err(("bcmsdh_sdmmc: Failed to set F2 blocksize to %d(%d)\n",
-				sd_f2_blocksize, err_ret));
+			sd_f2_blocksize, err_ret));
 		goto fail;
 	}
 
@@ -504,7 +499,7 @@ const bcm_iovar_t sdioh_iovars[] = {
 
 int
 sdioh_iovar_op(sdioh_info_t *si, const char *name,
-			   void *params, int plen, void *arg, int len, bool set)
+                           void *params, int plen, void *arg, int len, bool set)
 {
 	const bcm_iovar_t *vi = NULL;
 	int bcmerror = 0;
@@ -591,17 +586,10 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		}
 
 		switch (func) {
-		case 0:
-			maxsize = 32;
-			break;
-		case 1:
-			maxsize = BLOCK_SIZE_4318;
-			break;
-		case 2:
-			maxsize = BLOCK_SIZE_4328;
-			break;
-		default:
-			maxsize = 0;
+		case 0: maxsize = 32; break;
+		case 1: maxsize = BLOCK_SIZE_4318; break;
+		case 2: maxsize = BLOCK_SIZE_4328; break;
+		default: maxsize = 0;
 		}
 		if (blksize > maxsize) {
 			bcmerror = BCME_BADARG;
@@ -614,6 +602,7 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		/* Now set it */
 		si->client_block_size[func] = blksize;
 
+#ifdef USE_DYNAMIC_F2_BLKSIZE
 		if (si->func[func] == NULL) {
 			sd_err(("%s: SDIO Device not present\n", __FUNCTION__));
 			bcmerror = BCME_NORESOURCE;
@@ -623,8 +612,9 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 		bcmerror = sdio_set_block_size(si->func[func], blksize);
 		if (bcmerror)
 			sd_err(("%s: Failed to set F%d blocksize to %d(%d)\n",
-					__FUNCTION__, func, blksize, bcmerror));
+				__FUNCTION__, func, blksize, bcmerror));
 		sdio_release_host(si->func[func]);
+#endif /* USE_DYNAMIC_F2_BLKSIZE */
 		break;
 	}
 
@@ -668,7 +658,7 @@ sdioh_iovar_op(sdioh_info_t *si, const char *name,
 			sdmmc_set_clock_divisor(si, sd_divisor);
 		} else {
 			DHD_ERROR(("%s: Invalid sd_divisor value, should be power of 2!\n",
-					   __FUNCTION__));
+				__FUNCTION__));
 		}
 		break;
 
@@ -836,7 +826,7 @@ sdioh_cisaddr_read(sdioh_info_t *sd, uint func, uint8 *cisd, uint32 offset)
 
 	sd_err(("%s: func_cis_ptr[%d]=0x%04x\n", __FUNCTION__, func, sd->func_cis_ptr[func]));
 
-	if (sdioh_sdmmc_card_regread (sd, 0, sd->func_cis_ptr[func] + offset, 1, &foo) < 0) {
+	if (sdioh_sdmmc_card_regread (sd, 0, sd->func_cis_ptr[func]+offset, 1, &foo) < 0) {
 		sd_err(("%s: regread failed: Can't read CIS\n", __FUNCTION__));
 		return SDIOH_API_RC_FAIL;
 	}
@@ -862,7 +852,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 
 	DHD_PM_RESUME_WAIT(sdioh_request_byte_wait);
 	DHD_PM_RESUME_RETURN_ERROR(SDIOH_API_RC_FAIL);
-	if (rw) { /* CMD52 Write */
+	if(rw) { /* CMD52 Write */
 		if (func == 0) {
 			/* Can only directly write to some F0 registers.  Handle F2 enable
 			 * as a special case.
@@ -870,73 +860,73 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 			if (regaddr == SDIOD_CCCR_IOEN) {
 #if defined(BT_OVER_SDIO)
 				do {
-					if (sd->func[3]) {
-						sd_info(("bcmsdh_sdmmc F3: *byte 0x%x\n", *byte));
+				if (sd->func[3]) {
+					sd_info(("bcmsdh_sdmmc F3: *byte 0x%x\n", *byte));
 
-						if (*byte & SDIO_FUNC_ENABLE_3) {
-							sdio_claim_host(sd->func[3]);
+					if (*byte & SDIO_FUNC_ENABLE_3) {
+						sdio_claim_host(sd->func[3]);
 
-							/* Set Function 3 Block Size */
-							err_ret = sdio_set_block_size(sd->func[3],
-														  sd_f3_blocksize);
-							if (err_ret) {
-								sd_err(("F3 blocksize set err%d\n",
-										err_ret));
-							}
-
-							/* Enable Function 3 */
-							sd_info(("bcmsdh_sdmmc F3: enable F3 fn %p\n",
-									 sd->func[3]));
-							err_ret = sdio_enable_func(sd->func[3]);
-							if (err_ret) {
-								sd_err(("bcmsdh_sdmmc: enable F3 err:%d\n",
-										err_ret));
-							}
-
-							sdio_release_host(sd->func[3]);
-
-							break;
-						} else if (*byte & SDIO_FUNC_DISABLE_3) {
-							sdio_claim_host(sd->func[3]);
-
-							/* Disable Function 3 */
-							sd_info(("bcmsdh_sdmmc F3: disable F3 fn %p\n",
-									 sd->func[3]));
-							err_ret = sdio_disable_func(sd->func[3]);
-							if (err_ret) {
-								sd_err(("bcmsdh_sdmmc: Disable F3 err:%d\n",
-										err_ret));
-							}
-							sdio_release_host(sd->func[3]);
-							sd->func[3] = NULL;
-
-							break;
+						/* Set Function 3 Block Size */
+						err_ret = sdio_set_block_size(sd->func[3],
+						sd_f3_blocksize);
+						if (err_ret) {
+							sd_err(("F3 blocksize set err%d\n",
+								err_ret));
 						}
+
+						/* Enable Function 3 */
+						sd_info(("bcmsdh_sdmmc F3: enable F3 fn %p\n",
+						sd->func[3]));
+						err_ret = sdio_enable_func(sd->func[3]);
+						if (err_ret) {
+							sd_err(("bcmsdh_sdmmc: enable F3 err:%d\n",
+								err_ret));
+						}
+
+						sdio_release_host(sd->func[3]);
+
+						break;
+					} else if (*byte & SDIO_FUNC_DISABLE_3) {
+						sdio_claim_host(sd->func[3]);
+
+						/* Disable Function 3 */
+						sd_info(("bcmsdh_sdmmc F3: disable F3 fn %p\n",
+						sd->func[3]));
+						err_ret = sdio_disable_func(sd->func[3]);
+						if (err_ret) {
+							sd_err(("bcmsdh_sdmmc: Disable F3 err:%d\n",
+								err_ret));
+						}
+						sdio_release_host(sd->func[3]);
+						sd->func[3] = NULL;
+
+						break;
 					}
+				}
 #endif /* defined (BT_OVER_SDIO) */
-					if (sd->func[2]) {
-						sdio_claim_host(sd->func[2]);
-						if (*byte & SDIO_FUNC_ENABLE_2) {
-							/* Enable Function 2 */
-							err_ret = sdio_enable_func(sd->func[2]);
-							if (err_ret) {
-								sd_err(("bcmsdh_sdmmc: enable F2 failed:%d\n",
-										err_ret));
-							}
-						} else {
-							/* Disable Function 2 */
-							err_ret = sdio_disable_func(sd->func[2]);
-							if (err_ret) {
-								sd_err(("bcmsdh_sdmmc: Disab F2 failed:%d\n",
-										err_ret));
-							}
+				if (sd->func[2]) {
+					sdio_claim_host(sd->func[2]);
+					if (*byte & SDIO_FUNC_ENABLE_2) {
+						/* Enable Function 2 */
+						err_ret = sdio_enable_func(sd->func[2]);
+						if (err_ret) {
+							sd_err(("bcmsdh_sdmmc: enable F2 failed:%d\n",
+								err_ret));
 						}
-						sdio_release_host(sd->func[2]);
+					} else {
+						/* Disable Function 2 */
+						err_ret = sdio_disable_func(sd->func[2]);
+						if (err_ret) {
+							sd_err(("bcmsdh_sdmmc: Disab F2 failed:%d\n",
+								err_ret));
+						}
 					}
+					sdio_release_host(sd->func[2]);
+				}
 #if defined(BT_OVER_SDIO)
-				} while (0);
+			} while (0);
 #endif /* defined (BT_OVER_SDIO) */
-			}
+		}
 #if defined(MMC_SDIO_ABORT)
 			/* to allow abort command through F1 */
 			else if (regaddr == SDIOD_CCCR_IOABORT) {
@@ -949,7 +939,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 						 * As of this time, this is temporaray one
 						 */
 						sdio_writeb(sd->func[func],
-									*byte, regaddr, &err_ret);
+							*byte, regaddr, &err_ret);
 						sdio_release_host(sd->func[func]);
 					}
 					if (!err_ret)
@@ -958,6 +948,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 			}
 #endif /* MMC_SDIO_ABORT */
 			/* to allow abort command through F1 */
+#if defined(SDIO_ISR_THREAD)
 			else if (regaddr == SDIOD_CCCR_INTR_EXTN) {
 				while (sdio_abort_retry--) {
 					if (sd->func[func]) {
@@ -975,6 +966,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 						break;
 				}
 			}
+#endif
 			else if (regaddr < 0xF0) {
 				sd_err(("bcmsdh_sdmmc: F0 Wr:0x%02x: write disallowed\n", regaddr));
 			} else {
@@ -982,7 +974,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 				if (sd->func[func]) {
 					sdio_claim_host(sd->func[func]);
 					sdio_f0_writeb(sd->func[func],
-								   *byte, regaddr, &err_ret);
+						*byte, regaddr, &err_ret);
 					sdio_release_host(sd->func[func]);
 				}
 			}
@@ -1009,17 +1001,17 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 
 	if (err_ret) {
 		if ((regaddr == 0x1001F) && ((err_ret == -ETIMEDOUT) || (err_ret == -EILSEQ)
-									 || (err_ret == -EIO))) {
+			|| (err_ret == -EIO))) {
 		} else {
 			sd_err(("bcmsdh_sdmmc: Failed to %s byte F%d:@0x%05x=%02x, Err: %d\n",
-					rw ? "Write" : "Read", func, regaddr, *byte, err_ret));
+				rw ? "Write" : "Read", func, regaddr, *byte, err_ret));
 		}
 	}
 
 	if (sd_msglevel & SDH_COST_VAL) {
 		osl_do_gettimeofday(&now);
 		sd_cost(("%s: rw=%d len=1 cost=%lds %luus\n", __FUNCTION__,
-				 rw, now.tv_sec - before.tv_sec, now.tv_nsec / 1000 - before.tv_nsec / 1000));
+			rw, now.tv_sec-before.tv_sec, now.tv_nsec/1000-before.tv_nsec/1000));
 	}
 
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
@@ -1038,7 +1030,7 @@ sdioh_set_mode(sdioh_info_t *sd, uint mode)
 
 extern SDIOH_API_RC
 sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint addr,
-				   uint32 *word, uint nbytes)
+                                   uint32 *word, uint nbytes)
 {
 	int err_ret = SDIOH_API_RC_FAIL;
 	int err_ret2 = SDIOH_API_RC_SUCCESS; // terence 20130621: prevent dhd_dpc in dead lock
@@ -1056,14 +1048,14 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 	}
 
 	sd_info(("%s: cmd_type=%d, rw=%d, func=%d, addr=0x%05x, nbytes=%d\n",
-			 __FUNCTION__, cmd_type, rw, func, addr, nbytes));
+	         __FUNCTION__, cmd_type, rw, func, addr, nbytes));
 
 	DHD_PM_RESUME_WAIT(sdioh_request_word_wait);
 	DHD_PM_RESUME_RETURN_ERROR(SDIOH_API_RC_FAIL);
 	/* Claim host controller */
 	sdio_claim_host(sd->func[func]);
 
-	if (rw) { /* CMD52 Write */
+	if(rw) { /* CMD52 Write */
 		if (nbytes == 4) {
 			sdio_writel(sd->func[func], *word, addr, &err_ret);
 		} else if (nbytes == 2) {
@@ -1096,7 +1088,7 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 				 * As of this time, this is temporaray one
 				 */
 				sdio_writeb(sd->func[0],
-							func, SDIOD_CCCR_IOABORT, &err_ret2);
+					func, SDIOD_CCCR_IOABORT, &err_ret2);
 				sdio_release_host(sd->func[0]);
 			}
 			if (!err_ret2)
@@ -1106,23 +1098,23 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 #endif /* MMC_SDIO_ABORT */
 		{
 			sd_err(("bcmsdh_sdmmc: Failed to %s word F%d:@0x%05x=%02x, Err: 0x%08x\n",
-					rw ? "Write" : "Read", func, addr, *word, err_ret));
+				rw ? "Write" : "Read", func, addr, *word, err_ret));
 		}
 	}
 
 	if (sd_msglevel & SDH_COST_VAL) {
 		osl_do_gettimeofday(&now);
 		sd_cost(("%s: rw=%d, len=%d cost=%lds %luus\n", __FUNCTION__,
-				 rw, nbytes, now.tv_sec - before.tv_sec, now.tv_nsec / 1000 - before.tv_nsec / 1000));
+			rw, nbytes, now.tv_sec-before.tv_sec, now.tv_nsec/1000 - before.tv_nsec/1000));
 	}
 
-	return (((err_ret == 0) && (err_ret2 == 0)) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
+	return (((err_ret == 0)&&(err_ret2 == 0)) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
 }
 
 #ifdef BCMSDIOH_TXGLOM
 static SDIOH_API_RC
 sdioh_request_packet_chain(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
-						   uint addr, void *pkt)
+                     uint addr, void *pkt)
 {
 	bool fifo = (fix_inc == SDIOH_DATA_FIX);
 	int err_ret = 0;
@@ -1160,98 +1152,98 @@ sdioh_request_packet_chain(sdioh_info_t *sd, uint fix_inc, uint write, uint func
 
 	ttl_len = 0;
 	sg_count = 0;
-	if (sd->txglom_mode == SDPCM_TXGLOM_MDESC) {
-		while (pnext != NULL) {
-			ttl_len = 0;
-			sg_count = 0;
-			memset(&mmc_req, 0, sizeof(struct mmc_request));
-			memset(&mmc_cmd, 0, sizeof(struct mmc_command));
-			memset(&mmc_dat, 0, sizeof(struct mmc_data));
-			sg_init_table(sd->sg_list, ARRAYSIZE(sd->sg_list));
+	if(sd->txglom_mode == SDPCM_TXGLOM_MDESC) {
+	while (pnext != NULL) {
+		ttl_len = 0;
+		sg_count = 0;
+		memset(&mmc_req, 0, sizeof(struct mmc_request));
+		memset(&mmc_cmd, 0, sizeof(struct mmc_command));
+		memset(&mmc_dat, 0, sizeof(struct mmc_data));
+		sg_init_table(sd->sg_list, ARRAYSIZE(sd->sg_list));
 
-			/* Set up scatter-gather DMA descriptors. this loop is to find out the max
-			 * data we can transfer with one command 53. blocks per command is limited by
-			 * host max_req_size and 9-bit max block number. when the total length of this
-			 * packet chain is bigger than max_req_size, use multiple SD_IO_RW_EXTENDED
-			 * commands (each transfer is still block aligned)
+		/* Set up scatter-gather DMA descriptors. this loop is to find out the max
+		 * data we can transfer with one command 53. blocks per command is limited by
+		 * host max_req_size and 9-bit max block number. when the total length of this
+		 * packet chain is bigger than max_req_size, use multiple SD_IO_RW_EXTENDED
+		 * commands (each transfer is still block aligned)
+		 */
+		while (pnext != NULL && ttl_len < max_req_size) {
+			int pkt_len;
+			int sg_data_size;
+			uint8 *pdata = (uint8*)PKTDATA(sd->osh, pnext);
+
+			ASSERT(pdata != NULL);
+			pkt_len = PKTLEN(sd->osh, pnext);
+			sd_trace(("%s[%d] data=%p, len=%d\n", __FUNCTION__, write, pdata, pkt_len));
+			/* sg_count is unlikely larger than the array size, and this is
+			 * NOT something we can handle here, but in case it happens, PLEASE put
+			 * a restriction on max tx/glom count (based on host->max_segs).
 			 */
-			while (pnext != NULL && ttl_len < max_req_size) {
-				int pkt_len;
-				int sg_data_size;
-				uint8 *pdata = (uint8*)PKTDATA(sd->osh, pnext);
-
-				ASSERT(pdata != NULL);
-				pkt_len = PKTLEN(sd->osh, pnext);
-				sd_trace(("%s[%d] data=%p, len=%d\n", __FUNCTION__, write, pdata, pkt_len));
-				/* sg_count is unlikely larger than the array size, and this is
-				 * NOT something we can handle here, but in case it happens, PLEASE put
-				 * a restriction on max tx/glom count (based on host->max_segs).
-				 */
-				if (sg_count >= ARRAYSIZE(sd->sg_list)) {
-					sd_err(("%s: sg list entries(%u) exceed limit(%zu),"
-							" sd blk_size=%u\n",
-							__FUNCTION__, sg_count, ARRAYSIZE(sd->sg_list), blk_size));
-					return (SDIOH_API_RC_FAIL);
-				}
-				pdata += pkt_offset;
-
-				sg_data_size = pkt_len - pkt_offset;
-				if (sg_data_size > max_req_size - ttl_len)
-					sg_data_size = max_req_size - ttl_len;
-				/* some platforms put a restriction on the data size of each scatter-gather
-				 * DMA descriptor, use multiple sg buffers when xfer_size is bigger than
-				 * max_seg_size
-				 */
-				if (sg_data_size > host->max_seg_size) {
-					sg_data_size = host->max_seg_size;
-				}
-				sg_set_buf(&sd->sg_list[sg_count++], pdata, sg_data_size);
-
-				ttl_len += sg_data_size;
-				pkt_offset += sg_data_size;
-				if (pkt_offset == pkt_len) {
-					pnext = PKTNEXT(sd->osh, pnext);
-					pkt_offset = 0;
-				}
+			if (sg_count >= ARRAYSIZE(sd->sg_list)) {
+				sd_err(("%s: sg list entries(%u) exceed limit(%zu),"
+					" sd blk_size=%u\n",
+					__FUNCTION__, sg_count, (size_t)ARRAYSIZE(sd->sg_list), blk_size));
+				return (SDIOH_API_RC_FAIL);
 			}
+			pdata += pkt_offset;
 
-			if (ttl_len % blk_size != 0) {
-				sd_err(("%s, data length %d not aligned to block size %d\n",
-						__FUNCTION__,  ttl_len, blk_size));
-				return SDIOH_API_RC_FAIL;
+			sg_data_size = pkt_len - pkt_offset;
+			if (sg_data_size > max_req_size - ttl_len)
+				sg_data_size = max_req_size - ttl_len;
+			/* some platforms put a restriction on the data size of each scatter-gather
+			 * DMA descriptor, use multiple sg buffers when xfer_size is bigger than
+			 * max_seg_size
+			 */
+			if (sg_data_size > host->max_seg_size) {
+				sg_data_size = host->max_seg_size;
 			}
-			blk_num = ttl_len / blk_size;
-			mmc_dat.sg = sd->sg_list;
-			mmc_dat.sg_len = sg_count;
-			mmc_dat.blksz = blk_size;
-			mmc_dat.blocks = blk_num;
-			mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
-			mmc_cmd.opcode = 53; /* SD_IO_RW_EXTENDED */
-			mmc_cmd.arg = write ? 1 << 31 : 0;
-			mmc_cmd.arg |= (func & 0x7) << 28;
-			mmc_cmd.arg |= 1 << 27;
-			mmc_cmd.arg |= fifo ? 0 : 1 << 26;
-			mmc_cmd.arg |= (addr & 0x1FFFF) << 9;
-			mmc_cmd.arg |= blk_num & 0x1FF;
-			mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
-			mmc_req.cmd = &mmc_cmd;
-			mmc_req.data = &mmc_dat;
-			if (!fifo)
-				addr += ttl_len;
+			sg_set_buf(&sd->sg_list[sg_count++], pdata, sg_data_size);
 
-			sdio_claim_host(sdio_func);
-			mmc_set_data_timeout(&mmc_dat, sdio_func->card);
-			mmc_wait_for_req(host, &mmc_req);
-			sdio_release_host(sdio_func);
-
-			err_ret = mmc_cmd.error ? mmc_cmd.error : mmc_dat.error;
-			if (0 != err_ret) {
-				sd_err(("%s:CMD53 %s failed with code %d\n",
-						__FUNCTION__, write ? "write" : "read", err_ret));
-				return SDIOH_API_RC_FAIL;
+			ttl_len += sg_data_size;
+			pkt_offset += sg_data_size;
+			if (pkt_offset == pkt_len) {
+				pnext = PKTNEXT(sd->osh, pnext);
+				pkt_offset = 0;
 			}
 		}
-	} else if (sd->txglom_mode == SDPCM_TXGLOM_CPY) {
+
+		if (ttl_len % blk_size != 0) {
+			sd_err(("%s, data length %d not aligned to block size %d\n",
+				__FUNCTION__,  ttl_len, blk_size));
+			return SDIOH_API_RC_FAIL;
+		}
+		blk_num = ttl_len / blk_size;
+		mmc_dat.sg = sd->sg_list;
+		mmc_dat.sg_len = sg_count;
+		mmc_dat.blksz = blk_size;
+		mmc_dat.blocks = blk_num;
+		mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+		mmc_cmd.opcode = 53; /* SD_IO_RW_EXTENDED */
+		mmc_cmd.arg = write ? 1<<31 : 0;
+		mmc_cmd.arg |= (func & 0x7) << 28;
+		mmc_cmd.arg |= 1<<27;
+		mmc_cmd.arg |= fifo ? 0 : 1<<26;
+		mmc_cmd.arg |= (addr & 0x1FFFF) << 9;
+		mmc_cmd.arg |= blk_num & 0x1FF;
+		mmc_cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+		mmc_req.cmd = &mmc_cmd;
+		mmc_req.data = &mmc_dat;
+		if (!fifo)
+			addr += ttl_len;
+
+		sdio_claim_host(sdio_func);
+		mmc_set_data_timeout(&mmc_dat, sdio_func->card);
+		mmc_wait_for_req(host, &mmc_req);
+		sdio_release_host(sdio_func);
+
+		err_ret = mmc_cmd.error? mmc_cmd.error : mmc_dat.error;
+		if (0 != err_ret) {
+			sd_err(("%s:CMD53 %s failed with code %d\n",
+				__FUNCTION__, write ? "write" : "read", err_ret));
+			return SDIOH_API_RC_FAIL;
+		}
+	}
+	} else if(sd->txglom_mode == SDPCM_TXGLOM_CPY) {
 		for (pnext = pkt; pnext; pnext = PKTNEXT(sd->osh, pnext)) {
 			ttl_len += PKTLEN(sd->osh, pnext);
 		}
@@ -1265,7 +1257,7 @@ sdioh_request_packet_chain(sdioh_info_t *sd, uint fix_inc, uint write, uint func
 				localbuf = (uint8 *)MALLOC(sd->osh, ttl_len);
 				if (localbuf == NULL) {
 					sd_err(("%s: %s TXGLOM: localbuf malloc FAILED\n",
-							__FUNCTION__, (write) ? "TX" : "RX"));
+						__FUNCTION__, (write) ? "TX" : "RX"));
 					goto txglomfail;
 				}
 			}
@@ -1286,31 +1278,31 @@ txglomfail:
 
 			if ((write) && (!fifo))
 				err_ret = sdio_memcpy_toio(
-							  sd->func[func],
-							  addr, buf, pkt_len);
+						sd->func[func],
+						addr, buf, pkt_len);
 			else if (write)
 				err_ret = sdio_memcpy_toio(
-							  sd->func[func],
-							  addr, buf, pkt_len);
+						sd->func[func],
+						addr, buf, pkt_len);
 			else if (fifo)
 				err_ret = sdio_readsb(
-							  sd->func[func],
-							  buf, addr, pkt_len);
+						sd->func[func],
+						buf, addr, pkt_len);
 			else
 				err_ret = sdio_memcpy_fromio(
-							  sd->func[func],
-							  buf, addr, pkt_len);
+						sd->func[func],
+						buf, addr, pkt_len);
 
 			if (err_ret)
 				sd_err(("%s: %s FAILED %p[%d], addr=0x%05x, pkt_len=%d, ERR=%d\n",
-						__FUNCTION__,
-						(write) ? "TX" : "RX",
-						pnext, sg_count, addr, pkt_len, err_ret));
+				       __FUNCTION__,
+				       (write) ? "TX" : "RX",
+				       pnext, sg_count, addr, pkt_len, err_ret));
 			else
 				sd_trace(("%s: %s xfr'd %p[%d], addr=0x%05x, len=%d\n",
-						  __FUNCTION__,
-						  (write) ? "TX" : "RX",
-						  pnext, sg_count, addr, pkt_len));
+					__FUNCTION__,
+					(write) ? "TX" : "RX",
+					pnext, sg_count, addr, pkt_len));
 
 			if (!fifo)
 				addr += pkt_len;
@@ -1328,7 +1320,7 @@ txglomfail:
 	if (sd_msglevel & SDH_COST_VAL) {
 		osl_do_gettimeofday(&now);
 		sd_cost(("%s: rw=%d, ttl_len=%d, cost=%lds %luus\n", __FUNCTION__,
-				 write, ttl_len, now.tv_sec - before.tv_sec, now.tv_nsec / 1000 - before.tv_nsec / 1000));
+			write, ttl_len, now.tv_sec-before.tv_sec, now.tv_nsec/1000-before.tv_nsec/1000));
 	}
 
 	sd_trace(("%s: Exit\n", __FUNCTION__));
@@ -1338,7 +1330,7 @@ txglomfail:
 
 static SDIOH_API_RC
 sdioh_buffer_tofrom_bus(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
-						uint addr, uint8 *buf, uint len)
+                     uint addr, uint8 *buf, uint len)
 {
 	bool fifo = (fix_inc == SDIOH_DATA_FIX);
 	int err_ret = 0;
@@ -1374,17 +1366,17 @@ sdioh_buffer_tofrom_bus(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 
 	if (err_ret)
 		sd_err(("%s: %s FAILED %p, addr=0x%05x, pkt_len=%d, ERR=%d\n", __FUNCTION__,
-				(write) ? "TX" : "RX", buf, addr, len, err_ret));
+		       (write) ? "TX" : "RX", buf, addr, len, err_ret));
 	else
 		sd_trace(("%s: %s xfr'd %p, addr=0x%05x, len=%d\n", __FUNCTION__,
-				  (write) ? "TX" : "RX", buf, addr, len));
+			(write) ? "TX" : "RX", buf, addr, len));
 
 	sd_trace(("%s: Exit\n", __FUNCTION__));
 
 	if (sd_msglevel & SDH_COST_VAL) {
 		osl_do_gettimeofday(&now);
 		sd_cost(("%s: rw=%d, len=%d cost=%lds %luus\n", __FUNCTION__,
-				 write, len, now.tv_sec - before.tv_sec, now.tv_nsec / 1000 - before.tv_nsec / 1000));
+			write, len, now.tv_sec-before.tv_sec, now.tv_nsec/1000 - before.tv_nsec/1000));
 	}
 
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
@@ -1403,7 +1395,7 @@ sdioh_buffer_tofrom_bus(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
  */
 extern SDIOH_API_RC
 sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, uint func,
-					 uint addr, uint reg_width, uint buf_len, uint8 *buffer, void *pkt)
+	uint addr, uint reg_width, uint buf_len, uint8 *buffer, void *pkt)
 {
 	SDIOH_API_RC status;
 	void *tmppkt;
@@ -1438,7 +1430,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 		return sdioh_buffer_tofrom_bus(sd, fix_inc, write, func, addr, buffer, buf_len);
 
 	sd_trace(("%s: [%d] doing memory copy buf=%p, len=%d\n",
-			  __FUNCTION__, write, buffer, buf_len));
+		__FUNCTION__, write, buffer, buf_len));
 
 	/* otherwise, a memory copy is needed as the input buffer is not aligned */
 	tmppkt = PKTGET_STATIC(sd->osh, buf_len + DEFAULT_SDIO_F2_BLKSIZE, write ? TRUE : FALSE);
@@ -1451,7 +1443,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 		bcopy(buffer, PKTDATA(sd->osh, tmppkt), buf_len);
 
 	status = sdioh_buffer_tofrom_bus(sd, fix_inc, write, func, addr,
-									 PKTDATA(sd->osh, tmppkt), ROUNDUP(buf_len, (DMA_ALIGN_MASK + 1)));
+		PKTDATA(sd->osh, tmppkt), ROUNDUP(buf_len, (DMA_ALIGN_MASK+1)));
 
 	if (!write)
 		bcopy(PKTDATA(sd->osh, tmppkt), buffer, buf_len);
@@ -1461,7 +1453,7 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 	if (sd_msglevel & SDH_COST_VAL) {
 		osl_do_gettimeofday(&now);
 		sd_cost(("%s: len=%d cost=%lds %luus\n", __FUNCTION__,
-				 buf_len, now.tv_sec - before.tv_sec, now.tv_nsec / 1000 - before.tv_nsec / 1000));
+			buf_len, now.tv_sec-before.tv_sec, now.tv_nsec/1000 - before.tv_nsec/1000));
 	}
 
 	return status;
@@ -1521,7 +1513,7 @@ sdioh_sdmmc_card_regread(sdioh_info_t *sd, int func, uint32 regaddr, int regsize
 		*data = temp;
 		*data &= 0xff;
 		sd_data(("%s: byte read data=0x%02x\n",
-				 __FUNCTION__, *data));
+		         __FUNCTION__, *data));
 	} else {
 		if (sdioh_request_word(sd, 0, SDIOH_READ, func, regaddr, data, regsize)) {
 			return BCME_SDIO_ERROR;
@@ -1530,7 +1522,7 @@ sdioh_sdmmc_card_regread(sdioh_info_t *sd, int func, uint32 regaddr, int regsize
 			*data &= 0xffff;
 
 		sd_data(("%s: word read data=0x%08x\n",
-				 __FUNCTION__, *data));
+		         __FUNCTION__, *data));
 	}
 
 	return SUCCESS;
@@ -1556,7 +1548,7 @@ static void IRQHandler(struct sdio_func *func)
 		sd_err(("bcmsdh_sdmmc: ***IRQHandler\n"));
 
 		sd_err(("%s: Not ready for intr: enabled %d, handler %p\n",
-				__FUNCTION__, sd->client_intr_enabled, sd->intr_handler));
+		        __FUNCTION__, sd->client_intr_enabled, sd->intr_handler));
 	}
 
 	sdio_claim_host(sd->func[0]);
@@ -1581,7 +1573,7 @@ sdioh_sdmmc_card_regwrite(sdioh_info_t *sd, int func, uint32 regaddr, int regsiz
 		temp = data & 0xff;
 		sdioh_request_byte(sd, SDIOH_READ, func, regaddr, &temp);
 		sd_data(("%s: byte write data=0x%02x\n",
-				 __FUNCTION__, data));
+		         __FUNCTION__, data));
 	} else {
 		if (regsize == 2)
 			data &= 0xffff;
@@ -1589,7 +1581,7 @@ sdioh_sdmmc_card_regwrite(sdioh_info_t *sd, int func, uint32 regaddr, int regsiz
 		sdioh_request_word(sd, 0, SDIOH_READ, func, regaddr, &data, regsize);
 
 		sd_data(("%s: word write data=0x%08x\n",
-				 __FUNCTION__, data));
+		         __FUNCTION__, data));
 	}
 
 	return SUCCESS;
@@ -1611,58 +1603,60 @@ sdioh_start(sdioh_info_t *sd, int stage)
 		sdio access will come in way
 	*/
 	if (sd->func[0]) {
-		if (stage == 0) {
-			/* Since the power to the chip is killed, we will have
-				re enumerate the device again. Set the block size
-				and enable the fucntion 1 for in preparation for
-				downloading the code
-			*/
-			/* sdio_reset_comm() - has been fixed in latest kernel/msm.git for Linux
-			   2.6.27. The implementation prior to that is buggy, and needs broadcom's
-			   patch for it
-			*/
-			if ((ret = sdio_reset_comm(sd->func[0]->card))) {
-				sd_err(("%s Failed, error = %d\n", __FUNCTION__, ret));
-				return ret;
+			if (stage == 0) {
+		/* Since the power to the chip is killed, we will have
+			re enumerate the device again. Set the block size
+			and enable the fucntion 1 for in preparation for
+			downloading the code
+		*/
+		/* sdio_reset_comm() - has been fixed in latest kernel/msm.git for Linux
+		   2.6.27. The implementation prior to that is buggy, and needs broadcom's
+		   patch for it
+		*/
+#if defined(ENABLE_INSMOD_NO_FW_LOAD) && !defined(BUS_POWER_RESTORE)
+		if ((ret = sdio_reset_comm(sd->func[0]->card))) {
+			sd_err(("%s Failed, error = %d\n", __FUNCTION__, ret));
+			return ret;
+		} else
+#endif
+		{
+			sd->num_funcs = 2;
+			sd->sd_blockmode = TRUE;
+			sd->use_client_ints = TRUE;
+			sd->client_block_size[0] = 64;
+
+			if (sd->func[1]) {
+				/* Claim host controller */
+				sdio_claim_host(sd->func[1]);
+
+				sd->client_block_size[1] = 64;
+				ret = sdio_set_block_size(sd->func[1], 64);
+				if (ret) {
+					sd_err(("bcmsdh_sdmmc: Failed to set F1 "
+						"blocksize(%d)\n", ret));
+				}
+
+				/* Release host controller F1 */
+				sdio_release_host(sd->func[1]);
 			}
-			else {
-				sd->num_funcs = 2;
-				sd->sd_blockmode = TRUE;
-				sd->use_client_ints = TRUE;
-				sd->client_block_size[0] = 64;
 
-				if (sd->func[1]) {
-					/* Claim host controller */
-					sdio_claim_host(sd->func[1]);
+			if (sd->func[2]) {
+				/* Claim host controller F2 */
+				sdio_claim_host(sd->func[2]);
 
-					sd->client_block_size[1] = 64;
-					ret = sdio_set_block_size(sd->func[1], 64);
-					if (ret) {
-						sd_err(("bcmsdh_sdmmc: Failed to set F1 "
-								"blocksize(%d)\n", ret));
-					}
-
-					/* Release host controller F1 */
-					sdio_release_host(sd->func[1]);
+				sd->client_block_size[2] = sd_f2_blocksize;
+				printf("%s: set sd_f2_blocksize %d\n", __FUNCTION__, sd_f2_blocksize);
+				ret = sdio_set_block_size(sd->func[2], sd_f2_blocksize);
+				if (ret) {
+					sd_err(("bcmsdh_sdmmc: Failed to set F2 "
+						"blocksize to %d(%d)\n", sd_f2_blocksize, ret));
 				}
 
-				if (sd->func[2]) {
-					/* Claim host controller F2 */
-					sdio_claim_host(sd->func[2]);
+				/* Release host controller F2 */
+				sdio_release_host(sd->func[2]);
+			}
 
-					sd->client_block_size[2] = sd_f2_blocksize;
-					printf("%s: set sd_f2_blocksize %d\n", __FUNCTION__, sd_f2_blocksize);
-					ret = sdio_set_block_size(sd->func[2], sd_f2_blocksize);
-					if (ret) {
-						sd_err(("bcmsdh_sdmmc: Failed to set F2 "
-								"blocksize to %d(%d)\n", sd_f2_blocksize, ret));
-					}
-
-					/* Release host controller F2 */
-					sdio_release_host(sd->func[2]);
-				}
-
-				sdioh_sdmmc_card_enablefuncs(sd);
+			sdioh_sdmmc_card_enablefuncs(sd);
 			}
 		} else {
 #if !defined(OOB_INTR_ONLY)

@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "gxl_p212.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesongxl_p212_kernel49/initramfs/ramfslist-64"

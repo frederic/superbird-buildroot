@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="CVD2NEW_Settings_AV_SECAM" platform="txlx" commands="">
+<Group num="0" val="0">
+<Page tab_title="CVD2NEW_Settings_AV_SECAM" layout="8x4">
+<Control ui_type="slider" name="CVD_YC_DLY"  sig="1540" range="0~15" addr="0x7" mask="3:0" dst="U" desc="CVD_YC_DLY" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_CONTRAST"  sig="1540" range="0~255" addr="0x8" mask="7:0" dst="U" desc="CVD_CONTRAST" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_BRIGHTNESS" sig="1540"  range="0~255" addr="0x9" mask="7:0" dst="U" desc="CVD_BRIGHTNESS" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_SATURATION"  sig="1540" range="0~255" addr="0xa" mask="7:0" dst="U" desc="CVD_SATURATION" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_HUE"  sig="1540" range="0~255" addr="0xb" mask="7:0" dst="U" desc="CVD_HUE" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_CONTRAST_AML" sig="1540"  range="0~511" addr="0x157" mask="8:0" dst="U" desc="CVD_CONTRAST_AML" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="CVD_BRIGHTNESS_AML" sig="1540"  range="0~1023" addr="0x157" mask="25:16" dst="U" desc="CVD_BRIGHTNESS_AML" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_53"  sig="1540" range="0~65535" addr="0x153" mask="15:0" dst="U" desc="ACD_REG_53" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_53_2"  sig="1540" range="0~65535" addr="0x153" mask="31:16" dst="U" desc="ACD_REG_53_2" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_54"  sig="1540" range="0~65535" addr="0x154" mask="15:0" dst="U" desc="ACD_REG_54" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_54_2"  sig="1540" range="0~65535" addr="0x154" mask="31:16" dst="U" desc="ACD_REG_54_2" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_55"  sig="1540" range="0~65535" addr="0x155" mask="15:0" dst="U" desc="ACD_REG_55" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_55_2"  sig="1540" range="0~65535" addr="0x155" mask="31:16" dst="U" desc="ACD_REG_55_2" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_56"  sig="1540" range="0~15" addr="0x156" mask="23:20" dst="U" desc="ACD_REG_56" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_58" sig="1540" range="0~65535" addr="0x158" mask="15:0" dst="U" desc="ACD_REG_58" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_58_2" sig="1540"  range="0~65535" addr="0x158" mask="31:16" dst="U" desc="ACD_REG_58_2" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_30B5" sig="1540"  range="0~65535" addr="0xb5" mask="15:0" dst="U" desc="ACD_REG_30B5" default="0" value="0" cmd="common:2,0xff642000"/>
+<Control ui_type="slider" name="ACD_REG_30B5_2" sig="1540"  range="0~65535" addr="0xb5" mask="31:16" dst="U" desc="ACD_REG_30B5_2" default="0" value="0" cmd="common:2,0xff642000"/>
+</Page>
+</Group>
+</Form>
+

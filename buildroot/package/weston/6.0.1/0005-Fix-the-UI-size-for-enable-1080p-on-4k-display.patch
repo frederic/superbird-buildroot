@@ -1,0 +1,280 @@
+From 15b2bc2c7310a82d4a941a6e5ee4f0ed15d60a59 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Tue, 16 Jul 2019 11:25:34 +0800
+Subject: [PATCH 5/7] Fix the UI size for enable 1080p on 4k display
+
+PD#SWPL-6435
+Fix the UI size for enable 1080p on 4k display when drm atomic enabled.
+Use weston config section "ui-size" can set the ui output(defaule is 1920x1080).
+Use atomic mode set for support 1080p gbm buffer object post on 4k display
+---
+ Makefile.am                |  4 +++
+ compositor/main.c          |  9 +++++
+ configure.ac               |  4 +++
+ libweston/compositor-drm.c | 87 ++++++++++++++++++++++++++++++++++++++++++++++
+ libweston/compositor-drm.h |  4 +++
+ 5 files changed, 108 insertions(+)
+
+diff --git a/Makefile.am b/Makefile.am
+index 5407b59..6860468 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -435,6 +435,10 @@ remoting_plugin_la_SOURCES =			\
+ 	remoting/remoting-plugin.h
+ endif
+ 
++if ENABLE_DRM_FIX_UI_SIZE
++drm_backend_la_CFLAGS += -DFIX_UI_SIZE_FOR_4K
++endif
++
+ endif
+ 
+ if ENABLE_WAYLAND_COMPOSITOR
+diff --git a/compositor/main.c b/compositor/main.c
+index b6ac6ea..6d13ce2 100644
+--- a/compositor/main.c
++++ b/compositor/main.c
+@@ -2331,6 +2331,7 @@ load_drm_backend(struct weston_compositor *c,
+ 	int use_pixman_config_ = 0;
+ 	int drm_use_current_mode = 0;
+ 	int32_t use_pixman_ = 0;
++	char* buffp = NULL;
+ 
+ 	wet->drm_use_current_mode = false;
+ 
+@@ -2351,6 +2352,14 @@ load_drm_backend(struct weston_compositor *c,
+ 	wet->drm_use_current_mode = drm_use_current_mode;
+ 	config.use_pixman = use_pixman_;
+ 
++	section = weston_config_get_section(wc, "output", NULL, NULL);
++	weston_config_section_get_string(section,
++					 "ui-size", &buffp,
++					 NULL);
++	if (buffp != NULL) {
++		sscanf(buffp, "%dx%d", &(config.fixed_ui_size.width), &(config.fixed_ui_size.height));
++	}
++
+ 	section = weston_config_get_section(wc, "core", NULL, NULL);
+ 	weston_config_section_get_string(section,
+ 					 "gbm-format", &config.gbm_format,
+diff --git a/configure.ac b/configure.ac
+index 4e0ff9b..c1c8a4d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -239,6 +239,10 @@ if test x$enable_drm_compositor = xyes; then
+ 		    [AC_MSG_WARN([GBM does not support dmabuf import, will omit that capability])])
+ fi
+ 
++AC_ARG_ENABLE(drm-fix-ui-size, [  --enable-drm-fix-ui-size],,
++	      enable_drm_fix_ui_size=no)
++AM_CONDITIONAL(ENABLE_DRM_FIX_UI_SIZE, test x$enable_drm_fix_ui_size = xyes)
++
+ AC_ARG_ENABLE(remoting, [  --enable-remoting],,
+               enable_remoting=no)
+ AM_CONDITIONAL(ENABLE_REMOTING, test x$enable_remoting = xyes)
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index e3a1353..0228221 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -353,6 +353,12 @@ struct drm_backend {
+ 	bool fb_modifiers;
+ 
+ 	struct weston_debug_scope *debug;
++
++	/*in fixed ui size mode the current_mode 's w/h will not equal to real display size any more */
++	struct weston_size  fixed_ui_size;
++
++	/*in fixed ui size mode, the real display size will saved out of the current mode*/
++	struct weston_size display_size;
+ };
+ 
+ struct drm_mode {
+@@ -571,6 +577,8 @@ struct drm_output {
+ 	bool virtual;
+ 
+ 	submit_frame_cb virtual_submit_frame;
++
++	bool current_mode_need_restore;
+ };
+ 
+ static const char *const aspect_ratio_as_string[] = {
+@@ -2063,10 +2071,18 @@ drm_output_prepare_scanout_view(struct drm_output_state *output_state,
+ 	if (!drm_plane_state_coords_for_view(state, ev))
+ 		goto err;
+ 
++#ifdef FIX_UI_SIZE_FOR_4K
++	//dest_w h should same with the display mode
++	if (state->dest_x != 0 || state->dest_y != 0 ||
++	    state->dest_w != (unsigned) b->display_size.width ||
++	    state->dest_h != (unsigned) b->display_size.height)
++		goto err;
++#else
+ 	if (state->dest_x != 0 || state->dest_y != 0 ||
+ 	    state->dest_w != (unsigned) output->base.current_mode->width ||
+ 	    state->dest_h != (unsigned) output->base.current_mode->height)
+ 		goto err;
++#endif
+ 
+ 	/* The legacy API does not let us perform cropping or scaling. */
+ 	if (!b->atomic_modeset &&
+@@ -2189,8 +2205,14 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
+ 
+ 	scanout_state->dest_x = 0;
+ 	scanout_state->dest_y = 0;
++#ifdef FIX_UI_SIZE_FOR_4K
++	//scanout_state->src_w  dest_w need same with the current_Mode
++	scanout_state->dest_w = b->display_size.width;
++	scanout_state->dest_h = b->display_size.height;
++#else
+ 	scanout_state->dest_w = scanout_state->src_w >> 16;
+ 	scanout_state->dest_h = scanout_state->src_h >> 16;
++#endif
+ 
+ 
+ 	pixman_region32_subtract(&c->primary_plane.damage,
+@@ -2603,6 +2625,7 @@ drm_output_apply_state_atomic(struct drm_output_state *state,
+ 		ret |= plane_add_prop(req, plane, WDRM_PLANE_CRTC_H,
+ 				      plane_state->dest_h);
+ 
++
+ 		if (plane_state->fb && plane_state->fb->format)
+ 			pinfo = plane_state->fb->format;
+ 
+@@ -4012,6 +4035,16 @@ choose_mode (struct drm_output *output, struct weston_mode *target_mode)
+ 	b = to_drm_backend(output->base.compositor);
+ 	target_aspect = target_mode->aspect_ratio;
+ 	src_aspect = output->base.current_mode->aspect_ratio;
++
++#ifdef FIX_UI_SIZE_FOR_4K
++	if (b->display_size.width == target_mode->width &&
++	    b->display_size.height == target_mode->height &&
++	    (output->base.current_mode->refresh == target_mode->refresh ||
++	     target_mode->refresh == 0)) {
++		if (!b->aspect_ratio_supported || src_aspect == target_aspect)
++			return to_drm_mode(output->base.current_mode);
++	}
++#else
+ 	if (output->base.current_mode->width == target_mode->width &&
+ 	    output->base.current_mode->height == target_mode->height &&
+ 	    (output->base.current_mode->refresh == target_mode->refresh ||
+@@ -4019,6 +4052,7 @@ choose_mode (struct drm_output *output, struct weston_mode *target_mode)
+ 		if (!b->aspect_ratio_supported || src_aspect == target_aspect)
+ 			return to_drm_mode(output->base.current_mode);
+ 	}
++#endif
+ 
+ 	wl_list_for_each(mode, &output->base.mode_list, base.link) {
+ 
+@@ -4071,6 +4105,19 @@ drm_output_switch_mode(struct weston_output *output_base, struct weston_mode *mo
+ 
+ 	output->base.current_mode->flags = 0;
+ 
++#ifdef FIX_UI_SIZE_FOR_4K
++	//restore the orgin size of current_mode
++	if (output->base.current_mode && output->current_mode_need_restore) {
++		output->base.current_mode->width = b->display_size.width;
++		output->base.current_mode->height = b->display_size.height;
++	}
++	//Save the orgin size of next current_mode
++	b->display_size.width = drm_mode->base.width;
++	b->display_size.height = drm_mode->base.height;
++	//Set the fixed ui size to current_mode
++	drm_mode->base.width = b->fixed_ui_size.width;
++	drm_mode->base.height = b->fixed_ui_size.height;
++#endif
+ 	output->base.current_mode = &drm_mode->base;
+ 	output->base.current_mode->flags =
+ 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
+@@ -4082,6 +4129,12 @@ drm_output_switch_mode(struct weston_output *output_base, struct weston_mode *mo
+ 	 *      content.
+ 	 */
+ 	b->state_invalid = true;
++#ifdef FIX_UI_SIZE_FOR_4K
++	//sleep is a workaround for wait for drm hdmi driver.
++	sleep(2);
++	//nothing need todo on fix ui mode
++	return 0;
++#endif
+ 
+ 	if (b->use_pixman) {
+ 		drm_output_fini_pixman(output);
+@@ -5830,6 +5883,21 @@ drm_output_set_mode(struct weston_output *base,
+ 	output->base.native_mode = output->base.current_mode;
+ 	output->base.native_scale = output->base.current_scale;
+ 
++#ifdef FIX_UI_SIZE_FOR_4K
++	// this is the first current_mode so not restore needed
++	if (output->current_mode_need_restore) {
++		assert(!output->current_mode_need_restore);
++	}
++	//Save the orgin size of next current_mode
++	b->display_size.width = output->base.current_mode->width;
++	b->display_size.height = output->base.current_mode->height;
++	//Set the fixed ui size to current_mode
++	output->base.current_mode->width = b->fixed_ui_size.width;
++	output->base.current_mode->height = b->fixed_ui_size.height;
++	output->current_mode_need_restore = true;
++#endif
++
++
+ 	return 0;
+ }
+ 
+@@ -6259,6 +6327,12 @@ drm_output_deinit(struct weston_output *base)
+ 		}
+ 	}
+ 
++	if (output->base.current_mode && output->current_mode_need_restore) {
++		output->base.current_mode->width = b->display_size.width;
++		output->base.current_mode->height = b->display_size.height;
++		output->current_mode_need_restore = false;
++	}
++
+ 	drm_output_fini_crtc(output);
+ }
+ 
+@@ -6571,6 +6645,7 @@ drm_output_create(struct weston_compositor *compositor, const char *name)
+ 
+ 	output->state_cur = drm_output_state_alloc(output, NULL);
+ 
++	output->current_mode_need_restore = false;
+ 	weston_compositor_add_pending_output(&output->base, b->compositor);
+ 
+ 	return &output->base;
+@@ -7473,6 +7548,18 @@ drm_backend_create(struct weston_compositor *compositor,
+ 	b->session_listener.notify = session_notify;
+ 	wl_signal_add(&compositor->session_signal, &b->session_listener);
+ 
++#ifdef FIX_UI_SIZE_FOR_4K
++	if (config->fixed_ui_size.width > 0 && config->fixed_ui_size.height > 0) {
++		b->fixed_ui_size.width = config->fixed_ui_size.width;
++		b->fixed_ui_size.height = config->fixed_ui_size.height;
++	} else {
++		b->fixed_ui_size.width = 1920;
++		b->fixed_ui_size.height = 1080;
++	}
++	b->display_size.width = 0;
++	b->display_size.height = 0;
++#endif
++
+ 	if (config->specific_device)
+ 		drm_device = open_specific_drm_device(b, config->specific_device);
+ 	else
+diff --git a/libweston/compositor-drm.h b/libweston/compositor-drm.h
+index 71a306f..45d49e1 100644
+--- a/libweston/compositor-drm.h
++++ b/libweston/compositor-drm.h
+@@ -223,6 +223,10 @@ struct weston_drm_backend_config {
+ 
+ 	/** Use shadow buffer if using Pixman-renderer. */
+ 	bool use_pixman_shadow;
++
++	/* fixed ui size mode the current_mode 's w/h will not equal real display size any more */
++	struct weston_size  fixed_ui_size;
++
+ };
+ 
+ #ifdef  __cplusplus
+-- 
+2.7.4
+

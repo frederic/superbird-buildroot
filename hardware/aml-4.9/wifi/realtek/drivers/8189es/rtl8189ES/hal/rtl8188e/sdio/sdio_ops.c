@@ -28,10 +28,10 @@
 * Creadted by Roger, 2011.01.31.
 *   */
 static void HalSdioGetCmdAddr8723ASdio(
-	IN	PADAPTER			padapter,
-	IN	u8				DeviceID,
-	IN	u32				Addr,
-	OUT	u32				*pCmdAddr
+		PADAPTER			padapter,
+		u8				DeviceID,
+		u32				Addr,
+		u32				*pCmdAddr
 )
 {
 	switch (DeviceID) {
@@ -1015,7 +1015,7 @@ DumpLoggedInterruptHistory8723Sdio(
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-	u4Byte				DebugLevel = DBG_LOUD;
+	u32				DebugLevel = DBG_LOUD;
 
 	if (DBG_Var.DbgPrintIsr == 0)
 		return;
@@ -1098,7 +1098,7 @@ LogInterruptHistory8723Sdio(
 
 void
 DumpHardwareProfile8723Sdio(
-	IN	PADAPTER		padapter
+		PADAPTER		padapter
 )
 {
 	DumpLoggedInterruptHistory8723Sdio(padapter);
@@ -1482,14 +1482,10 @@ void sd_int_dpc(PADAPTER padapter)
 		u8	freepage[4];
 
 		_sdio_local_read(padapter, SDIO_REG_FREE_TXPG, 4, freepage);
-		/* _enter_critical_bh(&pHalData->SdioTxFIFOFreePageLock, &irql); */
-		/* _rtw_memcpy(pHalData->SdioTxFIFOFreePage, freepage, 4); */
-		/* _exit_critical_bh(&pHalData->SdioTxFIFOFreePageLock, &irql); */
-		/* RTW_INFO("SDIO_HISR_AVAL, Tx Free Page = 0x%x%x%x%x\n", */
-		/*	freepage[0], */
-		/*	freepage[1], */
-		/*	freepage[2], */
-		/*	freepage[3]); */
+		#ifdef DBG_TX_FREE_PAGE
+		RTW_INFO("SDIO_HISR_AVAL, Tx Free Page = H:%u, M:%u, L:%u, P:%u\n",
+			freepage[0], freepage[1], freepage[2], freepage[3]);
+		#endif
 		_rtw_up_sema(&(padapter->xmitpriv.xmit_sema));
 	}
 #endif

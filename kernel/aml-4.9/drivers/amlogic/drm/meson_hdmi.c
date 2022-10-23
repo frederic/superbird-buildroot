@@ -65,6 +65,8 @@ static struct am_vout_mode am_vout_modes[] = {
 	{ "576p50hz", VMODE_HDMI, 720, 576, 50, 0},
 	{ "576i50hz", VMODE_HDMI, 720, 576, 50, DRM_MODE_FLAG_INTERLACE},
 	{ "480p60hz", VMODE_HDMI, 720, 480, 60, 0},
+	{ "1280x1024p60hz", VMODE_HDMI, 1280, 1024, 60, 0},
+	{ "1680x1050p60hz", VMODE_HDMI, 1680, 1050, 60, 0},
 };
 
 char *am_meson_hdmi_get_voutmode(struct drm_display_mode *mode)
@@ -99,6 +101,22 @@ static unsigned char default_edid[] = {
 	0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0xfc,
 	0x00, 0x4c, 0x69, 0x6e, 0x75, 0x78, 0x20, 0x46,
 	0x48, 0x44, 0x0a, 0x20, 0x20, 0x20, 0x00, 0x05,
+};
+
+static const struct drm_prop_enum_list am_color_space_enum_names[] = {
+	{ COLORSPACE_RGB444, "rgb" },
+	{ COLORSPACE_YUV422, "422" },
+	{ COLORSPACE_YUV444, "444" },
+	{ COLORSPACE_YUV420, "420" },
+	{ COLORSPACE_RESERVED, "reserved" },
+};
+
+static const struct drm_prop_enum_list am_color_depth_enum_names[] = {
+	{ COLORDEPTH_24B, "8bit" },
+	{ COLORDEPTH_30B, "10bit" },
+	{ COLORDEPTH_36B, "12bit" },
+	{ COLORDEPTH_48B, "16bit" },
+	{ COLORDEPTH_RESERVED, "reserved" },
 };
 
 int am_hdmi_tx_get_modes(struct drm_connector *connector)
@@ -179,14 +197,17 @@ void am_hdmi_hdcp_work_state_change(struct am_hdmi_tx *am_hdmi, int stop)
 		DRM_INFO("hdcp not support\n");
 		return;
 	}
-	if (am_hdmi->hdcp_work == NULL && stop != 1) {
-		am_hdmi->hdcp_work = kthread_run(am_hdcp_work,
-				(void *)am_hdmi, "kthread_hdcp_task");
-		if (IS_ERR(am_hdmi->hdcp_work)) {
-			DRM_INFO("hdcp work create failed\n");
-			am_hdmi->hdcp_work = NULL;
+	if (stop != 1) {
+		is_hdcp_hdmitx_supported(am_hdmi);
+		if (am_hdmi->hdcp_work == NULL) {
+			am_hdmi->hdcp_work = kthread_run(am_hdcp_work,
+					(void *)am_hdmi, "kthread_hdcp_task");
+			if (IS_ERR(am_hdmi->hdcp_work)) {
+				DRM_INFO("hdcp work create failed\n");
+				am_hdmi->hdcp_work = NULL;
+			}
+			return;
 		}
-		return;
 	}
 	if (am_hdmi->hdcp_work != NULL && stop == 1) {
 		DRM_INFO("stop hdcp work\n");
@@ -196,12 +217,100 @@ void am_hdmi_hdcp_work_state_change(struct am_hdmi_tx *am_hdmi, int stop)
 	}
 }
 
-static int am_hdmi_connector_set_property(struct drm_connector *connector,
+static int am_hdmi_check_attr(struct am_hdmi_tx *am_hdmi,
+			      struct drm_property *property,
+			      uint64_t val)
+{
+	int rtn_val;
+	struct drm_connector *connector;
+
+	rtn_val = 0;
+	connector = &am_hdmi->connector;
+	if ((property != am_hdmi->color_depth_property) &&
+		(property != am_hdmi->color_space_property) &&
+		(property != connector->content_protection_property)) {
+		rtn_val = -EINVAL;
+	}
+
+	if (property == am_hdmi->color_depth_property) {
+		if ((val != COLORDEPTH_24B) &&
+			(val != COLORDEPTH_30B) &&
+			(val != COLORDEPTH_36B) &&
+			(val != COLORDEPTH_48B)) {
+			DRM_INFO("[%s]: Color Depth: %llu\n", __func__, val);
+			rtn_val = -EINVAL;
+		}
+	}
+
+	if (property == am_hdmi->color_space_property) {
+		if ((val != COLORSPACE_RGB444) &&
+			(val != COLORSPACE_YUV422) &&
+			(val != COLORSPACE_YUV444) &&
+			(val != COLORSPACE_YUV420)) {
+			DRM_INFO("[%s]: Color Space: %llu\n", __func__, val);
+			rtn_val = -EINVAL;
+		}
+	}
+
+	return rtn_val;
+}
+
+static int am_hdmi_create_attr(struct am_hdmi_tx *am_hdmi,
+							   char attr[16])
+{
+	uint8_t count;
+	const struct drm_prop_enum_list *iterator;
+	uint8_t iter_num;
+
+	memset(attr, 0, 16);
+	iterator = &am_color_space_enum_names[0];
+	iter_num = ARRAY_SIZE(am_color_space_enum_names);
+	for (count = 0; count < iter_num; count++) {
+		if (iterator->type == (int)am_hdmi->color_space) {
+			strcpy(attr, iterator->name);
+			attr[strlen(attr)] = ',';
+			break;
+		}
+		iterator++;
+	}
+	if (count >= iter_num) {
+		DRM_INFO("[%s]: color_space %d error!",
+				 __func__, (int)am_hdmi->color_space);
+		return -EINVAL;
+	}
+
+	iterator = &am_color_depth_enum_names[0];
+	iter_num = ARRAY_SIZE(am_color_depth_enum_names);
+	for (count = 0; count < iter_num; count++) {
+		if (iterator->type == (int)am_hdmi->color_depth) {
+			strcat(attr, iterator->name);
+			break;
+		}
+		iterator++;
+	}
+	if (count >= iter_num) {
+		DRM_INFO("[%s]: color_depth %d error!",
+				 __func__, (int)am_hdmi->color_depth);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int am_hdmi_connector_atomic_set_property
+	(struct drm_connector *connector,
+	struct drm_connector_state *state,
 	struct drm_property *property, uint64_t val)
 {
 	struct am_hdmi_tx *am_hdmi = to_am_hdmi(connector);
-	struct drm_connector_state *state = am_hdmi->connector.state;
+	char attr[16];
+	int rtn_val;
 
+	rtn_val = am_hdmi_check_attr(am_hdmi, property, val);
+	if (rtn_val != 0) {
+		DRM_INFO("[%s]: Check attr Fail!\n", __func__);
+		return rtn_val;
+	}
 	if (property == connector->content_protection_property) {
 		DRM_INFO("property:%s       val: %lld\n", property->name, val);
 		/* For none atomic commit */
@@ -212,8 +321,26 @@ static int am_hdmi_connector_set_property(struct drm_connector *connector,
 		}
 		state->content_protection = val;
 	}
-	/*other parperty todo*/
-	return 0;
+
+	if (property == am_hdmi->color_depth_property) {
+		DRM_INFO("Set Color Depth to: %llu\n", val);
+		am_hdmi->color_depth = val;
+	}
+
+	if (property == am_hdmi->color_space_property) {
+		DRM_INFO("Set Color Space to: %llu\n", val);
+		am_hdmi->color_space = val;
+	}
+
+	rtn_val = am_hdmi_create_attr(am_hdmi, attr);
+	if (rtn_val == 0) {
+		DRM_INFO("[%s]: %s\n", __func__, attr);
+		setup_attr(attr);
+	} else {
+		DRM_INFO("[%s]: Create attr Fail!\n", __func__);
+	}
+
+	return rtn_val;
 }
 
 static int am_hdmi_connector_atomic_get_property
@@ -221,10 +348,24 @@ static int am_hdmi_connector_atomic_get_property
 	const struct drm_connector_state *state,
 	struct drm_property *property, uint64_t *val)
 {
+	struct am_hdmi_tx *am_hdmi = to_am_hdmi(connector);
 	if (property == connector->content_protection_property) {
 		DRM_INFO("get content_protection val: %d\n",
 			state->content_protection);
 		*val = state->content_protection;
+		return 0;
+	}
+
+	if (property == am_hdmi->color_depth_property) {
+		*val = am_hdmi->color_depth;
+		DRM_DEBUG_KMS("Get Color Depth val: %llu\n", *val);
+		return 0;
+	}
+
+	if (property == am_hdmi->color_space_property) {
+		*val = am_hdmi->color_space;
+		DRM_DEBUG_KMS("Get Color Space val: %llu\n", *val);
+		return 0;
 	} else {
 		DRM_DEBUG_ATOMIC("Unknown property %s\n", property->name);
 		return -EINVAL;
@@ -249,7 +390,8 @@ static const struct drm_connector_funcs am_hdmi_connector_funcs = {
 	.dpms			= drm_atomic_helper_connector_dpms,
 	.detect			= am_hdmi_connector_detect,
 	.fill_modes		= drm_helper_probe_single_connector_modes,
-	.set_property		= am_hdmi_connector_set_property,
+	.set_property   = drm_atomic_helper_connector_set_property,
+	.atomic_set_property	= am_hdmi_connector_atomic_set_property,
 	.atomic_get_property	= am_hdmi_connector_atomic_get_property,
 	.destroy		= am_hdmi_connector_destroy,
 	.reset			= drm_atomic_helper_connector_reset,
@@ -263,6 +405,7 @@ void am_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 {
 	const char attr1[16] = "rgb,8bit";
 	const char attr2[16] = "420,8bit";
+	char attr_tmp[16];
 	int vic;
 	struct am_hdmi_tx *am_hdmi = &am_hdmi_info;
 
@@ -274,17 +417,21 @@ void am_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 	/* Store the display mode for plugin/DPMS poweron events */
 	memcpy(&am_hdmi->previous_mode, adjusted_mode,
 	       sizeof(am_hdmi->previous_mode));
-	if (vic == 96 || vic == 97 || vic == 101 || vic == 102 ||
-	    vic == 106 || vic == 107)
-		setup_attr(attr2);
-	else
-		setup_attr(attr1);
+	get_attr(attr_tmp);
+	if (strlen(attr_tmp) == 0) {
+		if (vic == 96 || vic == 97 || vic == 101 || vic == 102 ||
+		    vic == 106 || vic == 107)
+			setup_attr(attr2);
+		else
+			setup_attr(attr1);
+	}
 }
 
 void am_hdmi_encoder_enable(struct drm_encoder *encoder)
 {
 	enum vmode_e vmode = get_current_vmode();
 	struct am_hdmi_tx *am_hdmi = to_am_hdmi(encoder);
+	struct drm_connector_state *state = am_hdmi->connector.state;
 
 	if (vmode == VMODE_HDMI)
 		DRM_INFO("enable\n");
@@ -292,9 +439,20 @@ void am_hdmi_encoder_enable(struct drm_encoder *encoder)
 		DRM_INFO("enable fail! vmode:%d\n", vmode);
 
 	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE_PRE, &vmode);
+	is_hdcp_hdmitx_supported(am_hdmi);
+	/* Update mode setting flag, the flag will transfer to hdcp22 process. */
+	am_hdmi->drm_mode_setting = 1;
+	setup_drm_mode_setting(1);
 	set_vout_vmode(vmode);
+	am_hdmi->drm_mode_setting = 0;
+	setup_drm_mode_setting(0);
 	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE, &vmode);
-	mdelay(1000);
+	if (am_hdmi->hdcp_tx_type == 0)
+		state->content_protection =
+			DRM_MODE_CONTENT_PROTECTION_UNDESIRED;
+	else
+		state->content_protection =
+			DRM_MODE_CONTENT_PROTECTION_DESIRED;
 	am_hdmi_hdcp_work_state_change(am_hdmi, 0);
 }
 
@@ -304,8 +462,6 @@ void am_hdmi_encoder_disable(struct drm_encoder *encoder)
 	struct drm_connector_state *state = am_hdmi->connector.state;
 
 	state->content_protection = DRM_MODE_CONTENT_PROTECTION_UNDESIRED;
-	am_hdmi_hdcp_work_state_change(am_hdmi, 1);
-
 }
 
 static int am_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
@@ -402,6 +558,7 @@ static int am_hdmi_i2c_xfer(struct i2c_adapter *adap,
 	struct am_hdmi_i2c *i2c = am_hdmi->i2c;
 	u8 addr = msgs[0].addr;
 	int i, ret = 0;
+	unsigned int   data32;
 
 	dev_dbg(am_hdmi->dev, "xfer: num: %d, addr: %#x\n", num, addr);
 
@@ -418,7 +575,12 @@ static int am_hdmi_i2c_xfer(struct i2c_adapter *adap,
 
 	/* Clear the EDID interrupt flag and unmute the interrupt */
 	hdmitx_wr_reg(HDMITX_DWC_I2CM_SOFTRSTZ, 0);
-	hdmitx_wr_reg(HDMITX_DWC_IH_MUTE_I2CM_STAT0, 0);
+	/* Mute The Interrupt of I2Cmasterdone, Otherwise Affect the Interrupt of HPD.*/
+	data32  = 0;
+	data32 |= (0 << 2);
+	data32 |= (1 << 1);
+	data32 |= (0 << 0);
+	hdmitx_wr_reg(HDMITX_DWC_IH_MUTE_I2CM_STAT0, data32);
 	/* TODO */
 	hdmitx_ddc_hw_op(DDC_MUX_DDC);
 
@@ -512,7 +674,8 @@ static irqreturn_t am_hdmi_hardirq(int irq, void *dev_id)
 	irqreturn_t ret = IRQ_NONE;
 
 	data32 = hdmitx_rd_reg(HDMITX_TOP_INTR_STAT);
-
+	/* Clear The Interrupt ot TX Controller IP*/
+	hdmitx_wr_reg(HDMITX_TOP_INTR_STAT_CLR, ~0);
 	/* check HPD status */
 	if ((data32 & (1 << 1)) && (data32 & (1 << 2))) {
 		if (hdmitx_hpd_hw_op(HPD_READ_HPD_GPIO))
@@ -525,10 +688,16 @@ static irqreturn_t am_hdmi_hardirq(int irq, void *dev_id)
 		ret = IRQ_WAKE_THREAD;
 		DRM_INFO("hotplug irq: %x\n", data32);
 		am_hdmi_info.hpd_flag = 0;
-		if (data32 & (1 << 1))
+		if (data32 & (1 << 1)) {
 			am_hdmi_info.hpd_flag = 1;/* HPD rising */
-		if (data32 & (1 << 2))
+			/* Update the hpd status to sysfs. */
+			setup_drm_hdmi_hpd(1);
+		}
+		if (data32 & (1 << 2)) {
 			am_hdmi_info.hpd_flag = 2;/* HPD falling */
+			/* Update the hpd status to sysfs. */
+			setup_drm_hdmi_hpd(0);
+		}
 		/* ack INTERNAL_INTR or else*/
 		hdmitx_wr_reg(HDMITX_TOP_INTR_STAT_CLR, data32 | 0x7);
 	}
@@ -543,33 +712,6 @@ static irqreturn_t am_hdmi_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int amhdmitx_get_dt_info(struct am_hdmi_tx *am_hdmi)
-{
-	struct device_node *hdcp_node;
-	unsigned char *hdcp_status;
-	int ret = 0;
-
-	hdcp_node = of_find_node_by_path("/drm-amhdmitx");
-	if (hdcp_node) {
-		ret = of_property_read_string(hdcp_node, "hdcp",
-					      (const char **)&(hdcp_status));
-		if (ret) {
-			DRM_INFO("not find hdcp_feature\n");
-		} else {
-			if (memcmp(hdcp_status, "okay", 4) == 0)
-				am_hdmi->hdcp_feature = 1;
-			else
-				am_hdmi->hdcp_feature = 0;
-			DRM_INFO("hdcp_feature: %d\n",
-				am_hdmi->hdcp_feature);
-		}
-	} else {
-		DRM_INFO("not find drm_amhdmitx\n");
-	}
-	return 0;
-}
-
-
 static const struct of_device_id am_meson_hdmi_dt_ids[] = {
 	{ .compatible = "amlogic,drm-amhdmitx", },
 	{},
@@ -580,6 +722,37 @@ MODULE_DEVICE_TABLE(of, am_meson_hdmi_dt_ids);
 struct drm_connector *am_meson_hdmi_connector(void)
 {
 	return &am_hdmi_info.connector;
+}
+
+static void am_meson_hdmi_connector_init_property(struct drm_device *drm_dev,
+		struct am_hdmi_tx *am_hdmi)
+{
+	struct drm_property *prop;
+	/* Connector */
+	am_hdmi->color_depth = MESON_DEFAULT_COLOR_DEPTH;
+	prop = drm_property_create_enum(drm_dev, 0, "Color Depth",
+			am_color_depth_enum_names,
+			ARRAY_SIZE(am_color_depth_enum_names));
+	if (prop) {
+		am_hdmi->color_depth_property = prop;
+		drm_object_attach_property(&am_hdmi->connector.base, prop,
+				am_hdmi->color_depth);
+	} else {
+		DRM_ERROR("Failed to add Color Depth property\n");
+	}
+
+	am_hdmi->color_space = MESON_DEFAULT_COLOR_SPACE;
+	prop = drm_property_create_enum(drm_dev, 0, "Color Space",
+			am_color_space_enum_names,
+			ARRAY_SIZE(am_color_space_enum_names));
+	if (prop) {
+		am_hdmi->color_space_property = prop;
+		drm_object_attach_property(&am_hdmi->connector.base, prop,
+				am_hdmi->color_space);
+	} else {
+		DRM_ERROR("Failed to add Color Space property\n");
+	}
+
 }
 
 static int am_meson_hdmi_bind(struct device *dev,
@@ -614,6 +787,7 @@ static int am_meson_hdmi_bind(struct device *dev,
 		dev_err(priv->dev, "Failed to init hdmi tx connector\n");
 		return ret;
 	}
+	am_meson_hdmi_connector_init_property(drm, am_hdmi);
 
 	connector->interlace_allowed = 1;
 
@@ -649,13 +823,10 @@ static int am_meson_hdmi_bind(struct device *dev,
 	}
 
 	/*HDCP INIT*/
-	amhdmitx_get_dt_info(am_hdmi);
-	if (am_hdmi->hdcp_feature) {
-		if (is_hdcp_hdmitx_supported(am_hdmi)) {
-			ret = am_hdcp_init(am_hdmi);
-			if (ret)
-				DRM_DEBUG_KMS("HDCP init failed, skipping.\n");
-		}
+	if (is_hdcp_hdmitx_supported(am_hdmi)) {
+		ret = am_hdcp_init(am_hdmi);
+		if (ret)
+			DRM_DEBUG_KMS("HDCP init failed, skipping.\n");
 	}
 	DRM_INFO("[%s] out\n", __func__);
 	return 0;

@@ -1,0 +1,211 @@
+From 44f347785340c26fb44b541ac8dc40f75e63d740 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Thu, 20 Jun 2019 14:25:22 +0800
+Subject: [PATCH 6/7] Add the drm-help funcitons for dynamic mode set/get
+ through IPC
+
+---
+ Makefile.am                |  5 ++++
+ configure.ac               |  5 ++++
+ libweston/compositor-drm.c | 62 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
+
+diff --git a/Makefile.am b/Makefile.am
+index 6860468..da9253f 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -412,6 +412,11 @@ drm_backend_la_SOURCES =			\
+ 	libweston/libbacklight.c		\
+ 	libweston/libbacklight.h
+ 
++if ENABLE_DRM_HELP
++drm_backend_la_LIBADD += $(WESTON_DRM_HELPER_LIBS)
++drm_backend_la_CFLAGS += $(WESTON_DRM_HELPER_CFLAGS) -DENABLE_DRM_HELP
++endif
++
+ if ENABLE_VAAPI_RECORDER
+ drm_backend_la_SOURCES += libweston/vaapi-recorder.c libweston/vaapi-recorder.h
+ drm_backend_la_LIBADD += $(LIBVA_LIBS)
+diff --git a/configure.ac b/configure.ac
+index c1c8a4d..a6baa10 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -215,6 +215,11 @@ if test x$enable_x11_compositor = xyes; then
+   AC_DEFINE([BUILD_X11_COMPOSITOR], [1], [Build the X11 compositor])
+ fi
+ 
++AC_ARG_ENABLE(drm-helper, [  --enable-drm-helper], , [enable_drm_helper=false])
++AM_CONDITIONAL(ENABLE_DRM_HELP, test x$enable_drm_helper = xyes)
++if test x$enable_drm_helper = xyes; then
++PKG_CHECK_MODULES(WESTON_DRM_HELPER, [libweston-drm-helper])
++fi
+ 
+ AC_ARG_ENABLE(drm-compositor, [  --enable-drm-compositor],,
+ 	      enable_drm_compositor=yes)
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index 0228221..fb6cf00 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -68,6 +68,10 @@
+ #include "linux-dmabuf-unstable-v1-server-protocol.h"
+ #include "linux-explicit-synchronization.h"
+ 
++#ifdef ENABLE_DRM_HELP
++#include "compositor-drm-help.h"
++#endif
++
+ #ifndef DRM_CLIENT_CAP_ASPECT_RATIO
+ #define DRM_CLIENT_CAP_ASPECT_RATIO	4
+ #endif
+@@ -2213,6 +2217,10 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
+ 	scanout_state->dest_w = scanout_state->src_w >> 16;
+ 	scanout_state->dest_h = scanout_state->src_h >> 16;
+ #endif
++#ifdef ENABLE_DRM_HELP
++	help_get_scanout_viewport(&scanout_state->dest_x, &scanout_state->dest_y, &scanout_state->dest_w, &scanout_state->dest_h);
++#endif
++
+ 
+ 
+ 	pixman_region32_subtract(&c->primary_plane.damage,
+@@ -2788,6 +2796,10 @@ drm_pending_state_apply_atomic(struct drm_pending_state *pending_state,
+ 		ret |= drm_output_apply_state_atomic(output_state, req, &flags);
+ 	}
+ 
++#ifdef ENABLE_DRM_HELP
++	ret |= help_atomic_req_add_prop(req);
++#endif
++
+ 	if (ret != 0) {
+ 		weston_log("atomic: couldn't compile atomic state\n");
+ 		goto out;
+@@ -3197,6 +3209,10 @@ drm_repaint_flush(struct weston_compositor *compositor, void *repaint_data)
+ 	drm_pending_state_apply(pending_state);
+ 	drm_debug(b, "[repaint] flushed pending_state %p\n", pending_state);
+ 	b->repaint_data = NULL;
++
++#ifdef ENABLE_DRM_HELP
++	help_do_repaint_cycle_completed();
++#endif
+ }
+ 
+ /**
+@@ -4122,6 +4138,11 @@ drm_output_switch_mode(struct weston_output *output_base, struct weston_mode *mo
+ 	output->base.current_mode->flags =
+ 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
+ 
++#ifdef ENABLE_DRM_HELP
++	help_update_display_mode_info(&drm_mode->mode_info);
++	help_update_ui_logic_size_info(output->base.current_mode->width, output->base.current_mode->height);
++#endif
++
+ 	/* XXX: This drops our current buffer too early, before we've started
+ 	 *      displaying it. Ideally this should be much more atomic and
+ 	 *      integrated with a full repaint cycle, rather than doing a
+@@ -5898,6 +5919,11 @@ drm_output_set_mode(struct weston_output *base,
+ #endif
+ 
+ 
++#ifdef ENABLE_DRM_HELP
++	help_update_display_mode_info(&current->mode_info);
++	help_update_ui_logic_size_info(output->base.current_mode->width, output->base.current_mode->height);
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -6232,6 +6258,17 @@ drm_output_print_modes(struct drm_output *output)
+ 	}
+ }
+ 
++
++#ifdef ENABLE_DRM_HELP
++static int drm_output_switch_mode_helper(output_ctx ctx, drm_helper_mode* mode) {
++	struct weston_mode m;
++	m.width = mode->width;
++	m.height = mode->height;
++	m.refresh = mode->refresh;
++	return weston_output_mode_set_native((struct weston_output *)ctx, &m, ((struct weston_output *)ctx)->current_scale);
++}
++#endif
++
+ static int
+ drm_output_enable(struct weston_output *base)
+ {
+@@ -6292,6 +6329,10 @@ drm_output_enable(struct weston_output *base)
+ 		   output->base.name, output->crtc_id);
+ 	drm_output_print_modes(output);
+ 
++#ifdef ENABLE_DRM_HELP
++	help_set_switch_mode_function((output_ctx)base, drm_output_switch_mode_helper);
++#endif
++
+ 	return 0;
+ 
+ err:
+@@ -6384,6 +6425,9 @@ drm_output_disable(struct weston_output *base)
+ 	}
+ 
+ 	weston_log("Disabling output %s\n", output->base.name);
++#ifdef ENABLE_DRM_HELP
++	help_set_switch_mode_function(NULL, NULL);
++#endif
+ 
+ 	if (output->base.enabled)
+ 		drm_output_deinit(&output->base);
+@@ -6454,6 +6498,10 @@ drm_head_assign_connector_info(struct drm_head *head,
+ 		return -1;
+ 	}
+ 
++#ifdef ENABLE_DRM_HELP
++	help_update_connector(head->connector, connector);
++#endif
++
+ 	if (head->connector)
+ 		drmModeFreeConnector(head->connector);
+ 	head->connector = connector;
+@@ -6578,6 +6626,9 @@ drm_head_create(struct drm_backend *backend, uint32_t connector_id,
+ 	weston_compositor_add_head(backend->compositor, &head->base);
+ 	drm_head_log_info(head, "found");
+ 
++#ifdef ENABLE_DRM_HELP
++	help_append_connector(connector);
++#endif
+ 	return head;
+ 
+ err_init:
+@@ -6595,6 +6646,9 @@ err_alloc:
+ static void
+ drm_head_destroy(struct drm_head *head)
+ {
++#ifdef ENABLE_DRM_HELP
++	help_delete_connector(head->connector);
++#endif
+ 	weston_head_release(&head->base);
+ 
+ 	drm_property_info_free(head->props_conn, WDRM_CONNECTOR__COUNT);
+@@ -6778,6 +6832,10 @@ udev_drm_event(int fd, uint32_t mask, void *data)
+ static void
+ drm_destroy(struct weston_compositor *ec)
+ {
++
++#ifdef ENABLE_DRM_HELP
++	stop_help_worker();
++#endif
+ 	struct drm_backend *b = to_drm_backend(ec);
+ 	struct weston_head *base, *next;
+ 
+@@ -7604,6 +7662,10 @@ drm_backend_create(struct weston_compositor *compositor,
+ 		goto err_sprite;
+ 	}
+ 
++#ifdef ENABLE_DRM_HELP
++	start_help_worker(b->drm.fd, b->atomic_modeset);
++#endif
++
+ 	if (drm_backend_create_heads(b, drm_device) < 0) {
+ 		weston_log("Failed to create heads for %s\n", b->drm.filename);
+ 		goto err_udev_input;
+-- 
+2.7.4
+

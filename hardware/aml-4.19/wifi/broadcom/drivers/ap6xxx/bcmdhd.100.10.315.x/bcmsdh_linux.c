@@ -1,7 +1,7 @@
 /*
  * SDIO access interface for drivers - linux specific (pci only)
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -81,7 +81,8 @@ typedef struct bcmsdh_os_info {
 } bcmsdh_os_info_t;
 
 /* debugging macros */
-#define SDLX_MSG(x)
+#define SDLX_ERR(x) printf x
+#define SDLX_MSG(x) printf x
 
 /**
  * Checks to see if vendor and device IDs match a supported SDIO Host Controller.
@@ -134,7 +135,7 @@ bcmsdh_chipmatch(uint16 vendor, uint16 device)
 }
 
 void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint bus_type,
-				   uint bus_num, uint slot_num)
+	uint bus_num, uint slot_num)
 {
 	ulong regs;
 	bcmsdh_info_t *bcmsdh;
@@ -143,12 +144,12 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 
 	bcmsdh = bcmsdh_attach(osh, sdioh, &regs);
 	if (bcmsdh == NULL) {
-		SDLX_MSG(("%s: bcmsdh_attach failed\n", __FUNCTION__));
+		SDLX_ERR(("%s: bcmsdh_attach failed\n", __FUNCTION__));
 		goto err;
 	}
 	bcmsdh_osinfo = MALLOC(osh, sizeof(bcmsdh_os_info_t));
 	if (bcmsdh_osinfo == NULL) {
-		SDLX_MSG(("%s: failed to allocate bcmsdh_os_info_t\n", __FUNCTION__));
+		SDLX_ERR(("%s: failed to allocate bcmsdh_os_info_t\n", __FUNCTION__));
 		goto err;
 	}
 	bzero((char *)bcmsdh_osinfo, sizeof(bcmsdh_os_info_t));
@@ -166,9 +167,9 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 	spin_lock_init(&bcmsdh_osinfo->oob_irq_spinlock);
 	/* Get customer specific OOB IRQ parametres: IRQ number as IRQ type */
 	bcmsdh_osinfo->oob_irq_num = wifi_platform_get_irq_number(adapter_info,
-								 &bcmsdh_osinfo->oob_irq_flags);
+		&bcmsdh_osinfo->oob_irq_flags);
 	if  (bcmsdh_osinfo->oob_irq_num < 0) {
-		SDLX_MSG(("%s: Host OOB irq is not defined\n", __FUNCTION__));
+		SDLX_ERR(("%s: Host OOB irq is not defined\n", __FUNCTION__));
 		goto err;
 	}
 #endif /* defined(BCMLXSDMMC) */
@@ -177,9 +178,9 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 	vendevid = bcmsdh_query_device(bcmsdh);
 	/* try to attach to the target device */
 	bcmsdh_osinfo->context = drvinfo.probe((vendevid >> 16), (vendevid & 0xFFFF), bus_num,
-										   slot_num, 0, bus_type, (void *)regs, osh, bcmsdh);
+		slot_num, 0, bus_type, (void *)regs, osh, bcmsdh);
 	if (bcmsdh_osinfo->context == NULL) {
-		SDLX_MSG(("%s: device attach failed\n", __FUNCTION__));
+		SDLX_ERR(("%s: device attach failed\n", __FUNCTION__));
 		goto err;
 	}
 
@@ -219,10 +220,13 @@ int bcmsdh_get_total_wake(bcmsdh_info_t *bcmsdh)
 
 int bcmsdh_set_get_wake(bcmsdh_info_t *bcmsdh, int flag)
 {
+#if defined(OOB_INTR_ONLY)
 	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
 	unsigned long flags;
-	int ret;
+#endif
+	int ret = 0;
 
+#if defined(OOB_INTR_ONLY)
 	spin_lock_irqsave(&bcmsdh_osinfo->oob_irq_spinlock, flags);
 
 	ret = bcmsdh->pkt_wake;
@@ -230,6 +234,7 @@ int bcmsdh_set_get_wake(bcmsdh_info_t *bcmsdh, int flag)
 	bcmsdh->pkt_wake = flag;
 
 	spin_unlock_irqrestore(&bcmsdh_osinfo->oob_irq_spinlock, flags);
+#endif
 	return ret;
 }
 #endif /* DHD_WAKE_STATUS */
@@ -278,7 +283,7 @@ bcmsdh_register(bcmsdh_driver_t *driver)
 	SDLX_MSG(("%s: register client driver\n", __FUNCTION__));
 	error = bcmsdh_register_client_driver();
 	if (error)
-		SDLX_MSG(("%s: failed %d\n", __FUNCTION__, error));
+		SDLX_ERR(("%s: failed %d\n", __FUNCTION__, error));
 
 	return error;
 }
@@ -287,8 +292,8 @@ void
 bcmsdh_unregister(void)
 {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
-	if (bcmsdh_pci_driver.node.next == NULL)
-		return;
+		if (bcmsdh_pci_driver.node.next == NULL)
+			return;
 #endif // endif
 
 	bcmsdh_unregister_client_driver();
@@ -352,30 +357,30 @@ static irqreturn_t wlan_oob_irq(int irq, void *dev_id)
 }
 
 int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handler,
-							 void* oob_irq_handler_context)
+	void* oob_irq_handler_context)
 {
 	int err = 0;
 	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
 
 	if (bcmsdh_osinfo->oob_irq_registered) {
-		SDLX_MSG(("%s: irq is already registered\n", __FUNCTION__));
+		SDLX_ERR(("%s: irq is already registered\n", __FUNCTION__));
 		return -EBUSY;
 	}
 #ifdef HW_OOB
-	printf("%s: HW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
-		   (int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags);
+	SDLX_MSG(("%s: HW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
+		(int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags));
 #else
-	printf("%s: SW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
-		   (int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags);
+	SDLX_MSG(("%s: SW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
+		(int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags));
 #endif
 	bcmsdh_osinfo->oob_irq_handler = oob_irq_handler;
 	bcmsdh_osinfo->oob_irq_handler_context = oob_irq_handler_context;
 	bcmsdh_osinfo->oob_irq_enabled = TRUE;
 	bcmsdh_osinfo->oob_irq_registered = TRUE;
 	err = request_irq(bcmsdh_osinfo->oob_irq_num, wlan_oob_irq,
-					  bcmsdh_osinfo->oob_irq_flags, "bcmsdh_sdmmc", bcmsdh);
+		bcmsdh_osinfo->oob_irq_flags, "bcmsdh_sdmmc", bcmsdh);
 	if (err) {
-		SDLX_MSG(("%s: request_irq failed with %d\n", __FUNCTION__, err));
+		SDLX_ERR(("%s: request_irq failed with %d\n", __FUNCTION__, err));
 		bcmsdh_osinfo->oob_irq_enabled = FALSE;
 		bcmsdh_osinfo->oob_irq_registered = FALSE;
 		return err;
@@ -385,11 +390,17 @@ int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handl
 	SDLX_MSG(("%s: disable_irq_wake\n", __FUNCTION__));
 	bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
 #else
-	err = enable_irq_wake(bcmsdh_osinfo->oob_irq_num);
-	if (err)
-		SDLX_MSG(("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err));
-	else
-		bcmsdh_osinfo->oob_irq_wake_enabled = TRUE;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+	if (device_may_wakeup(bcmsdh_osinfo->dev)) {
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
+		err = enable_irq_wake(bcmsdh_osinfo->oob_irq_num);
+		if (err)
+			SDLX_ERR(("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err));
+		else
+			bcmsdh_osinfo->oob_irq_wake_enabled = TRUE;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+	}
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 #endif
 
 	return 0;
@@ -406,9 +417,15 @@ void bcmsdh_oob_intr_unregister(bcmsdh_info_t *bcmsdh)
 		return;
 	}
 	if (bcmsdh_osinfo->oob_irq_wake_enabled) {
-		err = disable_irq_wake(bcmsdh_osinfo->oob_irq_num);
-		if (!err)
-			bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+		if (device_may_wakeup(bcmsdh_osinfo->dev)) {
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
+			err = disable_irq_wake(bcmsdh_osinfo->oob_irq_num);
+			if (!err)
+				bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+		}
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 	}
 	if (bcmsdh_osinfo->oob_irq_enabled) {
 		disable_irq(bcmsdh_osinfo->oob_irq_num);

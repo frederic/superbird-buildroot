@@ -94,11 +94,11 @@ static int aml_ooblayout_free(struct mtd_info *mtd, int section,
 	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 
-	if (section < 0 || section > ecc->steps)
+	if (section < 0 || section >= ecc->steps)
 		return -ERANGE;
 
 	oobregion->length = 2;
-	oobregion->offset = 2 * section;
+	oobregion->offset =  2 * section;
 
 	return 0;
 }
@@ -310,20 +310,21 @@ static int aml_nand_add_partition(struct aml_nand_chip *aml_chip)
 	int reserved_part_blk_num = RESERVED_BLOCK_NUM;
 	uint8_t bl_mode, base_part = 0;
 	uint32_t fip_copies, fip_size, fip_part_size = 0;
+	int plane_num_shift = 0;
+
 #ifndef CONFIG_NOT_SKIP_BAD_BLOCK
 	uint64_t start_blk = 0, part_blk = 0;
 	loff_t offset;
 	int phys_erase_shift, error = 0;
-	int plane_num_shift = 0;
 
 	if (!mtd->erasesize)
 		return -EINVAL;
 	phys_erase_shift = fls(mtd->erasesize) - 1;
+#endif
 
 	if (!aml_chip->plane_num)
 		return -EINVAL;
 	plane_num_shift = fls(aml_chip->plane_num) - 1;
-#endif
 
 	parts = plat->platform_nand_data.chip.partitions;
 	nr = plat->platform_nand_data.chip.nr_partitions;
@@ -1578,15 +1579,31 @@ dma_retry_plane1:
 			}
 		}
 	}
-				/* memset(buf, 0xff, nand_page_size); */
-				memset(oob_buf, 0x22, user_byte_num);
-				pr_info("%s %d read ecc failed here at",
-					__func__, __LINE__);
-				pr_info("page:%d, blk:%d chip[%d]\n",
-					page_addr,
-					(page_addr >> pages_per_blk_shift),
-					i);
-				mtd->ecc_stats.failed++;
+			/* memset(buf, 0xff, nand_page_size); */
+			memset(oob_buf, 0x22, user_byte_num);
+			pr_info("%s %d read ecc failed here at",
+				__func__, __LINE__);
+			pr_info("page:%d, blk:%d chip[%d]\n",
+				page_addr,
+				(page_addr >> pages_per_blk_shift),
+				i);
+
+			pr_info("%s %d pimux_reg0: 0x%x\n",
+				__func__, __LINE__,
+				amlnf_read_reg32(controller->pimux_reg0));
+			pr_info("%s %d pimux_reg1 0x%x\n",
+				__func__, __LINE__,
+				amlnf_read_reg32(controller->pimux_reg1));
+			pr_info("%s %d clk setting value: 0x%x\n",
+				__func__, __LINE__,
+				amlnf_read_reg32(controller->nand_clk_reg));
+			pr_info("%s %d CFG setting value: 0x%x\n",
+				__func__, __LINE__,
+				NFC_GET_CFG(controller));
+			pr_info("%s %d NAND_CLK_CNTL_INNER: 0x%x\n",
+				__func__, __LINE__,
+				amlnf_read_reg32(controller->nand_clk_upper));
+			mtd->ecc_stats.failed++;
 			if (aml_chip->support_new_nand == 1) {
 				if ((new_nand_info->type)
 					&& (new_nand_info->type < 10)) {
@@ -1959,7 +1976,7 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 	struct nand_chip *chip = &aml_chip->chip;
 	struct mtd_info *mtd = aml_chip->mtd;
 	struct mtd_oob_region oobregion;
-	int err = 0, i = 0;
+	int err = 0, i = 0, ret = 0;
 	unsigned int valid_chip_num = 0;
 	struct new_tech_nand_t *new_nand_info = &aml_chip->new_nand_info;
 	struct aml_nand_read_retry *nand_read_retry;
@@ -2014,11 +2031,11 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 
 	mtd_set_ooblayout(mtd, &aml_ooblayout_ops);
 	mtd_ooblayout_free(mtd, 0, &oobregion);
-
 	chip->options = 0;
 	chip->options |=  NAND_SKIP_BBTSCAN;
 	chip->options |= NAND_NO_SUBPAGE_WRITE;
-	if (aml_nand_scan(mtd, controller->chip_num)) {
+	ret = aml_nand_scan(mtd, controller->chip_num);
+	if (ret) {
 		err = -ENXIO;
 		goto exit_error;
 	}
@@ -2037,6 +2054,15 @@ int aml_nand_init(struct aml_nand_chip *aml_chip)
 		err = -ENXIO;
 		goto exit_error;
 	}
+
+	if (!ret)
+		ret = nand_scan_tail(mtd);
+
+	if (ret) {
+		err = -ENXIO;
+		goto exit_error;
+	}
+	pr_info("mtd->oobavail: 0x%x\n", mtd->oobavail);
 
 	aml_chip->virtual_page_size = mtd->writesize;
 	aml_chip->virtual_block_size = mtd->erasesize;
@@ -2146,12 +2172,6 @@ exit_error:
 	}
 	kfree(chip->buffers);
 	chip->buffers = NULL;
-
-/*#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 13) */
-#if 0
-	kfree(chip->ecc.layout);
-	chip->ecc.layout = NULL;
-#endif
 
 	if (aml_chip->aml_nand_data_buf) {
 #ifndef AML_NAND_UBOOT

@@ -2,7 +2,7 @@
  * IE/TLV (de)fragmentation declarations/definitions for
  * Broadcom 802.11abgn Networking Device Driver
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -33,6 +33,6 @@
 #define __FRAG_H__
 
 int bcm_tlv_dot11_frag_tot_len(const void *buf, uint buf_len,
-							   uint8 id, bool id_ext, uint *ie_len);
+	uint8 id, bool id_ext, uint *ie_len);
 
 #endif /* __FRAG_H__ */

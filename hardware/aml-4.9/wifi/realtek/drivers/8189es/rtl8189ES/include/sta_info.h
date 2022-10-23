@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -99,27 +99,27 @@ struct	stainfo_stats	{
 	systime last_rx_time;
 
 	u64 rx_mgnt_pkts;
-		u64 rx_beacon_pkts;
-		u64 rx_probereq_pkts;
-		u64 rx_probersp_pkts; /* unicast to self */
-		u64 rx_probersp_bm_pkts;
-		u64 rx_probersp_uo_pkts; /* unicast to others */
+	u64 rx_beacon_pkts;
+	u64 rx_probereq_pkts;
+	u64 rx_probersp_pkts; /* unicast to self */
+	u64 rx_probersp_bm_pkts;
+	u64 rx_probersp_uo_pkts; /* unicast to others */
 	u64 rx_ctrl_pkts;
 	u64 rx_data_pkts;
-		u64 rx_data_bc_pkts;
-		u64 rx_data_mc_pkts;
+	u64 rx_data_bc_pkts;
+	u64 rx_data_mc_pkts;
 	u64 rx_data_qos_pkts[TID_NUM]; /* unicast only */
 
 	u64	last_rx_mgnt_pkts;
-		u64 last_rx_beacon_pkts;
-		u64 last_rx_probereq_pkts;
-		u64 last_rx_probersp_pkts; /* unicast to self */
-		u64 last_rx_probersp_bm_pkts;
-		u64 last_rx_probersp_uo_pkts; /* unicast to others */
+	u64 last_rx_beacon_pkts;
+	u64 last_rx_probereq_pkts;
+	u64 last_rx_probersp_pkts; /* unicast to self */
+	u64 last_rx_probersp_bm_pkts;
+	u64 last_rx_probersp_uo_pkts; /* unicast to others */
 	u64	last_rx_ctrl_pkts;
 	u64	last_rx_data_pkts;
-		u64 last_rx_data_bc_pkts;
-		u64 last_rx_data_mc_pkts;
+	u64 last_rx_data_bc_pkts;
+	u64 last_rx_data_mc_pkts;
 	u64 last_rx_data_qos_pkts[TID_NUM]; /* unicast only */
 
 #ifdef CONFIG_TDLS
@@ -128,13 +128,14 @@ struct	stainfo_stats	{
 #endif
 
 	u64	rx_bytes;
-		u64	rx_bc_bytes;
-		u64	rx_mc_bytes;
+	u64	rx_bc_bytes;
+	u64	rx_mc_bytes;
 	u64	last_rx_bytes;
-		u64 last_rx_bc_bytes;
-		u64 last_rx_mc_bytes;
+	u64 last_rx_bc_bytes;
+	u64 last_rx_mc_bytes;
 	u64	rx_drops; /* TBD */
-	u16 rx_tp_mbytes;
+	u32 rx_tp_kbits;
+	u32 smooth_rx_tp_kbits;
 
 	u64	tx_pkts;
 	u64	last_tx_pkts;
@@ -142,7 +143,13 @@ struct	stainfo_stats	{
 	u64	tx_bytes;
 	u64	last_tx_bytes;
 	u64 tx_drops; /* TBD */
-	u16 tx_tp_mbytes;
+	u32 tx_tp_kbits;
+	u32 smooth_tx_tp_kbits;
+
+#ifdef CONFIG_LPS_CHK_BY_TP
+	u64 acc_tx_bytes;
+	u64 acc_rx_bytes;
+#endif
 
 	/* unicast only */
 	u64 last_rx_data_uc_pkts; /* For Read & Clear requirement in proc_get_rx_stat() */
@@ -151,6 +158,10 @@ struct	stainfo_stats	{
 	u32 tx_ok_cnt;		/* Read & Clear, in proc_get_tx_stat() */
 	u32 tx_fail_cnt;	/* Read & Clear, in proc_get_tx_stat() */
 	u32 tx_retry_cnt;	/* Read & Clear, in proc_get_tx_stat() */
+#ifdef CONFIG_RTW_MESH
+	u32 rx_hwmp_pkts;
+	u32 last_rx_hwmp_pkts;
+#endif
 };
 
 #ifndef DBG_SESSION_TRACKER
@@ -390,6 +401,8 @@ struct sta_info {
 	int wpa_pairwise_cipher;
 	int wpa2_pairwise_cipher;
 
+	u32 akm_suite_type;
+
 	u8 bpairwise_key_installed;
 #ifdef CONFIG_RTW_80211R
 	u8 ft_pairwise_key_installed;
@@ -464,9 +477,13 @@ struct sta_info {
 	u8 nonpeer_mps;
 
 	struct rtw_atlm_param metrics;
+	/* The reference for nexthop_lookup */
+	BOOLEAN alive;
 #endif
 
 #ifdef CONFIG_IOCTL_CFG80211
+	u8 *pauth_frame;
+	u32 auth_len;
 	u8 *passoc_req;
 	u32 assoc_req_len;
 #endif
@@ -483,6 +500,17 @@ struct sta_info {
 	u8 max_agg_num_minimal_record; /*keep minimal tx desc max_agg_num setting*/
 	u8 curr_rx_rate;
 	u8 curr_rx_rate_bmc;
+#ifdef CONFIG_RTS_FULL_BW
+	bool vendor_8812;
+#endif
+
+	/*
+	 * Vaiables for queuing TX pkt a short period of time
+	 * to wait something ready.
+	 */
+	u8 tx_q_enable;
+	struct __queue tx_queue;
+	_workitem tx_q_work;
 };
 
 #ifdef CONFIG_RTW_MESH
@@ -555,6 +583,15 @@ struct sta_info {
 #define sta_last_rx_probersp_uo_pkts(sta) \
 	(sta->sta_stats.last_rx_probersp_uo_pkts)
 
+#ifdef CONFIG_RTW_MESH
+#define update_last_rx_hwmp_pkts(sta) \
+	do { \
+		sta->sta_stats.last_rx_hwmp_pkts = sta->sta_stats.rx_hwmp_pkts; \
+	} while(0)
+#else
+#define update_last_rx_hwmp_pkts(sta) do {} while(0)
+#endif
+
 #define sta_update_last_rx_pkts(sta) \
 	do { \
 		int __i; \
@@ -566,6 +603,7 @@ struct sta_info {
 		sta->sta_stats.last_rx_probersp_bm_pkts = sta->sta_stats.rx_probersp_bm_pkts; \
 		sta->sta_stats.last_rx_probersp_uo_pkts = sta->sta_stats.rx_probersp_uo_pkts; \
 		sta->sta_stats.last_rx_ctrl_pkts = sta->sta_stats.rx_ctrl_pkts; \
+		update_last_rx_hwmp_pkts(sta); \
 		\
 		sta->sta_stats.last_rx_data_pkts = sta->sta_stats.rx_data_pkts; \
 		sta->sta_stats.last_rx_data_bc_pkts = sta->sta_stats.rx_data_bc_pkts; \
@@ -619,6 +657,8 @@ struct	sta_priv {
 	_adapter *padapter;
 
 	u32 adhoc_expire_to;
+
+	int rx_chk_limit;
 
 #ifdef CONFIG_AP_MODE
 	_list asoc_list;

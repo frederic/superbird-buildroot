@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -135,7 +135,8 @@ int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command );
 void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
                             tANI_U32 nFrameLength, tANI_U8* pbFrames,
                             tANI_U8 frameType,
-                            tANI_U32 rxChan, tANI_S8 rxRssi);
+                            tANI_U32 rxChan, tANI_S8 rxRssi,
+                            enum rxmgmt_flags rx_flags);
 
 void hdd_remainChanReadyHandler( hdd_adapter_t *pAdapter );
 void hdd_sendActionCnf( hdd_adapter_t *pAdapter, tANI_BOOLEAN actionSendSuccess );
@@ -171,8 +172,13 @@ int wlan_hdd_mgmt_tx( struct wiphy *wiphy, struct net_device *dev,
                      const u8 *buf, size_t len, u64 *cookie );
 #endif
 
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
+struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
+                                               const char *name,
+                                               unsigned char name_assign_type,
+                                               enum nl80211_iftype type,
+                                               struct vif_params *params);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
                                                const char *name,
                                                unsigned char name_assign_type,

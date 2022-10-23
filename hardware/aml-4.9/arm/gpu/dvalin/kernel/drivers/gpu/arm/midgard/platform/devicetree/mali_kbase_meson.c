@@ -251,8 +251,13 @@ static int kbase_platform_meson_init(struct kbase_device *kbdev)
 	if (IS_ERR(platform->clk_mali)) {
 		dev_err(kbdev->dev, "failed to get clock pointer\n");
 	} else {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
         clk_prepare_enable(platform->clk_mali);
         clk_set_rate(platform->clk_mali, 285000000);
+#else
+        clk_set_rate(platform->clk_mali, 285000000);
+        clk_prepare_enable(platform->clk_mali);
+#endif
     }
     MESON_PRINT("%s, %d begin\n", __func__, __LINE__);
     meson_gpu_reset(kbdev);

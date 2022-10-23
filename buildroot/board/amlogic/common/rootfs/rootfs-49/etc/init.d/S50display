@@ -23,6 +23,7 @@ else
     echo "meson egl: fbdev"
 fi
 
+#below just for fbdev(legacy)
 case "$1" in
     start)
         hdmi=`cat $HPD_STATE`
@@ -30,8 +31,21 @@ case "$1" in
             mode=`awk -f /etc/display/get_hdmi_mode.awk $DISP_CAP`
             echo $mode > $DISP_MODE
         fi
-        fbset -fb /dev/fb0 -g 1920 1080 1920 2160 32
-        echo 0 0 1919 1079 > /sys/class/graphics/fb0/free_scale_axis
+        osd_buffer_size=`fbset -fb /dev/fb0 -i|grep "Size        :"|cut -d: -f2`
+        # 1920 x 2160 x 32>>3  == 16588800 byte
+        # 1280 x 1440 x 32>>3  == 7372800 byte
+        # x 1440 x 32>>3  == 7372800 byte
+        # set fb buffer size, and free_scale_axis(src)
+        # if you need change resolution you can set /sys/class/display/mode then run /etc/set_display_mode.sh manually.
+        if [ $osd_buffer_size -lt 16588800 -a $osd_buffer_size -ge 7372800 ];then
+            #only support 720p
+            fbset -fb /dev/fb0 -g 1280 720 1280 1440 32
+            echo 0 0 1279 719 > /sys/class/graphics/fb0/free_scale_axis
+        else
+            fbset -fb /dev/fb0 -g 1920 1080 1920 2160 32
+            echo 0 0 1919 1079 > /sys/class/graphics/fb0/free_scale_axis
+        fi
+        echo 0x10001 > /sys/class/graphics/fb0/free_scale
 esac
 
 exit $?

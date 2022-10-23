@@ -88,14 +88,11 @@ void gamma_manual_read_histogram( gamma_manual_fsm_ptr_t p_fsm )
     gamma_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
     gamma_flow.flow_state = MON_ALG_FLOW_STATE_INPUT_READY;
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_GAMMA_FLOW, &gamma_flow, sizeof( gamma_flow ) );
-    LOG( LOG_INFO, "Gamma flow: INPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", gamma_flow.frame_id_tracking, gamma_flow.frame_id_current );
 }
 
 
 void gamma_manual_init( gamma_manual_fsm_ptr_t p_fsm )
 {
-    LOG( LOG_INFO, "Initialize gamma contrast FSM" );
-
     // request neccessary interrupts here
     p_fsm->mask.repeat_irq_mask = ACAMERA_IRQ_MASK( ACAMERA_IRQ_ANTIFOG_HIST );
     gamma_manual_request_interrupt( p_fsm, ACAMERA_IRQ_MASK( ACAMERA_IRQ_ANTIFOG_HIST ) );
@@ -133,7 +130,6 @@ void gamma_manual_update( gamma_manual_fsm_ptr_t p_fsm )
         gamma_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
         gamma_flow.flow_state = MON_ALG_FLOW_STATE_APPLIED;
         acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_GAMMA_FLOW, &gamma_flow, sizeof( gamma_flow ) );
-        LOG( LOG_INFO, "GAMMA flow: APPLIED: frame_id_tracking: %d, cur frame_id: %u.", gamma_flow.frame_id_tracking, gamma_flow.frame_id_current );
     }
 }
 
@@ -162,7 +158,6 @@ void gamma_manual_set_new_param( gamma_manual_fsm_ptr_t p_fsm, sbuf_gamma_t *p_s
         gamma_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
         gamma_flow.flow_state = MON_ALG_FLOW_STATE_OUTPUT_READY;
         acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_GAMMA_FLOW, &gamma_flow, sizeof( gamma_flow ) );
-        LOG( LOG_INFO, "GAMMA flow: OUTPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", gamma_flow.frame_id_tracking, gamma_flow.frame_id_current );
     }
 
     fsm_raise_event( p_fsm, event_id_gamma_new_param_ready );

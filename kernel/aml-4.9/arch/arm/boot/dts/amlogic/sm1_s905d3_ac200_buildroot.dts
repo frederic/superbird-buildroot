@@ -126,20 +126,14 @@
 			alignment = <0x100000>;
 			//no-map;
 		};
-		/*  vdin0 CMA pool */
-		vdin0_cma_reserved:linux,vdin0_cma {
-			compatible = "shared-dma-pool";
-			reusable;
-		/* 1920x1080x2x4  =16+4 M */
-			size = <0x04000000>;
-			alignment = <0x400000>;
-		};
 		/*  vdin1 CMA pool */
 		vdin1_cma_reserved:linux,vdin1_cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			/* 1920x1080x2x4  =16 M */
-			size = <0x04000000>;
+			/* up to 1920x1080 yuv422 8bit and 5 buffers
+			 * 1920x1080x2x5 = 20 M
+			 */
+			size = <0x01400000>;
 			alignment = <0x400000>;
 		};
 		vm0_cma_reserved:linux,vm0_cma {
@@ -886,176 +880,6 @@
 		tuner_xtal_cap = <30>; /* when tuner_xtal_mode = 1, set 25 */
 	};
 
-	p_tsensor: p_tsensor@ff634800 {
-		compatible = "amlogic, r1p1-tsensor";
-		device_name = "meson-pthermal";
-		status = "okay";
-		reg = <0xff634800 0x50>,
-			<0xff800268 0x4>;
-		cal_type = <0x1>;
-		cal_a = <324>;
-		cal_b = <424>;
-		cal_c = <3159>;
-		cal_d = <9411>;
-		rtemp = <115000>;
-		interrupts = <0 35 0>;
-		clocks = <&clkc CLKID_TS_COMP>; /* CLKID_TS_COMP>;*/
-		clock-names = "ts_comp";
-		#thermal-sensor-cells = <1>;
-	};
-
-	d_tsensor: d_tsensor@ff634c00 {
-		compatible = "amlogic, r1p1-tsensor";
-		device_name = "meson-dthermal";
-		status = "okay";
-		reg = <0xff634c00 0x50>,
-			<0xff800230 0x4>;
-		cal_type = <0x1>;
-		cal_a = <324>;
-		cal_b = <424>;
-		cal_c = <3159>;
-		cal_d = <9411>;
-		rtemp = <115000>;
-		interrupts = <0 36 0>;
-		clocks = <&clkc CLKID_TS_COMP>; /* CLKID_TS_COMP>;*/
-		clock-names = "ts_comp";
-		#thermal-sensor-cells = <1>;
-	};
-
-	meson_cooldev: meson-cooldev@0 {
-			status = "okay";
-			compatible = "amlogic, meson-cooldev";
-			device_name = "mcooldev";
-			cooling_devices {
-				cpufreq_cool_cluster0 {
-					min_state = <1000000>;
-					dyn_coeff = <125>;
-					cluster_id = <0>;
-					node_name = "cpufreq_cool0";
-					device_type = "cpufreq";
-				};
-				cpucore_cool_cluster0 {
-					min_state = <1>;
-					dyn_coeff = <0>;
-					cluster_id = <0>;
-					node_name = "cpucore_cool0";
-					device_type = "cpucore";
-				};
-				gpufreq_cool {
-					min_state = <400>;
-					dyn_coeff = <215>;
-					gpu_pp = <2>;
-					cluster_id = <0>;
-					node_name = "gpufreq_cool0";
-					device_type = "gpufreq";
-				};
-				gpucore_cool {
-					min_state = <1>;
-					dyn_coeff = <0>;
-					cluster_id = <0>;
-					node_name = "gpucore_cool0";
-					device_type = "gpucore";
-				};
-			};
-			cpufreq_cool0:cpufreq_cool0 {
-				#cooling-cells = <2>; /* min followed by max */
-			};
-			cpucore_cool0:cpucore_cool0 {
-				#cooling-cells = <2>; /* min followed by max */
-			};
-			gpufreq_cool0:gpufreq_cool0 {
-				#cooling-cells = <2>; /* min followed by max */
-			};
-			gpucore_cool0:gpucore_cool0 {
-				#cooling-cells = <2>; /* min followed by max */
-			};
-		};
-		/*meson cooling devices end*/
-
-	thermal-zones {
-		soc_thermal: soc_thermal {
-			polling-delay = <1000>;
-			polling-delay-passive = <100>;
-			sustainable-power = <1410>;
-			thermal-sensors = <&p_tsensor 0>;
-			trips {
-				pswitch_on: trip-point@0 {
-					temperature = <60000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				pcontrol: trip-point@1 {
-					temperature = <75000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				phot: trip-point@2 {
-					temperature = <85000>;
-					hysteresis = <5000>;
-					type = "hot";
-				};
-				pcritical: trip-point@3 {
-					temperature = <110000>;
-					hysteresis = <1000>;
-					type = "critical";
-				};
-			};
-
-			cooling-maps {
-				cpufreq_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&cpufreq_cool0 0 4>;
-					contribution = <1024>;
-				};
-				cpucore_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&cpucore_cool0 0 3>;
-					contribution = <1024>;
-				};
-				gpufreq_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&gpufreq_cool0 0 4>;
-					contribution = <1024>;
-				};
-				gpucore_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&gpucore_cool0 0 2>;
-					contribution = <1024>;
-				};
-			};
-		};
-		ddr_thermal: ddr_thermal {
-			polling-delay = <2000>;
-			polling-delay-passive = <1000>;
-			sustainable-power = <1410>;
-			thermal-sensors = <&d_tsensor 1>;
-			trips {
-				dswitch_on: trip-point@0 {
-					temperature = <60000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				dcontrol: trip-point@1 {
-					temperature = <75000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				dhot: trip-point@2 {
-					temperature = <85000>;
-					hysteresis = <5000>;
-					type = "hot";
-				};
-				dcritical: trip-point@3 {
-					temperature = <110000>;
-					hysteresis = <1000>;
-					type = "critical";
-				};
-			};
-
-		};
-	};
-	/*thermal zone end*/
-
 	cpu_opp_table0: cpu_opp_table0 {
 		compatible = "operating-points-v2";
 		opp-shared;
@@ -1106,7 +930,115 @@
 		};
 		opp11 {
 			opp-hz = /bits/ 64 <1908000000>;
-			opp-microvolt = <1000000>;
+			opp-microvolt = <970000>;
+		};
+	};
+
+	cpu_opp_table1: cpu_opp_table1 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp00 {
+			opp-hz = /bits/ 64 <100000000>;
+			opp-microvolt = <760000>;
+		};
+		opp01 {
+			opp-hz = /bits/ 64 <250000000>;
+			opp-microvolt = <760000>;
+		};
+		opp02 {
+			opp-hz = /bits/ 64 <500000000>;
+			opp-microvolt = <760000>;
+		};
+		opp03 {
+			opp-hz = /bits/ 64 <667000000>;
+			opp-microvolt = <780000>;
+		};
+		opp04 {
+			opp-hz = /bits/ 64 <1000000000>;
+			opp-microvolt = <800000>;
+		};
+		opp05 {
+			opp-hz = /bits/ 64 <1200000000>;
+			opp-microvolt = <810000>;
+		};
+		opp06 {
+			opp-hz = /bits/ 64 <1404000000>;
+			opp-microvolt = <820000>;
+		};
+		opp07 {
+			opp-hz = /bits/ 64 <1500000000>;
+			opp-microvolt = <830000>;
+		};
+		opp08 {
+			opp-hz = /bits/ 64 <1608000000>;
+			opp-microvolt = <860000>;
+		};
+		opp09 {
+			opp-hz = /bits/ 64 <1704000000>;
+			opp-microvolt = <900000>;
+		};
+		opp10 {
+			opp-hz = /bits/ 64 <1800000000>;
+			opp-microvolt = <910000>;
+		};
+		opp11 {
+			opp-hz = /bits/ 64 <1908000000>;
+			opp-microvolt = <910000>;
+		};
+	};
+
+	cpu_opp_table2: cpu_opp_table2 {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp00 {
+			opp-hz = /bits/ 64 <100000000>;
+			opp-microvolt = <760000>;
+		};
+		opp01 {
+			opp-hz = /bits/ 64 <250000000>;
+			opp-microvolt = <760000>;
+		};
+		opp02 {
+			opp-hz = /bits/ 64 <500000000>;
+			opp-microvolt = <760000>;
+		};
+		opp03 {
+			opp-hz = /bits/ 64 <667000000>;
+			opp-microvolt = <780000>;
+		};
+		opp04 {
+			opp-hz = /bits/ 64 <1000000000>;
+			opp-microvolt = <800000>;
+		};
+		opp05 {
+			opp-hz = /bits/ 64 <1200000000>;
+			opp-microvolt = <810000>;
+		};
+		opp06 {
+			opp-hz = /bits/ 64 <1404000000>;
+			opp-microvolt = <820000>;
+		};
+		opp07 {
+			opp-hz = /bits/ 64 <1500000000>;
+			opp-microvolt = <830000>;
+		};
+		opp08 {
+			opp-hz = /bits/ 64 <1608000000>;
+			opp-microvolt = <860000>;
+		};
+		opp09 {
+			opp-hz = /bits/ 64 <1704000000>;
+			opp-microvolt = <860000>;
+		};
+		opp10 {
+			opp-hz = /bits/ 64 <1800000000>;
+			opp-microvolt = <860000>;
+		};
+		opp11 {
+			opp-hz = /bits/ 64 <1908000000>;
+			opp-microvolt = <860000>;
 		};
 	};
 
@@ -1118,6 +1050,38 @@
 	};
 
 }; /* end of / */
+
+&CPU0 {
+	/*set multi table cpufreq max*/
+	multi_tables_available;
+	operating-points-v2 = <&cpu_opp_table0>,
+			<&cpu_opp_table1>,
+			<&cpu_opp_table2>;
+};
+
+&CPU1 {
+	/*set multi table cpufreq max*/
+	multi_tables_available;
+	operating-points-v2 = <&cpu_opp_table0>,
+			<&cpu_opp_table1>,
+			<&cpu_opp_table2>;
+};
+
+&CPU2 {
+	/*set multi table cpufreq max*/
+	multi_tables_available;
+	operating-points-v2 = <&cpu_opp_table0>,
+			<&cpu_opp_table1>,
+			<&cpu_opp_table2>;
+};
+
+&CPU3 {
+	/*set multi table cpufreq max*/
+	multi_tables_available;
+	operating-points-v2 = <&cpu_opp_table0>,
+			<&cpu_opp_table1>,
+			<&cpu_opp_table2>;
+};
 
 &meson_fb {
 	status = "okay";
@@ -1223,7 +1187,6 @@
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmb_mclk &tdmout_b &tdmin_b>;
 
-		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
 
 		/*
 		 * 0: tdmout_a;
@@ -1257,7 +1220,6 @@
 		clock-names = "mclk", "clk_srcpll";
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmc_mclk &tdmout_c &tdmin_c>;
-		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
 
 		status = "okay";
 	};
@@ -1753,8 +1715,12 @@
 
 /*if you want to use vdin just modify status to "ok"*/
 &vdin0 {
-	memory-region = <&vdin0_cma_reserved>;
+	/*memory-region = <&vdin0_cma_reserved>;*/
 	status = "okay";
+	/* up to 1920x1080 yuv422 8bit and 5 buffers
+	 * 1920x1080x2x5 = 20 M
+	 */
+	cma_size = <20>;
 	/*vdin write mem color depth support:
 	 *bit0:support 8bit
 	 *bit1:support 9bit
@@ -1762,7 +1728,7 @@
 	 *bit3:support 12bit
 	 *bit4:support yuv422 10bit full pack mode (from txl new add)
 	 */
-	tv_bit_mode = <0x15>;
+	tv_bit_mode = <0x1>;
 };
 &vdin1 {
 	memory-region = <&vdin1_cma_reserved>;

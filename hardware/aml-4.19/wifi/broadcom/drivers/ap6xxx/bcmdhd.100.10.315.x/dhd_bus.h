@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -27,7 +27,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_bus.h 770457 2018-07-03 08:45:49Z $
+ * $Id: dhd_bus.h 814378 2019-04-11 02:21:31Z $
  */
 
 #ifndef _dhd_bus_h_
@@ -41,13 +41,16 @@ extern int dbus_recv_ctl(struct dhd_bus *pub, uint8 *buf, int len);
  * Exported from dhd bus module (dhd_usb, dhd_sdio)
  */
 
+/* global variable for the bus */
+extern struct dhd_bus *g_dhd_bus;
+
 /* Indicate (dis)interest in finding dongles. */
 extern int dhd_bus_register(void);
 extern void dhd_bus_unregister(void);
 
 /* Download firmware image and nvram image */
 extern int dhd_bus_download_firmware(struct dhd_bus *bus, osl_t *osh,
-									 char *fw_path, char *nv_path, char *clm_path, char *conf_path);
+	char *fw_path, char *nv_path, char *clm_path, char *conf_path);
 #if defined(BT_OVER_SDIO)
 extern int dhd_bus_download_btfw(struct dhd_bus *bus, osl_t *osh, char *btfw_path);
 #endif /* defined (BT_OVER_SDIO) */
@@ -71,6 +74,10 @@ extern int dhd_bus_txdata(struct dhd_bus *bus, void *txp, uint8 ifidx);
 extern int dhd_bus_txdata(struct dhd_bus *bus, void *txp);
 #endif // endif
 
+#ifdef BCMPCIE
+extern void dhdpcie_cto_recovery_handler(dhd_pub_t *dhd);
+#endif /* BCMPCIE */
+
 /* Send/receive a control message to/from the dongle.
  * Expects caller to enforce a single outstanding transaction.
  */
@@ -89,6 +96,9 @@ extern bool dhd_bus_dev_pm_enabled(dhd_pub_t *dhdpub);
 
 /* Device console input function */
 extern int dhd_bus_console_in(dhd_pub_t *dhd, uchar *msg, uint msglen);
+#ifdef CONSOLE_DPC
+extern int dhd_bus_txcons(dhd_pub_t *dhd, uchar *msg, uint msglen);
+#endif
 
 /* Deferred processing for the bus, return TRUE requests reschedule */
 extern bool dhd_bus_dpc(struct dhd_bus *bus);
@@ -96,7 +106,7 @@ extern void dhd_bus_isr(bool * InterruptRecognized, bool * QueueMiniportHandleIn
 
 /* Check for and handle local prot-specific iovar commands */
 extern int dhd_bus_iovar_op(dhd_pub_t *dhdp, const char *name,
-							void *params, int plen, void *arg, int len, bool set);
+                            void *params, int plen, void *arg, int len, bool set);
 
 /* Add bus dump output to a buffer */
 extern void dhd_bus_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf);
@@ -134,12 +144,14 @@ extern int dhd_bus_reg_sdio_notify(void* semaphore);
 extern void dhd_bus_unreg_sdio_notify(void);
 extern void dhd_txglom_enable(dhd_pub_t *dhdp, bool enable);
 extern int dhd_bus_get_ids(struct dhd_bus *bus, uint32 *bus_type, uint32 *bus_num,
-						   uint32 *slot_num);
+	uint32 *slot_num);
 
 #if defined(DHD_FW_COREDUMP) && (defined(BCMPCIE) || defined(BCMSDIO))
 extern int dhd_bus_mem_dump(dhd_pub_t *dhd);
+extern int dhd_bus_get_mem_dump(dhd_pub_t *dhdp);
 #else
 #define dhd_bus_mem_dump(x)
+#define dhd_bus_get_mem_dump(x)
 #endif /* DHD_FW_COREDUMP && (BCMPCIE || BCMSDIO) */
 
 #ifdef BCMPCIE
@@ -187,7 +199,7 @@ enum {
 typedef void (*dhd_mb_ring_t) (struct dhd_bus *, uint32);
 typedef void (*dhd_mb_ring_2_t) (struct dhd_bus *, uint32, bool);
 extern void dhd_bus_cmn_writeshared(struct dhd_bus *bus, void * data, uint32 len, uint8 type,
-									uint16 ringid);
+	uint16 ringid);
 extern void dhd_bus_ringbell(struct dhd_bus *bus, uint32 value);
 extern void dhd_bus_ringbell_2(struct dhd_bus *bus, uint32 value, bool devwake);
 extern void dhd_bus_cmn_readshared(struct dhd_bus *bus, void* data, uint8 type, uint16 ringid);
@@ -198,9 +210,9 @@ extern void dhd_bus_stop_queue(struct dhd_bus *bus);
 extern dhd_mb_ring_t dhd_bus_get_mbintr_fn(struct dhd_bus *bus);
 extern dhd_mb_ring_2_t dhd_bus_get_mbintr_2_fn(struct dhd_bus *bus);
 extern void dhd_bus_write_flow_ring_states(struct dhd_bus *bus,
-		void * data, uint16 flowid);
+	void * data, uint16 flowid);
 extern void dhd_bus_read_flow_ring_states(struct dhd_bus *bus,
-		void * data, uint8 flowid);
+	void * data, uint8 flowid);
 extern int dhd_bus_flow_ring_create_request(struct dhd_bus *bus, void *flow_ring_node);
 extern void dhd_bus_clean_flow_ring(struct dhd_bus *bus, void *flow_ring_node);
 extern void dhd_bus_flow_ring_create_response(struct dhd_bus *bus, uint16 flow_id, int32 status);
@@ -210,7 +222,6 @@ extern int dhd_bus_flow_ring_flush_request(struct dhd_bus *bus, void *flow_ring_
 extern void dhd_bus_flow_ring_flush_response(struct dhd_bus *bus, uint16 flowid, uint32 status);
 extern uint32 dhd_bus_max_h2d_queues(struct dhd_bus *bus);
 extern int dhd_bus_schedule_queue(struct dhd_bus *bus, uint16 flow_id, bool txs);
-extern void dhd_bus_set_linkdown(dhd_pub_t *dhdp, bool val);
 
 #ifdef IDLE_TX_FLOW_MGMT
 extern void dhd_bus_flow_ring_resume_response(struct dhd_bus *bus, uint16 flowid, int32 status);
@@ -226,14 +237,16 @@ extern bool dhdpcie_bus_dongle_attach(struct dhd_bus *bus);
 extern int dhd_bus_release_dongle(struct dhd_bus *bus);
 extern int dhd_bus_request_irq(struct dhd_bus *bus);
 extern int dhdpcie_get_pcieirq(struct dhd_bus *bus, unsigned int *irq);
+extern void dhd_bus_aer_config(struct dhd_bus *bus);
 
 extern struct device * dhd_bus_to_dev(struct dhd_bus *bus);
 
-extern void dhdpcie_cto_init(struct dhd_bus *bus, bool enable);
+extern int dhdpcie_cto_init(struct dhd_bus *bus, bool enable);
+extern int dhdpcie_cto_cfg_init(struct dhd_bus *bus, bool enable);
+
 extern void dhdpcie_ssreset_dis_enum_rst(struct dhd_bus *bus);
 
 #ifdef DHD_FW_COREDUMP
-extern struct dhd_bus *g_dhd_bus;
 extern int dhd_dongle_mem_dump(void);
 #endif /* DHD_FW_COREDUMP */
 
@@ -262,16 +275,28 @@ extern int dhd_get_idletime(dhd_pub_t *dhd);
 #ifdef BCMPCIE
 extern void dhd_bus_dump_console_buffer(struct dhd_bus *bus);
 extern void dhd_bus_intr_count_dump(dhd_pub_t *dhdp);
+extern void dhd_bus_set_dpc_sched_time(dhd_pub_t *dhdp);
+extern bool dhd_bus_query_dpc_sched_errors(dhd_pub_t *dhdp);
+extern int dhd_bus_dmaxfer_lpbk(dhd_pub_t *dhdp, uint32 type);
+extern bool dhd_bus_check_driver_up(void);
+extern int dhd_bus_get_cto(dhd_pub_t *dhdp);
+extern void dhd_bus_set_linkdown(dhd_pub_t *dhdp, bool val);
+extern int dhd_bus_get_linkdown(dhd_pub_t *dhdp);
 #else
 #define dhd_bus_dump_console_buffer(x)
-static INLINE void dhd_bus_intr_count_dump(dhd_pub_t *dhdp) {
-	UNUSED_PARAMETER(dhdp);
-}
+static INLINE void dhd_bus_intr_count_dump(dhd_pub_t *dhdp) { UNUSED_PARAMETER(dhdp); }
+static INLINE void dhd_bus_set_dpc_sched_time(dhd_pub_t *dhdp) { }
+static INLINE bool dhd_bus_query_dpc_sched_errors(dhd_pub_t *dhdp) { return 0; }
+static INLINE int dhd_bus_dmaxfer_lpbk(dhd_pub_t *dhdp, uint32 type) { return 0; }
+static INLINE bool dhd_bus_check_driver_up(void) { return FALSE; }
+extern INLINE void dhd_bus_set_linkdown(dhd_pub_t *dhdp, bool val) { }
+extern INLINE int dhd_bus_get_linkdown(dhd_pub_t *dhdp) { return 0; }
+static INLINE int dhd_bus_get_cto(dhd_pub_t *dhdp) { return 0; }
 #endif /* BCMPCIE */
 
 #if defined(BCMPCIE) && defined(EWP_ETD_PRSRV_LOGS)
 void dhdpcie_get_etd_preserve_logs(dhd_pub_t *dhd, uint8 *ext_trap_data,
-								   void *event_decode_data);
+		void *event_decode_data);
 #endif // endif
 
 extern uint16 dhd_get_chipid(dhd_pub_t *dhd);
@@ -299,6 +324,8 @@ extern bool dhd_bus_get_flr_force_fail(struct dhd_bus *bus);
 extern bool dhd_bus_aspm_enable_rc_ep(struct dhd_bus *bus, bool enable);
 extern void dhd_bus_l1ss_enable_rc_ep(struct dhd_bus *bus, bool enable);
 
+bool dhd_bus_is_multibp_capable(struct dhd_bus *bus);
+
 #ifdef BCMPCIE
 extern void dhdpcie_advertise_bus_cleanup(dhd_pub_t  *dhdp);
 extern void dhd_msgbuf_iovar_timeout_dump(dhd_pub_t *dhd);
@@ -307,12 +334,10 @@ extern void dhd_msgbuf_iovar_timeout_dump(dhd_pub_t *dhd);
 extern bool dhd_bus_force_bt_quiesce_enabled(struct dhd_bus *bus);
 
 #ifdef DHD_SSSR_DUMP
-extern int dhd_bus_sssr_dump(dhd_pub_t *dhd);
-
 extern int dhd_bus_fis_trigger(dhd_pub_t *dhd);
 extern int dhd_bus_fis_dump(dhd_pub_t *dhd);
-
 #endif /* DHD_SSSR_DUMP */
+
 #ifdef PCIE_FULL_DONGLE
 extern int dhdpcie_set_dma_ring_indices(dhd_pub_t *dhd, int32 int_val);
 #endif /* PCIE_FULL_DONGLE */
@@ -320,4 +345,7 @@ extern int dhdpcie_set_dma_ring_indices(dhd_pub_t *dhd, int32 int_val);
 #ifdef DHD_USE_BP_RESET
 extern int dhd_bus_perform_bp_reset(struct dhd_bus *bus);
 #endif /* DHD_USE_BP_RESET */
+
+extern void dhd_bwm_bt_quiesce(struct dhd_bus *bus);
+extern void dhd_bwm_bt_resume(struct dhd_bus *bus);
 #endif /* _dhd_bus_h_ */

@@ -1,7 +1,7 @@
 /*
  * Fundamental types and constants relating to WPA
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wpa.h 761317 2018-05-07 21:33:58Z $
+ * $Id: wpa.h 822438 2019-05-29 17:13:44Z $
  */
 
 #ifndef _proto_wpa_h_
@@ -155,7 +155,13 @@ typedef BWL_PRE_PACKED_STRUCT struct
 				 (cipher) == WPA_CIPHER_AES_CCM || \
 				 (cipher) == WPA_CIPHER_AES_GCM || \
 				 (cipher) == WPA_CIPHER_AES_GCM256 || \
+				 (cipher) == WPA_CIPHER_CCMP_256 || \
 				 (cipher) == WPA_CIPHER_TPK)
+
+#define IS_WPA_BIP_CIPHER(cipher)  ((cipher) == WPA_CIPHER_BIP || \
+			            (cipher) == WPA_CIPHER_BIP_GMAC_128 || \
+				    (cipher) == WPA_CIPHER_BIP_GMAC_256 || \
+		                    (cipher) == WPA_CIPHER_BIP_CMAC_256)
 
 #ifdef BCMWAPI_WAI
 #define IS_WAPI_CIPHER(cipher)	((cipher) == WAPI_CIPHER_NONE || \
@@ -191,6 +197,16 @@ typedef BWL_PRE_PACKED_STRUCT struct
 					(cipher) == WPA_CIPHER_BIP_GMAC_128 || \
 					(cipher) == WPA_CIPHER_BIP_GMAC_256 || \
 					(cipher) == WPA_CIPHER_BIP_CMAC_256)
+
+#define WPA_IS_FT_AKM(akm)	((akm) == RSN_AKM_FBT_SHA256 || \
+			(akm) == RSN_AKM_FBT_SHA384)
+
+#define WPA_IS_FILS_AKM(akm)	((akm) == RSN_AKM_FILS_SHA256 || \
+			(akm) == RSN_AKM_FILS_SHA384)
+
+#define WPA_IS_FILS_FT_AKM(akm)	((akm) == RSN_AKM_FBT_SHA256_FILS || \
+			(akm) == RSN_AKM_FBT_SHA384_FILS)
+
 /* WPA TKIP countermeasures parameters */
 #define WPA_TKIP_CM_DETECT	60	/* multiple MIC failure window (seconds) */
 #define WPA_TKIP_CM_BLOCK	60	/* countermeasures active window (seconds) */
@@ -244,6 +260,8 @@ typedef uint32 rsn_ciphers_t;			/* mask of rsn_cipher_t */
 typedef uint8 rsn_akm_t;
 typedef uint8 auth_ie_type_mask_t;
 
+/* Old location for this structure. Moved to bcmwpa.h */
+#ifndef RSN_IE_INFO_STRUCT_RELOCATED
 typedef struct rsn_ie_info {
 	uint8 version;
 	rsn_cipher_t g_cipher;
@@ -268,7 +286,10 @@ typedef struct rsn_ie_info {
 	uint8 kek_len;				/* EAPOL KEK */
 	uint8 tk_len;				/* EAPOL TK */
 	uint8 ptk_len;				/* EAPOL PTK */
+	uint8 kck2_len;				/* EAPOL KCK2 */
+	uint8 kek2_len;				/* EAPOL KEK2 */
 } rsn_ie_info_t;
+#endif /* RSN_IE_INFO_STRUCT_RELOCATED */
 
 #ifdef BCMWAPI_WAI
 #define WAPI_CAP_PREAUTH		RSN_CAP_PREAUTH

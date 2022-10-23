@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -40,7 +40,7 @@ typedef struct _vsi_nn_space2depth_param
     /* local data must be the first. */
     vsi_nn_space2depth_lcl_data_t local;
 
-    uint32_t block_size[2];
+    int32_t block_size[2];
 } vsi_nn_space2depth_param;
 
 #ifdef __cplusplus

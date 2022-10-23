@@ -118,17 +118,27 @@ unsigned int av2_plugin_state;
  *bit[4]:nonstd debug print
  */
 unsigned int tvafe_dbg_print;
+static enum tvin_sig_fmt_e tvafe_manual_fmt_save;
+bool tvafe_atv_search_channel;
 
 #ifdef CONFIG_AMLOGIC_ATV_DEMOD
 static struct tvafe_info_s *g_tvafe_info;
 #endif
 
+static unsigned int vs_adj_val_pre;
 static struct tvafe_user_param_s tvafe_user_param = {
 	.cutwindow_val_h = {0, 10, 18, 20, 62},
 	/*level4: 48-->62 for ntsc-m*/
 	.cutwindow_val_v = {4, 8, 14, 16, 24},
 	.cutwindow_val_vs_ve = TVAFE_VS_VE_VAL,
+	.cdto_adj_hcnt_th = 0x260,
+	.cdto_adj_ratio_p = 1019, /* val/1000 */
+	.cdto_adj_offset_p = 0xfcc395,
+	.cdto_adj_ratio_n = 1036, /* val/1000 */
+	.cdto_adj_offset_n = 0x1b6b7d0,
 	/* auto_adj_en:
+	 * bit[7]: auto_vs_mode(0=dual side, 1=one side)
+	 * bit[6]: auto_hs_test_mode(0=hs side, 1=he side)
 	 * bit[5]: auto pga
 	 * bit[4]: auto 3d comb
 	 * bit[3]: auto de
@@ -138,6 +148,7 @@ static struct tvafe_user_param_s tvafe_user_param = {
 	 */
 	.auto_adj_en = 0x3e,
 	.vline_chk_cnt = 100, /* 100*10ms */
+
 	.nostd_vs_th = 0x0,
 	.nostd_no_vs_th = 0xf0,
 	.nostd_vs_cntl = 0x1,
@@ -148,8 +159,21 @@ static struct tvafe_user_param_s tvafe_user_param = {
 
 	/*4 is the test result@20171101 on fluke-54200 and DVD*/
 	.skip_vf_num = 4,
+	.unlock_cnt_max = 3,
 
 	.avout_en = 1,
+
+	/* cutwin_test_en:
+	 * bit[3]: test_vcut
+	 * bit[2]: test_hcut
+	 * bit[1]: test vcnt
+	 * bit[0]: test hcnt
+	 */
+	.cutwin_test_en = 0,
+	.cutwin_test_hcnt = 0,
+	.cutwin_test_vcnt = 0,
+	.cutwin_test_hcut = 0,
+	.cutwin_test_vcut = 0,
 };
 
 struct tvafe_user_param_s *tvafe_get_user_param(void)
@@ -162,19 +186,32 @@ struct tvafe_dev_s *tvafe_get_dev(void)
 	return tvafe_dev_local;
 }
 
-static int tvafe_pq_config_update(struct tvafe_dev_s *devp,
+static int tvafe_config_init(struct tvafe_dev_s *devp,
 				  enum tvin_port_e port)
 {
-	if ((port == TVIN_PORT_CVBS1) || (port == TVIN_PORT_CVBS2)) {
+	/* init variable */
+	memset(&devp->tvafe, 0, sizeof(struct tvafe_info_s));
+
+	if ((port == TVIN_PORT_CVBS1) || (port == TVIN_PORT_CVBS2)) { /* avin */
+		if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TM2_B)
+			devp->acd_table = cvbs_acd_table_tm2_b;
+		else
+			devp->acd_table = cvbs_acd_table;
+
 		devp->pq_conf = s_tvafe_data->cvbs_pq_conf;
 		if (tvafe_dbg_print & TVAFE_DBG_NORMAL) {
-			tvafe_pr_info("%s: select cvbs_pq config\n",
+			tvafe_pr_info("%s: select cvbs config\n",
 				      __func__);
 		}
-	} else {
+	} else { /* atv */
+		if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TM2_B)
+			devp->acd_table = rf_acd_table_tm2_b;
+		else
+			devp->acd_table = rf_acd_table;
+
 		devp->pq_conf = s_tvafe_data->rf_pq_conf;
 		if (tvafe_dbg_print & TVAFE_DBG_NORMAL) {
-			tvafe_pr_info("%s: select rf_pq config\n",
+			tvafe_pr_info("%s: select rf config\n",
 				      __func__);
 		}
 	}
@@ -265,7 +302,25 @@ static int tvafe_work_mode(bool mode)
 {
 	tvafe_pr_info("%s: %d\n", __func__, mode);
 	tvafe_mode = mode;
-	reinit_scan = true;
+	if (mode) {
+		reinit_scan = true;
+		if (tvafe_atv_search_channel) {
+			tvafe_manual_fmt_save = TVIN_SIG_FMT_NULL;
+			manual_flag = 0;
+		}
+	} else {
+		if (tvafe_atv_search_channel) {
+			if (g_tvafe_info) {
+				g_tvafe_info->cvd2.manual_fmt =
+					tvafe_manual_fmt_save;
+		tvafe_pr_info("%s: set cvd2 manual fmt:%s.\n",
+			      __func__,
+			      tvin_sig_fmt_str(tvafe_manual_fmt_save));
+			if (tvafe_manual_fmt_save != TVIN_SIG_FMT_NULL)
+				manual_flag = 1;
+			}
+		}
+	}
 
 	return 0;
 }
@@ -280,6 +335,7 @@ static int tvafe_get_v_fmt(void)
 	}
 	if (g_tvafe_info)
 		fmt = tvafe_cvd2_get_format(&g_tvafe_info->cvd2);
+	tvafe_manual_fmt_save = fmt;
 	return fmt;
 }
 #endif
@@ -311,9 +367,7 @@ static int tvafe_dec_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 #ifdef CONFIG_CMA
 	tvafe_cma_alloc(devp);
 #endif
-	/* init variable */
-	memset(tvafe, 0, sizeof(struct tvafe_info_s));
-	tvafe_pq_config_update(devp, port);
+	tvafe_config_init(devp, port);
 	/**enable and reset tvafe clock**/
 	tvafe_enable_module(true);
 	devp->flags &= (~TVAFE_POWERDOWN_IN_IDLE);
@@ -328,9 +382,9 @@ static int tvafe_dec_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 
 #ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT
 	/*only txlx chip enabled*/
-	if (tvafe_cpu_type() == CPU_TYPE_TXLX ||
-		tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 		/*synctip set to 0 when tvafe working&&av connected*/
 		/*enable clamp if av connected*/
 		if (port == TVIN_PORT_CVBS1) {
@@ -366,6 +420,7 @@ static int tvafe_dec_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 					CLAMP_EN_BIT, CLAMP_EN_WID);
 #endif
 	tvafe->parm.port = port;
+	vs_adj_val_pre = 0;
 
 	/* set the flag to enabble ioctl access */
 	devp->flags |= TVAFE_FLAG_DEV_OPENED;
@@ -424,9 +479,9 @@ static void tvafe_dec_start(struct tvin_frontend_s *fe, enum tvin_sig_fmt_e fmt)
 		W_APB_REG(CVD2_H_LOOP_MAXSTATE, 0x9);
 
 #ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT
-	if (tvafe_cpu_type() == CPU_TYPE_TXLX ||
-		tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 		if (port == TVIN_PORT_CVBS1)
 			tvafe_avin_detect_ch1_anlog_enable(0);
 		else if (port == TVIN_PORT_CVBS2)
@@ -491,9 +546,9 @@ static void tvafe_dec_stop(struct tvin_frontend_s *fe, enum tvin_port_e port)
 		tvafe_cvd2_set_default_de(&tvafe->cvd2);
 	}
 #ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT
-	if (tvafe_cpu_type() == CPU_TYPE_TXLX ||
-		tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 		if (port == TVIN_PORT_CVBS1)
 			tvafe_avin_detect_ch1_anlog_enable(1);
 		else if (port == TVIN_PORT_CVBS2)
@@ -561,9 +616,9 @@ static void tvafe_dec_close(struct tvin_frontend_s *fe)
 	tvafe_cma_release(devp);
 #endif
 #ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT
-	if (tvafe_cpu_type() == CPU_TYPE_TXLX ||
-		tvafe_cpu_type() == CPU_TYPE_TL1 ||
-		tvafe_cpu_type() == CPU_TYPE_TM2) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1 ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TM2) {
 		/*avsync tip set 1 to resume av detect*/
 		if (tvafe->parm.port == TVIN_PORT_CVBS1) {
 			avport_opened = 0;
@@ -600,8 +655,9 @@ static int tvafe_dec_isr(struct tvin_frontend_s *fe, unsigned int hcnt64)
 	struct tvafe_info_s *tvafe = &devp->tvafe;
 	enum tvin_port_e port = tvafe->parm.port;
 	enum tvin_aspect_ratio_e aspect_ratio = TVIN_ASPECT_NULL;
+	struct tvafe_user_param_s *user_param = tvafe_get_user_param();
 	static int count[10] = {0};
-	int i;
+	int i, unlock = 0;
 
 	if (!(devp->flags & TVAFE_FLAG_DEV_OPENED) ||
 		(devp->flags & TVAFE_POWERDOWN_IN_IDLE)) {
@@ -624,6 +680,42 @@ static int tvafe_dec_isr(struct tvin_frontend_s *fe, unsigned int hcnt64)
 	if ((port < TVIN_PORT_CVBS0) || (port > TVIN_PORT_CVBS3))
 		return TVIN_BUF_SKIP;
 
+	if ((tvafe->parm.info.status == TVIN_SIG_STATUS_STABLE) &&
+		(port == TVIN_PORT_CVBS1 || port == TVIN_PORT_CVBS2)) {
+		if (tvafe->cvd2.info.h_unlock_cnt >
+		    user_param->unlock_cnt_max) {
+			if (tvafe_dbg_print & TVAFE_DBG_ISR) {
+				pr_info("%s: h_unlock cnt: %d\n",
+					__func__,
+					tvafe->cvd2.info.h_unlock_cnt);
+			}
+			unlock = 1;
+		}
+		if (tvafe->cvd2.info.v_unlock_cnt >
+		    user_param->unlock_cnt_max) {
+			if (tvafe_dbg_print & TVAFE_DBG_ISR) {
+				pr_info("%s: v_unlock cnt: %d\n",
+					__func__,
+					tvafe->cvd2.info.v_unlock_cnt);
+			}
+			unlock = 1;
+		}
+		if (tvafe->cvd2.info.sig_unlock_cnt >
+		    user_param->unlock_cnt_max) {
+			if (tvafe_dbg_print & TVAFE_DBG_ISR) {
+				pr_info("%s: sig_unlock cnt: %d\n",
+					__func__,
+					tvafe->cvd2.info.sig_unlock_cnt);
+			}
+			unlock = 1;
+		}
+		if (unlock) {
+			if (tvafe->cvd2.info.unlock_cnt++ >= 65536)
+				tvafe->cvd2.info.unlock_cnt = 0;
+			return TVIN_BUF_SKIP;
+		}
+	}
+
 	if (tvafe->cvd2.info.isr_cnt++ >= 65536)
 		tvafe->cvd2.info.isr_cnt = 0;
 
@@ -635,13 +727,16 @@ static int tvafe_dec_isr(struct tvin_frontend_s *fe, unsigned int hcnt64)
 		tvafe_cvd2_adj_pga(&tvafe->cvd2);
 #endif
 
-	if (tvafe->parm.info.fmt == TVIN_SIG_FMT_CVBS_PAL_I) {
+	if (!tvafe_atv_search_channel) {
+		if (tvafe->parm.info.fmt == TVIN_SIG_FMT_CVBS_PAL_I) {
 #ifdef TVAFE_SET_CVBS_CDTO_EN
-		tvafe_cvd2_adj_cdto(&tvafe->cvd2, hcnt64);
+			tvafe_cvd2_adj_cdto(&tvafe->cvd2, hcnt64);
 #endif
-		tvafe_cvd2_adj_hs(&tvafe->cvd2, hcnt64);
-	} else if (tvafe->parm.info.fmt == TVIN_SIG_FMT_CVBS_NTSC_M)
-		tvafe_cvd2_adj_hs_ntsc(&tvafe->cvd2, hcnt64);
+			tvafe_cvd2_adj_hs(&tvafe->cvd2, hcnt64);
+		} else if (tvafe->parm.info.fmt == TVIN_SIG_FMT_CVBS_NTSC_M) {
+			tvafe_cvd2_adj_hs_ntsc(&tvafe->cvd2, hcnt64);
+		}
+	}
 
 	aspect_ratio = tvafe_cvd2_get_wss();
 	switch (aspect_ratio) {
@@ -704,7 +799,7 @@ static struct tvin_decoder_ops_s tvafe_dec_ops = {
 /*
  * tvafe signal signal status: signal on/off
  */
-bool tvafe_is_nosig(struct tvin_frontend_s *fe)
+static bool tvafe_is_nosig(struct tvin_frontend_s *fe)
 {
 	bool ret = false;
 	/* Get the per-device structure that contains this frontend */
@@ -728,7 +823,11 @@ bool tvafe_is_nosig(struct tvin_frontend_s *fe)
 	if (tvafe->cvd2.info.smr_cnt++ >= 65536)
 		tvafe->cvd2.info.smr_cnt = 0;
 
-	ret = tvafe_cvd2_no_sig(&tvafe->cvd2, &devp->mem);
+	if (devp->flags & TVAFE_FLAG_DEV_STARTED)
+		ret = tvafe_cvd2_no_sig(&tvafe->cvd2, &devp->mem, 1);
+	else
+		ret = tvafe_cvd2_no_sig(&tvafe->cvd2, &devp->mem, 0);
+
 	if ((!tvafe_mode) && (port == TVIN_PORT_CVBS3) &&
 		(devp->flags & TVAFE_FLAG_DEV_SNOW_FLAG)) { /* playing snow */
 		tvafe->cvd2.info.snow_state[3] = tvafe->cvd2.info.snow_state[2];
@@ -824,10 +923,107 @@ enum tvin_sig_fmt_e tvafe_get_fmt(struct tvin_frontend_s *fe)
 	return fmt;
 }
 
+static void tvafe_cutwindow_update(struct tvafe_info_s *tvafe,
+				   struct tvin_sig_property_s *prop)
+{
+	struct tvafe_user_param_s *user_param = &tvafe_user_param;
+	unsigned int hs_adj_val = 0;
+	unsigned int vs_adj_val = 0;
+	unsigned int i;
+
+	if (user_param->cutwin_test_en & 0x8) {
+		vs_adj_val = user_param->cutwin_test_vcut;
+		if (user_param->auto_adj_en & TVAFE_AUTO_VS_MODE) {
+			prop->vs = user_param->cutwin_test_vcut;
+			prop->ve = 0;
+		} else {
+			prop->vs = user_param->cutwin_test_vcut;
+			prop->ve = user_param->cutwin_test_vcut;
+		}
+	} else {
+		if (tvafe->cvd2.info.vs_adj_en) {
+			if (user_param->auto_adj_en & TVAFE_AUTO_VS_MODE) {
+				if (tvafe->cvd2.info.vs_adj_dir) {
+					/* < std freq*/
+					vs_adj_val = 0;
+				} else {/* > std freq*/
+					i = tvafe->cvd2.info.vs_adj_level;
+					if (i < 5) {
+						vs_adj_val =
+						user_param->cutwindow_val_v[i];
+					} else {
+						vs_adj_val = 0;
+					}
+				}
+				prop->vs = vs_adj_val;
+				prop->ve = 0;
+			} else {
+				i = tvafe->cvd2.info.vs_adj_level;
+				if (i < 5) {
+					vs_adj_val =
+						user_param->cutwindow_val_v[i];
+				} else {
+					vs_adj_val = 0;
+				}
+				prop->vs = vs_adj_val;
+				prop->ve = vs_adj_val;
+			}
+		} else {
+			prop->vs = 0;
+			prop->ve = 0;
+		}
+	}
+	if (vs_adj_val != vs_adj_val_pre) {
+		if (tvafe_dbg_print & TVAFE_DBG_NOSTD) {
+			tvafe_pr_info("%s: vs_adj_en:%d, vs_adj_level:%d, vs_adj_val:%d\n",
+				      __func__,
+				      tvafe->cvd2.info.vs_adj_en,
+				      tvafe->cvd2.info.vs_adj_level,
+				      vs_adj_val);
+		}
+		vs_adj_val_pre = vs_adj_val;
+	}
+
+	if (user_param->cutwin_test_en & 0x4) {
+		vs_adj_val = user_param->cutwin_test_hcut;
+		if (user_param->auto_adj_en & TVAFE_AUTO_HS_MODE) {
+			prop->hs = 0;
+			prop->he = user_param->cutwin_test_hcut;
+		} else {
+			prop->hs = user_param->cutwin_test_hcut;
+			prop->he = 0;
+		}
+	} else {
+		if (tvafe->cvd2.info.hs_adj_en) {
+			i = tvafe->cvd2.info.hs_adj_level;
+			if (i < 4) {
+				hs_adj_val = user_param->cutwindow_val_h[i];
+			} else if (i == 4) {
+				hs_adj_val = user_param->cutwindow_val_h[i];
+				prop->vs = user_param->cutwindow_val_vs_ve;
+				prop->ve = user_param->cutwindow_val_vs_ve;
+			} else {
+				 hs_adj_val = 0;
+			}
+
+			if (tvafe->cvd2.info.hs_adj_dir) {
+				prop->hs = 0;
+				prop->he = hs_adj_val;
+			} else {
+				prop->hs = hs_adj_val;
+				prop->he = 0;
+			}
+		} else {
+			prop->hs = 0;
+			prop->he = 0;
+		}
+	}
+}
+
 /*
  * tvafe signal property: 2D/3D, color format, aspect ratio, pixel repeat
  */
-void tvafe_get_sig_property(struct tvin_frontend_s *fe,
+static void tvafe_get_sig_property(struct tvin_frontend_s *fe,
 		struct tvin_sig_property_s *prop)
 {
 	struct tvafe_dev_s *devp = container_of(fe, struct tvafe_dev_s,
@@ -835,9 +1031,6 @@ void tvafe_get_sig_property(struct tvin_frontend_s *fe,
 	struct tvafe_info_s *tvafe = &devp->tvafe;
 	struct tvafe_user_param_s *user_param = &tvafe_user_param;
 	enum tvin_port_e port = tvafe->parm.port;
-	unsigned int hs_adj_lev = user_param->cutwindow_val_h[1];
-	unsigned int vs_adj_lev = user_param->cutwindow_val_v[1];
-	unsigned int i;
 
 	if (!(devp->flags & TVAFE_FLAG_DEV_OPENED) ||
 		(devp->flags & TVAFE_POWERDOWN_IN_IDLE)) {
@@ -850,41 +1043,9 @@ void tvafe_get_sig_property(struct tvin_frontend_s *fe,
 	prop->dest_cfmt = TVIN_YUV422;
 
 #ifdef TVAFE_CVD2_AUTO_DE_ENABLE
-	if ((port >= TVIN_PORT_CVBS0) && (port <= TVIN_PORT_CVBS3)) {
-		if (tvafe->cvd2.info.vs_adj_en) {
-			i = tvafe->cvd2.info.vs_adj_level;
-			if (i < 5)
-				vs_adj_lev = user_param->cutwindow_val_v[i];
-			else
-				vs_adj_lev = 0;
-			prop->vs = vs_adj_lev;
-			prop->ve = vs_adj_lev;
-		} else {
-			prop->vs = 0;
-			prop->ve = 0;
-		}
-		if (tvafe->cvd2.info.hs_adj_en) {
-			i = tvafe->cvd2.info.hs_adj_level;
-			if (i < 4) {
-				hs_adj_lev = user_param->cutwindow_val_h[i];
-			} else if (i == 4) {
-				hs_adj_lev = user_param->cutwindow_val_h[i];
-				prop->vs = user_param->cutwindow_val_vs_ve;
-				prop->ve = user_param->cutwindow_val_vs_ve;
-			} else {
-				hs_adj_lev = 0;
-			}
-			if (tvafe->cvd2.info.hs_adj_dir == true) {
-				prop->hs = 0;
-				prop->he = hs_adj_lev;
-			} else {
-				prop->hs = hs_adj_lev;
-				prop->he = 0;
-			}
-		} else {
-			prop->hs = 0;
-			prop->he = 0;
-		}
+	if (devp->flags & TVAFE_FLAG_DEV_STARTED) {
+		if ((port >= TVIN_PORT_CVBS0) && (port <= TVIN_PORT_CVBS3))
+			tvafe_cutwindow_update(tvafe, prop);
 	}
 #endif
 	prop->color_fmt_range = TVIN_YUV_LIMIT;
@@ -991,7 +1152,7 @@ static long tvafe_ioctl(struct file *file,
 				unsigned int cmd, unsigned long arg)
 {
 	long ret = 0;
-	unsigned int snowcfg = 0;
+	unsigned int temp = 0;
 	void __user *argp = (void __user *)arg;
 	struct tvafe_dev_s *devp = file->private_data;
 	struct tvafe_info_s *tvafe = &devp->tvafe;
@@ -1039,13 +1200,12 @@ static long tvafe_ioctl(struct file *file,
 		}
 	case TVIN_IOC_S_AFE_SONWCFG:
 		/*tl1/txhd tvconfig snow en/disable*/
-		if (copy_from_user(&snowcfg, argp,
-			sizeof(unsigned int))) {
+		if (copy_from_user(&temp, argp, sizeof(unsigned int))) {
 			tvafe_pr_info("snowcfg: get param err\n");
 			ret = -EINVAL;
 			break;
 		}
-		if (snowcfg == 1)
+		if (temp == 1)
 			tvafe_set_snow_cfg(true);
 		else
 			tvafe_set_snow_cfg(false);
@@ -1085,6 +1245,11 @@ static long tvafe_ioctl(struct file *file,
 			__func__, tvin_sig_fmt_str(fmt));
 		if (fmt != TVIN_SIG_FMT_NULL)
 			manual_flag = 1;
+		if (tvin_get_sm_status(tvafe->parm.index)
+				== TVIN_SM_STATUS_NOSIG) {
+			tvafe_pr_info("%s: reset_tvin_smr.\n", __func__);
+			reset_tvin_smr(tvafe->parm.index);
+		}
 		break;
 	case TVIN_IOC_G_AFE_CVBS_STD:
 		if (tvafe->cvd2.info.state == TVAFE_CVD2_STATE_FIND)
@@ -1093,6 +1258,18 @@ static long tvafe_ioctl(struct file *file,
 			ret = -EFAULT;
 		tvafe_pr_info("%s: ioctl get fmt:%s.\n",
 			__func__, tvin_sig_fmt_str(fmt));
+		break;
+	case TVIN_IOC_S_AFE_ATV_SEARCH:
+		if (copy_from_user(&temp, argp, sizeof(unsigned int))) {
+			tvafe_pr_info("set atv_search: get param err\n");
+			ret = -EINVAL;
+			break;
+		}
+		if (temp)
+			tvafe_atv_search_channel = true;
+		else
+			tvafe_atv_search_channel = false;
+		tvafe_pr_info("set atv_search: %d\n", tvafe_atv_search_channel);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -1297,7 +1474,7 @@ static void tvafe_user_parameters_config(struct device_node *of_node)
 }
 
 static struct meson_tvafe_data meson_txl_tvafe_data = {
-	.cpu_id = CPU_TYPE_TXL,
+	.cpu_id = TVAFE_CPU_TYPE_TXL,
 	.name = "meson-txl-tvafe",
 
 	.cvbs_pq_conf = NULL,
@@ -1305,7 +1482,7 @@ static struct meson_tvafe_data meson_txl_tvafe_data = {
 };
 
 static struct meson_tvafe_data meson_txlx_tvafe_data = {
-	.cpu_id = CPU_TYPE_TXLX,
+	.cpu_id = TVAFE_CPU_TYPE_TXLX,
 	.name = "meson-txlx-tvafe",
 
 	.cvbs_pq_conf = NULL,
@@ -1313,7 +1490,7 @@ static struct meson_tvafe_data meson_txlx_tvafe_data = {
 };
 
 static struct meson_tvafe_data meson_tl1_tvafe_data = {
-	.cpu_id = CPU_TYPE_TL1,
+	.cpu_id = TVAFE_CPU_TYPE_TL1,
 	.name = "meson-tl1-tvafe",
 
 	.cvbs_pq_conf = NULL,
@@ -1321,8 +1498,16 @@ static struct meson_tvafe_data meson_tl1_tvafe_data = {
 };
 
 static struct meson_tvafe_data meson_tm2_tvafe_data = {
-	.cpu_id = CPU_TYPE_TM2,
+	.cpu_id = TVAFE_CPU_TYPE_TM2,
 	.name = "meson-tm2-tvafe",
+
+	.cvbs_pq_conf = NULL,
+	.rf_pq_conf = NULL,
+};
+
+static struct meson_tvafe_data meson_tm2_b_tvafe_data = {
+	.cpu_id = TVAFE_CPU_TYPE_TM2_B,
+	.name = "meson-tm2_b-tvafe",
 
 	.cvbs_pq_conf = NULL,
 	.rf_pq_conf = NULL,
@@ -1341,8 +1526,11 @@ static const struct of_device_id meson_tvafe_dt_match[] = {
 	}, {
 		.compatible = "amlogic, tvafe-tm2",
 		.data		= &meson_tm2_tvafe_data,
+	}, {
+		.compatible = "amlogic, tvafe-tm2_b",
+		.data		= &meson_tm2_b_tvafe_data,
 	},
-	{},
+	{}
 };
 
 static unsigned int tvafe_use_reserved_mem;
@@ -1538,6 +1726,7 @@ static int tvafe_drv_probe(struct platform_device *pdev)
 
 	disableapi = false;
 	force_stable = false;
+	tvafe_atv_search_channel = false;
 
 	tvafe_pr_info("driver probe ok\n");
 
@@ -1634,7 +1823,7 @@ static int tvafe_drv_resume(struct platform_device *pdev)
 
 static void tvafe_drv_shutdown(struct platform_device *pdev)
 {
-	if (tvafe_cpu_type() == CPU_TYPE_TL1) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TL1) {
 		W_APB_BIT(TVFE_VAFE_CTRL0, 0, 19, 1);
 		W_APB_BIT(TVFE_VAFE_CTRL1, 0, 8, 1);
 	}

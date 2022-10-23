@@ -233,7 +233,7 @@ restart:
 		}
 		/* Track the carrier if the search was successful */
 		if (fepriv->algo_status == V4L2_SEARCH_SUCCESS) {
-			s = FE_HAS_LOCK;
+			s = V4L2_HAS_LOCK;
 		} else {
 			/*dev->algo_status |= AML_ATVDEMOD_ALGO_SEARCH_AGAIN;*/
 			if (fepriv->algo_status != V4L2_SEARCH_INVALID) {
@@ -246,7 +246,7 @@ restart:
 			/* update event list */
 			v4l2_frontend_add_event(v4l2_fe, s);
 			fepriv->status = s;
-			if (!(s & FE_HAS_LOCK)) {
+			if (!(s & V4L2_HAS_LOCK)) {
 				fepriv->delay = HZ / 10;
 				fepriv->algo_status |= V4L2_SEARCH_AGAIN;
 			} else {
@@ -381,7 +381,7 @@ static int v4l2_set_frontend(struct v4l2_frontend *v4l2_fe,
 
 	/*
 	 * Initialize output parameters to match the values given by
-	 * the user. FE_SET_FRONTEND triggers an initial frontend event
+	 * the user. V4L2_SET_FRONTEND triggers an initial frontend event
 	 * with status = 0, which copies output parameters to userspace.
 	 */
 	/* memcpy(&v4l2_fe->params, params,
@@ -837,7 +837,7 @@ static long v4l2_frontend_ioctl(struct file *filp, void *fh, bool valid_prio,
 		if (down_interruptible(&fepriv->sem))
 			return -ERESTARTSYS;
 
-	if (fepriv->exit != DVB_FE_NO_EXIT) {
+	if (fepriv->exit != V4L2_FE_NO_EXIT) {
 		up(&fepriv->sem);
 		return -ENODEV;
 	}
@@ -901,7 +901,7 @@ static int v4l2_frontend_open(struct file *filp)
 
 	/* Because tuner ko insmod after demod, so need check */
 	if (!amlatvdemod_devp->analog_attached) {
-		ret = aml_attach_demod(amlatvdemod_devp);
+		ret = aml_atvdemod_attach_demod(amlatvdemod_devp);
 		if (ret < 0) {
 			pr_err("%s: line %d, error ret %d.\n",
 					__func__, __LINE__, ret);
@@ -910,7 +910,7 @@ static int v4l2_frontend_open(struct file *filp)
 	}
 
 	if (!amlatvdemod_devp->tuner_attached) {
-		ret = aml_attach_tuner(amlatvdemod_devp);
+		ret = aml_atvdemod_attach_tuner(amlatvdemod_devp);
 		if (ret < 0) {
 			pr_err("%s: line %d, error ret %d.\n",
 					__func__, __LINE__, ret);

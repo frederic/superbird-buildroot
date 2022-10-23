@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -77,13 +77,13 @@ endif
 
 ifeq ($(DYNAMIC), 1)
 ifeq ($(USE_ARMCC), 1)
-LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+LDFLAGS += --shared -L--soname=,$(TARGET_NAME)
 else
-LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+LDFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
 endif
 $(TARGET_OUTPUT): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+	@$(CC) $(LDFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
 endif
 
 ifeq ($(STATIC), 1)

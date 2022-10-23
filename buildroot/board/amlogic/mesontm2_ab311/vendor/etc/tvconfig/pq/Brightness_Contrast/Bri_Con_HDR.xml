@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="Bri_Con_HDR" platform="txlx" commands="">
+<Group num="0" val="0">
+<Page tab_title="bri_con" layout="3x3">
+<Control ui_type="slider" name="brightness" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="-500" cmd="b_c:brightness"/>
+<Control ui_type="slider" name="contrast" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="-500" cmd="b_c:contrast"/>
+</Page>
+</Group>
+<Group num="1" val="127">
+<Page tab_title="bri_con" layout="3x3">
+<Control ui_type="slider" name="brightness" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="-44" cmd="b_c:brightness"/>
+<Control ui_type="slider" name="contrast" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="96" cmd="b_c:contrast"/>
+</Page>
+</Group>
+<Group num="2" val="255">
+<Page tab_title="bri_con" layout="3x3">
+<Control ui_type="slider" name="brightness" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="500" cmd="b_c:brightness"/>
+<Control ui_type="slider" name="contrast" range="-1024~1023" addr="" mask="31:0" dst="S" desc="" default="1" value="500" cmd="b_c:contrast"/>
+</Page>
+</Group>
+</Form>
+

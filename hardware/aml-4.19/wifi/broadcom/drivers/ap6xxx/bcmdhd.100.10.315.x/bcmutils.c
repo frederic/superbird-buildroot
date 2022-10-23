@@ -1,7 +1,7 @@
 /*
  * Driver O/S-independent utility routines
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmutils.c 760883 2018-05-03 22:57:07Z $
+ * $Id: bcmutils.c 813798 2019-04-08 10:20:21Z $
  */
 
 #include <bcm_cfg.h>
@@ -83,7 +83,7 @@ pkttotlen(osl_t *osh, void *p)
 	total = 0;
 	for (; p; p = PKTNEXT(osh, p)) {
 		len = PKTLEN(osh, p);
-		total += len;
+		total += (uint)len;
 #ifdef BCMLFRAG
 		if (BCMLFRAG_ENAB()) {
 			if (PKTISFRAG(osh, p)) {
@@ -139,7 +139,7 @@ pktcopy(osl_t *osh, void *p, uint offset, int len, uchar *buf)
 	for (; p && offset; p = PKTNEXT(osh, p)) {
 		if (offset < (uint)PKTLEN(osh, p))
 			break;
-		offset -= PKTLEN(osh, p);
+		offset -= (uint)PKTLEN(osh, p);
 	}
 
 	if (!p)
@@ -168,7 +168,7 @@ pktfrombuf(osl_t *osh, void *p, uint offset, int len, uchar *buf)
 	for (; p && offset; p = PKTNEXT(osh, p)) {
 		if (offset < (uint)PKTLEN(osh, p))
 			break;
-		offset -= PKTLEN(osh, p);
+		offset -= (uint)PKTLEN(osh, p);
 	}
 
 	if (!p)
@@ -200,11 +200,11 @@ pktdataoffset(osl_t *osh, void *p,  uint offset)
 	for (; p; p = PKTNEXT(osh, p)) {
 		pdata = (uint8 *) PKTDATA(osh, p);
 		pkt_off = offset - len;
-		len += PKTLEN(osh, p);
+		len += (uint)PKTLEN(osh, p);
 		if (len > offset)
 			break;
 	}
-	return (uint8*) (pdata + pkt_off);
+	return (uint8*) (pdata+pkt_off);
 }
 
 /* given a offset in pdata, find the pkt seg hdr */
@@ -218,7 +218,7 @@ pktoffset(osl_t *osh, void *p,  uint offset)
 		return NULL;
 
 	for (; p; p = PKTNEXT(osh, p)) {
-		len += PKTLEN(osh, p);
+		len += (uint)PKTLEN(osh, p);
 		if (len > offset)
 			break;
 	}
@@ -246,7 +246,7 @@ prpkt(const char *msg, osl_t *osh, void *p0)
 		printf("%s:\n", msg);
 
 	for (p = p0; p; p = PKTNEXT(osh, p))
-		prhex(NULL, PKTDATA(osh, p), PKTLEN(osh, p));
+		prhex(NULL, PKTDATA(osh, p), (uint)PKTLEN(osh, p));
 }
 #endif // endif
 
@@ -260,8 +260,8 @@ pktsetprio(void *pkt, bool update_vtag)
 	struct ether_header *eh;
 	struct ethervlan_header *evh;
 	uint8 *pktdata;
-	int priority = 0;
-	int rc = 0;
+	uint priority = 0;
+	uint rc = 0;
 
 	pktdata = (uint8 *)PKTDATA(OSH_NULL, pkt);
 	ASSERT(ISALIGNED((uintptr)pktdata, sizeof(uint16)));
@@ -270,18 +270,18 @@ pktsetprio(void *pkt, bool update_vtag)
 
 	if (eh->ether_type == hton16(ETHER_TYPE_8021Q)) {
 		uint16 vlan_tag;
-		int vlan_prio, dscp_prio = 0;
+		uint vlan_prio, dscp_prio = 0;
 
 		evh = (struct ethervlan_header *)eh;
 
 		vlan_tag = ntoh16(evh->vlan_tag);
-		vlan_prio = (int) (vlan_tag >> VLAN_PRI_SHIFT) & VLAN_PRI_MASK;
+		vlan_prio = (vlan_tag >> VLAN_PRI_SHIFT) & VLAN_PRI_MASK;
 
 		if ((evh->ether_type == hton16(ETHER_TYPE_IP)) ||
-				(evh->ether_type == hton16(ETHER_TYPE_IPV6))) {
+			(evh->ether_type == hton16(ETHER_TYPE_IPV6))) {
 			uint8 *ip_body = pktdata + sizeof(struct ethervlan_header);
-			uint8 tos_tc = IP_TOS46(ip_body);
-			dscp_prio = (int)(tos_tc >> IPV4_TOS_PREC_SHIFT);
+			uint8 tos_tc = (uint8)IP_TOS46(ip_body);
+			dscp_prio = tos_tc >> IPV4_TOS_PREC_SHIFT;
 		}
 
 		/* DSCP priority gets precedence over 802.1P (vlan tag) */
@@ -311,37 +311,46 @@ pktsetprio(void *pkt, bool update_vtag)
 		rc = PKTPRIO_DSCP;
 #endif /* EAPOL_PKT_PRIO || DHD_LOSSLESS_ROAMING */
 	} else if ((eh->ether_type == hton16(ETHER_TYPE_IP)) ||
-			   (eh->ether_type == hton16(ETHER_TYPE_IPV6))) {
+		(eh->ether_type == hton16(ETHER_TYPE_IPV6))) {
 		uint8 *ip_body = pktdata + sizeof(struct ether_header);
-		uint8 tos_tc = IP_TOS46(ip_body);
+		uint8 tos_tc = (uint8)IP_TOS46(ip_body);
 		uint8 dscp = tos_tc >> IPV4_TOS_DSCP_SHIFT;
 		switch (dscp) {
 		case DSCP_EF:
+		case DSCP_VA:
 			priority = PRIO_8021D_VO;
 			break;
 		case DSCP_AF31:
 		case DSCP_AF32:
 		case DSCP_AF33:
+		case DSCP_CS3:
 			priority = PRIO_8021D_CL;
 			break;
 		case DSCP_AF21:
 		case DSCP_AF22:
 		case DSCP_AF23:
+			priority = PRIO_8021D_EE;
+			break;
 		case DSCP_AF11:
 		case DSCP_AF12:
 		case DSCP_AF13:
-			priority = PRIO_8021D_EE;
+		case DSCP_CS2:
+			priority = PRIO_8021D_BE;
+			break;
+		case DSCP_CS6:
+		case DSCP_CS7:
+			priority = PRIO_8021D_NC;
 			break;
 		default:
-			priority = (int)(tos_tc >> IPV4_TOS_PREC_SHIFT);
+			priority = tos_tc >> IPV4_TOS_PREC_SHIFT;
 			break;
 		}
 
 		rc |= PKTPRIO_DSCP;
 	}
 
-	ASSERT(priority >= 0 && priority <= MAXPRIO);
-	PKTSETPRIO(pkt, priority);
+	ASSERT(priority <= MAXPRIO);
+	PKTSETPRIO(pkt, (int)priority);
 	return (rc | priority);
 }
 
@@ -376,12 +385,12 @@ pktsetprio_qms(void *pkt, uint8* up_table, bool update_vtag)
 		uint rc = 0;
 
 		pktdata = (uint8 *)PKTDATA(OSH_NULL, pkt);
-		pktlen = PKTLEN(OSH_NULL, pkt);
+		pktlen = (uint)PKTLEN(OSH_NULL, pkt);
 
 		if (pktgetdscp(pktdata, pktlen, &dscp)) {
 			rc = PKTPRIO_DSCP;
 			user_priority = dscp2up(up_table, dscp);
-			PKTSETPRIO(pkt, user_priority);
+			PKTSETPRIO(pkt, (int)user_priority);
 		}
 
 		return (rc | user_priority);
@@ -408,7 +417,7 @@ pktgetdscp(uint8 *pktdata, uint pktlen, uint8 *dscp)
 
 	if (eh->ether_type == HTON16(ETHER_TYPE_IP)) {
 		ip_body = pktdata + sizeof(struct ether_header);
-		*dscp = IP_DSCP46(ip_body);
+		*dscp = (uint8)IP_DSCP46(ip_body);
 		rc = TRUE;
 	}
 	else if (eh->ether_type == HTON16(ETHER_TYPE_8021Q)) {
@@ -416,9 +425,9 @@ pktgetdscp(uint8 *pktdata, uint pktlen, uint8 *dscp)
 
 		/* minimum length is ethervlan header and IP header */
 		if (pktlen >= sizeof(struct ethervlan_header) + IPV4_MIN_HEADER_LEN &&
-				evh->ether_type == HTON16(ETHER_TYPE_IP)) {
+			evh->ether_type == HTON16(ETHER_TYPE_IP)) {
 			ip_body = pktdata + sizeof(struct ethervlan_header);
-			*dscp = IP_DSCP46(ip_body);
+			*dscp = (uint8)IP_DSCP46(ip_body);
 			rc = TRUE;
 		}
 	}
@@ -463,7 +472,7 @@ wl_set_up_table(uint8 *up_table, bcm_tlv_t *qos_map_ie)
 		uint8 *except_ptr = (uint8 *)qos_map_ie->data;
 		uint8 except_len = len - QOS_MAP_FIXED_LENGTH;
 		uint8 *range_ptr = except_ptr + except_len;
-		int i;
+		uint8 i;
 
 		/* fill in ranges */
 		for (i = 0; i < QOS_MAP_FIXED_LENGTH; i += 2) {
@@ -483,7 +492,7 @@ wl_set_up_table(uint8 *up_table, bcm_tlv_t *qos_map_ie)
 		/* update exceptions */
 		for (i = 0; i < except_len; i += 2) {
 			uint8 dscp = except_ptr[i];
-			uint8 usr_prio = except_ptr[i + 1];
+			uint8 usr_prio = except_ptr[i+1];
 
 			/* exceptions with invalid dscp/usr_prio are ignored */
 			up_table_set(up_table, usr_prio, dscp, dscp);
@@ -503,7 +512,7 @@ const char *
 BCMRAMFN(bcmerrorstr)(int bcmerror)
 {
 	/* check if someone added a bcmerror code but forgot to add errorstring */
-	ASSERT(ABS(BCME_LAST) == (ARRAYSIZE(bcmerrorstrtable) - 1));
+	ASSERT((uint)ABS(BCME_LAST) == (ARRAYSIZE(bcmerrorstrtable) - 1));
 
 	if (bcmerror > 0 || bcmerror < BCME_LAST) {
 		snprintf(bcm_undeferrstr, sizeof(bcm_undeferrstr), "Undefined error %d", bcmerror);
@@ -746,7 +755,7 @@ bcm_mwbmap_fini(osl_t * osh, struct bcm_mwbmap * mwbmap_hdl)
 	mwbmap_p = BCM_MWBMAP_PTR(mwbmap_hdl);
 
 	MFREE(osh, mwbmap_p, sizeof(struct bcm_mwbmap)
-		  + (sizeof(uint32) * mwbmap_p->imaps));
+			     + (sizeof(uint32) * mwbmap_p->imaps));
 	return;
 }
 
@@ -774,9 +783,9 @@ bcm_mwbmap_alloc(struct bcm_mwbmap * mwbmap_hdl)
 			/* clear all except trailing 1 */
 			bitmap   = (uint32)(((int)(bitmap)) & (-((int)(bitmap))));
 			MWBMAP_ASSERT(C_bcm_count_leading_zeros(bitmap) ==
-						  bcm_count_leading_zeros(bitmap));
+			              bcm_count_leading_zeros(bitmap));
 			bitix    = (BCM_MWBMAP_BITS_WORD - 1)
-					   - bcm_count_leading_zeros(bitmap); /* use asm clz */
+				 - (uint32)bcm_count_leading_zeros(bitmap); /* use asm clz */
 			wordix   = BCM_MWBMAP_MULOP(wordix) + bitix;
 
 			/* Clear bit if wd count is 0, without conditional branch */
@@ -784,18 +793,18 @@ bcm_mwbmap_alloc(struct bcm_mwbmap * mwbmap_hdl)
 			count = bcm_cntsetbits(mwbmap_p->id_bitmap[wordix]) - 1;
 #else  /* ! BCM_MWBMAP_USE_CNTSETBITS */
 			mwbmap_p->wd_count[wordix]--;
-			count = mwbmap_p->wd_count[wordix];
+			count = (uint32)mwbmap_p->wd_count[wordix];
 			MWBMAP_ASSERT(count ==
-						  (bcm_cntsetbits(mwbmap_p->id_bitmap[wordix]) - 1));
+			              (bcm_cntsetbits(mwbmap_p->id_bitmap[wordix]) - 1));
 #endif /* ! BCM_MWBMAP_USE_CNTSETBITS */
 			MWBMAP_ASSERT(count >= 0);
 
 			/* clear wd_bitmap bit if id_map count is 0 */
-			bitmap = (count == 0) << bitix;
+			bitmap = ((uint32)(count == 0)) << BCM_MWBMAP_MODOP(bitix);
 
 			MWBMAP_DBG((
-						   "Lvl1: bitix<%02u> wordix<%02u>: %08x ^ %08x = %08x wfree %d",
-						   bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap, count));
+			    "Lvl1: bitix<%02u> wordix<%02u>: %08x ^ %08x = %08x wfree %d",
+			    bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap, count));
 
 			*bitmap_p ^= bitmap;
 
@@ -808,18 +817,18 @@ bcm_mwbmap_alloc(struct bcm_mwbmap * mwbmap_hdl)
 			/* clear all except trailing 1 */
 			bitmap   = (uint32)(((int)(bitmap)) & (-((int)(bitmap))));
 			MWBMAP_ASSERT(C_bcm_count_leading_zeros(bitmap) ==
-						  bcm_count_leading_zeros(bitmap));
+			              bcm_count_leading_zeros(bitmap));
 			bitix    = BCM_MWBMAP_MULOP(wordix)
-					   + (BCM_MWBMAP_BITS_WORD - 1)
-					   - bcm_count_leading_zeros(bitmap); /* use asm clz */
+				 + (BCM_MWBMAP_BITS_WORD - 1)
+				 - (uint32)bcm_count_leading_zeros(bitmap); /* use asm clz */
 
 			mwbmap_p->ifree--; /* decrement system wide free count */
 			MWBMAP_ASSERT(mwbmap_p->ifree >= 0);
 
 			MWBMAP_DBG((
-						   "Lvl2: bitix<%02u> wordix<%02u>: %08x ^ %08x = %08x ifree %d",
-						   bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap,
-						   mwbmap_p->ifree));
+			    "Lvl2: bitix<%02u> wordix<%02u>: %08x ^ %08x = %08x ifree %d",
+			    bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap,
+			    mwbmap_p->ifree));
 
 			*bitmap_p ^= bitmap; /* mark as allocated = 1b0 */
 
@@ -855,8 +864,8 @@ bcm_mwbmap_force(struct bcm_mwbmap * mwbmap_hdl, uint32 bitix)
 	ASSERT(mwbmap_p->ifree >= 0);
 
 	MWBMAP_DBG(("Lvl2: bitix<%u> wordix<%u>: %08x ^ %08x = %08x ifree %d",
-				bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap,
-				mwbmap_p->ifree));
+	            bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) ^ bitmap,
+	            mwbmap_p->ifree));
 
 	*bitmap_p ^= bitmap; /* mark as in use */
 
@@ -870,16 +879,16 @@ bcm_mwbmap_force(struct bcm_mwbmap * mwbmap_hdl, uint32 bitix)
 	count = bcm_cntsetbits(mwbmap_p->id_bitmap[bitix]);
 #else  /* ! BCM_MWBMAP_USE_CNTSETBITS */
 	mwbmap_p->wd_count[bitix]--;
-	count = mwbmap_p->wd_count[bitix];
+	count = (uint32)mwbmap_p->wd_count[bitix];
 	MWBMAP_ASSERT(count == bcm_cntsetbits(mwbmap_p->id_bitmap[bitix]));
 #endif /* ! BCM_MWBMAP_USE_CNTSETBITS */
 	MWBMAP_ASSERT(count >= 0);
 
-	bitmap   = (count == 0) << BCM_MWBMAP_MODOP(bitix);
+	bitmap   = (uint32)(count == 0) << BCM_MWBMAP_MODOP(bitix);
 
 	MWBMAP_DBG(("Lvl1: bitix<%02lu> wordix<%02u>: %08x ^ %08x = %08x wfree %d",
-				BCM_MWBMAP_MODOP(bitix), wordix, *bitmap_p, bitmap,
-				(*bitmap_p) ^ bitmap, count));
+	            BCM_MWBMAP_MODOP(bitix), wordix, *bitmap_p, bitmap,
+	            (*bitmap_p) ^ bitmap, count));
 
 	*bitmap_p ^= bitmap; /* mark as in use */
 
@@ -909,8 +918,8 @@ bcm_mwbmap_free(struct bcm_mwbmap * mwbmap_hdl, uint32 bitix)
 	ASSERT(mwbmap_p->ifree <= mwbmap_p->total);
 
 	MWBMAP_DBG(("Lvl2: bitix<%02u> wordix<%02u>: %08x | %08x = %08x ifree %d",
-				bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) | bitmap,
-				mwbmap_p->ifree));
+	            bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) | bitmap,
+	            mwbmap_p->ifree));
 
 	*bitmap_p |= bitmap; /* mark as available */
 
@@ -939,7 +948,7 @@ bcm_mwbmap_free(struct bcm_mwbmap * mwbmap_hdl, uint32 bitix)
 		MWBMAP_ASSERT(count <= BCM_MWBMAP_BITS_WORD);
 
 		MWBMAP_DBG(("Lvl1: bitix<%02u> wordix<%02u>: %08x | %08x = %08x wfree %d",
-					bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) | bitmap, count));
+		            bitix, wordix, *bitmap_p, bitmap, (*bitmap_p) | bitmap, count));
 	}
 #endif /* BCM_MWBMAP_DEBUG */
 
@@ -959,7 +968,7 @@ bcm_mwbmap_free_cnt(struct bcm_mwbmap * mwbmap_hdl)
 
 	ASSERT(mwbmap_p->ifree >= 0);
 
-	return mwbmap_p->ifree;
+	return (uint32)mwbmap_p->ifree;
 }
 
 /* Determine whether an index is inuse or free */
@@ -991,8 +1000,8 @@ bcm_mwbmap_show(struct bcm_mwbmap * mwbmap_hdl)
 	mwbmap_p = BCM_MWBMAP_PTR(mwbmap_hdl);
 
 	printf("mwbmap_p %p wmaps %u imaps %u ifree %d total %u\n",
-		   OSL_OBFUSCATE_BUF((void *)mwbmap_p),
-		   mwbmap_p->wmaps, mwbmap_p->imaps, mwbmap_p->ifree, mwbmap_p->total);
+		OSL_OBFUSCATE_BUF((void *)mwbmap_p),
+	       mwbmap_p->wmaps, mwbmap_p->imaps, mwbmap_p->ifree, mwbmap_p->total);
 	for (ix = 0U; ix < mwbmap_p->wmaps; ix++) {
 		printf("\tWDMAP:%2u. 0x%08x\t", ix, mwbmap_p->wd_bitmap[ix]);
 		bcm_bitprint32(mwbmap_p->wd_bitmap[ix]);
@@ -1002,7 +1011,7 @@ bcm_mwbmap_show(struct bcm_mwbmap * mwbmap_hdl)
 #if defined(BCM_MWBMAP_USE_CNTSETBITS)
 		count = bcm_cntsetbits(mwbmap_p->id_bitmap[ix]);
 #else  /* ! BCM_MWBMAP_USE_CNTSETBITS */
-		count = mwbmap_p->wd_count[ix];
+		count = (uint32)mwbmap_p->wd_count[ix];
 		MWBMAP_ASSERT(count == bcm_cntsetbits(mwbmap_p->id_bitmap[ix]));
 #endif /* ! BCM_MWBMAP_USE_CNTSETBITS */
 		printf("\tIDMAP:%2u. 0x%08x %02u\t", ix, mwbmap_p->id_bitmap[ix], count);
@@ -1032,7 +1041,7 @@ bcm_mwbmap_audit(struct bcm_mwbmap * mwbmap_hdl)
 #if defined(BCM_MWBMAP_USE_CNTSETBITS)
 				count = bcm_cntsetbits(mwbmap_p->id_bitmap[idmap_ix]);
 #else  /* ! BCM_MWBMAP_USE_CNTSETBITS */
-				count = mwbmap_p->wd_count[idmap_ix];
+				count = (uint32)mwbmap_p->wd_count[idmap_ix];
 				ASSERT(count == bcm_cntsetbits(mwbmap_p->id_bitmap[idmap_ix]));
 #endif /* ! BCM_MWBMAP_USE_CNTSETBITS */
 				ASSERT(count != 0U);
@@ -1086,7 +1095,7 @@ id16_map_init(osl_t *osh, uint16 total_ids, uint16 start_val16)
 	 * with random values.
 	 */
 	ASSERT((start_val16 == ID16_UNDEFINED) ||
-		   (start_val16 + total_ids) < ID16_INVALID);
+	       (start_val16 + total_ids) < ID16_INVALID);
 
 	id16_map = (id16_map_t *) MALLOC(osh, ID16_MAP_SZ(total_ids));
 	if (id16_map == NULL) {
@@ -1169,7 +1178,7 @@ id16_map_clear(void * id16_map_hndl, uint16 total_ids, uint16 start_val16)
 	 * with random values.
 	 */
 	ASSERT((start_val16 == ID16_UNDEFINED) ||
-		   (start_val16 + total_ids) < ID16_INVALID);
+	       (start_val16 + total_ids) < ID16_INVALID);
 
 	id16_map = (id16_map_t *)id16_map_hndl;
 	if (id16_map == NULL) {
@@ -1213,7 +1222,9 @@ id16_map_alloc(void * id16_map_hndl)
 	id16_map_t * id16_map;
 
 	ASSERT(id16_map_hndl != NULL);
-
+	if (!id16_map_hndl) {
+		return ID16_INVALID;
+	}
 	id16_map = (id16_map_t *)id16_map_hndl;
 
 	ASSERT(id16_map->total > 0);
@@ -1228,7 +1239,7 @@ id16_map_alloc(void * id16_map_hndl)
 
 #if defined(BCM_DBG) && defined(BCM_DBG_ID16)
 	ASSERT((id16_map->start == ID16_UNDEFINED) ||
-		   (val16 < (id16_map->start + id16_map->total)));
+	       (val16 < (id16_map->start + id16_map->total)));
 
 	if (id16_map->dbg) { /* Validate val16 */
 		id16_map_dbg_t *id16_map_dbg = (id16_map_dbg_t *)id16_map->dbg;
@@ -1252,7 +1263,7 @@ id16_map_free(void * id16_map_hndl, uint16 val16)
 
 #if defined(BCM_DBG) && defined(BCM_DBG_ID16)
 	ASSERT((id16_map->start == ID16_UNDEFINED) ||
-		   (val16 < (id16_map->start + id16_map->total)));
+	       (val16 < (id16_map->start + id16_map->total)));
 
 	if (id16_map->dbg) { /* Validate val16 */
 		id16_map_dbg_t *id16_map_dbg = (id16_map_dbg_t *)id16_map->dbg;
@@ -1281,7 +1292,9 @@ id16_map_audit(void * id16_map_hndl)
 	id16_map_t * id16_map;
 
 	ASSERT(id16_map_hndl != NULL);
-
+	if (!id16_map_hndl) {
+		goto done;
+	}
 	id16_map = (id16_map_t *)id16_map_hndl;
 
 	ASSERT(id16_map->stack_idx >= -1);
@@ -1300,7 +1313,7 @@ id16_map_audit(void * id16_map_hndl)
 			if (((id16_map_dbg_t *)(id16_map->dbg))->avail[val16] != TRUE) {
 				insane |= 1;
 				ID16_MAP_MSG(("id16_map<%p>: stack_idx %u invalid val16 %u\n",
-							  OSL_OBFUSATE_BUF(id16_map_hndl), idx, val16));
+				              OSL_OBFUSATE_BUF(id16_map_hndl), idx, val16));
 			}
 		}
 #endif /* BCM_DBG && BCM_DBG_ID16 */
@@ -1316,8 +1329,8 @@ id16_map_audit(void * id16_map_hndl)
 		if (avail && (avail != (id16_map->stack_idx + 1))) {
 			insane |= 1;
 			ID16_MAP_MSG(("id16_map<%p>: avail %u stack_idx %u\n",
-						  OSL_OBFUSCATE_BUF(id16_map_hndl),
-						  avail, id16_map->stack_idx));
+			              OSL_OBFUSCATE_BUF(id16_map_hndl),
+			              avail, id16_map->stack_idx));
 		}
 	}
 #endif /* BCM_DBG && BCM_DBG_ID16 */
@@ -1331,25 +1344,25 @@ done:
 void
 dll_pool_detach(void * osh, dll_pool_t * pool, uint16 elems_max, uint16 elem_size)
 {
-	uint32 mem_size;
-	mem_size = sizeof(dll_pool_t) + (elems_max * elem_size);
+	uint32 memsize;
+	memsize = sizeof(dll_pool_t) + (elems_max * elem_size);
 	if (pool)
-		MFREE(osh, pool, mem_size);
+		MFREE(osh, pool, memsize);
 }
 dll_pool_t *
 dll_pool_init(void * osh, uint16 elems_max, uint16 elem_size)
 {
-	uint32 mem_size, i;
+	uint32 memsize, i;
 	dll_pool_t * dll_pool_p;
 	dll_t * elem_p;
 
 	ASSERT(elem_size > sizeof(dll_t));
 
-	mem_size = sizeof(dll_pool_t) + (elems_max * elem_size);
+	memsize = sizeof(dll_pool_t) + (elems_max * elem_size);
 
-	if ((dll_pool_p = (dll_pool_t *)MALLOCZ(osh, mem_size)) == NULL) {
+	if ((dll_pool_p = (dll_pool_t *)MALLOCZ(osh, memsize)) == NULL) {
 		printf("dll_pool_init: elems_max<%u> elem_size<%u> malloc failure\n",
-			   elems_max, elem_size);
+			elems_max, elem_size);
 		ASSERT(0);
 		return dll_pool_p;
 	}
@@ -1447,7 +1460,7 @@ bcm_bprintf(struct bcmstrbuf *b, const char *fmt, ...)
 	if ((r == -1) || (r >= (int)b->size)) {
 		b->size = 0;
 	} else {
-		b->size -= r;
+		b->size -= (uint)r;
 		b->buf += r;
 	}
 
@@ -1531,12 +1544,12 @@ bcm_find_vendor_ie(const  void *tlvs, uint tlvs_len, const char *voui, uint8 *ty
 	do {
 		ie_len = ie->len;
 		if ((ie->id == DOT11_MNG_VS_ID) &&
-				(ie_len >= (DOT11_OUI_LEN + type_len)) &&
-				!bcmp(ie->data, voui, DOT11_OUI_LEN))
+		    (ie_len >= (DOT11_OUI_LEN + type_len)) &&
+		    !bcmp(ie->data, voui, DOT11_OUI_LEN))
 		{
 			/* compare optional type */
 			if (type_len == 0 ||
-					!bcmp(&ie->data[DOT11_OUI_LEN], type, type_len)) {
+			    !bcmp(&ie->data[DOT11_OUI_LEN], type, type_len)) {
 				GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
 				return (bcm_tlv_t *)(ie);		/* a match */
 				GCC_DIAGNOSTIC_POP();
@@ -1568,7 +1581,7 @@ bcm_format_ssid(char* buf, const uchar ssid[], uint ssid_len)
 		} else if (bcm_isprint((uchar)c)) {
 			*p++ = (char)c;
 		} else {
-			p += snprintf(p, (endp - p), "\\x%02X", c);
+			p += snprintf(p, (size_t)(endp - p), "\\x%02X", c);
 		}
 	}
 	*p = '\0';
@@ -1584,10 +1597,10 @@ char *
 bcm_ether_ntoa(const struct ether_addr *ea, char *buf)
 {
 	static const char hex[] =
-	{
-		'0', '1', '2', '3', '4', '5', '6', '7',
-		'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-	};
+	  {
+		  '0', '1', '2', '3', '4', '5', '6', '7',
+		  '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+	  };
 	const uint8 *octet = ea->octet;
 	char *p = buf;
 	int i;
@@ -1598,7 +1611,7 @@ bcm_ether_ntoa(const struct ether_addr *ea, char *buf)
 		*p++ = ':';
 	}
 
-	*(p - 1) = '\0';
+	*(p-1) = '\0';
 
 	return (buf);
 }
@@ -1616,14 +1629,14 @@ bcm_find_fsb(uint32 num)
 		num >>= 1;
 		pos++;
 	}
-	return (pos + 1);
+	return (pos+1);
 }
 
 char *
 bcm_ip_ntoa(struct ipv4_addr *ia, char *buf)
 {
 	snprintf(buf, 16, "%d.%d.%d.%d",
-			 ia->addr[0], ia->addr[1], ia->addr[2], ia->addr[3]);
+	         ia->addr[0], ia->addr[1], ia->addr[2], ia->addr[3]);
 	return (buf);
 }
 
@@ -1639,7 +1652,7 @@ bcm_ipv6_ntoa(void *ipv6, char *buf)
 	uint8 *a4 = NULL;
 	memcpy((uint8 *)&tmp[0], (uint8 *)ipv6, IPV6_ADDR_LEN);
 
-	for (i = 0; i < IPV6_ADDR_LEN / 2; i++) {
+	for (i = 0; i < IPV6_ADDR_LEN/2; i++) {
 		if (a[i]) {
 			if (cnt > cnt_max) {
 				cnt_max = cnt;
@@ -1654,13 +1667,13 @@ bcm_ipv6_ntoa(void *ipv6, char *buf)
 		i_max = i - cnt;
 	}
 	if (i_max == 0 &&
-			/* IPv4-translated: ::ffff:0:a.b.c.d */
-			((cnt_max == 4 && a[4] == 0xffff && a[5] == 0) ||
-			 /* IPv4-mapped: ::ffff:a.b.c.d */
-			 (cnt_max == 5 && a[5] == 0xffff)))
+		/* IPv4-translated: ::ffff:0:a.b.c.d */
+		((cnt_max == 4 && a[4] == 0xffff && a[5] == 0) ||
+		/* IPv4-mapped: ::ffff:a.b.c.d */
+		(cnt_max == 5 && a[5] == 0xffff)))
 		a4 = (uint8*) (a + 6);
 
-	for (i = 0; i < IPV6_ADDR_LEN / 2; i++) {
+	for (i = 0; i < IPV6_ADDR_LEN/2; i++) {
 		if ((uint8*) (a + i) == a4) {
 			snprintf(p, 16, ":%u.%u.%u.%u", a4[0], a4[1], a4[2], a4[3]);
 			break;
@@ -1682,28 +1695,28 @@ bcm_ipv6_ntoa(void *ipv6, char *buf)
 #if !defined(BCMROMOFFLOAD_EXCLUDE_BCMUTILS_FUNCS)
 const unsigned char bcm_ctype[] = {
 
-	_BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C,			/* 0-7 */
-	_BCM_C, _BCM_C | _BCM_S, _BCM_C | _BCM_S, _BCM_C | _BCM_S, _BCM_C | _BCM_S, _BCM_C | _BCM_S, _BCM_C,
+	_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,			/* 0-7 */
+	_BCM_C, _BCM_C|_BCM_S, _BCM_C|_BCM_S, _BCM_C|_BCM_S, _BCM_C|_BCM_S, _BCM_C|_BCM_S, _BCM_C,
 	_BCM_C,	/* 8-15 */
-	_BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C,			/* 16-23 */
-	_BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C, _BCM_C,			/* 24-31 */
-	_BCM_S | _BCM_SP, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,		/* 32-39 */
-	_BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,			/* 40-47 */
-	_BCM_D, _BCM_D, _BCM_D, _BCM_D, _BCM_D, _BCM_D, _BCM_D, _BCM_D,			/* 48-55 */
-	_BCM_D, _BCM_D, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,			/* 56-63 */
-	_BCM_P, _BCM_U | _BCM_X, _BCM_U | _BCM_X, _BCM_U | _BCM_X, _BCM_U | _BCM_X, _BCM_U | _BCM_X,
-	_BCM_U | _BCM_X, _BCM_U, /* 64-71 */
-	_BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U,			/* 72-79 */
-	_BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U, _BCM_U,			/* 80-87 */
-	_BCM_U, _BCM_U, _BCM_U, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,			/* 88-95 */
-	_BCM_P, _BCM_L | _BCM_X, _BCM_L | _BCM_X, _BCM_L | _BCM_X, _BCM_L | _BCM_X, _BCM_L | _BCM_X,
-	_BCM_L | _BCM_X, _BCM_L, /* 96-103 */
-	_BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, /* 104-111 */
-	_BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, _BCM_L, /* 112-119 */
-	_BCM_L, _BCM_L, _BCM_L, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_C, /* 120-127 */
+	_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,			/* 16-23 */
+	_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,_BCM_C,			/* 24-31 */
+	_BCM_S|_BCM_SP,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,		/* 32-39 */
+	_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,			/* 40-47 */
+	_BCM_D,_BCM_D,_BCM_D,_BCM_D,_BCM_D,_BCM_D,_BCM_D,_BCM_D,			/* 48-55 */
+	_BCM_D,_BCM_D,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,			/* 56-63 */
+	_BCM_P, _BCM_U|_BCM_X, _BCM_U|_BCM_X, _BCM_U|_BCM_X, _BCM_U|_BCM_X, _BCM_U|_BCM_X,
+	_BCM_U|_BCM_X, _BCM_U, /* 64-71 */
+	_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,			/* 72-79 */
+	_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,_BCM_U,			/* 80-87 */
+	_BCM_U,_BCM_U,_BCM_U,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_P,			/* 88-95 */
+	_BCM_P, _BCM_L|_BCM_X, _BCM_L|_BCM_X, _BCM_L|_BCM_X, _BCM_L|_BCM_X, _BCM_L|_BCM_X,
+	_BCM_L|_BCM_X, _BCM_L, /* 96-103 */
+	_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L, /* 104-111 */
+	_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L,_BCM_L, /* 112-119 */
+	_BCM_L,_BCM_L,_BCM_L,_BCM_P,_BCM_P,_BCM_P,_BCM_P,_BCM_C, /* 120-127 */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,		/* 128-143 */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,		/* 144-159 */
-	_BCM_S | _BCM_SP, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,
+	_BCM_S|_BCM_SP, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,
 	_BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,	/* 160-175 */
 	_BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,
 	_BCM_P, _BCM_P, _BCM_P, _BCM_P, _BCM_P,	/* 176-191 */
@@ -1753,8 +1766,8 @@ bcm_strtoull(const char *cp, char **endp, uint base)
 	result = 0;
 
 	while (bcm_isxdigit(*cp) &&
-			(value = bcm_isdigit(*cp) ? *cp - '0' : bcm_toupper(*cp) - 'A' + 10) < base) {
-		result = result * base + value;
+	       (value = (uint64)(bcm_isdigit(*cp) ? *cp-'0' : bcm_toupper(*cp)-'A'+10)) < base) {
+		result = result*base + value;
 		/* Detected overflow */
 		if (result < last_result && !minus) {
 			if (endp) {
@@ -1764,7 +1777,7 @@ bcm_strtoull(const char *cp, char **endp, uint base)
 				}
 				*endp = DISCARD_QUAL(cp, char);
 			}
-			return (ulong) - 1;
+			return (ulong)-1;
 		}
 		last_result = result;
 		cp++;
@@ -1805,7 +1818,7 @@ bcmstrstr(const char *haystack, const char *needle)
 	len = (int)strlen(haystack) - nlen + 1;
 
 	for (i = 0; i < len; i++)
-		if (memcmp(needle, &haystack[i], nlen) == 0)
+		if (memcmp(needle, &haystack[i], (size_t)nlen) == 0)
 			return DISCARD_QUAL(&haystack[i], char);
 	return (NULL);
 }
@@ -1909,7 +1922,7 @@ bcmstrtok(char **string, const char *delimiters, char *tokdelim)
 	for (; *str; str++) {
 		if (map[*str >> 5] & (1 << (*str & 31))) {
 			if (tokdelim != NULL) {
-				*tokdelim = *str;
+				*tokdelim = (char)*str;
 			}
 
 			*str++ = '\0';
@@ -2005,7 +2018,7 @@ bcm_ether_atoe(const char *p, struct ether_addr *ea)
 	char *ep;
 
 	for (;;) {
-		ea->octet[i++] = (char) bcm_strtoul(p, &ep, 16);
+		ea->octet[i++] = (uint8) bcm_strtoul(p, &ep, 16);
 		p = ep;
 		if (!*p++ || i == 6)
 			break;
@@ -2050,7 +2063,7 @@ wchar2ascii(char *abuf, ushort *wbuf, ushort wbuflen, ulong abuflen)
 	for (i = 0; i < wbuflen; ++i) {
 		if (--abuflen == 0)
 			break;
-		*abuf++ = (char) * wbuf++;
+		*abuf++ = (char) *wbuf++;
 		++copyct;
 	}
 	*abuf = '\0';
@@ -2109,9 +2122,9 @@ bcm_object_trace_init(void)
 
 	for (i = 0; i < BCM_OBJDBG_COUNT; ++i) {
 		bcm_dbg_objs[i].next = (i == (BCM_OBJDBG_COUNT - 1)) ?
-							   dbgobj_freehead : &bcm_dbg_objs[i + 1];
+			dbgobj_freehead : &bcm_dbg_objs[i + 1];
 		bcm_dbg_objs[i].prior = (i == 0) ?
-								dbgobj_freetail : &bcm_dbg_objs[i - 1];
+			dbgobj_freetail : &bcm_dbg_objs[i - 1];
 	}
 }
 
@@ -2127,7 +2140,7 @@ bcm_object_trace_deinit(void)
 
 static void
 bcm_object_rm_list(struct bcm_dbgobj **head, struct bcm_dbgobj **tail,
-				   struct bcm_dbgobj *dbgobj)
+	struct bcm_dbgobj *dbgobj)
 {
 	if ((dbgobj == *head) && (dbgobj == *tail)) {
 		*head = NULL;
@@ -2143,7 +2156,7 @@ bcm_object_rm_list(struct bcm_dbgobj **head, struct bcm_dbgobj **tail,
 
 static void
 bcm_object_add_list(struct bcm_dbgobj **head, struct bcm_dbgobj **tail,
-					struct bcm_dbgobj *dbgobj, int addtotail)
+	struct bcm_dbgobj *dbgobj, int addtotail)
 {
 	if (!(*head) && !(*tail)) {
 		*head = dbgobj;
@@ -2166,7 +2179,7 @@ bcm_object_add_list(struct bcm_dbgobj **head, struct bcm_dbgobj **tail,
 
 static INLINE void
 bcm_object_movetoend(struct bcm_dbgobj **head, struct bcm_dbgobj **tail,
-					 struct bcm_dbgobj *dbgobj, int movetotail)
+	struct bcm_dbgobj *dbgobj, int movetotail)
 {
 	if ((*head) && (*tail)) {
 		if (movetotail == BCM_OBJDBG_ADDTOTAIL) {
@@ -2195,15 +2208,15 @@ bcm_object_trace_opr(void *obj, uint32 opt, const char *caller, int line)
 	BCM_OBJDBG_LOCK(&dbgobj_lock, flags);
 
 	if (opt == BCM_OBJDBG_ADD_PKT ||
-			opt == BCM_OBJDBG_ADD) {
+		opt == BCM_OBJDBG_ADD) {
 		dbgobj = dbgobj_objtail;
 		while (dbgobj) {
 			if (dbgobj->obj == obj) {
 				printf("%s: obj %p allocated from %s(%d),"
-					   " allocate again from %s(%d)\n",
-					   __FUNCTION__, dbgobj->obj,
-					   dbgobj->caller, dbgobj->line,
-					   caller, line);
+					" allocate again from %s(%d)\n",
+					__FUNCTION__, dbgobj->obj,
+					dbgobj->caller, dbgobj->line,
+					caller, line);
 				ASSERT(0);
 				goto EXIT;
 			}
@@ -2230,7 +2243,7 @@ FREED_ENTRY_FOUND:
 #endif /* BCM_OBJECT_MERGE_SAME_OBJ */
 		if (!dbgobj) {
 			printf("%s: already got %d objects ?????????????????????\n",
-				   __FUNCTION__, BCM_OBJDBG_COUNT);
+				__FUNCTION__, BCM_OBJDBG_COUNT);
 			ASSERT(0);
 			goto EXIT;
 		}
@@ -2238,7 +2251,7 @@ FREED_ENTRY_FOUND:
 		bcm_object_rm_list(&dbgobj_freehead, &dbgobj_freetail, dbgobj);
 		dbgobj->obj = obj;
 		strncpy(dbgobj->caller, caller, BCM_OBJDBG_CALLER_LEN);
-		dbgobj->caller[BCM_OBJDBG_CALLER_LEN - 1] = '\0';
+		dbgobj->caller[BCM_OBJDBG_CALLER_LEN-1] = '\0';
 		dbgobj->line = line;
 		dbgobj->flag = 0;
 		if (opt == BCM_OBJDBG_ADD_PKT) {
@@ -2250,7 +2263,7 @@ FREED_ENTRY_FOUND:
 			*(uint32*)PKTTAG(obj) = dbgobj->obj_sn;
 		}
 		bcm_object_add_list(&dbgobj_objhead, &dbgobj_objtail, dbgobj,
-							BCM_OBJDBG_ADDTOTAIL);
+			BCM_OBJDBG_ADDTOTAIL);
 
 		dbgobj_count++;
 
@@ -2260,15 +2273,15 @@ FREED_ENTRY_FOUND:
 			if (dbgobj->obj == obj) {
 				if (dbgobj->flag) {
 					printf("%s: rm flagged obj %p flag 0x%08x from %s(%d)\n",
-						   __FUNCTION__, obj, dbgobj->flag, caller, line);
+						__FUNCTION__, obj, dbgobj->flag, caller, line);
 				}
 				bcm_object_rm_list(&dbgobj_objhead, &dbgobj_objtail, dbgobj);
 				memset(dbgobj->caller, 0x00, BCM_OBJDBG_CALLER_LEN);
 				strncpy(dbgobj->caller, caller, BCM_OBJDBG_CALLER_LEN);
-				dbgobj->caller[BCM_OBJDBG_CALLER_LEN - 1] = '\0';
+				dbgobj->caller[BCM_OBJDBG_CALLER_LEN-1] = '\0';
 				dbgobj->line = line;
 				bcm_object_add_list(&dbgobj_freehead, &dbgobj_freetail, dbgobj,
-									BCM_OBJDBG_ADDTOTAIL);
+					BCM_OBJDBG_ADDTOTAIL);
 				dbgobj_count--;
 				goto EXIT;
 			}
@@ -2281,10 +2294,10 @@ FREED_ENTRY_FOUND:
 		while (dbgobj && dbgobj->obj) {
 			if (dbgobj->obj == obj) {
 				printf("%s: obj %p already freed from from %s(%d),"
-					   " try free again from %s(%d)\n",
-					   __FUNCTION__, obj,
-					   dbgobj->caller, dbgobj->line,
-					   caller, line);
+					" try free again from %s(%d)\n",
+					__FUNCTION__, obj,
+					dbgobj->caller, dbgobj->line,
+					caller, line);
 				//ASSERT(0); /* release same obj more than one time? */
 				goto EXIT;
 			}
@@ -2294,7 +2307,7 @@ FREED_ENTRY_FOUND:
 		}
 
 		printf("%s: ################### release none-existing obj %p from %s(%d)\n",
-			   __FUNCTION__, obj, caller, line);
+			__FUNCTION__, obj, caller, line);
 		//ASSERT(0); /* release same obj more than one time? */
 
 	}
@@ -2319,7 +2332,7 @@ bcm_object_trace_upd(void *obj, void *obj_new)
 			dbgobj->obj = obj_new;
 			if (dbgobj != dbgobj_objtail) {
 				bcm_object_movetoend(&dbgobj_objhead, &dbgobj_objtail,
-									 dbgobj, BCM_OBJDBG_ADDTOTAIL);
+					dbgobj, BCM_OBJDBG_ADDTOTAIL);
 			}
 			goto EXIT;
 		}
@@ -2335,7 +2348,7 @@ EXIT:
 
 void
 bcm_object_trace_chk(void *obj, uint32 chksn, uint32 sn,
-					 const char *caller, int line)
+	const char *caller, int line)
 {
 	struct bcm_dbgobj *dbgobj;
 	unsigned long flags;
@@ -2346,10 +2359,10 @@ bcm_object_trace_chk(void *obj, uint32 chksn, uint32 sn,
 	dbgobj = dbgobj_objtail;
 	while (dbgobj) {
 		if ((dbgobj->obj == obj) &&
-				((!chksn) || (dbgobj->obj_sn == sn))) {
+			((!chksn) || (dbgobj->obj_sn == sn))) {
 			if (dbgobj != dbgobj_objtail) {
 				bcm_object_movetoend(&dbgobj_objhead, &dbgobj_objtail,
-									 dbgobj, BCM_OBJDBG_ADDTOTAIL);
+					dbgobj, BCM_OBJDBG_ADDTOTAIL);
 			}
 			goto EXIT;
 		}
@@ -2361,11 +2374,11 @@ bcm_object_trace_chk(void *obj, uint32 chksn, uint32 sn,
 	dbgobj = dbgobj_freetail;
 	while (dbgobj) {
 		if ((dbgobj->obj == obj) &&
-				((!chksn) || (dbgobj->obj_sn == sn))) {
+			((!chksn) || (dbgobj->obj_sn == sn))) {
 			printf("%s: (%s:%d) obj %p (sn %d state %d) was freed from %s(%d)\n",
-				   __FUNCTION__, caller, line,
-				   dbgobj->obj, dbgobj->obj_sn, dbgobj->obj_state,
-				   dbgobj->caller, dbgobj->line);
+				__FUNCTION__, caller, line,
+				dbgobj->obj, dbgobj->obj_sn, dbgobj->obj_state,
+				dbgobj->caller, dbgobj->line);
 			goto EXIT;
 		}
 		else if (dbgobj->obj == NULL) {
@@ -2377,12 +2390,12 @@ bcm_object_trace_chk(void *obj, uint32 chksn, uint32 sn,
 	}
 
 	printf("%s: obj %p not found, check from %s(%d), chksn %s, sn %d\n",
-		   __FUNCTION__, obj, caller, line, chksn ? "yes" : "no", sn);
+		__FUNCTION__, obj, caller, line, chksn ? "yes" : "no", sn);
 	dbgobj = dbgobj_objtail;
 	while (dbgobj) {
 		printf("%s: (%s:%d) obj %p sn %d was allocated from %s(%d)\n",
-			   __FUNCTION__, caller, line,
-			   dbgobj->obj, dbgobj->obj_sn, dbgobj->caller, dbgobj->line);
+				__FUNCTION__, caller, line,
+				dbgobj->obj, dbgobj->obj_sn, dbgobj->caller, dbgobj->line);
 		dbgobj = dbgobj->prior;
 		if (dbgobj == dbgobj_objtail)
 			break;
@@ -2415,7 +2428,7 @@ bcm_object_feature_set(void *obj, uint32 type, uint32 value)
 			}
 			if (dbgobj != dbgobj_objtail) {
 				bcm_object_movetoend(&dbgobj_objhead, &dbgobj_objtail,
-									 dbgobj, BCM_OBJDBG_ADDTOTAIL);
+					dbgobj, BCM_OBJDBG_ADDTOTAIL);
 			}
 			goto EXIT;
 		}
@@ -2450,7 +2463,7 @@ bcm_object_feature_get(void *obj, uint32 type, uint32 value)
 			}
 			if (dbgobj != dbgobj_objtail) {
 				bcm_object_movetoend(&dbgobj_objhead, &dbgobj_objtail,
-									 dbgobj, BCM_OBJDBG_ADDTOTAIL);
+					dbgobj, BCM_OBJDBG_ADDTOTAIL);
 			}
 			goto EXIT;
 		}
@@ -2493,8 +2506,8 @@ bcm_write_tlv(int type, const void *data, int datalen, uint8 *dst)
 	 * (this last condition detects datalen > 0 with a NULL data pointer)
 	 */
 	if ((dst != NULL) &&
-			((datalen >= 0) && (datalen <= BCM_TLV_MAX_DATA_SIZE)) &&
-			((data != NULL) || (datalen == 0))) {
+	    ((datalen >= 0) && (datalen <= BCM_TLV_MAX_DATA_SIZE)) &&
+	    ((data != NULL) || (datalen == 0))) {
 
 		/* write type, len fields */
 		dst_tlv->id = (uint8)type;
@@ -2505,7 +2518,7 @@ bcm_write_tlv(int type, const void *data, int datalen, uint8 *dst)
 		 */
 		if (datalen > 0) {
 
-			memcpy(dst_tlv->data, data, datalen);
+			memcpy(dst_tlv->data, data, (size_t)datalen);
 		}
 
 		/* update the output destination poitner to point past
@@ -2541,8 +2554,8 @@ bcm_write_tlv_ext(uint8 type, uint8 ext, const void *data, uint8 datalen, uint8 
 	 * (this last condition detects datalen > 0 with a NULL data pointer)
 	 */
 	if ((dst != NULL) &&
-			(datalen <= BCM_TLV_EXT_MAX_DATA_SIZE) &&
-			((data != NULL) || (datalen == 0))) {
+	    (datalen <= BCM_TLV_EXT_MAX_DATA_SIZE) &&
+	    ((data != NULL) || (datalen == 0))) {
 
 		/* write type, len fields */
 		dst_tlv->id = (uint8)type;
@@ -2575,7 +2588,7 @@ bcm_write_tlv_safe(int type, const void *data, int datalen, uint8 *dst, int dst_
 		/* if len + tlv hdr len is more than destlen, don't do anything
 		 * just return the buffer untouched
 		 */
-		if ((int)(datalen + BCM_TLV_HDR_SIZE) <= dst_maxlen) {
+		if ((int)(datalen + (int)BCM_TLV_HDR_SIZE) <= dst_maxlen) {
 
 			new_dst = bcm_write_tlv(type, data, datalen, dst);
 		}
@@ -2641,38 +2654,38 @@ uint8 *bcm_copy_tlv_safe(const void *src, uint8 *dst, int dst_maxlen)
  */
 
 static const uint8 crc8_table[256] = {
-	0x00, 0xF7, 0xB9, 0x4E, 0x25, 0xD2, 0x9C, 0x6B,
-	0x4A, 0xBD, 0xF3, 0x04, 0x6F, 0x98, 0xD6, 0x21,
-	0x94, 0x63, 0x2D, 0xDA, 0xB1, 0x46, 0x08, 0xFF,
-	0xDE, 0x29, 0x67, 0x90, 0xFB, 0x0C, 0x42, 0xB5,
-	0x7F, 0x88, 0xC6, 0x31, 0x5A, 0xAD, 0xE3, 0x14,
-	0x35, 0xC2, 0x8C, 0x7B, 0x10, 0xE7, 0xA9, 0x5E,
-	0xEB, 0x1C, 0x52, 0xA5, 0xCE, 0x39, 0x77, 0x80,
-	0xA1, 0x56, 0x18, 0xEF, 0x84, 0x73, 0x3D, 0xCA,
-	0xFE, 0x09, 0x47, 0xB0, 0xDB, 0x2C, 0x62, 0x95,
-	0xB4, 0x43, 0x0D, 0xFA, 0x91, 0x66, 0x28, 0xDF,
-	0x6A, 0x9D, 0xD3, 0x24, 0x4F, 0xB8, 0xF6, 0x01,
-	0x20, 0xD7, 0x99, 0x6E, 0x05, 0xF2, 0xBC, 0x4B,
-	0x81, 0x76, 0x38, 0xCF, 0xA4, 0x53, 0x1D, 0xEA,
-	0xCB, 0x3C, 0x72, 0x85, 0xEE, 0x19, 0x57, 0xA0,
-	0x15, 0xE2, 0xAC, 0x5B, 0x30, 0xC7, 0x89, 0x7E,
-	0x5F, 0xA8, 0xE6, 0x11, 0x7A, 0x8D, 0xC3, 0x34,
-	0xAB, 0x5C, 0x12, 0xE5, 0x8E, 0x79, 0x37, 0xC0,
-	0xE1, 0x16, 0x58, 0xAF, 0xC4, 0x33, 0x7D, 0x8A,
-	0x3F, 0xC8, 0x86, 0x71, 0x1A, 0xED, 0xA3, 0x54,
-	0x75, 0x82, 0xCC, 0x3B, 0x50, 0xA7, 0xE9, 0x1E,
-	0xD4, 0x23, 0x6D, 0x9A, 0xF1, 0x06, 0x48, 0xBF,
-	0x9E, 0x69, 0x27, 0xD0, 0xBB, 0x4C, 0x02, 0xF5,
-	0x40, 0xB7, 0xF9, 0x0E, 0x65, 0x92, 0xDC, 0x2B,
-	0x0A, 0xFD, 0xB3, 0x44, 0x2F, 0xD8, 0x96, 0x61,
-	0x55, 0xA2, 0xEC, 0x1B, 0x70, 0x87, 0xC9, 0x3E,
-	0x1F, 0xE8, 0xA6, 0x51, 0x3A, 0xCD, 0x83, 0x74,
-	0xC1, 0x36, 0x78, 0x8F, 0xE4, 0x13, 0x5D, 0xAA,
-	0x8B, 0x7C, 0x32, 0xC5, 0xAE, 0x59, 0x17, 0xE0,
-	0x2A, 0xDD, 0x93, 0x64, 0x0F, 0xF8, 0xB6, 0x41,
-	0x60, 0x97, 0xD9, 0x2E, 0x45, 0xB2, 0xFC, 0x0B,
-	0xBE, 0x49, 0x07, 0xF0, 0x9B, 0x6C, 0x22, 0xD5,
-	0xF4, 0x03, 0x4D, 0xBA, 0xD1, 0x26, 0x68, 0x9F
+    0x00, 0xF7, 0xB9, 0x4E, 0x25, 0xD2, 0x9C, 0x6B,
+    0x4A, 0xBD, 0xF3, 0x04, 0x6F, 0x98, 0xD6, 0x21,
+    0x94, 0x63, 0x2D, 0xDA, 0xB1, 0x46, 0x08, 0xFF,
+    0xDE, 0x29, 0x67, 0x90, 0xFB, 0x0C, 0x42, 0xB5,
+    0x7F, 0x88, 0xC6, 0x31, 0x5A, 0xAD, 0xE3, 0x14,
+    0x35, 0xC2, 0x8C, 0x7B, 0x10, 0xE7, 0xA9, 0x5E,
+    0xEB, 0x1C, 0x52, 0xA5, 0xCE, 0x39, 0x77, 0x80,
+    0xA1, 0x56, 0x18, 0xEF, 0x84, 0x73, 0x3D, 0xCA,
+    0xFE, 0x09, 0x47, 0xB0, 0xDB, 0x2C, 0x62, 0x95,
+    0xB4, 0x43, 0x0D, 0xFA, 0x91, 0x66, 0x28, 0xDF,
+    0x6A, 0x9D, 0xD3, 0x24, 0x4F, 0xB8, 0xF6, 0x01,
+    0x20, 0xD7, 0x99, 0x6E, 0x05, 0xF2, 0xBC, 0x4B,
+    0x81, 0x76, 0x38, 0xCF, 0xA4, 0x53, 0x1D, 0xEA,
+    0xCB, 0x3C, 0x72, 0x85, 0xEE, 0x19, 0x57, 0xA0,
+    0x15, 0xE2, 0xAC, 0x5B, 0x30, 0xC7, 0x89, 0x7E,
+    0x5F, 0xA8, 0xE6, 0x11, 0x7A, 0x8D, 0xC3, 0x34,
+    0xAB, 0x5C, 0x12, 0xE5, 0x8E, 0x79, 0x37, 0xC0,
+    0xE1, 0x16, 0x58, 0xAF, 0xC4, 0x33, 0x7D, 0x8A,
+    0x3F, 0xC8, 0x86, 0x71, 0x1A, 0xED, 0xA3, 0x54,
+    0x75, 0x82, 0xCC, 0x3B, 0x50, 0xA7, 0xE9, 0x1E,
+    0xD4, 0x23, 0x6D, 0x9A, 0xF1, 0x06, 0x48, 0xBF,
+    0x9E, 0x69, 0x27, 0xD0, 0xBB, 0x4C, 0x02, 0xF5,
+    0x40, 0xB7, 0xF9, 0x0E, 0x65, 0x92, 0xDC, 0x2B,
+    0x0A, 0xFD, 0xB3, 0x44, 0x2F, 0xD8, 0x96, 0x61,
+    0x55, 0xA2, 0xEC, 0x1B, 0x70, 0x87, 0xC9, 0x3E,
+    0x1F, 0xE8, 0xA6, 0x51, 0x3A, 0xCD, 0x83, 0x74,
+    0xC1, 0x36, 0x78, 0x8F, 0xE4, 0x13, 0x5D, 0xAA,
+    0x8B, 0x7C, 0x32, 0xC5, 0xAE, 0x59, 0x17, 0xE0,
+    0x2A, 0xDD, 0x93, 0x64, 0x0F, 0xF8, 0xB6, 0x41,
+    0x60, 0x97, 0xD9, 0x2E, 0x45, 0xB2, 0xFC, 0x0B,
+    0xBE, 0x49, 0x07, 0xF0, 0x9B, 0x6C, 0x22, 0xD5,
+    0xF4, 0x03, 0x4D, 0xBA, 0xD1, 0x26, 0x68, 0x9F
 };
 
 #define CRC_INNER_LOOP(n, c, x) \
@@ -2717,45 +2730,45 @@ hndcrc8(
  */
 
 static const uint16 crc16_table[256] = {
-	0x0000, 0x1189, 0x2312, 0x329B, 0x4624, 0x57AD, 0x6536, 0x74BF,
-	0x8C48, 0x9DC1, 0xAF5A, 0xBED3, 0xCA6C, 0xDBE5, 0xE97E, 0xF8F7,
-	0x1081, 0x0108, 0x3393, 0x221A, 0x56A5, 0x472C, 0x75B7, 0x643E,
-	0x9CC9, 0x8D40, 0xBFDB, 0xAE52, 0xDAED, 0xCB64, 0xF9FF, 0xE876,
-	0x2102, 0x308B, 0x0210, 0x1399, 0x6726, 0x76AF, 0x4434, 0x55BD,
-	0xAD4A, 0xBCC3, 0x8E58, 0x9FD1, 0xEB6E, 0xFAE7, 0xC87C, 0xD9F5,
-	0x3183, 0x200A, 0x1291, 0x0318, 0x77A7, 0x662E, 0x54B5, 0x453C,
-	0xBDCB, 0xAC42, 0x9ED9, 0x8F50, 0xFBEF, 0xEA66, 0xD8FD, 0xC974,
-	0x4204, 0x538D, 0x6116, 0x709F, 0x0420, 0x15A9, 0x2732, 0x36BB,
-	0xCE4C, 0xDFC5, 0xED5E, 0xFCD7, 0x8868, 0x99E1, 0xAB7A, 0xBAF3,
-	0x5285, 0x430C, 0x7197, 0x601E, 0x14A1, 0x0528, 0x37B3, 0x263A,
-	0xDECD, 0xCF44, 0xFDDF, 0xEC56, 0x98E9, 0x8960, 0xBBFB, 0xAA72,
-	0x6306, 0x728F, 0x4014, 0x519D, 0x2522, 0x34AB, 0x0630, 0x17B9,
-	0xEF4E, 0xFEC7, 0xCC5C, 0xDDD5, 0xA96A, 0xB8E3, 0x8A78, 0x9BF1,
-	0x7387, 0x620E, 0x5095, 0x411C, 0x35A3, 0x242A, 0x16B1, 0x0738,
-	0xFFCF, 0xEE46, 0xDCDD, 0xCD54, 0xB9EB, 0xA862, 0x9AF9, 0x8B70,
-	0x8408, 0x9581, 0xA71A, 0xB693, 0xC22C, 0xD3A5, 0xE13E, 0xF0B7,
-	0x0840, 0x19C9, 0x2B52, 0x3ADB, 0x4E64, 0x5FED, 0x6D76, 0x7CFF,
-	0x9489, 0x8500, 0xB79B, 0xA612, 0xD2AD, 0xC324, 0xF1BF, 0xE036,
-	0x18C1, 0x0948, 0x3BD3, 0x2A5A, 0x5EE5, 0x4F6C, 0x7DF7, 0x6C7E,
-	0xA50A, 0xB483, 0x8618, 0x9791, 0xE32E, 0xF2A7, 0xC03C, 0xD1B5,
-	0x2942, 0x38CB, 0x0A50, 0x1BD9, 0x6F66, 0x7EEF, 0x4C74, 0x5DFD,
-	0xB58B, 0xA402, 0x9699, 0x8710, 0xF3AF, 0xE226, 0xD0BD, 0xC134,
-	0x39C3, 0x284A, 0x1AD1, 0x0B58, 0x7FE7, 0x6E6E, 0x5CF5, 0x4D7C,
-	0xC60C, 0xD785, 0xE51E, 0xF497, 0x8028, 0x91A1, 0xA33A, 0xB2B3,
-	0x4A44, 0x5BCD, 0x6956, 0x78DF, 0x0C60, 0x1DE9, 0x2F72, 0x3EFB,
-	0xD68D, 0xC704, 0xF59F, 0xE416, 0x90A9, 0x8120, 0xB3BB, 0xA232,
-	0x5AC5, 0x4B4C, 0x79D7, 0x685E, 0x1CE1, 0x0D68, 0x3FF3, 0x2E7A,
-	0xE70E, 0xF687, 0xC41C, 0xD595, 0xA12A, 0xB0A3, 0x8238, 0x93B1,
-	0x6B46, 0x7ACF, 0x4854, 0x59DD, 0x2D62, 0x3CEB, 0x0E70, 0x1FF9,
-	0xF78F, 0xE606, 0xD49D, 0xC514, 0xB1AB, 0xA022, 0x92B9, 0x8330,
-	0x7BC7, 0x6A4E, 0x58D5, 0x495C, 0x3DE3, 0x2C6A, 0x1EF1, 0x0F78
+    0x0000, 0x1189, 0x2312, 0x329B, 0x4624, 0x57AD, 0x6536, 0x74BF,
+    0x8C48, 0x9DC1, 0xAF5A, 0xBED3, 0xCA6C, 0xDBE5, 0xE97E, 0xF8F7,
+    0x1081, 0x0108, 0x3393, 0x221A, 0x56A5, 0x472C, 0x75B7, 0x643E,
+    0x9CC9, 0x8D40, 0xBFDB, 0xAE52, 0xDAED, 0xCB64, 0xF9FF, 0xE876,
+    0x2102, 0x308B, 0x0210, 0x1399, 0x6726, 0x76AF, 0x4434, 0x55BD,
+    0xAD4A, 0xBCC3, 0x8E58, 0x9FD1, 0xEB6E, 0xFAE7, 0xC87C, 0xD9F5,
+    0x3183, 0x200A, 0x1291, 0x0318, 0x77A7, 0x662E, 0x54B5, 0x453C,
+    0xBDCB, 0xAC42, 0x9ED9, 0x8F50, 0xFBEF, 0xEA66, 0xD8FD, 0xC974,
+    0x4204, 0x538D, 0x6116, 0x709F, 0x0420, 0x15A9, 0x2732, 0x36BB,
+    0xCE4C, 0xDFC5, 0xED5E, 0xFCD7, 0x8868, 0x99E1, 0xAB7A, 0xBAF3,
+    0x5285, 0x430C, 0x7197, 0x601E, 0x14A1, 0x0528, 0x37B3, 0x263A,
+    0xDECD, 0xCF44, 0xFDDF, 0xEC56, 0x98E9, 0x8960, 0xBBFB, 0xAA72,
+    0x6306, 0x728F, 0x4014, 0x519D, 0x2522, 0x34AB, 0x0630, 0x17B9,
+    0xEF4E, 0xFEC7, 0xCC5C, 0xDDD5, 0xA96A, 0xB8E3, 0x8A78, 0x9BF1,
+    0x7387, 0x620E, 0x5095, 0x411C, 0x35A3, 0x242A, 0x16B1, 0x0738,
+    0xFFCF, 0xEE46, 0xDCDD, 0xCD54, 0xB9EB, 0xA862, 0x9AF9, 0x8B70,
+    0x8408, 0x9581, 0xA71A, 0xB693, 0xC22C, 0xD3A5, 0xE13E, 0xF0B7,
+    0x0840, 0x19C9, 0x2B52, 0x3ADB, 0x4E64, 0x5FED, 0x6D76, 0x7CFF,
+    0x9489, 0x8500, 0xB79B, 0xA612, 0xD2AD, 0xC324, 0xF1BF, 0xE036,
+    0x18C1, 0x0948, 0x3BD3, 0x2A5A, 0x5EE5, 0x4F6C, 0x7DF7, 0x6C7E,
+    0xA50A, 0xB483, 0x8618, 0x9791, 0xE32E, 0xF2A7, 0xC03C, 0xD1B5,
+    0x2942, 0x38CB, 0x0A50, 0x1BD9, 0x6F66, 0x7EEF, 0x4C74, 0x5DFD,
+    0xB58B, 0xA402, 0x9699, 0x8710, 0xF3AF, 0xE226, 0xD0BD, 0xC134,
+    0x39C3, 0x284A, 0x1AD1, 0x0B58, 0x7FE7, 0x6E6E, 0x5CF5, 0x4D7C,
+    0xC60C, 0xD785, 0xE51E, 0xF497, 0x8028, 0x91A1, 0xA33A, 0xB2B3,
+    0x4A44, 0x5BCD, 0x6956, 0x78DF, 0x0C60, 0x1DE9, 0x2F72, 0x3EFB,
+    0xD68D, 0xC704, 0xF59F, 0xE416, 0x90A9, 0x8120, 0xB3BB, 0xA232,
+    0x5AC5, 0x4B4C, 0x79D7, 0x685E, 0x1CE1, 0x0D68, 0x3FF3, 0x2E7A,
+    0xE70E, 0xF687, 0xC41C, 0xD595, 0xA12A, 0xB0A3, 0x8238, 0x93B1,
+    0x6B46, 0x7ACF, 0x4854, 0x59DD, 0x2D62, 0x3CEB, 0x0E70, 0x1FF9,
+    0xF78F, 0xE606, 0xD49D, 0xC514, 0xB1AB, 0xA022, 0x92B9, 0x8330,
+    0x7BC7, 0x6A4E, 0x58D5, 0x495C, 0x3DE3, 0x2C6A, 0x1EF1, 0x0F78
 };
 
 uint16
 hndcrc16(
-	const uint8 *pdata,  /* pointer to array of data to process */
-	uint nbytes, /* number of input data bytes to process */
-	uint16 crc     /* either CRC16_INIT_VALUE or previous return value */
+    const uint8 *pdata,  /* pointer to array of data to process */
+    uint nbytes, /* number of input data bytes to process */
+    uint16 crc     /* either CRC16_INIT_VALUE or previous return value */
 )
 {
 	while (nbytes-- > 0)
@@ -2764,70 +2777,70 @@ hndcrc16(
 }
 
 static const uint32 crc32_table[256] = {
-	0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
-	0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
-	0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988,
-	0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
-	0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE,
-	0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
-	0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC,
-	0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
-	0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172,
-	0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
-	0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940,
-	0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
-	0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116,
-	0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
-	0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924,
-	0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
-	0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A,
-	0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
-	0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818,
-	0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
-	0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E,
-	0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
-	0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C,
-	0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
-	0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2,
-	0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
-	0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0,
-	0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
-	0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086,
-	0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
-	0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4,
-	0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
-	0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A,
-	0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
-	0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8,
-	0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
-	0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE,
-	0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
-	0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC,
-	0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
-	0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252,
-	0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
-	0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60,
-	0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
-	0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236,
-	0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
-	0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04,
-	0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
-	0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A,
-	0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
-	0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38,
-	0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
-	0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E,
-	0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
-	0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C,
-	0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
-	0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2,
-	0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
-	0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0,
-	0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
-	0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6,
-	0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
-	0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
-	0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
+    0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
+    0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
+    0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988,
+    0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
+    0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE,
+    0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
+    0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC,
+    0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
+    0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172,
+    0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
+    0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940,
+    0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
+    0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116,
+    0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
+    0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924,
+    0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
+    0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A,
+    0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
+    0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818,
+    0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
+    0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E,
+    0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
+    0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C,
+    0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
+    0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2,
+    0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
+    0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0,
+    0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
+    0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086,
+    0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
+    0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4,
+    0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
+    0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A,
+    0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
+    0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8,
+    0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
+    0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE,
+    0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
+    0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC,
+    0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
+    0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252,
+    0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
+    0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60,
+    0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
+    0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236,
+    0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
+    0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04,
+    0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
+    0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A,
+    0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
+    0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38,
+    0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
+    0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E,
+    0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
+    0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C,
+    0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
+    0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2,
+    0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
+    0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0,
+    0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
+    0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6,
+    0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
+    0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
+    0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
 };
 
 /*
@@ -2858,25 +2871,25 @@ testcrc32(void)
 	uint len[CNBUFS];
 	uint32 crcr;
 	uint32 crc32tv[CNBUFS] =
-	{0xd2cb1faa, 0xd385c8fa, 0xf5b4f3f3, 0x55789e20, 0x00343110};
+		{0xd2cb1faa, 0xd385c8fa, 0xf5b4f3f3, 0x55789e20, 0x00343110};
 
-	ASSERT((buf = MALLOC(CBUFSIZ * CNBUFS)) != NULL);
+	ASSERT((buf = MALLOC(CBUFSIZ*CNBUFS)) != NULL);
 
 	/* step through all possible alignments */
 	for (l = 0; l <= 4; l++) {
 		for (j = 0; j < CNBUFS; j++) {
 			len[j] = CLEN;
 			for (k = 0; k < len[j]; k++)
-				*(buf + j * CBUFSIZ + (k + l)) = (j + k) & 0xff;
+				*(buf + j*CBUFSIZ + (k+l)) = (j+k) & 0xff;
 		}
 
 		for (j = 0; j < CNBUFS; j++) {
-			crcr = crc32(buf + j * CBUFSIZ + l, len[j], CRC32_INIT_VALUE);
+			crcr = crc32(buf + j*CBUFSIZ + l, len[j], CRC32_INIT_VALUE);
 			ASSERT(crcr == crc32tv[j]);
 		}
 	}
 
-	MFREE(buf, CBUFSIZ * CNBUFS);
+	MFREE(buf, CBUFSIZ*CNBUFS);
 	return;
 }
 #endif /* notdef */
@@ -2912,6 +2925,109 @@ bcm_next_tlv(const  bcm_tlv_t *elt, uint *buflen)
 	GCC_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
 	return (bcm_tlv_t *)(elt);
 	GCC_DIAGNOSTIC_POP();
+}
+
+/**
+ * Advance a const tlv buffer pointer and length up to the given tlv element pointer
+ * 'elt'.  The function checks that elt is a valid tlv; the elt pointer and data
+ * are all in the range of the buffer/length.
+ *
+ * @param elt      pointer to a valid bcm_tlv_t in the buffer
+ * @param buffer   pointer to a tlv buffer
+ * @param buflen   length of the buffer in bytes
+ *
+ * On return, if elt is not a tlv in the buffer bounds, the *buffer parameter
+ * will be set to NULL and *buflen parameter will be set to zero.  Otherwise,
+ * *buffer will point to elt, and *buflen will have been adjusted by the the
+ * difference between *buffer and elt.
+ */
+void
+bcm_tlv_buffer_advance_to(const bcm_tlv_t *elt, const uint8 **buffer, uint *buflen)
+{
+	uint new_buflen;
+	const uint8 *new_buffer;
+
+	new_buffer = (const uint8*)elt;
+
+	/* make sure the input buffer pointer is non-null, that (buffer + buflen) does not wrap,
+	 * and that the elt pointer is in the range of [buffer, buffer + buflen]
+	 */
+	if ((*buffer != NULL) &&
+	    ((uintptr)*buffer < ((uintptr)*buffer + *buflen)) &&
+	    (new_buffer >= *buffer) &&
+	    (new_buffer < (*buffer + *buflen))) {
+		/* delta between buffer and new_buffer is <= *buflen, so truncating cast to uint
+		 * from ptrdiff is ok
+		 */
+		uint delta = (uint)(new_buffer - *buffer);
+
+		/* New buffer length is old len minus the delta from the buffer start to elt.
+		 * The check just above guarantees that the subtractions does not underflow.
+		 */
+		new_buflen = *buflen - delta;
+
+		/* validate current elt */
+		if (bcm_valid_tlv(elt, new_buflen)) {
+			/* All good, so update the input/output parameters */
+			*buffer = new_buffer;
+			*buflen = new_buflen;
+			return;
+		}
+	}
+
+	/* something did not check out, clear out the buffer info */
+	*buffer = NULL;
+	*buflen = 0;
+
+	return;
+}
+
+/**
+ * Advance a const tlv buffer pointer and length past the given tlv element pointer
+ * 'elt'.  The function checks that elt is a valid tlv; the elt pointer and data
+ * are all in the range of the buffer/length.  The function also checks that the
+ * remaining buffer starts with a valid tlv.
+ *
+ * @param elt      pointer to a valid bcm_tlv_t in the buffer
+ * @param buffer   pointer to a tlv buffer
+ * @param buflen   length of the buffer in bytes
+ *
+ * On return, if elt is not a tlv in the buffer bounds, or the remaining buffer
+ * following the elt does not begin with a tlv in the buffer bounds, the *buffer
+ * parameter will be set to NULL and *buflen parameter will be set to zero.
+ * Otherwise, *buffer will point to the first byte past elt, and *buflen will
+ * have the remaining buffer length.
+ */
+void
+bcm_tlv_buffer_advance_past(const bcm_tlv_t *elt, const uint8 **buffer, uint *buflen)
+{
+	/* Start by advancing the buffer up to the given elt */
+	bcm_tlv_buffer_advance_to(elt, buffer, buflen);
+
+	/* if that did not work, bail out */
+	if (*buflen == 0) {
+		return;
+	}
+
+#if defined(__COVERITY__)
+	/* The elt has been verified by bcm_tlv_buffer_advance_to() to be a valid element,
+	 * so its elt->len is in the bounds of the buffer. The following check prevents
+	 * Coverity from flagging the (elt->data + elt->len) statement below as using a
+	 * tainted elt->len to index into array 'elt->data'.
+	 */
+	if (elt->len > *buflen) {
+		return;
+	}
+#endif /* __COVERITY__ */
+
+	/* We know we are advanced up to a good tlv.
+	 * Now just advance to the following tlv.
+	 */
+	elt = (const bcm_tlv_t*)(elt->data + elt->len);
+
+	bcm_tlv_buffer_advance_to(elt, buffer, buflen);
+
+	return;
 }
 
 /*
@@ -2980,7 +3096,7 @@ bcm_parse_tlvs_dot11(const void *buf, int buflen, uint key, bool id_ext)
 				break;
 			}
 
-			return (bcm_tlv_t *)(elt);		/* a match */
+				return (bcm_tlv_t *)(elt);		/* a match */
 		} while (0);
 
 		elt = (bcm_tlv_t*)((uint8*)elt + (len + TLV_HDR_LEN));
@@ -3000,7 +3116,7 @@ bcm_tlv_t *
 bcm_parse_tlvs_min_bodylen(const  void *buf, int buflen, uint key, int min_bodylen)
 {
 	bcm_tlv_t * ret;
-	ret = bcm_parse_tlvs(buf, buflen, key);
+	ret = bcm_parse_tlvs(buf, (uint)buflen, key);
 	if (ret == NULL || ret->len < min_bodylen) {
 		return NULL;
 	}
@@ -3062,8 +3178,8 @@ bcm_format_field(const bcm_bit_desc_ex_t *bd, uint32 flags, char* buf, int len)
 		bit = bd->bitfield[i].bit;
 		if ((flags & mask) == bit) {
 			if (len > (int)strlen(name)) {
-				slen = strlen(name);
-				strncpy(buf, name, slen + 1);
+				slen = (int)strlen(name);
+				strncpy(buf, name, (size_t)len);
 			}
 			break;
 		}
@@ -3097,7 +3213,7 @@ bcm_format_flags(const bcm_bit_desc_t *bd, uint32 flags, char* buf, int len)
 		} else if ((flags & bit) == 0)
 			continue;
 		flags &= ~bit;
-		nlen = strlen(name);
+		nlen = (int)strlen(name);
 		slen += nlen;
 		/* count btwn flag space */
 		if (flags != 0)
@@ -3106,7 +3222,7 @@ bcm_format_flags(const bcm_bit_desc_t *bd, uint32 flags, char* buf, int len)
 		if (len <= slen)
 			break;
 		/* copy NULL char but don't count it */
-		strncpy(p, name, nlen + 1);
+		strncpy(p, name, (size_t)len);
 		p += nlen;
 		/* copy btwn flag space and NULL char */
 		if (flags != 0)
@@ -3124,7 +3240,7 @@ bcm_format_flags(const bcm_bit_desc_t *bd, uint32 flags, char* buf, int len)
 /* print out whcih bits in octet array 'addr' are set. bcm_bit_desc_t:bit is a bit offset. */
 int
 bcm_format_octets(const bcm_bit_desc_t *bd, uint bdsz,
-				  const uint8 *addr, uint size, char *buf, int len)
+	const uint8 *addr, uint size, char *buf, int len)
 {
 	uint i;
 	char *p = buf;
@@ -3143,8 +3259,10 @@ bcm_format_octets(const bcm_bit_desc_t *bd, uint bdsz,
 	for (i = 0; i < bdsz; i++) {
 		bit = bd[i].bit;
 		name = bd[i].name;
+		CLANG_DIAGNOSTIC_PUSH_SUPPRESS_CAST();
 		if (isset(addr, bit)) {
-			nlen = strlen(name);
+		CLANG_DIAGNOSTIC_POP();
+			nlen = (int)strlen(name);
 			slen += nlen;
 			/* need SPACE - for simplicity */
 			slen += 1;
@@ -3153,7 +3271,7 @@ bcm_format_octets(const bcm_bit_desc_t *bd, uint bdsz,
 				more = TRUE;
 				break;
 			}
-			memcpy(p, name, nlen);
+			memcpy(p, name, (size_t)nlen);
 			p += nlen;
 			p[0] = ' ';
 			p += 1;
@@ -3201,12 +3319,12 @@ prhex(const char *msg, const uchar *buf, uint nbytes)
 	p = line;
 	for (i = 0; i < nbytes; i++) {
 		if (i % 16 == 0) {
-			nchar = snprintf(p, len, "  %04x: ", i);	/* line prefix */
+			nchar = snprintf(p, (size_t)len, "  %04x: ", i);	/* line prefix */
 			p += nchar;
 			len -= nchar;
 		}
 		if (len > 0) {
-			nchar = snprintf(p, len, "%02x ", buf[i]);
+			nchar = snprintf(p, (size_t)len, "%02x ", buf[i]);
 			p += nchar;
 			len -= nchar;
 		}
@@ -3270,7 +3388,18 @@ bcm_chipname(uint chipid, char *buf, uint len)
 	const char *fmt;
 
 	fmt = ((chipid > 0xa000) || (chipid < 0x4000)) ? "%d" : "%x";
+	/*
+	  * The following call to snprintf generates a compiler warning
+	  * due to -Wformat-nonliteral. However, the format string is coming
+	  * from internal callers rather than external data input, and is a
+	  * useful debugging tool serving a variety of diagnostics. Rather
+	  * than expand code size by replicating multiple functions with different
+	  * argument lists, or disabling the warning globally, let's consider
+	  * if we can just disable the warning for this one instance.
+	  */
+	CLANG_DIAGNOSTIC_PUSH_SUPPRESS_FORMAT()
 	snprintf(buf, len, fmt, chipid);
+	CLANG_DIAGNOSTIC_POP()
 	return buf;
 }
 
@@ -3316,7 +3445,7 @@ printbig(char *buf)
 /* routine to dump fields in a fileddesc structure */
 uint
 bcmdumpfields(bcmutl_rdreg_rtn read_rtn, void *arg0, uint arg1, struct fielddesc *fielddesc_array,
-			  char *buf, uint32 bufsize)
+	char *buf, uint32 bufsize)
 {
 	uint  filled_len;
 	int len;
@@ -3328,14 +3457,26 @@ bcmdumpfields(bcmutl_rdreg_rtn read_rtn, void *arg0, uint arg1, struct fielddesc
 	while (bufsize > 1) {
 		if (cur_ptr->nameandfmt == NULL)
 			break;
+
+		/*
+		 * The following call to snprintf generates a compiler warning
+		 * due to -Wformat-nonliteral. However, the format string is coming
+		 * from internal callers rather than external data input, and is a
+		 * useful debugging tool serving a variety of diagnostics. Rather
+		 * than expand code size by replicating multiple functions with different
+		 * argument lists, or disabling the warning globally, let's consider
+		 * if we can just disable the warning for this one instance.
+		 */
+		CLANG_DIAGNOSTIC_PUSH_SUPPRESS_FORMAT()
 		len = snprintf(buf, bufsize, cur_ptr->nameandfmt,
-					   read_rtn(arg0, arg1, cur_ptr->offset));
+		read_rtn(arg0, arg1, cur_ptr->offset));
+		CLANG_DIAGNOSTIC_POP()
 		/* check for snprintf overflow or error */
 		if (len < 0 || (uint32)len >= bufsize)
-			len = bufsize - 1;
+			len = (int)(bufsize - 1);
 		buf += len;
-		bufsize -= len;
-		filled_len += len;
+		bufsize -= (uint32)len;
+		filled_len += (uint32)len;
 		cur_ptr++;
 	}
 	return filled_len;
@@ -3383,12 +3524,12 @@ bcm_mkiovar(const char *name, const char *data, uint datalen, char *buf, uint bu
 #define QDBM_TABLE_HIGH_BOUND 64938 /* High bound */
 
 static const uint16 nqdBm_to_mW_map[QDBM_TABLE_LEN] = {
-	/* qdBm:	+0	+1	+2	+3	+4	+5	+6	+7 */
-	/* 153: */      6683,	7079,	7499,	7943,	8414,	8913,	9441,	10000,
-	/* 161: */      10593,	11220,	11885,	12589,	13335,	14125,	14962,	15849,
-	/* 169: */      16788,	17783,	18836,	19953,	21135,	22387,	23714,	25119,
-	/* 177: */      26607,	28184,	29854,	31623,	33497,	35481,	37584,	39811,
-	/* 185: */      42170,	44668,	47315,	50119,	53088,	56234,	59566,	63096
+/* qdBm:	+0	+1	+2	+3	+4	+5	+6	+7 */
+/* 153: */      6683,	7079,	7499,	7943,	8414,	8913,	9441,	10000,
+/* 161: */      10593,	11220,	11885,	12589,	13335,	14125,	14962,	15849,
+/* 169: */      16788,	17783,	18836,	19953,	21135,	22387,	23714,	25119,
+/* 177: */      26607,	28184,	29854,	31623,	33497,	35481,	37584,	39811,
+/* 185: */      42170,	44668,	47315,	50119,	53088,	56234,	59566,	63096
 };
 
 uint16
@@ -3413,7 +3554,7 @@ bcm_qdbm_to_mw(uint8 qdbm)
 	/* return the mW value scaled down to the correct factor of 10,
 	 * adding in factor/2 to get proper rounding.
 	 */
-	return ((nqdBm_to_mW_map[idx] + factor / 2) / factor);
+	return (uint16)((nqdBm_to_mW_map[idx] + factor/2) / factor);
 }
 
 uint8
@@ -3436,9 +3577,9 @@ bcm_mw_to_qdbm(uint16 mw)
 		offset -= 40;
 	}
 
-	for (qdbm = 0; qdbm < QDBM_TABLE_LEN - 1; qdbm++) {
-		boundary = nqdBm_to_mW_map[qdbm] + (nqdBm_to_mW_map[qdbm + 1] -
-											nqdBm_to_mW_map[qdbm]) / 2;
+	for (qdbm = 0; qdbm < QDBM_TABLE_LEN-1; qdbm++) {
+		boundary = nqdBm_to_mW_map[qdbm] + (nqdBm_to_mW_map[qdbm+1] -
+		                                    nqdBm_to_mW_map[qdbm])/2;
 		if (mw_uint < boundary) break;
 	}
 
@@ -3487,10 +3628,10 @@ process_nvram_vars(char *varbuf, unsigned int len)
 	// terence 20130914: print out NVRAM version
 	if (varbuf[0] == '#') {
 		memset(nv_ver, 0x00, sizeof(nv_ver));
-		for (n = 1; n < len && n < (sizeof(nv_ver) - 1); n++) {
+		for (n=1; n<len && n<(sizeof(nv_ver)-1); n++) {
 			if (varbuf[n] == '\n')
 				break;
-			nv_ver[n - 1] = varbuf[n];
+			nv_ver[n-1] = varbuf[n];
 		}
 		printf("NVRAM version: %s\n", nv_ver);
 	}
@@ -3564,16 +3705,16 @@ isclr(const void *array, uint bit)
 void
 set_bitrange(void *array, uint start, uint end, uint maxbit)
 {
-	uint startbyte = start / NBBY;
-	uint endbyte = end / NBBY;
+	uint startbyte = start/NBBY;
+	uint endbyte = end/NBBY;
 	uint i, startbytelastbit, endbytestartbit;
 
 	if (end >= start) {
 		if (endbyte - startbyte > 1)
 		{
-			startbytelastbit = (startbyte + 1) * NBBY - 1;
-			endbytestartbit = endbyte * NBBY;
-			for (i = startbyte + 1; i < endbyte; i++)
+			startbytelastbit = (startbyte+1)*NBBY - 1;
+			endbytestartbit = endbyte*NBBY;
+			for (i = startbyte+1; i < endbyte; i++)
 				((uint8 *)array)[i] = 0xFF;
 			for (i = start; i <= startbytelastbit; i++)
 				setbit(array, i);
@@ -3611,13 +3752,13 @@ uint16
 bcm_ip_cksum(uint8 *buf, uint32 len, uint32 sum)
 {
 	while (len > 1) {
-		sum += (buf[0] << 8) | buf[1];
+		sum += (uint32)((buf[0] << 8) | buf[1]);
 		buf += 2;
 		len -= 2;
 	}
 
 	if (len > 0) {
-		sum += (*buf) << 8;
+		sum += (uint32)((*buf) << 8);
 	}
 
 	while (sum >> 16) {
@@ -3723,7 +3864,7 @@ ipv4_hdr_cksum(uint8 *ip, int ip_len)
 	ptr += OFFSETOF(struct ipv4_hdr, hdr_chksum) + 2;
 
 	/* return calculated chksum */
-	return ip_cksum(sum, ptr, ip_len - OFFSETOF(struct ipv4_hdr, src_ip));
+	return ip_cksum(sum, ptr, (uint32)((uint)ip_len - OFFSETOF(struct ipv4_hdr, src_ip)));
 }
 
 /* calculate TCP header checksum using partial sum */
@@ -3766,6 +3907,8 @@ ipv4_tcp_hdr_cksum(uint8 *ip, uint8 *tcp, uint16 tcp_len)
 	ASSERT(tcp != NULL);
 	ASSERT(tcp_len >= TCP_MIN_HEADER_LEN);
 
+	if (!ip || !tcp || !(tcp_len >= TCP_MIN_HEADER_LEN))
+		return 0;
 	/* pseudo header cksum */
 	memset(&tcp_ps, 0, sizeof(tcp_ps));
 	memcpy(&tcp_ps.dst_ip, ip_hdr->dst_ip, IPV4_ADDR_LEN);
@@ -3802,12 +3945,14 @@ ipv6_tcp_hdr_cksum(uint8 *ipv6, uint8 *tcp, uint16 tcp_len)
 	ASSERT(tcp != NULL);
 	ASSERT(tcp_len >= TCP_MIN_HEADER_LEN);
 
+	if (!ipv6 || !tcp || !(tcp_len >= TCP_MIN_HEADER_LEN))
+		return 0;
 	/* pseudo header cksum */
 	memset((char *)&ipv6_pseudo, 0, sizeof(ipv6_pseudo));
 	memcpy((char *)ipv6_pseudo.saddr, (char *)ipv6_hdr->saddr.addr,
-		   sizeof(ipv6_pseudo.saddr));
+		sizeof(ipv6_pseudo.saddr));
 	memcpy((char *)ipv6_pseudo.daddr, (char *)ipv6_hdr->daddr.addr,
-		   sizeof(ipv6_pseudo.daddr));
+		sizeof(ipv6_pseudo.daddr));
 	ipv6_pseudo.payload_len = ipv6_hdr->payload_len;
 	ipv6_pseudo.next_hdr = ipv6_hdr->nexthdr;
 	sum = ip_cksum_partial(sum, (uint8 *)&ipv6_pseudo, sizeof(ipv6_pseudo));
@@ -3860,8 +4005,8 @@ setbits(uint8 *addr, uint size, uint stbit, uint nbits, uint32 val)
 	uint lbyte = (stbit + nbits - 1) >> 3;	/* last byte */
 	uint fbit = stbit & 7;			/* first bit in the first byte */
 	uint rbits = (nbits > 8 - fbit ?
-				  nbits - (8 - fbit) :
-				  0) & 7;			/* remaining bits of the last byte when not 0 */
+	              nbits - (8 - fbit) :
+	              0) & 7;			/* remaining bits of the last byte when not 0 */
 	uint8 mask;
 	uint byte;
 
@@ -3873,7 +4018,7 @@ setbits(uint8 *addr, uint size, uint stbit, uint nbits, uint32 val)
 
 	/* all bits are in the same byte */
 	if (fbyte == lbyte) {
-		mask = ((1 << nbits) - 1) << fbit;
+		mask = (uint8)(((1 << nbits) - 1) << fbit);
 		addr[fbyte] &= ~mask;
 		addr[fbyte] |= (uint8)(val << fbit);
 		return;
@@ -3881,7 +4026,7 @@ setbits(uint8 *addr, uint size, uint stbit, uint nbits, uint32 val)
 
 	/* first partial byte */
 	if (fbit > 0) {
-		mask = (0xff << fbit);
+		mask = (uint8)(0xff << fbit);
 		addr[fbyte] &= ~mask;
 		addr[fbyte] |= (uint8)(val << fbit);
 		val >>= (8 - fbit);
@@ -3891,7 +4036,7 @@ setbits(uint8 *addr, uint size, uint stbit, uint nbits, uint32 val)
 
 	/* last partial byte */
 	if (rbits > 0) {
-		mask = (1 << rbits) - 1;
+		mask = (uint8)((1 << rbits) - 1);
 		addr[lbyte] &= ~mask;
 		addr[lbyte] |= (uint8)(val >> (nbits - rbits));
 		lbyte --;	/* last full byte */
@@ -3911,8 +4056,8 @@ getbits(const uint8 *addr, uint size, uint stbit, uint nbits)
 	uint lbyte = (stbit + nbits - 1) >> 3;	/* last byte */
 	uint fbit = stbit & 7;			/* first bit in the first byte */
 	uint rbits = (nbits > 8 - fbit ?
-				  nbits - (8 - fbit) :
-				  0) & 7;			/* remaining bits of the last byte when not 0 */
+	              nbits - (8 - fbit) :
+	              0) & 7;			/* remaining bits of the last byte when not 0 */
 	uint32 val = 0;
 	uint bits = 0;				/* bits in first partial byte */
 	uint8 mask;
@@ -3926,7 +4071,7 @@ getbits(const uint8 *addr, uint size, uint stbit, uint nbits)
 
 	/* all bits are in the same byte */
 	if (fbyte == lbyte) {
-		mask = ((1 << nbits) - 1) << fbit;
+		mask = (uint8)(((1 << nbits) - 1) << fbit);
 		val = (addr[fbyte] & mask) >> fbit;
 		return val;
 	}
@@ -3934,21 +4079,21 @@ getbits(const uint8 *addr, uint size, uint stbit, uint nbits)
 	/* first partial byte */
 	if (fbit > 0) {
 		bits = 8 - fbit;
-		mask = (0xff << fbit);
+		mask = (uint8)(0xFFu << fbit);
 		val |= (addr[fbyte] & mask) >> fbit;
 		fbyte ++;	/* first full byte */
 	}
 
 	/* last partial byte */
 	if (rbits > 0) {
-		mask = (1 << rbits) - 1;
-		val |= (addr[lbyte] & mask) << (nbits - rbits);
+		mask = (uint8)((1 << rbits) - 1);
+		val |= (uint32)((addr[lbyte] & mask) << (nbits - rbits));
 		lbyte --;	/* last full byte */
 	}
 
 	/* remaining full byte(s) */
 	for (byte = fbyte; byte <= lbyte; byte ++) {
-		val |= (addr[byte] << (((byte - fbyte) << 3) + bits));
+		val |= (uint32)((addr[byte] << (((byte - fbyte) << 3) + bits)));
 	}
 
 	return val;
@@ -4079,7 +4224,7 @@ array_zero_count(uint8 *array, int array_size)
  */
 static int
 verify_ordered_array(uint8 *array1, int16 *array2, int array_size,
-					 int range_lo, int range_hi, bool err_if_no_zero_term, bool is_ordered)
+	int range_lo, int range_hi, bool err_if_no_zero_term, bool is_ordered)
 {
 	int ret;
 	int i;
@@ -4127,25 +4272,25 @@ verify_ordered_array(uint8 *array1, int16 *array2, int array_size,
 /* Validate an ordered uint8 configuration array */
 int
 verify_ordered_array_uint8(uint8 *array, int array_size,
-						   uint8 range_lo, uint8 range_hi)
+	uint8 range_lo, uint8 range_hi)
 {
 	return verify_ordered_array(array, NULL, array_size, (int)range_lo, (int)range_hi,
-								TRUE, TRUE);
+		TRUE, TRUE);
 }
 
 /* Validate an ordered int16 non-zero-terminated configuration array */
 int
 verify_ordered_array_int16(int16 *array, int array_size,
-						   int16 range_lo, int16 range_hi)
+	int16 range_lo, int16 range_hi)
 {
 	return verify_ordered_array(NULL, array, array_size, (int)range_lo, (int)range_hi,
-								FALSE, TRUE);
+		FALSE, TRUE);
 }
 
 /* Validate all values in an array are in range */
 int
 verify_array_values(uint8 *array, int array_size,
-					int range_lo, int range_hi, bool zero_terminated)
+	int range_lo, int range_hi, bool zero_terminated)
 {
 	int ret = BCME_OK;
 	int i;
@@ -4180,10 +4325,10 @@ verify_array_values(uint8 *array, int array_size,
  */
 bool
 replace_nvram_variable(char *varbuf, unsigned int buflen, const char *variable,
-					   unsigned int *datalen)
+	unsigned int *datalen)
 {
 	char *p;
-	int variable_heading_len, record_len, variable_record_len = strlen(variable) + 1;
+	int variable_heading_len, record_len, variable_record_len = (int)strlen(variable) + 1;
 	char *buf_end = varbuf + buflen;
 	p = strchr(variable, '=');
 	if (!p) {
@@ -4194,9 +4339,10 @@ replace_nvram_variable(char *varbuf, unsigned int buflen, const char *variable,
 	/* Scanning NVRAM, record by record up to trailing 0 */
 	for (p = varbuf; *p; p += strlen(p) + 1) {
 		/* If given variable found - remove it */
-		if (!strncmp(p, variable, variable_heading_len)) {
-			record_len = strlen(p) + 1;
-			memmove_s(p, buf_end - p, p + record_len, buf_end - (p + record_len));
+		if (!strncmp(p, variable, (size_t)variable_heading_len)) {
+			record_len = (int)strlen(p) + 1;
+			memmove_s(p, buf_end - p, p + record_len,
+				(size_t)(buf_end - (p + record_len)));
 		}
 	}
 	/* If buffer does not have space for given variable - return FALSE */
@@ -4204,7 +4350,7 @@ replace_nvram_variable(char *varbuf, unsigned int buflen, const char *variable,
 		return FALSE;
 	}
 	/* Copy given variable to end of buffer */
-	memmove_s(p, buf_end - p, variable, variable_record_len);
+	memmove_s(p, buf_end - p, variable, (size_t)variable_record_len);
 	/* Adding trailing 0 */
 	p[variable_record_len] = 0;
 	/* Setting optional output parameter - length of data in buffer */
@@ -4220,7 +4366,7 @@ pktset8021xprio(void *pkt, int prio)
 {
 	struct ether_header *eh;
 	uint8 *pktdata;
-	if (prio == PKTPRIO(pkt))
+	if(prio == PKTPRIO(pkt))
 		return;
 	pktdata = (uint8 *)PKTDATA(OSH_NULL, pkt);
 	ASSERT(ISALIGNED((uintptr)pktdata, sizeof(uint16)));
@@ -4229,4 +4375,4 @@ pktset8021xprio(void *pkt, int prio)
 		ASSERT(prio >= 0 && prio <= MAXPRIO);
 		PKTSETPRIO(pkt, prio);
 	}
-}
+}	

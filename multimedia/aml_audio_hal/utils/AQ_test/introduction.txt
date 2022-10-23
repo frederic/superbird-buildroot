@@ -1,0 +1,33 @@
+﻿使用方法：
+1、把相应的bin文件push到system/bin下面
+2、对应source post音量的调试说明
+
+        LOG("*************Source Post Gain PARAM***************\n");
+        LOG("id:     0 -> Source\n");
+        LOG("device: 0 ->  ATV 1 -> DTV 2 -> HDMI 3 -> AV\n");
+        LOG("id:     1 -> Post\n");
+        LOG("device: 0 ->  SPEAKER 1 -> SPDIF_ARC 2 -> HEADPHONE\n");
+       
+        //调节source gain
+        1)调节ATV的source gain ,增加10db
+        console:/system/bin # ./audioAQtest 0  0 10 
+
+        2)调节hdmi的source gain ,增加10db
+        console:/system/bin # ./audioAQtest 0  2 10 
+      
+        //调节post gain
+        1)调节speaker的post gain ,增加10db
+        console:/system/bin # ./audioAQtest 1  0 10 
+
+        2)调节SPDIF_ARC的post gain ,增加10db
+         console:/system/bin # ./audioAQtest 1  1 10  
+    
+3、对source mute的说明
+        
+        LOG("*************Source mute PARAM***************\n");
+        LOG("mute:  1 ->mute  0 ->unmute\n");
+        LOG("**************************************************\n\n");
+        //静音
+       console:/system/bin # ./audioAQtest 1
+       //非静音
+       console:/system/bin # ./audioAQtest 0

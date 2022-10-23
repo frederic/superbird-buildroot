@@ -1,0 +1,27 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264,
+      gop-opt: IP_SVC3,
+      gop: 32
+    }
+  },
+  {
+    type: fileout,
+    param: {
+      path: "/data/isp_venc-gop-opt-svc3.h264",
+      dump: 100
+    }
+  }
+]
+

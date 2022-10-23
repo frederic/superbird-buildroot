@@ -166,7 +166,7 @@
 ./usr/lib/libblkid.so
 ./usr/lib/libcom_err.so.2.1
 ./usr/lib/libe2p.so.2.3
-./usr/lib/libglib-2.0.so.0.5600.3
+./usr/lib/libglib-2.0.so.0.6200.4
 ./usr/lib/libe2p.so
 ./usr/lib/libext2fs.so.2.4
 ./usr/lib/libuuid.so

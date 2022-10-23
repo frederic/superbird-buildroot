@@ -55,6 +55,7 @@ SbPlayer SbPlayerCreate(SbWindow window,
                         SbDecodeTargetGraphicsContextProvider* provider) {
   SB_UNREFERENCED_PARAMETER(window);
 #if SB_API_VERSION >= 11
+
   SB_UNREFERENCED_PARAMETER(max_video_capabilities);
 #endif  // SB_API_VERSION >= 11
 #if SB_API_VERSION < 10
@@ -124,8 +125,8 @@ SbPlayer SbPlayerCreate(SbWindow window,
     SB_LOG(ERROR) << "Unsupported player output mode " << output_mode;
     return kSbPlayerInvalid;
   }
-
-  if (!FilterBasedPlayerWorkerHandler::AllocateDecoders(video_codec, audio_codec)) {
+  bool bsubdecoder = FilterBasedPlayerWorkerHandler::GetDecoderType(max_video_capabilities);
+  if (!FilterBasedPlayerWorkerHandler::AllocateDecoders(video_codec, audio_codec,bsubdecoder)) {
     SB_LOG(ERROR) << "Failed to allocate decoders";
     return kSbPlayerInvalid;
   }
@@ -135,7 +136,7 @@ SbPlayer SbPlayerCreate(SbWindow window,
   starboard::scoped_ptr<PlayerWorker::Handler> handler(
       new FilterBasedPlayerWorkerHandler(video_codec, audio_codec, drm_system,
                                          audio_sample_info, output_mode,
-                                         provider));
+                                         provider,bsubdecoder));
 
   SbPlayer player = SbPlayerPrivate::CreateInstance(
       audio_codec, video_codec, audio_sample_info, sample_deallocate_func,

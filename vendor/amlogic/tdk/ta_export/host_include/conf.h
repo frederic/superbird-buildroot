@@ -6,16 +6,24 @@
 #define CFG_ARM32_core 1
 #define CFG_ARM32_ta_arm32 1
 /* CFG_ARM64_core is not set */
+#define CFG_ATOS_IMPL_VERSION 0x20404
+/* CFG_AV_CONTROL is not set */
 /* CFG_BOOT_SECONDARY_REQUEST is not set */
 #define CFG_CACHE_API 1
+#define CFG_CIPHER_DECRYPT 1
+/* CFG_CLEAN_TVP_MEM_WHEN_TVP_EXIT is not set */
 #define CFG_CONCURRENT_SINGLE_INSTANCE_TA 1
+#define CFG_CORE_BIGNUM_MAX_BITS 4096
 #define CFG_CORE_HEAP_SIZE 65536
+#define CFG_CORE_MBEDTLS_MPI 1
 /* CFG_CORE_SANITIZE_KADDRESS is not set */
 /* CFG_CORE_SANITIZE_UNDEFINED is not set */
 #define CFG_CORE_TZSRAM_EMUL_SIZE 368640
 #define CFG_CORE_WORKAROUND_SPECTRE_BP 1
 #define CFG_CORE_WORKAROUND_SPECTRE_BP_SEC 1
 #define CFG_CRYPTO 1
+#define CFG_CRYPTOLIB_DIR core/lib/libtomcrypt
+#define CFG_CRYPTOLIB_NAME tomcrypt
 #define CFG_CRYPTO_AES 1
 #define CFG_CRYPTO_AES_AML 1
 #define CFG_CRYPTO_CBC 1
@@ -32,8 +40,8 @@
 #define CFG_CRYPTO_ECB 1
 #define CFG_CRYPTO_ECC 1
 #define CFG_CRYPTO_GCM 1
-#define CFG_CRYPTO_GCM_AML 1
-#define CFG_CRYPTO_GCM_SCP 1
+/* CFG_CRYPTO_GCM_AML is not set */
+/* CFG_CRYPTO_GCM_SCP is not set */
 #define CFG_CRYPTO_HKDF 1
 #define CFG_CRYPTO_HMAC 1
 #define CFG_CRYPTO_HMAC_AML 1
@@ -51,10 +59,13 @@
 #define CFG_CRYPTO_SHA512 1
 #define CFG_CRYPTO_SIZE_OPTIMIZATION 1
 #define CFG_CRYPTO_XTS 1
-#define CFG_DESCRAMBLER 1
+/* CFG_DEBUG is not set */
+/* CFG_DESCRAMBLER is not set */
+#define CFG_DEVICE_KEY 1
 /* CFG_DT is not set */
 #define CFG_DTB_MAX_SIZE 0x10000
 #define CFG_EFUSE 1
+#define CFG_EFUSE_LAYOUT 1
 #define CFG_EFUSE_READ_ALL_WRITE_BLOCK 1
 #define CFG_ENCRYPT_TA 1
 #define CFG_ENC_FS 1
@@ -62,16 +73,20 @@
 #define CFG_FS_COMP 1
 #define CFG_GENERIC_BOOT 1
 /* CFG_GP_SOCKETS is not set */
+/* CFG_HDMI is not set */
 /* CFG_HW_KL is not set */
+/* CFG_HW_KL_DRV_TEST is not set */
 /* CFG_HW_KL_TEST is not set */
-#define CFG_HW_KL_VENDORID {0x2a,0x42}
+#define CFG_HW_KL_VENDORID { 0x2a, 0x42 }
+#define CFG_KDF_MKL 1
+/* CFG_KDF_MKL_TEST is not set */
 #define CFG_KERN_LINKER_ARCH arm
 #define CFG_KERN_LINKER_FORMAT elf32-littlearm
+/* CFG_KEYMASTER3 is not set */
 #define CFG_LIBUTILS_WITH_ISOC 1
 #define CFG_LPAE_ADDR_SPACE_SIZE (1ull << 32)
 #define CFG_LTC_OPTEE_THREAD 1
-#define CFG_MESON_MEMCONFIG_ENABLE 1
-#define CFG_MESON_MEMCONFIG_V2_ENABLE 1
+/* CFG_MARKETID_TA is not set */
 #define CFG_MESON_UART 1
 #define CFG_MMU_V7_TTB 1
 #define CFG_MSG_LONG_PREFIX_THRESHOLD 3
@@ -82,23 +97,37 @@
 #define CFG_OTP_SUPPORT 1
 /* CFG_PAGED_USER_TA is not set */
 #define CFG_PM_STUBS 1
+#define CFG_PUB_RAM_SIZE 0x100000
+/* CFG_REE_CALLBACK is not set */
 #define CFG_REE_FS 1
+#define CFG_REE_LOGGER 1
+/* CFG_REG_DEBUG is not set */
+/* CFG_RNG_API is not set */
+#define CFG_RNG_POOL_WAIT_FILLED 1
 #define CFG_RPMB_DRIVER 1
-#define CFG_RPMB_FS_DEV_ID 0
+#define CFG_RPMB_FS_DEV_ID 2
+/* CFG_RPMB_FS_FORMAT is not set */
 /* CFG_RPMB_TEST is not set */
 /* CFG_RPMB_WRITE_KEY is not set */
-#define CFG_RSV_MEM_SIZE 0x2000000
+#define CFG_RSV_MEM_SIZE 0x300000
+/* CFG_RW_REG_API is not set */
 /* CFG_SECURE_DATA_PATH is not set */
 #define CFG_SECURE_STORAGE 1
 /* CFG_SECURE_TIME_SOURCE_REE is not set */
 #define CFG_SECURE_TIME_SOURCE_TEE 1
+/* CFG_SHM_MMAP_API is not set */
 #define CFG_SMALL_PAGE_USER_TA 1
 /* CFG_SQL_FS is not set */
+#define CFG_TA_BIGNUM_MAX_BITS 2048
 #define CFG_TA_FLOAT_SUPPORT 1
 /* CFG_TA_GPROF_SUPPORT is not set */
+/* CFG_TA_HEADER_V1_COMPAT is not set */
+#define CFG_TA_MBEDTLS 1
+#define CFG_TA_MBEDTLS_SELF_TEST 1
+/* CFG_TA_MUTEX is not set */
 #define CFG_TEE_API_VERSION GPD-1.1-dev
 /* CFG_TEE_CORE_DEBUG is not set */
-#define CFG_TEE_CORE_EMBED_INTERNAL_TESTS 1
+/* CFG_TEE_CORE_EMBED_INTERNAL_TESTS is not set */
 #define CFG_TEE_CORE_LOG_LEVEL 2
 /* CFG_TEE_CORE_MALLOC_DEBUG is not set */
 #define CFG_TEE_CORE_TA_TRACE 1
@@ -108,19 +137,27 @@
 #define CFG_TEE_IMPL_DESCR OPTEE
 #define CFG_TEE_MANUFACTURER LINARO
 #define CFG_TEE_PANIC_DEBUG 1
+#define CFG_TEE_RAM_VA_SIZE 0x100000
 #define CFG_TEE_TA_LOG_LEVEL 1
 /* CFG_TEE_TA_MALLOC_DEBUG is not set */
-#define CFG_TVP 1
-#define CFG_TVP_MEM_POOL1_SIZE 0x30000000
-#define CFG_TVP_MEM_POOL1_START 0x10000000
-#define CFG_TVP_MEM_POOL2_SIZE 0x70000000
-#define CFG_TVP_MEM_POOL2_START 0x50000000
+/* CFG_TEE_TIMER is not set */
+/* CFG_TVP is not set */
+#define CFG_TVP_MEM_POOL1_SIZE 0x30000000ul
+#define CFG_TVP_MEM_POOL1_START 0x10000000ul
+#define CFG_TVP_MEM_POOL2_SIZE 0x70000000ul
+#define CFG_TVP_MEM_POOL2_START 0x50000000ul
+#define CFG_TZDRAM_BASE 0x05300000
 /* CFG_ULIBS_GPROF is not set */
 #define CFG_UNIFY_KEY 1
-#define CFG_VIDEO_FW_LOAD 1
-#define CFG_WATERMARK 1
-#define CFG_WATERMARK_NEXGUARD 1
-#define CFG_WATERMARK_VERIMATRIX 1
+#define CFG_VDEC_RAM_SIZE 0
+/* CFG_VIDEO_FW_LOAD is not set */
+#define CFG_VIDEO_FW_RAM_SIZE 0
+/* CFG_VMX_2017_240_COMPAT is not set */
+/* CFG_VMX_240_COMPAT is not set */
+/* CFG_VMX_TA is not set */
+/* CFG_WATERMARK is not set */
+/* CFG_WATERMARK_NEXGUARD is not set */
+/* CFG_WATERMARK_VERIMATRIX is not set */
 #define CFG_WITH_ARM_TRUSTED_FW 1
 #define CFG_WITH_DEBUG 1
 /* CFG_WITH_PAGER is not set */
@@ -130,8 +167,9 @@
 #define CFG_WITH_STEST 1
 #define CFG_WITH_USER_TA 1
 #define CFG_WITH_VFP 1
-#define PLATFORM_FLAVOR tl1
-#define PLATFORM_FLAVOR_tl1 1
+#define PLATFORM_FLAVOR c1
+#define PLATFORM_FLAVOR_a1 1
+#define PLATFORM_FLAVOR_c1 1
 #define PLATFORM_meson 1
 #define _CFG_CRYPTO_WITH_ACIPHER 1
 #define _CFG_CRYPTO_WITH_ASN1 1

@@ -80,7 +80,7 @@ int fw_intf_set_custom_sensor_wdr_mode( uint32_t ctx_id, uint32_t ctrl_val );
 int fw_intf_set_custom_sensor_exposure( uint32_t ctx_id, uint32_t ctrl_val );
 int fw_intf_set_custom_sensor_fps( uint32_t ctx_id, uint32_t ctrl_val );
 int fw_intf_set_custom_snr_manual(uint32_t ctx_id, uint32_t ctrl_val);
-int fw_intf_set_custom_snr_offset(uint32_t ctx_id, uint32_t ctrl_val);
+int fw_intf_set_custom_snr_strength(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_custom_tnr_manual(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_custom_tnr_offset(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_custom_fr_fps(uint32_t ctx_id, uint32_t ctrl_val);
@@ -100,11 +100,17 @@ int fw_intf_set_customer_awb_red_gain(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_customer_awb_blue_gain(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_customer_max_integration_time(uint32_t ctx_id, uint32_t ctrl_val);
 int fw_intf_set_customer_temper_mode(uint32_t ctx_id, uint32_t ctrl_val);
+int fw_intf_set_customer_sensor_mode(uint32_t ctx_id, uint32_t ctrl_val);
+int fw_intf_get_customer_sensor_mode( uint32_t ctx_id );
+int fw_intf_set_customer_antiflicker(uint32_t ctx_id, uint32_t ctrl_val);
+int fw_intf_get_customer_antiflicker( uint32_t ctx_id );
 int fw_intf_get_ae_compensation( uint32_t ctx_id );
 int fw_intf_get_custom_snr_manual(uint32_t ctx_id);
-int fw_intf_get_custom_snr_offset(uint32_t ctx_id);
+int fw_intf_get_custom_snr_strength(uint32_t ctx_id);
 int fw_intf_get_custom_tnr_manual(uint32_t ctx_id);
 int fw_intf_get_custom_tnr_offset(uint32_t ctx_id);
 int fw_intf_get_custom_temper_mode(uint32_t ctx_id);
+int fw_intf_set_customer_defog_mode(uint32_t ctx_id, uint32_t ctrl_val);
+int fw_intf_set_customer_defog_ratio(uint32_t ctx_id, uint32_t ctrl_val);
 
 #endif

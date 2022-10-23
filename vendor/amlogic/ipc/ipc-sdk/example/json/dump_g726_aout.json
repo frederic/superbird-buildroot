@@ -1,0 +1,27 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      codec: g726,
+      source: file,
+      device:"/data/ain_g726-16k-le.dump"
+    }
+  },
+  {
+    type: ACodecG726,
+    param:
+    {
+      codec: s16le,
+      bitrate: 16k,
+      endian: le
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

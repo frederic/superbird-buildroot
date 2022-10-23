@@ -41,8 +41,8 @@
                 dataType: 'text',
                 type: 'post',
                 success: function (res) {
-                    if (res == '1') {
-                        location.href = "../index.php";
+                    if (res === '1') {
+                        location.href = "../index.html";
                     } else {
                         layer.msg('invalid account or password');
                     }

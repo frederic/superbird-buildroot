@@ -1,0 +1,20 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      codec: s16le,
+      source: file,
+      rate: 48000,
+      channel:2,
+      device: "/data/ain.pcm"
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

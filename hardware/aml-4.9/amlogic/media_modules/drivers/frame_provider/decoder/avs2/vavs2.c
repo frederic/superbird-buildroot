@@ -761,6 +761,9 @@ struct AVS2Decoder_s {
 #endif
 	int frameinfo_enable;
 	struct vframe_qos_s vframe_qos;
+	u32 dynamic_buf_margin;
+	int sidebind_type;
+	int sidebind_channel_id;
 };
 
 static int  compute_losless_comp_body_size(
@@ -3098,6 +3101,11 @@ static void config_sao_hw(struct AVS2Decoder_s *dec)
 #endif
 	}
 #endif
+	if (get_double_write_mode(dec) == 0)
+		data32 |= 0x2; /*disable double write*/
+	else if (get_double_write_mode(dec) & 0x10)
+		data32 |= 0x1; /*disable cm*/
+
 	WRITE_VREG(HEVC_SAO_CTRL1, data32);
 
 	if (get_double_write_mode(dec) & 0x10) {
@@ -3885,7 +3893,7 @@ static int avs2_local_init(struct AVS2Decoder_s *dec)
 #ifndef AVS2_10B_MMU
 	init_buf_list(dec);
 #else
-	dec->used_buf_num = max_buf_num;
+	dec->used_buf_num = max_buf_num + dec->dynamic_buf_margin;
 	if (dec->used_buf_num > MAX_BUF_NUM)
 		dec->used_buf_num = MAX_BUF_NUM;
 	if (dec->used_buf_num > FRAME_BUFFERS)
@@ -4054,6 +4062,9 @@ static void set_frame_info(struct AVS2Decoder_s *dec, struct vframe_s *vf)
 	ar = min_t(u32, dec->frame_ar, DISP_RATIO_ASPECT_RATIO_MAX);
 	vf->ratio_control = (ar << DISP_RATIO_ASPECT_RATIO_BIT);
 
+	vf->sidebind_type = dec->sidebind_type;
+	vf->sidebind_channel_id = dec->sidebind_channel_id;
+
 	return;
 }
 
@@ -4135,7 +4146,7 @@ static struct vframe_s *vavs2_vf_get(void *op_arg)
 
 	if (kfifo_get(&dec->display_q, &vf)) {
 		uint8_t index = vf->index & 0xff;
-		if (index >= 0 && index < dec->used_buf_num) {
+		if (index < dec->used_buf_num) {
 			struct avs2_frame_s *pic = get_pic_by_index(dec, index);
 			if (pic == NULL &&
 				(debug & AVS2_DBG_PIC_LEAK)) {
@@ -4185,8 +4196,7 @@ static void vavs2_vf_put(struct vframe_s *vf, void *op_arg)
 		__func__, vf->index,
 		dec->vf_put_count);
 
-	if (index >= 0
-		&& index < dec->used_buf_num) {
+	if (index < dec->used_buf_num) {
 		unsigned long flags;
 		struct avs2_frame_s *pic;
 
@@ -4257,7 +4267,10 @@ static void fill_frame_info(struct AVS2Decoder_s *dec,
 /*
 #define SHOW_QOS_INFO
 */
-	vframe_qos->size = framesize;
+	if (input_frame_based(hw_to_vdec(dec)))
+		vframe_qos->size = pic->frame_size;
+	else
+		vframe_qos->size = framesize;
 	vframe_qos->pts = pts;
 #ifdef SHOW_QOS_INFO
 	avs2_print(dec, 0, "slice:%d\n", pic->slice_type);
@@ -4296,8 +4309,6 @@ static void fill_frame_info(struct AVS2Decoder_s *dec,
 
 	vframe_qos->num++;
 
-	if (dec->frameinfo_enable)
-		vdec_fill_frame_info(vframe_qos, 1);
 }
 
 static void set_vframe(struct AVS2Decoder_s *dec,
@@ -4305,7 +4316,7 @@ static void set_vframe(struct AVS2Decoder_s *dec,
 {
 	unsigned long flags;
 	int stream_offset;
-	unsigned int frame_size;
+	unsigned int frame_size = 0;
 	int pts_discontinue;
 	stream_offset = pic->stream_offset;
 	avs2_print(dec, AVS2_DBG_BUFMGR,
@@ -4533,6 +4544,22 @@ static void set_vframe(struct AVS2Decoder_s *dec,
 	dec->vf_pre_count++;
 }
 
+static inline void dec_update_gvs(struct AVS2Decoder_s *dec)
+{
+	if (dec->gvs->frame_height != dec->frame_height) {
+		dec->gvs->frame_width = dec->frame_width;
+		dec->gvs->frame_height = dec->frame_height;
+	}
+	if (dec->gvs->frame_dur != dec->frame_dur) {
+		dec->gvs->frame_dur = dec->frame_dur;
+		if (dec->frame_dur != 0)
+			dec->gvs->frame_rate = 96000 / dec->frame_dur;
+		else
+			dec->gvs->frame_rate = -1;
+	}
+	dec->gvs->status = dec->stat | dec->fatal_error;
+}
+
 
 static int avs2_prepare_display_buf(struct AVS2Decoder_s *dec)
 {
@@ -4540,6 +4567,7 @@ static int avs2_prepare_display_buf(struct AVS2Decoder_s *dec)
 	struct vframe_s *vf = NULL;
 	/*unsigned short slice_type;*/
 	struct avs2_frame_s *pic;
+	struct vdec_s *pvdec = hw_to_vdec(dec);
 	while (1) {
 		pic = get_disp_pic(dec);
 		if (pic == NULL)
@@ -4574,17 +4602,22 @@ static int avs2_prepare_display_buf(struct AVS2Decoder_s *dec)
 		}
 
 		if (vf) {
+			struct vdec_info tmp4x;
+			int stream_offset = pic->stream_offset;
 			set_vframe(dec, vf, pic, 0);
-			decoder_do_frame_check(hw_to_vdec(dec), vf);
+			decoder_do_frame_check(pvdec, vf);
 			kfifo_put(&dec->display_q, (const struct vframe_s *)vf);
 			ATRACE_COUNTER(MODULE_NAME, vf->pts);
 
-	#ifndef CONFIG_AMLOGIC_MEDIA_MULTI_DEC
+			dec_update_gvs(dec);
 			/*count info*/
-			gvs->frame_dur = dec->frame_dur;
-			vdec_count_info(gvs, 0, stream_offset);
-	#endif
-			hw_to_vdec(dec)->vdec_fps_detec(hw_to_vdec(dec)->id);
+			vdec_count_info(dec->gvs, 0, stream_offset);
+			memcpy(&tmp4x, dec->gvs, sizeof(struct vdec_info));
+			tmp4x.bit_depth_luma = bit_depth_luma;
+			tmp4x.bit_depth_chroma = bit_depth_chroma;
+			tmp4x.double_write_mode = get_double_write_mode(dec);
+			vdec_fill_vdec_frame(pvdec, &dec->vframe_qos, &tmp4x, vf, pic->hw_decode_time);
+			pvdec->vdec_fps_detec(pvdec->id);
 			if (without_display_mode == 0) {
 				vf_notify_receiver(dec->provider_name,
 				VFRAME_EVENT_PROVIDER_VFRAME_READY, NULL);
@@ -4773,11 +4806,17 @@ we can call this function to get qos info*/
 static void get_picture_qos_info(struct AVS2Decoder_s *dec)
 {
 	struct avs2_frame_s *picture = dec->avs2_dec.hc.cur_pic;
+	struct vdec_s *vdec = hw_to_vdec(dec);
 	if (!picture) {
 		avs2_print(dec, AVS2_DBG_BUFMGR_MORE,
 			"%s decode picture is none exist\n");
 
 		return;
+	}
+	if (vdec->mvfrm) {
+		picture->frame_size = vdec->mvfrm->frame_size;
+		picture->hw_decode_time =
+		local_clock() - vdec->mvfrm->hw_decode_start;
 	}
 
 /*
@@ -5132,55 +5171,55 @@ static void get_picture_qos_info(struct AVS2Decoder_s *dec)
 #endif
 		picture->min_mv = mv_lo;
 
+#ifdef DEBUG_QOS
 		/* {mvy_L0_max, mvy_L0_min} */
 	    rdata32 = READ_VREG(HEVC_PIC_QUALITY_DATA);
 	    mv_hi = (rdata32>>16)&0xffff;
 	    if (mv_hi & 0x8000)
 			mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
 	    avs2_print(dec, 0, "[Picture %d Quality] MVY_L0 MAX : %d\n",
 			pic_number, mv_hi);
-#endif
+
 
 	    mv_lo = (rdata32>>0)&0xffff;
 	    if (mv_lo & 0x8000)
 			mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	    avs2_print(dec, 0, "[Picture %d Quality] MVY_L0 MIN : %d\n",
 			pic_number, mv_lo);
-#endif
+
 
 		/* {mvx_L1_max, mvx_L1_min} */
 	    rdata32 = READ_VREG(HEVC_PIC_QUALITY_DATA);
 	    mv_hi = (rdata32>>16)&0xffff;
 	    if (mv_hi & 0x8000)
 			mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
+
 	    avs2_print(dec, 0, "[Picture %d Quality] MVX_L1 MAX : %d\n",
 			pic_number, mv_hi);
-#endif
+
 
 	    mv_lo = (rdata32>>0)&0xffff;
 	    if (mv_lo & 0x8000)
 			mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	    avs2_print(dec, 0, "[Picture %d Quality] MVX_L1 MIN : %d\n",
 			pic_number, mv_lo);
-#endif
+
 
 		/* {mvy_L1_max, mvy_L1_min} */
 	    rdata32 = READ_VREG(HEVC_PIC_QUALITY_DATA);
 	    mv_hi = (rdata32>>16)&0xffff;
 	    if (mv_hi & 0x8000)
 			mv_hi = 0x8000 - mv_hi;
-#ifdef DEBUG_QOS
+
 	    avs2_print(dec, 0, "[Picture %d Quality] MVY_L1 MAX : %d\n",
 			pic_number, mv_hi);
-#endif
+
 	    mv_lo = (rdata32>>0)&0xffff;
 	    if (mv_lo & 0x8000)
 			mv_lo = 0x8000 - mv_lo;
-#ifdef DEBUG_QOS
+
 	    avs2_print(dec, 0, "[Picture %d Quality] MVY_L1 MIN : %d\n",
 			pic_number, mv_lo);
 #endif
@@ -5439,6 +5478,7 @@ static irqreturn_t vavs2_isr_thread_fn(int irq, void *data)
 		debug_buffer_mgr_more(dec);
 		get_frame_rate(&dec->avs2_dec.param, dec);
 
+#if 0 // The video_signal_type is type of uint16_t and result false, so comment it out.
 		if (dec->avs2_dec.param.p.video_signal_type
 				& (1<<30)) {
 			union param_u *pPara;
@@ -5511,6 +5551,7 @@ static irqreturn_t vavs2_isr_thread_fn(int irq, void *data)
 				"max_pic_average:0x%x\n",
 				dec->vf_dp.content_light_level.max_pic_average);
 		}
+#endif
 
 
 		if (dec->video_ori_signal_type !=
@@ -6110,19 +6151,17 @@ int vavs2_dec_status(struct vdec_s *vdec, struct vdec_info *vstatus)
 	vstatus->error_count = 0;
 	vstatus->status = dec->stat | dec->fatal_error;
 	vstatus->frame_dur = dec->frame_dur;
-#ifndef CONFIG_AMLOGIC_MEDIA_MULTI_DEC
-	vstatus->bit_rate = gvs->bit_rate;
-	vstatus->frame_data = gvs->frame_data;
-	vstatus->total_data = gvs->total_data;
-	vstatus->frame_count = gvs->frame_count;
-	vstatus->error_frame_count = gvs->error_frame_count;
-	vstatus->drop_frame_count = gvs->drop_frame_count;
-	vstatus->total_data = gvs->total_data;
-	vstatus->samp_cnt = gvs->samp_cnt;
-	vstatus->offset = gvs->offset;
+	vstatus->bit_rate = dec->gvs->bit_rate;
+	vstatus->frame_data = dec->gvs->frame_data;
+	vstatus->total_data = dec->gvs->total_data;
+	vstatus->frame_count = dec->gvs->frame_count;
+	vstatus->error_frame_count = dec->gvs->error_frame_count;
+	vstatus->drop_frame_count = dec->gvs->drop_frame_count;
+	vstatus->total_data = dec->gvs->total_data;
+	vstatus->samp_cnt = dec->gvs->samp_cnt;
+	vstatus->offset = dec->gvs->offset;
 	snprintf(vstatus->vdec_name, sizeof(vstatus->vdec_name),
 		"%s", DRIVER_NAME);
-#endif
 	return 0;
 }
 
@@ -6208,7 +6247,7 @@ static int vavs2_set_trickmode(struct vdec_s *vdec, unsigned long trickmode)
 		(struct AVS2Decoder_s *)vdec->private;
 	if (i_only_flag & 0x100)
 		return 0;
-	if (trickmode == TRICKMODE_I)
+	if (trickmode == TRICKMODE_I || trickmode == TRICKMODE_I_HEVC)
 		dec->i_only = 0x3;
 	else if (trickmode == TRICKMODE_NONE)
 		dec->i_only = 0x0;
@@ -6290,6 +6329,8 @@ static s32 vavs2_init(struct vdec_s *vdec)
 	dec->stat |= STAT_TIMER_INIT;
 	if (vavs2_local_init(dec) < 0)
 		return -EBUSY;
+
+	vdec_set_vframe_comm(vdec, DRIVER_NAME);
 
 	fw = vmalloc(sizeof(struct firmware_s) + fw_size);
 	if (IS_ERR_OR_NULL(fw))
@@ -6816,13 +6857,15 @@ static void avs2_work(struct work_struct *work)
 			return;
 		}
 	} else if (dec->dec_result == DEC_RESULT_EOS) {
-		avs2_print(dec, PRINT_FLAG_VDEC_STATUS,
+		avs2_print(dec, 0,
 			"%s: end of stream\n",
 			__func__);
 		dec->eos = 1;
-		check_pic_error(dec, dec->avs2_dec.hc.cur_pic);
-		avs2_post_process(&dec->avs2_dec);
-		avs2_prepare_display_buf(dec);
+		if ( dec->avs2_dec.hc.cur_pic != NULL) {
+			check_pic_error(dec, dec->avs2_dec.hc.cur_pic);
+			avs2_post_process(&dec->avs2_dec);
+			avs2_prepare_display_buf(dec);
+		}
 		vdec_vframe_dirty(hw_to_vdec(dec), dec->chunk);
 	} else if (dec->dec_result == DEC_RESULT_FORCE_EXIT) {
 		avs2_print(dec, PRINT_FLAG_VDEC_STATUS,
@@ -6887,7 +6930,7 @@ static unsigned long run_ready(struct vdec_s *vdec, unsigned long mask)
 	if (dec->next_again_flag &&
 		(!vdec_frame_based(vdec))) {
 		u32 parser_wr_ptr =
-			READ_PARSER_REG(PARSER_VIDEO_WP);
+			STBUF_READ(&vdec->vbuf, get_wp);
 		if (parser_wr_ptr >= dec->pre_parser_wr_ptr &&
 			(parser_wr_ptr - dec->pre_parser_wr_ptr) <
 			again_threshold) {
@@ -6902,8 +6945,8 @@ static unsigned long run_ready(struct vdec_s *vdec, unsigned long mask)
 		&& pre_decode_buf_level != 0) {
 		u32 rp, wp, level;
 
-		rp = READ_PARSER_REG(PARSER_VIDEO_RP);
-		wp = READ_PARSER_REG(PARSER_VIDEO_WP);
+		rp = STBUF_READ(&vdec->vbuf, get_rp);
+		wp = STBUF_READ(&vdec->vbuf, get_wp);
 		if (wp < rp)
 			level = vdec->input.size + wp - rp;
 		else
@@ -6963,9 +7006,12 @@ static void run(struct vdec_s *vdec, unsigned long mask,
 	dec->vdec_cb = callback;
 	/* dec->chunk = vdec_prepare_input(vdec); */
 	hevc_reset_core(vdec);
-	dec->pre_parser_wr_ptr =
-			READ_PARSER_REG(PARSER_VIDEO_WP);
+
+	if (vdec_stream_based(vdec)) {
+		dec->pre_parser_wr_ptr =
+			STBUF_READ(&vdec->vbuf, get_wp);
 		dec->next_again_flag = 0;
+	}
 
 	r = vdec_prepare_input(vdec, &dec->chunk);
 	if (r < 0) {
@@ -7054,6 +7100,8 @@ static void run(struct vdec_s *vdec, unsigned long mask,
 		WRITE_VREG(HEVC_SHIFT_BYTE_COUNT, 0);
 		r = dec->chunk->size +
 			(dec->chunk->offset & (VDEC_FIFO_ALIGN - 1));
+		if (vdec->mvfrm)
+			vdec->mvfrm->frame_size = dec->chunk->size;
 	}
 
 	WRITE_VREG(HEVC_DECODE_SIZE, r);
@@ -7071,6 +7119,8 @@ static void run(struct vdec_s *vdec, unsigned long mask,
 	mod_timer(&dec->timer, jiffies);
 	dec->stat |= STAT_TIMER_ARM;
 	dec->stat |= STAT_ISR_REG;
+	if (vdec->mvfrm)
+		vdec->mvfrm->hw_decode_start = local_clock();
 	amhevc_start();
 	dec->stat |= STAT_VDEC_RUN;
 }
@@ -7200,10 +7250,10 @@ static void avs2_dump_state(struct vdec_s *vdec)
 		READ_VREG(HEVC_STREAM_RD_PTR));
 	avs2_print(dec, 0,
 		"PARSER_VIDEO_RP=0x%x\n",
-		READ_PARSER_REG(PARSER_VIDEO_RP));
+		STBUF_READ(&vdec->vbuf, get_rp));
 	avs2_print(dec, 0,
 		"PARSER_VIDEO_WP=0x%x\n",
-		READ_PARSER_REG(PARSER_VIDEO_WP));
+		STBUF_READ(&vdec->vbuf, get_wp));
 
 	if (input_frame_based(vdec) &&
 		(debug & PRINT_FLAG_VDEC_DATA)
@@ -7310,7 +7360,7 @@ static int ammvdec_avs2_probe(struct platform_device *pdev)
 		dec->stat |= VP9_TRIGGER_FRAME_ENABLE;
 #if 1
 	if ((debug & IGNORE_PARAM_FROM_CONFIG) == 0 &&
-			pdata->config && pdata->config_len) {
+			pdata->config_len) {
 		/*use ptr config for doubel_write_mode, etc*/
 		avs2_print(dec, 0, "pdata->config=%s\n", pdata->config);
 		if (get_config_int(pdata->config, "avs2_double_write_mode",
@@ -7318,6 +7368,21 @@ static int ammvdec_avs2_probe(struct platform_device *pdev)
 			dec->double_write_mode = config_val;
 		else
 			dec->double_write_mode = double_write_mode;
+
+		if (get_config_int(pdata->config, "parm_v4l_buffer_margin",
+			&config_val) == 0)
+			dec->dynamic_buf_margin = config_val;
+		else
+			dec->dynamic_buf_margin = 0;
+
+		if (get_config_int(pdata->config, "sidebind_type",
+				&config_val) == 0)
+			dec->sidebind_type = config_val;
+
+		if (get_config_int(pdata->config, "sidebind_channel_id",
+				&config_val) == 0)
+			dec->sidebind_channel_id = config_val;
+
 		if (get_config_int(pdata->config, "HDRStaticInfo",
 				&vf_dp.present_flag) == 0
 				&& vf_dp.present_flag == 1) {
@@ -7363,6 +7428,7 @@ static int ammvdec_avs2_probe(struct platform_device *pdev)
 		dec->vavs2_amstream_dec_info.height = 0;
 		dec->vavs2_amstream_dec_info.rate = 30;*/
 		dec->double_write_mode = double_write_mode;
+		dec->dynamic_buf_margin = dynamic_buf_num_margin;
 	}
 	video_signal_type = dec->video_signal_type;
 
@@ -7393,13 +7459,6 @@ static int ammvdec_avs2_probe(struct platform_device *pdev)
 	dec->first_sc_checked = 0;
 	dec->fatal_error = 0;
 	dec->show_frame_num = 0;
-	if (pdata == NULL) {
-		pr_info("\namvdec_avs2 memory resource undefined.\n");
-		uninit_mmu_buffers(dec);
-		/* devm_kfree(&pdev->dev, (void *)dec); */
-		vfree((void *)dec);
-		return -EFAULT;
-	}
 
 	if (debug) {
 		pr_info("===AVS2 decoder mem resource 0x%lx size 0x%x\n",

@@ -2,7 +2,7 @@
  * Fundamental types and constants relating to WFA NAN
  * (Neighbor Awareness Networking)
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: nan.h 758133 2018-04-17 19:07:15Z $
+ * $Id: nan.h 818571 2019-05-08 04:36:41Z $
  */
 #ifndef _NAN_H_
 #define _NAN_H_
@@ -291,6 +291,16 @@ typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_ibss_attr_s {
 	/* avail. intervals bitmap, var len  */
 	uint8 avail_bmp[1];
 } BWL_POST_PACKED_STRUCT wifi_nan_ibss_attr_t;
+
+/* Country code attribute  */
+typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_country_code_attr_s {
+	/* Attribute ID - 0x0B. */
+	uint8 id;
+	/* Length of the following fields in the attribute */
+	uint16 len;
+	/* Condensed Country String first two octets */
+	uint8 country_str[2];
+} BWL_POST_PACKED_STRUCT wifi_nan_country_code_attr_t;
 
 /* Further Availability MAP attr  */
 typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_favail_attr_s {
@@ -669,7 +679,7 @@ typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_channel_entry_list_s {
 #define NAN_CHAN_NUM_ENTRIES_MASK 0xF0
 
 typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_band_entry_s {
-	uint8 band[0];
+	uint8 band[1];
 } BWL_POST_PACKED_STRUCT wifi_nan_band_entry_t;
 
 /* Type of  Availability: committed */
@@ -833,6 +843,8 @@ enum
 								NDL_ATTR_TYPE_STATUS_ACCEPTED)
 #define NAN_NDL_REJECT(_ndl)	(((_ndl)->type_status & NAN_NDL_STATUS_MASK) == \
 								NDL_ATTR_TYPE_STATUS_REJECTED)
+#define NAN_NDL_FRM_STATUS(_ndl) \
+	(((_ndl)->type_status & NAN_NDL_STATUS_MASK) >> NAN_NDL_STATUS_SHIFT)
 
 #define NDL_ATTR_CTRL_NONE				0
 #define NDL_ATTR_CTRL_PEER_ID_PRESENT	(1 << NDL_ATTR_CTRL_PEER_ID_PRESENT_SHIFT)
@@ -1072,6 +1084,10 @@ typedef BWL_PRE_PACKED_STRUCT struct nan2_pub_act_frame_s {
 /* Schedule Update */
 #define NAN_MGMT_FRM_SUBTYPE_SCHED_UPD		13
 
+#define NAN_SCHEDULE_AF(_naf_subtype) \
+	((_naf_subtype >= NAN_MGMT_FRM_SUBTYPE_SCHED_REQ) && \
+	(_naf_subtype <= NAN_MGMT_FRM_SUBTYPE_SCHED_UPD))
+
 /* Reason code defines */
 #define NAN_REASON_RESERVED			0x0
 #define NAN_REASON_UNSPECIFIED			0x1
@@ -1138,10 +1154,23 @@ typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_ndp_attr_s {
 									NAN_NDP_STATUS_ACCEPT)
 #define NAN_NDP_REJECT(_ndp)	(((_ndp)->type_status & NAN_NDP_STATUS_MASK) == \
 									NAN_NDP_STATUS_REJECT)
+
+#define NAN_NDP_FRM_STATUS(_ndp) \
+	(((_ndp)->type_status & NAN_NDP_STATUS_MASK) >> NAN_NDP_STATUS_SHIFT)
+
 /* NDP Setup Status */
 #define NAN_NDP_SETUP_STATUS_OK		1
 #define NAN_NDP_SETUP_STATUS_FAIL	0
 #define NAN_NDP_SETUP_STATUS_REJECT	2
+
+/* NDPE TLV list */
+#define NDPE_TLV_TYPE_IPV6		0x00
+#define NDPE_TLV_TYPE_SVC_INFO		0x01
+typedef BWL_PRE_PACKED_STRUCT struct wifi_nan_ndpe_tlv_s {
+	uint8 type;		/* Operating Class */
+	uint16 length;		/* Channel Bitmap */
+	uint8 data[];
+} BWL_POST_PACKED_STRUCT wifi_nan_ndpe_tlv_t;
 
 /* Rng setup attribute type and status macros */
 #define NAN_RNG_TYPE_MASK	0x0F

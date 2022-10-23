@@ -1,4 +1,6 @@
 menu "Media DRM Prebuilt"
 source "../multimedia/libmediadrm/widevine-bin/Config.in"
 source "../multimedia/libmediadrm/libsecmem-bin/Config.in"
+#source "../multimedia/libmediadrm/playready-bin/Config.in"
+source "../multimedia/libmediadrm/youtubesign-bin/Config.in"
 endmenu

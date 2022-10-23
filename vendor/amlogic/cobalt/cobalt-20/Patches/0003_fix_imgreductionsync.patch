@@ -1,0 +1,26 @@
+diff --git a/src/starboard/shared/starboard/player/player_worker.h b/src/starboard/shared/starboard/player/player_worker.h
+index 19b4f4302..c244100c7 100644
+--- a/src/starboard/shared/starboard/player/player_worker.h
++++ b/src/starboard/shared/starboard/player/player_worker.h
+@@ -130,7 +130,11 @@ class PlayerWorker {
+   }
+ 
+   void SetBounds(Bounds bounds) {
+-    job_queue_->Schedule(std::bind(&PlayerWorker::DoSetBounds, this, bounds));
++    SbTimeMonotonic delay = 0;
++    if (old_bounds_.width >= bounds.width && old_bounds_.height >= bounds.height)
++      delay = 120000;
++    job_queue_->Schedule(std::bind(&PlayerWorker::DoSetBounds, this, bounds), delay);
++    old_bounds_ = bounds;
+   }
+ 
+   void SetPause(bool pause) {
+@@ -217,7 +221,7 @@ class PlayerWorker {
+   SbPlayer player_;
+   void* context_;
+   int ticket_;
+-
++  Bounds old_bounds_;
+   SbPlayerState player_state_;
+   scoped_refptr<InputBuffer> pending_audio_buffer_;
+   scoped_refptr<InputBuffer> pending_video_buffer_;

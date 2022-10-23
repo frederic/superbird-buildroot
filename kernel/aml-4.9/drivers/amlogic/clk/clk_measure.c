@@ -1624,6 +1624,9 @@ static const char * const sm1_table[] = {
 };
 
 static const char * const tm2_table[] = {
+	[174] = "revb_earcrx_pll_dmac",
+	[173] = "revb_adec_lr_outrdy",
+	[172] = "revb_atv_dmd_mono_out",
 	[171] = "pcie1_clk_inn",
 	[170] = "pcie1_clk_inp",
 	[169] = "pcie0_phy_bs_clk",
@@ -1637,6 +1640,7 @@ static const char * const tm2_table[] = {
 	[161] = "audio_t0_hdmitx_spdif_clk",
 	[160] = "dspb_clk",
 	[159] = "dspa_clk",
+	[158] = "revb_hdmi_tx_fe",
 	[157] = "vpu_dmc_clk",
 	[156] = "p22_usb2_clkout",
 	[155] = "p21_usb2_clkout",

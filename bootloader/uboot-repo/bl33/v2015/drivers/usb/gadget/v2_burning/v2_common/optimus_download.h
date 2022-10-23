@@ -95,6 +95,7 @@ unsigned v2_key_burn(const char* keyName, const u8* keyVal, const unsigned keyVa
 #define OPTIMUS_DOWNLOAD_TRANSFER_BUF_ADDR      (OPTIMUS_SPARSE_IMG_LEFT_DATA_ADDR_LOW + OPTIMUS_SPARSE_IMG_LEFT_DATA_MAX_SZ)
 
 #define OPTIMUS_DOWNLOAD_SLOT_SZ                (64<<10)    //64K
+#define OPTIMUS_LOCAL_UPGRADE_SLOT_SZ           (OPTIMUS_DOWNLOAD_SLOT_SZ * 16) //1M per time for fatload
 #define OPTIMUS_DOWNLOAD_SLOT_SZ_SHIFT_BITS     (16)    //64K
 #define OPTIMUS_DOWNLOAD_SLOT_NUM               (OPTIMUS_DOWNLOAD_TRANSFER_BUF_TOTALSZ/OPTIMUS_DOWNLOAD_SLOT_SZ)
 
@@ -190,6 +191,8 @@ int platform_busy_increase_un_reported_size(const unsigned nBytes);
 #define OPTIMUS_WORK_MODE_SDC_UPDATE      (0xefe7)
 #define OPTIMUS_WORK_MODE_SDC_PRODUCE     (0xefe8)
 #define OPTIMUS_WORK_MODE_SYS_RECOVERY    (0xefe9)
+#define OPTIMUS_WORK_MODE_UDISK_UPDATE    (0xefea)
+#define OPTIMUS_WORK_MODE_UDISK_PRODUCE   (0xefeb)
 int optimus_work_mode_get(void);
 int optimus_work_mode_set(int workmode);
 
@@ -203,7 +206,9 @@ int optimus_work_mode_set(int workmode);
 
 //ENV for auto jump into producing
 #define _ENV_TIME_OUT_TO_AUTO_BURN "identifyWaitTime"
+#ifndef AML_SYS_RECOVERY_PART
 #define AML_SYS_RECOVERY_PART      "aml_sysrecovery"
+#endif// #ifndef AML_SYS_RECOVERY_PART
 
 #if defined(CONFIG_AML_MTD) && (defined(UBIFS_IMG) || defined(CONFIG_CMD_UBIFS))
 #define OPTIMUS_BURN_TARGET_SUPPORT_UBIFS       1
@@ -214,6 +219,29 @@ int optimus_work_mode_set(int workmode);
 //getenv wrapper to avoid coverity tained string error
 //cannot called nested as it shares the same buffer
 const char* getenv_optimus(const char* name);
+
+#ifdef CONFIG_AML_FACTORY_BURN_LOCAL_UPGRADE
+#define SUM_FUNC_TIME_COST 0
+#if SUM_FUNC_TIME_COST
+#define _func_cost_utime_yret(sum, ret, func, ...) do {\
+    unsigned long uTime = timer_get_us(); \
+    ret = func(__VA_ARGS__); \
+    sum += timer_get_us() - uTime; \
+} while(0)
+
+#define _func_cost_utime_nret(sum, func, ...) do {\
+    unsigned long uTime = timer_get_us(); \
+    func(__VA_ARGS__); \
+    sum += timer_get_us() - uTime; \
+} while(0)
+
+extern unsigned long ImageRdTime;
+extern unsigned long FlashRdTime;
+extern unsigned long FlashWrTime;
+
+#else
+#endif//#if SUM_FUNC_TIME_COST
+#endif//#ifdef CONFIG_AML_FACTORY_BURN_LOCAL_UPGRADE
 
 #endif//ifndef __OPTIMUS_DOWNLOAD_H__
 

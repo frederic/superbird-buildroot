@@ -25,6 +25,10 @@
 // V4L2 async subdevice list.
 #define V4L2_SOC_SENSOR_NAME "SocSensor"
 
+enum info_index{
+    SEN_RESOLUTION = 0,
+    SEN_NAME,
+};
 
 // This is used as the main communication structure between
 // V4L2 ISP Device and V4L2 Sensor Subdevice

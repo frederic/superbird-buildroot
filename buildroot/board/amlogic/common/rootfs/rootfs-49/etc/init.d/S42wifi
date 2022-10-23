@@ -204,6 +204,8 @@ case "$1" in
 		DONE=`start-stop-daemon -K -o -p $PIDFILE3`
 		rm -f $PIDFILE1
 		rm -f $PIDFILE3
+		ifconfig wlan1 down
+		ifconfig wlan0 down
 		$MULTI_WIFI station 0
 		$POWERCTL 0
 		;;

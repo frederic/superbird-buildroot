@@ -25,6 +25,7 @@
               'all_dependent_settings': {
                   'defines': [
                       'COBALT_WIDEVINE_OPTEE',
+                      'SECMEM_V2',
                   ],
                   'include_dirs': [
                       '<!(echo $WIDEVINE_CE_CDM_INC)',

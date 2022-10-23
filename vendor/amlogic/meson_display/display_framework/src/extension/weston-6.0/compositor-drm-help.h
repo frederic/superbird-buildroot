@@ -25,6 +25,8 @@ extern "C" {
 typedef struct _drm_helper_mode {
      int32_t width, height;
      uint32_t refresh;
+     uint32_t flags; /* Use for support drm mode flags, eg: DRM_MODE_FLAG_INTERLACE,DRM_MODE_FLAG_DBLSCAN */
+     const char* aspect_ratio;
 } drm_helper_mode;
 
 typedef struct _drm_helper_rect {

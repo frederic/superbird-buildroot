@@ -76,6 +76,10 @@ AUDIOSERVICE_CONF_OPTS += --enable-avs
 AUDIOSERVICE_DEPENDENCIES += avs-sdk
 endif
 
+ifeq ($(BR2_PACKAGE_DOLBY_ATMOS_VERSION_1_7),y)
+AUDIOSERVICE_CONF_OPTS += --enable-dolby_ver_1_7
+endif
+
 define AUDIOSERVICE_LIB_INSTALL_CMD
 
 endef

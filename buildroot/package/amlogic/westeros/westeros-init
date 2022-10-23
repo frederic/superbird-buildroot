@@ -41,7 +41,13 @@ if [ -f "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
     echo "ERROR: A Wayland compositor $WAYLAND_DISPLAY is already running"
     exit 1
 fi
+#export WESTEROS_GL_DEBUG=3
 export WESTEROS_GL_USE_BEST_MODE=1
+export WESTEROS_GL_MAX_MODE=3840x2160
+export WESTEROS_GL_GRAPHICS_MAX_SIZE=1920x1080
+
 echo 1 > /sys/module/amvdec_ports/parameters/multiplanar
+echo 1 > /sys/module/amvdec_ports/parameters/vp9_need_prefix
+
 exec /usr/bin/westeros --renderer $RENDERER --framerate 60 --display $WAYLAND_DISPLAY
 

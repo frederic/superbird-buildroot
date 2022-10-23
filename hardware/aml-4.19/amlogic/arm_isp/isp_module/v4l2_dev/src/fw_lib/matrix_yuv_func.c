@@ -46,8 +46,8 @@ static void matrix_vector_multiply( int16_t *m, int16_t *v )
     for ( i = 0; i < dim1; ++i ) {
         int32_t temp = 0;
         for ( j = 0; j < dim2; ++j )
-            temp += ( ( (int32_t)m[i * dim2 + j] * v[j] ) >> 8 );
-        result[i] = (uint16_t)temp;
+            temp += ( ( (int32_t)m[i * dim2 + j] * v[j] )  );
+        result[i] = (uint16_t)( ( temp + ( 1 << 7 ) ) >> 8 );
     }
     for ( i = 0; i < dim1; ++i )
         v[i] = ACAMERA_MAX( -1023, ACAMERA_MIN( 1023, result[i] ) );
@@ -66,8 +66,8 @@ static void matrix_matrix_multiply( int16_t *a1, int16_t *a2 )
         for ( j = 0; j < dim3; ++j ) {
             int32_t temp = 0;
             for ( k = 0; k < dim2; ++k )
-                temp += ( ( (int32_t)a1[i * dim2 + k] * a2[k * dim3 + j] ) >> 8 );
-            result[i * dim3 + j] = (int16_t)temp;
+                temp += ( ( (int32_t)a1[i * dim2 + k] * a2[k * dim3 + j] ) );
+            result[i * dim3 + j] = (int16_t)( ( temp + ( 1 << 7 ) ) >> 8 );
         }
     }
     for ( i = 0; i < 9; i++ )
@@ -106,6 +106,17 @@ static void matrix_yuv_clip( int16_t *input )
 }
 static void matrix_yuv_fr_coefft_write_to_hardware( matrix_yuv_fsm_t *p_fsm )
 {
+    // set U and V channel to 0 in black and white mode
+    int i = 0;
+    if ( p_fsm->color_mode == BLACK_AND_WHITE ) {
+       for ( i = 3; i < 9; i++ ) {
+           p_fsm->fr_composite_yuv_matrix[i] = 0;
+       }
+       p_fsm->fr_composite_yuv_matrix[9] = 0;
+       p_fsm->fr_composite_yuv_matrix[10] = 512;
+       p_fsm->fr_composite_yuv_matrix[11] = 512;
+    }
+
     int16_t *yuv_matrix = p_fsm->fr_composite_yuv_matrix;
     acamera_isp_fr_cs_conv_coefft_11_write( p_fsm->cmn.isp_base, yuv_matrix[0] );
     acamera_isp_fr_cs_conv_coefft_12_write( p_fsm->cmn.isp_base, yuv_matrix[1] );
@@ -164,6 +175,16 @@ static void matrix_yuv_fr_coefft_write_to_hardware( matrix_yuv_fsm_t *p_fsm )
 
 static void matrix_yuv_ds_write_to_hardware( matrix_yuv_fsm_t *p_fsm )
 {
+    // set U and V channel to 0 in black and white mode
+    int i = 0;
+    if ( p_fsm->color_mode == BLACK_AND_WHITE ) {
+       for ( i = 3; i < 9; i++ ) {
+           p_fsm->fr_composite_yuv_matrix[i] = 0;
+       }
+       p_fsm->fr_composite_yuv_matrix[9] = 0;
+       p_fsm->fr_composite_yuv_matrix[10] = 512;
+       p_fsm->fr_composite_yuv_matrix[11] = 512;
+    }
 
 #if ISP_HAS_DS1
     int16_t *yuv_matrix = p_fsm->ds1_composite_yuv_matrix;
@@ -379,6 +400,8 @@ static void matrix_compute_hue_saturation( uint16_t value, int16_t *p_matrix )
     for ( _index = 0; _index < 9; _index++ ) {
         p_matrix[_index] = ( hue_coeff[0 + ( _index * 3 )] >> 1 ) + MUL_16_16( hue_coeff[1 + ( _index * 3 )], cosine ) + MUL_16_16( hue_coeff[2 + ( _index * 3 )], sine );
         p_matrix[_index] = p_matrix[_index] >> 5; //(Q13->Q8)
+        if (theta == 0)
+           p_matrix[_index] = identity_matrix[_index];
     }
 }
 static void matrix_compute_color_mode( uint16_t mode, int16_t *p_color_mode_matrix, matrix_yuv_fsm_t *p_fsm )

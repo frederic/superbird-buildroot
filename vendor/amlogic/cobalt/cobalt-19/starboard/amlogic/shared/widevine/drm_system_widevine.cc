@@ -444,6 +444,53 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
   const SbDrmSampleInfo* drm_info = buffer->drm_info();
 
   if (drm_info == NULL || drm_info->initialization_vector_size == 0) {
+    //clr stream
+    if (wvcdm_session_id_clearstream.length() <= 0)
+      return kRetry;
+    std::vector<uint8_t> initialization_vector(16,16);
+    wv3cdm::InputBuffer input;
+    input.data = buffer->data();
+    input.data_length = buffer->size();
+    input.block_offset = 0;
+    input.key_id = 0;
+    input.key_id_length = 0;;
+    input.iv = initialization_vector.data();
+    input.iv_length = static_cast<uint32_t>(initialization_vector.size());
+    input.is_video = (buffer->sample_type() == kSbMediaTypeVideo);
+
+    wv3cdm::OutputBuffer output;
+#if defined(COBALT_WIDEVINE_OPTEE)
+    std::vector<uint8_t> output_data;
+    if ((buffer->sample_type() == kSbMediaTypeVideo) && (decoder_) &&
+      (decoder_->IsTvpMode())) {
+      output.data_length = buffer->size();
+      output.data = decoder_->GetSecMem(output.data_length);
+      if (output.data == NULL) {
+        SB_LOG(ERROR) << "Can't allocate memory in TVP mode, size " << output.data_length;
+        return kFailure;
+      }
+      output.is_secure = true;
+      output_data.assign(sizeof(drminfo_t), 0);
+      drminfo_t *drminfo = (drminfo_t *)&output_data[0];
+      drminfo->drm_level = DRM_LEVEL1;
+      drminfo->drm_pktsize = buffer->size();
+      drminfo->drm_hasesdata = 0;
+      drminfo->drm_phy = (unsigned int)((size_t)(output.data));
+      drminfo->drm_flag = TYPE_DRMINFO | TYPE_PATTERN;
+    } else {
+    // audio use L3
+    output_data.resize(buffer->size());
+    output.data = output_data.data();
+    output.data_length = output_data.size();
+  }
+#endif
+    input.encryption_scheme = wv3cdm::EncryptionScheme::kClear;
+    wv3cdm::Status status = cdm_->decrypt(wvcdm_session_id_clearstream,input, output);
+
+    buffer->SetDecryptedContent(output_data.data(), output_data.size());
+    if(status != wv3cdm::kSuccess) {
+        return kFailure;
+    }
     return kSuccess;
   }
 
@@ -518,10 +565,16 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
         return kFailure;
       }
 
+#if defined(SECMEM_V2)
+      input.data += subsample.clear_byte_count;
+      output.data_offset += subsample.clear_byte_count;
+      input.first_subsample = false;
+#else
       input.data += subsample.clear_byte_count;
       output.data += subsample.clear_byte_count;
       output.data_length -= subsample.clear_byte_count;
       input.first_subsample = false;
+#endif
     }
 
     if (subsample.encrypted_byte_count) {
@@ -542,11 +595,14 @@ SbDrmSystemPrivate::DecryptStatus DrmSystemWidevine::Decrypt(
                                          drm_info->identifier_size);
         return kFailure;
       }
-
+#if defined(SECMEM_V2)
+      input.data += subsample.encrypted_byte_count;
+      output.data_offset += subsample.encrypted_byte_count;
+#else
       input.data += subsample.encrypted_byte_count;
       output.data += subsample.encrypted_byte_count;
       output.data_length -= subsample.encrypted_byte_count;
-
+#endif
       input.block_offset += subsample.encrypted_byte_count;
       input.block_offset %= 16;
 
@@ -590,6 +646,7 @@ void DrmSystemWidevine::GenerateSessionUpdateRequestInternal(
     if (is_first_session) {
       first_wvcdm_session_id_ = wvcdm_session_id;
     }
+    wvcdm_session_id_clearstream = wvcdm_session_id;
     SetTicket(WvdmSessionIdToSbDrmSessionId(wvcdm_session_id), ticket);
     SB_DLOG(INFO) << "Calling generateRequest()";
     status = cdm_->generateRequest(wvcdm_session_id, init_data_type,

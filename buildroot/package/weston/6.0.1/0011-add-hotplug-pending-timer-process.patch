@@ -1,0 +1,153 @@
+From 925f3377e89aeb534d4efce6e09059357369c42b Mon Sep 17 00:00:00 2001
+From: Dezhi Kong <dezhi.kong@amlogic.com>
+Date: Wed, 22 Apr 2020 22:17:50 +0800
+Subject: [PATCH 11/11] add hotplug pending timer process
+
+problem:
+hdmi hot plug out,auto switch to cvbs fail sometimes.
+
+reason:
+hdmitx and cvbs bind with the same crtc,
+when hdmitx plug out,the atomic may not complete right now.
+The auto swith to cvbs get avalible crtc will fail.
+
+solution:
+add hotplug pending flag for auto switch output.
+
+Signed-off-by: Dezhi Kong <dezhi.kong@amlogic.com>
+---
+ Makefile.am                |  9 +++++++++
+ configure.ac               |  4 ++++
+ libweston/compositor-drm.c | 24 +++++++++++++++++++++++-
+ libweston/compositor.c     |  7 ++++++-
+ libweston/compositor.h     |  1 +
+ 5 files changed, 43 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 038fc76..a1e74cd 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -64,6 +64,10 @@ libweston_@LIBWESTON_MAJOR@_la_LIBADD = $(COMPOSITOR_LIBS) \
+ 	$(DL_LIBS) -lm $(CLOCK_GETTIME_LIBS) \
+ 	$(LIBINPUT_BACKEND_LIBS) libshared.la
+ libweston_@LIBWESTON_MAJOR@_la_LDFLAGS = -version-info $(LT_VERSION_INFO)
++if ENABLE_OUTPUT_DYNAMIC_SWITCH
++libweston_@LIBWESTON_MAJOR@_la_CFLAGS += -DAML_OUTPUT_DYNAMIC_SWITCH
++libweston_@LIBWESTON_MAJOR@_la_CPPFLAGS += -DAML_OUTPUT_DYNAMIC_SWITCH
++endif
+ 
+ libweston_@LIBWESTON_MAJOR@_la_SOURCES =			\
+ 	libweston/git-version.h				\
+@@ -405,6 +409,9 @@ drm_backend_la_CFLAGS =				\
+ 	$(DRM_COMPOSITOR_CFLAGS)		\
+ 	$(INPUT_BACKEND_CFLAGS)			\
+ 	$(AM_CFLAGS)
++if ENABLE_OUTPUT_DYNAMIC_SWITCH
++drm_backend_la_CFLAGS += -DAML_OUTPUT_DYNAMIC_SWITCH
++endif
+ drm_backend_la_SOURCES =			\
+ 	libweston/compositor-drm.c		\
+ 	libweston/compositor-drm.h		\
+@@ -426,6 +433,8 @@ drm_backend_la_LDFLAGS += -pthread
+ drm_backend_la_CFLAGS += $(LIBVA_CFLAGS)
+ endif
+ 
++
++
+ # remoting
+ if ENABLE_REMOTING
+ libweston_module_LTLIBRARIES += remoting-plugin.la
+diff --git a/configure.ac b/configure.ac
+index 7056ad1..0cc559d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -250,6 +250,10 @@ if test x$enable_drm_compositor = xyes; then
+ 		    [AC_MSG_WARN([GBM does not support dmabuf import, will omit that capability])])
+ fi
+ 
++AC_ARG_ENABLE(output-dynamic-switch, [  --enable-output-dynamic-switch],,
++	      enable_output_dynamic_switch=yes)
++AM_CONDITIONAL(ENABLE_OUTPUT_DYNAMIC_SWITCH, test x$enable_output_dynamic_switch = xyes)
++
+ AC_ARG_ENABLE(drm-fix-ui-size, [  --enable-drm-fix-ui-size],,
+ 	      enable_drm_fix_ui_size=no)
+ AM_CONDITIONAL(ENABLE_DRM_FIX_UI_SIZE, test x$enable_drm_fix_ui_size = xyes)
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index e4c05a9..3971a03 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -1922,6 +1922,15 @@ drm_output_update_complete(struct drm_output *output, uint32_t flags,
+ 	drm_output_state_free(output->state_last);
+ 	output->state_last = NULL;
+ 
++	if (output->base.compositor->hpd_pending) {
++	#ifdef AML_OUTPUT_DYNAMIC_SWITCH
++		output->base.compositor->hpd_pending = 0;
++		wl_signal_emit(&output->base.compositor->heads_changed_signal,
++			       output->base.compositor);
++		weston_log("%s: hpd_pending to 0\n", __func__);
++	#endif
++	}
++
+ 	if (output->destroy_pending) {
+ 		output->destroy_pending = 0;
+ 		output->disable_pending = 0;
+@@ -6818,11 +6827,24 @@ udev_drm_event(int fd, uint32_t mask, void *data)
+ {
+ 	struct drm_backend *b = data;
+ 	struct udev_device *event;
++#ifdef AML_OUTPUT_DYNAMIC_SWITCH
++	struct drm_output *output;
++#endif
+ 
+ 	event = udev_monitor_receive_device(b->udev_monitor);
+ 
+-	if (udev_event_is_hotplug(b, event))
++	if (udev_event_is_hotplug(b, event)) {
++#ifdef AML_OUTPUT_DYNAMIC_SWITCH
++		wl_list_for_each(output, &b->compositor->output_list, base.link) {
++			if (output->page_flip_pending || output->vblank_pending ||
++			    output->atomic_complete_pending) {
++				b->compositor->hpd_pending = 1;
++				weston_log("%s: hpd_pending to 1\n", __func__);
++			}
++		}
++#endif
+ 		drm_backend_update_heads(b, event);
++	}
+ 
+ 	udev_device_unref(event);
+ 
+diff --git a/libweston/compositor.c b/libweston/compositor.c
+index e117479..4414aa5 100644
+--- a/libweston/compositor.c
++++ b/libweston/compositor.c
+@@ -4733,7 +4733,12 @@ weston_compositor_call_heads_changed(void *data)
+ 
+ 	compositor->heads_changed_source = NULL;
+ 
+-	wl_signal_emit(&compositor->heads_changed_signal, compositor);
++#ifdef AML_OUTPUT_DYNAMIC_SWITCH
++	if (compositor->hpd_pending)
++		weston_log("hpd_pending delay heads_changed_signal\n");
++	else
++#endif
++		wl_signal_emit(&compositor->heads_changed_signal, compositor);
+ 
+ 	wl_list_for_each(head, &compositor->head_list, compositor_link) {
+ 		if (head->output && head->output->enabled)
+diff --git a/libweston/compositor.h b/libweston/compositor.h
+index 3af1443..e9f56ea 100644
+--- a/libweston/compositor.h
++++ b/libweston/compositor.h
+@@ -1111,6 +1111,7 @@ struct weston_compositor {
+ 	uint32_t idle_inhibit;
+ 	int idle_time;			/* timeout, s */
+ 	struct wl_event_source *repaint_timer;
++	bool hpd_pending;
+ 
+ 	const struct weston_pointer_grab_interface *default_pointer_grab;
+ 
+-- 
+2.26.1
+

@@ -37,7 +37,14 @@
 #define V3_IE_F_ZERO_SAD_I16 (I16MB_WEIGHT_OFFSET + 0x10)
 #define V3_IE_F_ZERO_SAD_I4 (I4MB_WEIGHT_OFFSET + 0x20)
 #define V3_ME_F_ZERO_SAD (ME_WEIGHT_OFFSET + 0x10)
+#define ME_WEIGHT_OFFSET_CUSTOM 0x340
+#define I4MB_WEIGHT_OFFSET_CUSTOM 0x755
+#define I16MB_WEIGHT_OFFSET_CUSTOM 0x340
+#define V3_IE_F_ZERO_SAD_I16_CUSTOM (I16MB_WEIGHT_OFFSET_CUSTOM + 0x80)
+#define V3_IE_F_ZERO_SAD_I4_CUSTOM (I4MB_WEIGHT_OFFSET_CUSTOM + 0x80)
+#define V3_ME_F_ZERO_SAD_CUSTOM (ME_WEIGHT_OFFSET_CUSTOM + 0x20)
 
+#define PROPERTY_VALUE_MAX 96
 static uint32_t qp_tbl_default[] = {
     0x02010001, 0x06050403,
     0x08080707, 0x09090909,
@@ -58,6 +65,43 @@ static uint32_t qp_tbl_none_cbr_once[] = {
     0x04040404, 0x05050505,
     0x06060606, 0x07070707
 };
+static uint32_t qp_tbl_default_custom[] = {
+    0x00000000, 0x01010101,
+    0x03030202, 0x05050404,
+    0x06060606, 0x07070707,
+    0x08080808, 0x09090909
+};
+static uint32_t qp_tbl_i4i16[] = {
+    0x00000000, 0x01010101,
+    0x03030202, 0x04040303,
+    0x05050404, 0x06060505,
+    0x07070606, 0x07070707
+};
+static uint32_t qp_tbl_i_new[] = {
+    0x00000000, 0x01010101,
+    0x02020202, 0x03030303,
+    0x04040404, 0x05050505,
+    0x06060606, 0x07070707
+};
+bool isSVCandVBR(void) {
+	return true;
+//	bool ret = false;
+//	char prop[PROPERTY_VALUE_MAX];
+//	int media_custom = 0;
+//#ifdef SUPPORT_STANDARD_PROP
+//	if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//	if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//		sscanf(prop, "%d", &media_custom);
+//	}
+//	int svc_enable = amsysfs_get_sysfs_int("/sys/module/encoder/parameters/svc_enable");
+//	if (media_custom != 0 && svc_enable != 0)
+//		ret = true;
+//	else
+//		ret = false;
+//	return ret;
+}
 static int encode_poll(int fd, int timeout) {
     struct pollfd poll_fd[1];
     poll_fd[0].fd = fd;
@@ -321,7 +365,7 @@ static int set_input(gx_fast_enc_drv_t* p, ulong *yuv, uint32_t enc_width, uint3
     src->crop.src_h = 0;
     p->scale_enable = false;
 
-    if ((scale_width) && (scale_height) || (fmt == AMVENC_BGR888)) {
+    if (((scale_width) && (scale_height)) || (fmt == AMVENC_BGR888)) {
         p->scale_enable = true;
         src->crop.crop_top = crop_top;
         src->crop.crop_bottom = crop_bottom;
@@ -432,6 +476,9 @@ static void Prepare_CBR_BitsTable(gx_fast_enc_drv_t* p, bool rc)
         for (j = 0; j < p->block_width_n; j++) {
             offset = i * p->block_width_n + j;
             if (rc) {
+                if (p->qp_stic.f_sad_count <= 0) {
+                    p->qp_stic.f_sad_count = 1;
+                }
                 p->block_mb_size[offset] =
                     (uint32_t) (((unsigned long long) (target * p->block_sad_size[offset])) /p->qp_stic.f_sad_count);
                 if (p->block_mb_size[offset] > 0xffff)
@@ -463,6 +510,48 @@ void smooth_tbl(uint32_t tbl[])
             //LOGAPI("EB smooth qp %x", tbl[i]);
         }
 }
+static void smooth_tbl_mode(gx_fast_enc_drv_t* p, uint32_t tbl[]) {
+  uint8_t* max_value;
+  int qp_min, qp_max;
+  if (p == NULL)
+    return;
+  if (p->IDRframe) {
+    qp_min = 15;
+    qp_max = 30;
+  } else {
+    qp_min = 20;
+    qp_max = 35;
+  }
+
+  if (isSVCandVBR()) {
+	int qpbase = 43;
+
+//#ifdef SUPPORT_STANDARD_PROP
+//	if (property_get("vendor.media.encoder.qpbase", prop, NULL) > 0) {
+//#else
+//	if (property_get("media.encoder.qpbase", prop, NULL) > 0) {
+//#endif
+//		sscanf(prop, "%d", &qpbase);
+//	}
+
+	if (qpbase > 0 && qpbase > qp_min) {
+		qp_max = qpbase;
+	}
+  }
+  for (int i = 0; i < 8; i++) {
+    max_value = (uint8_t*)(&tbl[i]);
+    max_value += 3;
+    for (int j = 0; j < 4; j++) {
+      if (*max_value > qp_max) {
+        *max_value = qp_max;
+      }
+      if (*max_value < qp_min) {
+        *max_value = qp_min;
+      }
+      max_value--;
+    }
+  }
+}
 
 static void Fill_CBR_Table(gx_fast_enc_drv_t* p, bool rc)
 {
@@ -472,7 +561,30 @@ static void Fill_CBR_Table(gx_fast_enc_drv_t* p, bool rc)
     unsigned char *tbl_addr;
     uint16_t *short_addr;
     uint32_t tbl[8];
+    char prop[PROPERTY_VALUE_MAX];
+    int value = 0;
 
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &value);
+//    }
+
+    int media_value = 0;
+
+//    memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_value);
+//    }
+
+    if (p->bitrate_urgent_mode)
+        media_value = 1;
     if (rc) {
         uint32_t qp_base =qp | qp << 8 | qp << 16 | qp << 24;
         qp_step = 0x01010101;
@@ -491,16 +603,28 @@ static void Fill_CBR_Table(gx_fast_enc_drv_t* p, bool rc)
         memcpy(tbl_addr+64, &tbl[0], sizeof(tbl));
         short_addr = (uint16_t *)(tbl_addr + 96);
         if (i >= 13) {
+            if (value > 0 || media_value > 0) {
+                *short_addr++ = I4MB_WEIGHT_OFFSET + 4000;
+                *short_addr++ = I16MB_WEIGHT_OFFSET;
+                *short_addr++ = ME_WEIGHT_OFFSET + 3500;
+            } else {
             *short_addr++ = I4MB_WEIGHT_OFFSET + ((i - 13) * 0x380);
             *short_addr++ = I16MB_WEIGHT_OFFSET;// + ((i - 13) * 0x800);
             *short_addr++ = ME_WEIGHT_OFFSET + ((i - 13) * 0x200);
+            }
             *short_addr++ = V3_IE_F_ZERO_SAD_I4+ ((i - 13) * 0x480);
             *short_addr++ = V3_IE_F_ZERO_SAD_I16 + ((i - 13) * 0x200);
             *short_addr++ = V3_ME_F_ZERO_SAD + ((i - 13) * 0x280);
         } else {
+            if (value > 0 || media_value > 0) {
+                *short_addr++ = I4MB_WEIGHT_OFFSET + 4000;
+                *short_addr++ = I16MB_WEIGHT_OFFSET;
+                *short_addr++ = ME_WEIGHT_OFFSET + 3500;
+            } else {
                 *short_addr++ = I4MB_WEIGHT_OFFSET;
                 *short_addr++ = I16MB_WEIGHT_OFFSET;
                 *short_addr++ = ME_WEIGHT_OFFSET;
+            }
             *short_addr++ = V3_IE_F_ZERO_SAD_I4;
             *short_addr++ = V3_IE_F_ZERO_SAD_I16;
             *short_addr++ = V3_ME_F_ZERO_SAD;
@@ -519,8 +643,129 @@ static void Fill_CBR_Table(gx_fast_enc_drv_t* p, bool rc)
     return;
 }
 
+static void Fill_CBR_Table_Custom(gx_fast_enc_drv_t* p, bool rc)
+{
+    unsigned char qp = (p->quant > START_TABLE_ID) ? (p->quant - START_TABLE_ID) : 0;
+    uint32_t qp_step;
+    unsigned int i;
+    unsigned char *tbl_addr;
+    uint16_t *short_addr;
+    uint32_t tbl[8];
+    uint32_t tbl_i4i16[8];
+    char prop[PROPERTY_VALUE_MAX];
+    int value = 0;
+
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &value);
+//    }
+
+    int media_value = 0;
+//    memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_value);
+//    }
+    if (p->bitrate_urgent_mode)
+        media_value = 1;
+    if (rc) {
+        uint32_t qp_base =qp | qp << 8 | qp << 16 | qp << 24;
+        qp_step = 0x01010101;
+        for (i = 0; i < 8; i++) {
+            tbl[i] = qp_base + p->qp_tbl[i];
+            tbl_i4i16[i] = qp_base + qp_tbl_i4i16[i];
+        }
+    } else {
+        memset(tbl, p->quant, sizeof(tbl));
+        memset(tbl_i4i16, p->quant, sizeof(tbl_i4i16));
+        qp_step = 0;
+    }
+    smooth_tbl_mode(p,tbl);
+    smooth_tbl_mode(p,tbl_i4i16);
+    tbl_addr = p->cbr_buff.addr;
+    for (i = 0; i < 16; i++) {
+        memcpy(tbl_addr, &tbl_i4i16[0], sizeof(tbl_i4i16));
+        memcpy(tbl_addr+32, &tbl_i4i16[0], sizeof(tbl_i4i16));
+        memcpy(tbl_addr+64, &tbl[0], sizeof(tbl));
+        short_addr = (uint16_t *)(tbl_addr + 96);
+        if (i >= 13) {
+            if (value > 0 || media_value > 0) {
+                *short_addr++ = I4MB_WEIGHT_OFFSET_CUSTOM + 4000;
+                *short_addr++ = I16MB_WEIGHT_OFFSET_CUSTOM;
+                *short_addr++ = ME_WEIGHT_OFFSET_CUSTOM + 3500;
+                *short_addr++ = V3_IE_F_ZERO_SAD_I4_CUSTOM + ((i - 13) * 0x480);
+                *short_addr++ = V3_IE_F_ZERO_SAD_I16_CUSTOM + ((i - 13) * 0x200);
+                *short_addr++ = V3_ME_F_ZERO_SAD_CUSTOM + ((i - 13) * 0x280);
+            } else {
+                *short_addr++ = I4MB_WEIGHT_OFFSET;// + ((i - 13) * 0x380);
+                *short_addr++ = I16MB_WEIGHT_OFFSET;// + ((i - 13) * 0x800);
+                *short_addr++ = ME_WEIGHT_OFFSET;// + ((i - 13) * 0x200);
+                *short_addr++ = V3_IE_F_ZERO_SAD_I4+ ((i - 13) * 0x480);
+                *short_addr++ = V3_IE_F_ZERO_SAD_I16 + ((i - 13) * 0x200);
+                *short_addr++ = V3_ME_F_ZERO_SAD + ((i - 13) * 0x280);
+            }
+        } else {
+            if (value > 0 || media_value > 0) {
+                *short_addr++ = I4MB_WEIGHT_OFFSET_CUSTOM + 4000;
+                *short_addr++ = I16MB_WEIGHT_OFFSET_CUSTOM;
+                *short_addr++ = ME_WEIGHT_OFFSET_CUSTOM + 3500;
+                *short_addr++ = V3_IE_F_ZERO_SAD_I4_CUSTOM;
+                *short_addr++ = V3_IE_F_ZERO_SAD_I16_CUSTOM;
+                *short_addr++ = V3_ME_F_ZERO_SAD_CUSTOM;
+            } else {
+                *short_addr++ = I4MB_WEIGHT_OFFSET;
+                *short_addr++ = I16MB_WEIGHT_OFFSET;
+                *short_addr++ = ME_WEIGHT_OFFSET;
+                *short_addr++ = V3_IE_F_ZERO_SAD_I4;
+                *short_addr++ = V3_IE_F_ZERO_SAD_I16;
+                *short_addr++ = V3_ME_F_ZERO_SAD;
+            }
+        }
+        *short_addr++ = 0x55aa;
+        *short_addr++ = 0xaa55;
+        tbl_addr += 128;
+        if (p->IDRframe) {
+            if (i == 4 || i == 6 || i == 8 || i >= 10) {
+                qp_step = 0x01010101;
+            } else {
+                qp_step = 0;
+            }
+        } else {
+            if (i == 1 ||i == 3 || i == 5 || i >=6) {
+                qp_step = 0x01010101;
+            } else {
+                qp_step = 0;
+            }
+        }
+        for (int j = 0; j < 8; j++) {
+            tbl[j] += qp_step;
+            tbl_i4i16[j] += qp_step;
+        }
+        smooth_tbl_mode(p, tbl);
+        smooth_tbl_mode(p,tbl_i4i16);
+    }
+    short_addr = (uint16_t *) (p->cbr_buff.addr + 0x800);
+    for (i = 0; i < p->block_width_n * p->block_height_n; i++)
+        short_addr[i] = (uint16_t) p->block_mb_size[i];
+    return;
+}
 void gen_qp_table(gx_fast_enc_drv_t* p, uint32_t * dst, qp_table_type type)
 {
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
     if (type == curve) {
         int qp_base = p->quant | p->quant << 8 | p->quant << 16 | p->quant << 24;
         for (int i = 0; i < 8; i++) {
@@ -537,10 +782,15 @@ void gen_qp_table(gx_fast_enc_drv_t* p, uint32_t * dst, qp_table_type type)
             memset(dst + sizeof(qp_table_t) / 4 / 3 * 2 + i, p->quant + (i - 4), 4);
         }
     }
-
+    if (media_custom > 0) {
+        smooth_tbl_mode(p, dst);
+        smooth_tbl_mode(p, dst + sizeof(qp_table_t) / 4 / 3);
+        smooth_tbl_mode(p, dst + sizeof(qp_table_t) / 4 / 3 * 2);
+    } else {
     smooth_tbl(dst);
     smooth_tbl(dst + sizeof(qp_table_t) / 4 / 3);
     smooth_tbl(dst + sizeof(qp_table_t) / 4 / 3 * 2);
+    }
 }
 
 static AMVEnc_Status start_ime_cbr(gx_fast_enc_drv_t* p, unsigned char* outptr, int* datalen) {
@@ -553,6 +803,15 @@ static AMVEnc_Status start_ime_cbr(gx_fast_enc_drv_t* p, unsigned char* outptr, 
     uint32_t qp_base;
     uint32_t tbl_offset = sizeof(qp_table_t) / 4 /3;
     uint32_t info_off;
+    char prop_custom[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop_custom, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop_custom, NULL) > 0) {
+//#endif
+//        sscanf(prop_custom, "%d", &media_custom);
+//    }
 
     if (p->logtime)
         gettimeofday(&p->start_test, NULL);
@@ -576,10 +835,40 @@ static AMVEnc_Status start_ime_cbr(gx_fast_enc_drv_t* p, unsigned char* outptr, 
         memset(&control_info[17], p->quant, sizeof(qp_table_t));
     }
     Prepare_CBR_BitsTable(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    if (media_custom > 0) {
+        Fill_CBR_Table_Custom(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    } else {
     Fill_CBR_Table(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    }
+//    char prop[PROPERTY_VALUE_MAX];
+    int value = 0;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("hw.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &value);
+//    }
+    int media_value = 0;
+//    memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.test", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.test", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_value);
+//    }
+    if (p->bitrate_urgent_mode)
+        media_value = 1;
+    if (value > 0 || media_value > 0) {
+        control_info[info_off++] = -4000;
+    control_info[info_off++] = 0;
+        control_info[info_off++] = -3500;
+    } else {
     control_info[info_off++] = 0;
     control_info[info_off++] = 0;
-    control_info[info_off++] = 0;
+        control_info[info_off++] = 0;
+    }
     control_info[info_off++] = p->block_width;
     control_info[info_off++] = p->block_height;
     control_info[info_off++] = CBR_LONG_THRESH;
@@ -643,9 +932,26 @@ static AMVEnc_Status start_intra_cbr_twice(gx_fast_enc_drv_t* p, unsigned char* 
     uint32_t qp_base;
     uint32_t tbl_offset = sizeof(qp_table_t) / 4 /3;
     uint32_t info_off;
+    uint32_t q_backup;
 
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
     if (p->logtime)
         gettimeofday(&p->start_test, NULL);
+    if (media_custom < 1) {
+        q_backup = p->quant;
+        if (p->quant <= 23) {
+            p->quant = 23;
+            LOGAPI("p->quant = %d\n", p->quant);
+        }
+    }
 
     p->re_encode = false;
     control_info[0] = ENCODER_IDR;
@@ -663,7 +969,11 @@ static AMVEnc_Status start_intra_cbr_twice(gx_fast_enc_drv_t* p, unsigned char* 
 
     memset(&control_info[17], p->quant, sizeof(qp_table_t));
     Prepare_CBR_BitsTable(p, false);
+    if (media_custom > 0) {
+        Fill_CBR_Table_Custom(p, false);
+    } else {
     Fill_CBR_Table(p, false);
+    }
     control_info[info_off++] = 0;
     control_info[info_off++] = 0;
     control_info[info_off++] = 0;
@@ -716,13 +1026,20 @@ static AMVEnc_Status start_intra_cbr_twice(gx_fast_enc_drv_t* p, unsigned char* 
         ret = AMVENC_TIMEOUT;
     }
 
+    if (media_custom < 1) {
+        p->quant = q_backup;
+    }
     if (p->make_qptl == ADJUSTED_QP_FLAG && status == ENCODER_IDR_DONE) {
         info_off = 17 + tbl_offset * 3;
         control_info[6] = ADJUSTED_QP_FLAG;
         control_info[7] = AMVENC_FLUSH_FLAG_DUMP | AMVENC_FLUSH_FLAG_OUTPUT | AMVENC_FLUSH_FLAG_CBR;
         gen_qp_table(p, &control_info[17], curve);
         Prepare_CBR_BitsTable(p, true);
+        if (media_custom > 0) {
+            Fill_CBR_Table_Custom(p, true);
+        } else {
         Fill_CBR_Table(p, true);
+        }
         control_info[info_off++] = 0;
         control_info[info_off++] = 0;
         control_info[info_off++] = 0;
@@ -779,6 +1096,15 @@ static AMVEnc_Status start_intra_cbr(gx_fast_enc_drv_t* p, unsigned char* outptr
     uint32_t qp_base;
     uint32_t tbl_offset = sizeof(qp_table_t) / 4 /3;
     uint32_t info_off;
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
 
     if (p->logtime)
         gettimeofday(&p->start_test, NULL);
@@ -801,7 +1127,11 @@ static AMVEnc_Status start_intra_cbr(gx_fast_enc_drv_t* p, unsigned char* outptr
         memset(&control_info[17], p->quant, sizeof(qp_table_t));
     }
     Prepare_CBR_BitsTable(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    if (media_custom > 0) {
+        Fill_CBR_Table_Custom(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    } else {
     Fill_CBR_Table(p, (p->make_qptl == ADJUSTED_QP_FLAG) ? true : false);
+    }
     control_info[info_off++] = 0;
     control_info[info_off++] = 0;
     control_info[info_off++] = 0;
@@ -1346,6 +1676,23 @@ void* GxInitFastEncode(int fd, amvenc_initpara_t* init_para) {
         free(p);
         return NULL;
     }
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
+    if (media_custom > 0) {
+        p->qp_mode = 1;    
+        ret = ioctl(p->fd, FASTGX_AVC_IOC_QP_MODE, &(p->qp_mode));
+        if (ret)
+            LOGAPI("set qp mode failed!\n");
+        else
+            LOGAPI("set qp mode successfully!");
+    }
 
     p->quant = init_para->initQP;
     p->enc_width = init_para->enc_width;
@@ -1363,6 +1710,9 @@ void* GxInitFastEncode(int fd, amvenc_initpara_t* init_para) {
     p->gotPPS = false;
     p->fix_qp = -1;
     p->nr_mode = 3;
+    p->cabac_mode = false;
+    p->bitrate_urgent_cnt = 0;
+    p->bitrate_urgent_mode = false;
     p->cbr_hw = init_para->cbr_hw;
     if (p->cbr_hw)
         get_block_resolution(p, p->src.mb_width, p->src.mb_height);
@@ -1403,15 +1753,58 @@ void* GxInitFastEncode(int fd, amvenc_initpara_t* init_para) {
     p->total_encode_time = 0;
     p->scale_enable = false;
     p->make_qptl = ADJUSTED_QP_FLAG;
-    {
-        p->logtime = false;
-        p->logtime = true;
 
+    {
+        char prop[PROPERTY_VALUE_MAX];
+        int value = 0;
+        p->logtime = false;
+//        memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//        if (property_get("vendor.hw.encoder.log.flag", prop, NULL) > 0) {
+//#else
+//        if (property_get("hw.encoder.log.flag", prop, NULL) > 0) {
+//#endif
+//            sscanf(prop, "%d", &value);
+//        }
+
+        if (value & 0x8) {
+			LOGAPI("Enable Debug Time Log, fd:%d", p->fd);
+            p->logtime = true;
+        }
+
+        value = -1;
+//        memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//        if (property_get("vendor.hw.encoder.fix_qp", prop, NULL) > 0) {
+//#else
+//        if (property_get("hw.encoder.fix_qp", prop, NULL) > 0) {
+//#endif
+//            sscanf(prop, "%d", &value);
+//            if ((value >= 0) && (value < 51)) {
+//                p->fix_qp = value;
+//                p->quant = p->fix_qp;
+//                ALOGD("Enable fix qp mode: %d. fd:%d", p->fix_qp, p->fd);
+//            }
+//        }
         if (init_para->rcEnable == false || p->fix_qp >= 0) {
             p->make_qptl = 0;
             p->encode_once = 1;
         }
+        value = -1;
+//        memset(prop, 0, sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//        if (property_get("vendor.hw.encoder.nr_mode", prop, NULL) > 0) {
+//#else
+//        if (property_get("hw.encoder.nr_mode", prop, NULL) > 0) {
+//#endif
+//            sscanf(prop, "%d", &value);
+//            if ((value >= 0) && (value <= 3)) {
+//                p->nr_mode = value;
+//                ALOGD("Set Nr Mode as %d. fd:%d", p->nr_mode, p->fd);
+//            }
+//        }
     }
+
     return (void *) p;
 }
 
@@ -1481,6 +1874,12 @@ AMVEnc_Status GxFastEncodeSPS_PPS(void* dev, unsigned char* outptr, int* datalen
         LOGAPI("sps pps timeout, status:%d, fd:%d", status, p->fd);
         ret = AMVENC_TIMEOUT;
     }
+    if (outptr && *datalen >= 6) {
+        if (outptr[5] == 0x4d) {
+			LOGAPI("Encode in CABAC mode");
+            p->cabac_mode = true;
+        }
+    }
     return ret;
 }
 
@@ -1490,15 +1889,32 @@ AMVEnc_Status GxFastEncodeSlice(void* dev, unsigned char* outptr, int* datalen) 
     if ((!p) || (!outptr) || (!datalen))
         return ret;
 
+    char prop[PROPERTY_VALUE_MAX];
+    int media_custom = 1;
+//#ifdef SUPPORT_STANDARD_PROP
+//    if (property_get("vendor.media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#else
+//    if (property_get("media.encoder.bitrate.custom", prop, NULL) > 0) {
+//#endif
+//        sscanf(prop, "%d", &media_custom);
+//    }
     if (p->fix_qp >= 0)
         p->quant = p->fix_qp;
 
     if (p->cbr_hw) {
         if (p->IDRframe) {
+            if (media_custom > 0) {
+                p->qp_tbl = qp_tbl_i_new;
+            } else {
             p->qp_tbl = qp_tbl_i;
+            }
             ret = start_intra_cbr_twice(p, outptr, datalen);
         } else {
-            p->qp_tbl = qp_tbl_default;
+            if (media_custom > 0) {
+                p->qp_tbl = qp_tbl_default_custom;
+            } else {
+                p->qp_tbl = qp_tbl_default;
+            }
             ret = start_ime_cbr(p, outptr, datalen);
         }
     } else if (p->encode_once) {

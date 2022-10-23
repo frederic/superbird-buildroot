@@ -262,6 +262,11 @@ static int do_GetValidSlot(
     bootable_a = slot_is_bootable(&(info.slots[0]));
     bootable_b = slot_is_bootable(&(info.slots[1]));
 
+    if (dynamic_partition)
+        setenv("partiton_mode","dynamic");
+    else
+        setenv("partiton_mode","normal");
+
     if ((slot == 0) && (bootable_a)) {
         if (has_boot_slot == 1) {
             setenv("active_slot","_a");
@@ -273,6 +278,7 @@ static int do_GetValidSlot(
             setenv("active_slot","normal");
             setenv("boot_part","boot");
             setenv("recovery_part","recovery");
+            setenv("slot-suffixes","-1");
         }
         return 0;
     }
@@ -288,6 +294,7 @@ static int do_GetValidSlot(
             setenv("active_slot","normal");
             setenv("boot_part","boot");
             setenv("recovery_part","recovery");
+            setenv("slot-suffixes","-1");
         }
         return 0;
     }

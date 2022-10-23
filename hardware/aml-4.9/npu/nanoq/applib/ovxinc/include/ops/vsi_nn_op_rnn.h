@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,9 +31,36 @@
 extern "C" {
 #endif
 
+/* enum for inputs/outputs */
+enum
+{
+    RNNCELL_INPUT_INPUT        = 0,
+    RNNCELL_INPUT_WEIGHT_I     = 1,
+    RNNCELL_INPUT_WEIGHT_H     = 2,
+    RNNCELL_INPUT_BIAS         = 3,
+    RNNCELL_INPUT_H_STATE      = 4,
+
+    RNNCELL_INPUT_AUX_INPUT    = 5,
+    RNNCELL_INPUT_AUX_WEIGHT   = 6,
+    RNNCELL_INPUT_CNT,
+
+    RNNCELL_OUTPUT_H_STATE     = 0,
+    RNNCELL_OUTPUT_OUTPUT      = 1,
+    RNNCELL_OUTPUT_CNT
+};
+
+enum
+{
+    RNNCELL_QUANTIZE_PARAM_I,
+    RNNCELL_QUANTIZE_PARAM_H,
+    RNNCELL_QUANTIZE_PARAM_AUX,
+
+    RNNCELL_QUANTIZE_PARAM_COUNT
+};
+
 typedef struct _vsi_nn_rnn_param
 {
-    int32_t activation;
+    vsi_nn_activation_e activation;
 } vsi_nn_rnn_param;
 
 #ifdef __cplusplus

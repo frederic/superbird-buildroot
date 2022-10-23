@@ -57,6 +57,8 @@ struct _general_fsm_t {
     uint32_t wdr_mode_frames;
     uint32_t cur_exp_number;
 #endif
+
+    uint32_t gamma2_enable;
 };
 
 

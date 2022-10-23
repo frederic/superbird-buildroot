@@ -27,6 +27,19 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define MESON_CPU_MAJOR_ID_G12A		0x28
+
+static int is_cpu_id_g12a(void)
+{
+	unsigned int cpu_id_reg = readl(P_AO_SEC_SD_CFG8);
+	unsigned int family_id = (cpu_id_reg >> 24) & (0XFF);
+
+	if (family_id == MESON_CPU_MAJOR_ID_G12A)
+		return 1;
+	else
+		return 0;
+}
+
 static void set_vddee_voltage(unsigned int target_voltage)
 {
 	unsigned int to, pwm_size = 0;
@@ -78,8 +91,16 @@ static void power_off_at_24M(unsigned int suspend_from)
 
 static void power_on_at_24M(unsigned int suspend_from)
 {
-	/*step up ee voltage*/
-	set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
+	/*
+	 * sm1 socket board share BSP code with g12a_skt_v1
+	 */
+	if (is_cpu_id_g12a()) {
+		/*g12a_skt_v1 step up ee voltage*/
+		set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
+	} else {
+		/*sm1 socket step up ee voltage*/
+		set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE_SM1);
+	}
 
 	/*set test_n low to power on vcck & vcc 3.3v*/
 	writel(readl(AO_GPIO_O) | (1 << 31), AO_GPIO_O);
@@ -102,7 +123,7 @@ void get_wakeup_source(void *response, unsigned int suspend_from)
 
 	p->status = RESPONSE_OK;
 	val = (POWER_KEY_WAKEUP_SRC | AUTO_WAKEUP_SRC | REMOTE_WAKEUP_SRC |
-	       BT_WAKEUP_SRC | CECB_WAKEUP_SRC);
+	       BT_WAKEUP_SRC | CEC_WAKEUP_SRC | CECB_WAKEUP_SRC);
 
 	p->sources = val;
 	p->gpio_info_count = i;
@@ -124,9 +145,13 @@ static unsigned int detect_key(unsigned int suspend_from)
 
 	do {
 		#ifdef CONFIG_CEC_WAKEUP
-		if (irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {
+		if (cec_suspend_wakeup_chk())
+			exit_reason = CEC_WAKEUP;
+		if (irq[IRQ_AO_CEC] == IRQ_AO_CEC1_NUM ||
+		    irq[IRQ_AO_CECB] == IRQ_AO_CEC2_NUM) {
+			irq[IRQ_AO_CEC] = 0xFFFFFFFF;
 			irq[IRQ_AO_CECB] = 0xFFFFFFFF;
-			if (cec_power_on_check())
+			if (cec_suspend_handle())
 				exit_reason = CEC_WAKEUP;
 		}
 		#endif

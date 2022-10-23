@@ -10,3 +10,7 @@ media_clock
 firmware
 decoder_common
 stream_input
+
+#optee
+optee
+optee_armtz

@@ -27,7 +27,7 @@
 #if AMLOGIC_GPU_USE_GPPLL
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 16)
 #include <linux/amlogic/amports/gp_pll.h>
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <linux/amlogic/media/clk/gp_pll.h>
 #endif
 #endif
@@ -69,7 +69,9 @@ static inline void mali_clk_exected(void)
 {
 	mali_dvfs_threshold_table * pdvfs = pmali_plat->dvfs_table;
 	uint32_t execStep = currentStep;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	mali_dvfs_threshold_table *dvfs_tbl = &pmali_plat->dvfs_table[currentStep];
+#endif
 
 	//if (pdvfs[currentStep].freq_index == pdvfs[lastStep].freq_index) return;
 	if ((pdvfs[execStep].freq_index == pdvfs[lastStep].freq_index) ||
@@ -90,7 +92,7 @@ static inline void mali_clk_exected(void)
 		is_gp_pll_put = 0;
 		gp_pll_release(gp_pll_user_gpu);
 	}
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	if ((0 == strcmp(dvfs_tbl->clk_parent, "gp0_pll")) &&
 			!IS_ERR(dvfs_tbl->clkp_handle) &&
 			(0 != dvfs_tbl->clkp_freq)) {
@@ -102,11 +104,13 @@ static inline void mali_clk_exected(void)
 	//mali_dev_pause();
 	mali_clock_set(pdvfs[execStep].freq_index);
 	//mali_dev_resume();
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #if AMLOGIC_GPU_USE_GPPLL==0
 	if ((0 == strcmp(pdvfs[lastStep].clk_parent,"gp0_pll")) &&
 		(0 != strcmp(pdvfs[execStep].clk_parent, "gp0_pll"))) {
 			clk_disable_unprepare(pdvfs[lastStep].clkp_handle);
 	}
+#endif
 #endif
 
 	lastStep = execStep;

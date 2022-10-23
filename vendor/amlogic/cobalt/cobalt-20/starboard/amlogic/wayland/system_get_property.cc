@@ -22,6 +22,11 @@
 #include "starboard/common/log.h"
 #include "starboard/common/string.h"
 
+#if SB_API_VERSION >= 11
+const char kCertificationScope[] = "amlogic-2020-ottreference"; // Please fill in the certification scope you get from google team
+const char kBase64EncodedCertificationSecret[] = "Fake Secret"; // If you want to test with SW device authentication, please fill in the device secret key you get from google team
+#endif  // SB_API_VERSION >= 11
+
 namespace {
 
 const char* kFriendlyName = "Linux Desktop";
@@ -122,6 +127,20 @@ bool SbSystemGetProperty(SbSystemPropertyId property_id,
     case kSbSystemPropertyPlatformUuid:
       return GetPlatformUuid(out_value, value_length);
 #endif  // SB_API_VERSION < 10
+
+#if SB_API_VERSION >= 11
+    case kSbSystemPropertyCertificationScope:
+      if (kCertificationScope[0] == '\0')
+        return false;
+      return CopyStringAndTestIfSuccess(out_value, value_length,
+                                        kCertificationScope);
+
+    case kSbSystemPropertyBase64EncodedCertificationSecret:
+      if (kBase64EncodedCertificationSecret[0] == '\0')
+        return false;
+      return CopyStringAndTestIfSuccess(out_value, value_length,
+                                        kBase64EncodedCertificationSecret);
+#endif  // SB_API_VERSION >= 11
 
     default:
       SB_DLOG(WARNING) << __FUNCTION__

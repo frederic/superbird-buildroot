@@ -57,9 +57,10 @@
 		ramoops@0x07400000 {
 			compatible = "ramoops";
 			reg = <0x0 0x07400000 0x0 0x00100000>;
-			record-size = <0x8000>;
-			console-size = <0x8000>;
-			ftrace-size = <0x40000>;
+			record-size = <0x20000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x80000>;
+			pmsg-size = <0x20000>;
 		};
 
 		secmon_reserved:linux,secmon {
@@ -133,20 +134,14 @@
 			alignment = <0x0 0x100000>;
 			//no-map;
 		};
-		/*  vdin0 CMA pool */
-		//vdin0_cma_reserved:linux,vdin0_cma {
-		//	compatible = "shared-dma-pool";
-		//	reusable;
-		/* 1920x1080x2x4  =16+4 M */
-		//	size = <0x0 0x04000000>;
-		//	alignment = <0x0 0x400000>;
-		//};
 		/*  vdin1 CMA pool */
 		vdin1_cma_reserved:linux,vdin1_cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			/* 1920x1080x2x4  =16 M */
-			size = <0x0 0x01000000>;
+			/* up to 1920x1080 yuv422 8bit and 5 buffers
+			 * 1920x1080x2x5 = 20 M
+			 */
+			size = <0x0 0x01400000>;
 			alignment = <0x0 0x400000>;
 		};
 	};
@@ -369,7 +364,7 @@
 	unifykey{
 		compatible = "amlogic, unifykey";
 		status = "ok";
-		unifykey-num = <16>;
+		unifykey-num = <30>;
 		unifykey-index-0 = <&keysn_0>;
 		unifykey-index-1 = <&keysn_1>;
 		unifykey-index-2 = <&keysn_2>;
@@ -386,6 +381,20 @@
 		unifykey-index-13= <&keysn_13>;
 		unifykey-index-14= <&keysn_14>;
 		unifykey-index-15= <&keysn_15>;
+		unifykey-index-16= <&keysn_16>;
+		unifykey-index-17= <&keysn_17>;
+		unifykey-index-18= <&keysn_18>;
+		unifykey-index-19= <&keysn_19>;
+		unifykey-index-20= <&keysn_20>;
+		unifykey-index-21= <&keysn_21>;
+		unifykey-index-22= <&keysn_22>;
+		unifykey-index-23= <&keysn_23>;
+		unifykey-index-24= <&keysn_24>;
+		unifykey-index-25= <&keysn_25>;
+		unifykey-index-26= <&keysn_26>;
+		unifykey-index-27= <&keysn_27>;
+		unifykey-index-28= <&keysn_28>;
+		unifykey-index-29= <&keysn_29>;
 
 		keysn_0: key_0{
 			key-name = "usid";
@@ -468,6 +477,76 @@
 		keysn_15:key_15{
 			key-name = "netflix_mgkid";
 			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+		keysn_16:key_16{
+			key-name = "netflix_mgkid";
+			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+		keysn_17:key_17{
+			key-name = "KEY_WIDEVINE";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_18:key_18{
+			key-name = "KEY_PLAYREADY_PRIVATE";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_19:key_19{
+			key-name = "KEY_PLAYREADY_PUBLIC";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_20:key_20{
+			key-name = "KEY_HDCP_TX14";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_21:key_21{
+			key-name = "KEY_HDCP_TX22";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_22:key_22{
+			key-name = "KEY_HDCP_RX14";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_23:key_23{
+			key-name = "KEY_HDCP_RX22";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_24:key_24{
+			key-name = "KEY_HDCP_RX22_FW";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_25:key_25{
+			key-name = "KEY_HDCP_RX22_FW_PRIVATE";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_26:key_26{
+			key-name = "KEY_KEYMASTER3";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_27:key_27{
+			key-name = "PROVISION_FIELD_ID";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_28:key_28{
+			key-name = "PROVISION_FIELD_PROTECT_KEY";
+			key-device = "provision";
+			key-permit = "read","write","del";
+		};
+		keysn_29:key_29{
+			key-name = "KEY_KM3_ATTEST_DEV_ID_BOX";
+			key-device = "provision";
 			key-permit = "read","write","del";
 		};
 	};//End unifykey
@@ -1302,7 +1381,11 @@
 /*if you want to use vdin just modify status to "ok"*/
 &vdin0 {
 	/*memory-region = <&vdin0_cma_reserved>;*/
-	status = "disabled";
+	status = "okay";
+	/* up to 1920x1080 yuv422 8bit and 5 buffers
+	 * 1920x1080x2x5 = 20 M
+	 */
+	cma_size = <20>;
 	/*vdin write mem color depth support:
 	 *bit0:support 8bit
 	 *bit1:support 9bit
@@ -1310,7 +1393,7 @@
 	 *bit3:support 12bit
 	 *bit4:support yuv422 10bit full pack mode (from txl new add)
 	 */
-	tv_bit_mode = <0x15>;
+	tv_bit_mode = <0x1>;
 };
 &vdin1 {
 	memory-region = <&vdin1_cma_reserved>;

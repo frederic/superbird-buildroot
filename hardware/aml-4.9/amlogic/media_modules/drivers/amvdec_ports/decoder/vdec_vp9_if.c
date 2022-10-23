@@ -33,6 +33,9 @@
 #include "aml_vp9_parser.h"
 #include "vdec_vp9_trigger.h"
 
+#define KERNEL_ATRACE_TAG KERNEL_ATRACE_TAG_V4L2
+#include <trace/events/meson_atrace.h>
+
 #define PREFIX_SIZE	(16)
 
 #define NAL_TYPE(value)				((value) & 0x1F)
@@ -133,11 +136,14 @@ static void get_pic_info(struct vdec_vp9_inst *inst,
 {
 	*pic = inst->vsi->pic;
 
-	aml_vcodec_debug(inst, "pic(%d, %d), buf(%d, %d)",
-			 pic->visible_width, pic->visible_height,
-			 pic->coded_width, pic->coded_height);
-	aml_vcodec_debug(inst, "Y(%d, %d), C(%d, %d)", pic->y_bs_sz,
-			 pic->y_len_sz, pic->c_bs_sz, pic->c_len_sz);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"pic(%d, %d), buf(%d, %d)\n",
+		 pic->visible_width, pic->visible_height,
+		 pic->coded_width, pic->coded_height);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"Y(%d, %d), C(%d, %d)\n",
+		pic->y_bs_sz, pic->y_len_sz,
+		pic->c_bs_sz, pic->c_len_sz);
 }
 
 static void get_crop_info(struct vdec_vp9_inst *inst, struct v4l2_rect *cr)
@@ -147,14 +153,15 @@ static void get_crop_info(struct vdec_vp9_inst *inst, struct v4l2_rect *cr)
 	cr->width = inst->vsi->crop.width;
 	cr->height = inst->vsi->crop.height;
 
-	aml_vcodec_debug(inst, "l=%d, t=%d, w=%d, h=%d",
-			 cr->left, cr->top, cr->width, cr->height);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO,
+		"l=%d, t=%d, w=%d, h=%d\n",
+		 cr->left, cr->top, cr->width, cr->height);
 }
 
 static void get_dpb_size(struct vdec_vp9_inst *inst, unsigned int *dpb_sz)
 {
 	*dpb_sz = inst->vsi->dec.dpb_sz;
-	aml_vcodec_debug(inst, "sz=%d", *dpb_sz);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_EXINFO, "sz=%d\n", *dpb_sz);
 }
 
 static u32 vdec_config_default_parms(u8 *parm)
@@ -202,6 +209,7 @@ static void vdec_parser_parms(struct vdec_vp9_inst *inst)
 		ctx->config.length = pbuf - ctx->config.buf;
 	} else {
 		ctx->config.parm.dec.cfg.double_write_mode = 16;
+		ctx->config.parm.dec.cfg.ref_buf_margin = 7;
 		ctx->config.length = vdec_config_default_parms(ctx->config.buf);
 	}
 
@@ -273,7 +281,8 @@ static int vdec_vp9_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 	inst->vfm.ada_ctx	= &inst->vdec;
 	ret = vcodec_vfm_init(&inst->vfm);
 	if (ret) {
-		pr_err("%s, init vfm failed.\n", __func__);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"init vfm failed.\n");
 		goto err;
 	}
 
@@ -286,14 +295,15 @@ static int vdec_vp9_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 
 	/* alloc the header buffer to be used cache sps or spp etc.*/
 	inst->vsi->header_buf = kzalloc(HEADER_BUFFER_SIZE, GFP_KERNEL);
-	if (!inst->vsi) {
+	if (!inst->vsi->header_buf) {
 		ret = -ENOMEM;
 		goto err;
 	}
 
 	init_completion(&inst->comp);
 
-	aml_vcodec_debug(inst, "vp9 Instance >> %p", inst);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+		"vp9 Instance >> %lx\n", (ulong) inst);
 
 	ctx->ada_ctx	= &inst->vdec;
 	*h_vdec		= (unsigned long)inst;
@@ -301,7 +311,8 @@ static int vdec_vp9_init(struct aml_vcodec_ctx *ctx, unsigned long *h_vdec)
 	/* init decoder. */
 	ret = video_decoder_init(&inst->vdec);
 	if (ret) {
-		aml_vcodec_err(inst, "vdec_vp9 init err=%d", ret);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"vdec_vp9 init err=%d\n", ret);
 		goto err;
 	}
 
@@ -421,19 +432,21 @@ static void fill_vdec_params(struct vdec_vp9_inst *inst,
 	inst->parms.ps.dpb_size		= dec->dpb_sz;
 	inst->parms.parms_status	|= V4L2_CONFIG_PARM_DECODE_PSINFO;
 
-	aml_vcodec_debug(inst, "[%d] The stream infos, dw: %d, coded:(%d x %d), visible:(%d x %d), DPB: %d, margin: %d\n",
-		inst->ctx->id, dw, pic->coded_width, pic->coded_height,
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_BUFMGR,
+		"The stream infos, dw: %d, coded:(%d x %d), visible:(%d x %d), DPB: %d, margin: %d\n",
+		dw, pic->coded_width, pic->coded_height,
 		pic->visible_width, pic->visible_height,
 		dec->dpb_sz - margin, margin);
 }
 
-static int stream_parse_by_ucode(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
+static int parse_stream_ucode(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
 {
 	int ret = 0;
 
 	ret = vdec_write_nalu(inst, buf, size, 0);
 	if (ret < 0) {
-		pr_err("write frame data failed. err: %d\n", ret);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"write frame data failed. err: %d\n", ret);
 		return ret;
 	}
 
@@ -444,18 +457,39 @@ static int stream_parse_by_ucode(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
 	return inst->vsi->dec.dpb_sz ? 0 : -1;
 }
 
-static int stream_parse(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
+static int parse_stream_ucode_dma(struct vdec_vp9_inst *inst,
+	ulong buf, u32 size, u32 handle)
+{
+	int ret = 0;
+	struct aml_vdec_adapt *vdec = &inst->vdec;
+
+	ret = vdec_vframe_write_with_dma(vdec, buf, size, 0, handle);
+	if (ret < 0) {
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"write frame data failed. err: %d\n", ret);
+		return ret;
+	}
+
+	/* wait ucode parse ending. */
+	wait_for_completion_timeout(&inst->comp,
+		msecs_to_jiffies(1000));
+
+	return inst->vsi->dec.dpb_sz ? 0 : -1;
+}
+
+static int parse_stream_cpu(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
 {
 	int ret = 0;
 	struct vp9_param_sets *ps = NULL;
 
-	ps = kzalloc(sizeof(struct vp9_param_sets), GFP_KERNEL);
+	ps = vzalloc(sizeof(struct vp9_param_sets));
 	if (ps == NULL)
 		return -ENOMEM;
 
 	ret = vp9_decode_extradata_ps(buf, size, ps);
 	if (ret) {
-		pr_err("parse extra data failed. err: %d\n", ret);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"parse extra data failed. err: %d\n", ret);
 		goto out;
 	}
 
@@ -464,7 +498,7 @@ static int stream_parse(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
 
 	ret = ps->head_parsed ? 0 : -1;
 out:
-	kfree(ps);
+	vfree(ps);
 
 	return ret;
 }
@@ -474,22 +508,35 @@ static int vdec_vp9_probe(unsigned long h_vdec,
 {
 	struct vdec_vp9_inst *inst =
 		(struct vdec_vp9_inst *)h_vdec;
-	struct stream_info *st;
 	u8 *buf = (u8 *)bs->vaddr;
 	u32 size = bs->size;
 	int ret = 0;
 
-	st = (struct stream_info *)buf;
-	if (inst->ctx->is_drm_mode && (st->magic == DRMe || st->magic == DRMn))
-		return 0;
+	if (inst->ctx->is_drm_mode) {
+		if (bs->model == VB2_MEMORY_MMAP) {
+			struct aml_video_stream *s =
+				(struct aml_video_stream *) buf;
 
-	if (st->magic == NORe || st->magic == NORn)
-		ret = stream_parse(inst, st->data, st->length);
-	else {
-		if (inst->ctx->param_sets_from_ucode)
-			ret = stream_parse_by_ucode(inst, buf, size);
-		else
-			ret = stream_parse(inst, buf, size);
+			if ((s->magic != AML_VIDEO_MAGIC) &&
+				(s->type != V4L_STREAM_TYPE_MATEDATA))
+				return -1;
+
+			if (inst->ctx->param_sets_from_ucode) {
+				ret = parse_stream_ucode(inst, s->data, s->len);
+			} else {
+				ret = parse_stream_cpu(inst, s->data, s->len);
+			}
+		} else if (bs->model == VB2_MEMORY_DMABUF ||
+			bs->model == VB2_MEMORY_USERPTR) {
+			ret = parse_stream_ucode_dma(inst, bs->addr, size,
+				BUFF_IDX(bs, bs->index));
+		}
+	} else {
+		if (inst->ctx->param_sets_from_ucode) {
+			ret = parse_stream_ucode(inst, buf, size);
+		} else {
+			ret = parse_stream_cpu(inst, buf, size);
+		}
 	}
 
 	inst->vsi->cur_pic = inst->vsi->pic;
@@ -502,8 +549,6 @@ static void vdec_vp9_deinit(unsigned long h_vdec)
 	ulong flags;
 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
 	struct aml_vcodec_ctx *ctx = inst->ctx;
-
-	aml_vcodec_debug_enter(inst);
 
 	video_decoder_release(&inst->vdec);
 
@@ -539,14 +584,16 @@ static void vdec_vp9_get_vf(struct vdec_vp9_inst *inst, struct vdec_v4l2_buffer 
 
 	vf = peek_video_frame(&inst->vfm);
 	if (!vf) {
-		aml_vcodec_debug(inst, "there is no vframe.");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"there is no vframe.\n");
 		*out = NULL;
 		return;
 	}
 
 	vf = get_video_frame(&inst->vfm);
 	if (!vf) {
-		aml_vcodec_debug(inst, "the vframe is avalid.");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the vframe is avalid.\n");
 		*out = NULL;
 		return;
 	}
@@ -577,7 +624,8 @@ static void add_prefix_data(struct vp9_superframe_split *s,
 	length = s->size + s->nb_frames * PREFIX_SIZE;
 	p = vzalloc(length);
 	if (!p) {
-		pr_err("alloc size %d failed.\n" ,length);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR,
+			"alloc size %d failed.\n" ,length);
 		return;
 	}
 
@@ -627,7 +675,8 @@ static void trigger_decoder(struct aml_vdec_adapt *vdec)
 		frame_size = vp9_trigger_framesize[i];
 		ret = vdec_vframe_write(vdec, p,
 			frame_size, 0);
-		pr_err("write trigger frame %d\n", ret);
+		v4l_dbg(vdec->ctx, V4L_DEBUG_CODEC_ERROR,
+			"write trigger frame %d\n", ret);
 		p += frame_size;
 	}
 }
@@ -656,7 +705,8 @@ static int vdec_write_nalu(struct vdec_vp9_inst *inst,
 		s.data_size = size;
 		ret = vp9_superframe_split_filter(&s);
 		if (ret) {
-			pr_err("parse frames failed.\n");
+			v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+				"parse frames failed.\n");
 			return ret;
 		}
 
@@ -681,7 +731,7 @@ static bool monitor_res_change(struct vdec_vp9_inst *inst, u8 *buf, u32 size)
 		((p[17] << 16) | (p[18] << 8) | p[19]);
 
 	if (synccode == SYNC_CODE) {
-		ret = stream_parse(inst, p, len);
+		ret = parse_stream_cpu(inst, p, len);
 		if (!ret && (inst->vsi->cur_pic.coded_width !=
 			inst->vsi->pic.coded_width ||
 			inst->vsi->cur_pic.coded_height !=
@@ -699,36 +749,52 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct aml_vcodec_mem *bs,
 {
 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
 	struct aml_vdec_adapt *vdec = &inst->vdec;
-	struct stream_info *st;
-	u8 *buf;
-	u32 size;
+	u8 *buf = (u8 *) bs->vaddr;
+	u32 size = bs->size;
 	int ret = -1;
 
 	if (bs == NULL)
 		return -1;
 
-	if (vdec_input_full(vdec))
+	if (vdec_input_full(vdec)) {
+		ATRACE_COUNTER("vdec_input_full", 0);
 		return -EAGAIN;
+	}
 
-	buf = (u8 *)bs->vaddr;
-	size = bs->size;
-	st = (struct stream_info *)buf;
+	if (inst->ctx->is_drm_mode) {
+		if (bs->model == VB2_MEMORY_MMAP) {
+			struct aml_video_stream *s =
+				(struct aml_video_stream *) buf;
 
-	if (inst->ctx->is_drm_mode && (st->magic == DRMe || st->magic == DRMn))
-		ret = vdec_vbuf_write(vdec, st->m.buf, sizeof(st->m.drm));
-	else if (st->magic == NORe)
-		ret = vdec_vbuf_write(vdec, st->data, st->length);
-	else if (st->magic == NORn)
-		ret = vdec_write_nalu(inst, st->data, st->length, timestamp);
-	else if (inst->ctx->is_stream_mode)
-		ret = vdec_vbuf_write(vdec, buf, size);
-	else {
+			if (s->magic != AML_VIDEO_MAGIC)
+				return -1;
+
+			if (!inst->ctx->param_sets_from_ucode &&
+				(s->type == V4L_STREAM_TYPE_MATEDATA)) {
+				if ((*res_chg = monitor_res_change(inst,
+					s->data, s->len)))
+				return 0;
+			}
+
+			ret = vdec_vframe_write(vdec,
+				s->data,
+				s->len,
+				timestamp);
+		} else if (bs->model == VB2_MEMORY_DMABUF ||
+			bs->model == VB2_MEMORY_USERPTR) {
+			ret = vdec_vframe_write_with_dma(vdec,
+				bs->addr, size, timestamp,
+				BUFF_IDX(bs, bs->index));
+		}
+	} else {
 		/*checked whether the resolution changes.*/
-		if ((*res_chg = monitor_res_change(inst, buf, size)))
+		if ((!inst->ctx->param_sets_from_ucode) &&
+			(*res_chg = monitor_res_change(inst, buf, size)))
 			return 0;
 
 		ret = vdec_write_nalu(inst, buf, size, timestamp);
 	}
+	ATRACE_COUNTER("v4l2_decode_write", ret);
 
 	return ret;
 }
@@ -747,7 +813,8 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct aml_vcodec_mem *bs,
 
 	 parms->parms_status |= inst->parms.parms_status;
 
-	 aml_vcodec_debug(inst, "parms status: %u", parms->parms_status);
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+		"parms status: %u\n", parms->parms_status);
  }
 
 static int vdec_vp9_get_param(unsigned long h_vdec,
@@ -757,7 +824,8 @@ static int vdec_vp9_get_param(unsigned long h_vdec,
 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
 
 	if (!inst) {
-		pr_err("the vp9 inst of dec is invalid.\n");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the vp9 inst of dec is invalid.\n");
 		return -1;
 	}
 
@@ -786,7 +854,8 @@ static int vdec_vp9_get_param(unsigned long h_vdec,
 		get_param_config_info(inst, out);
 		break;
 	default:
-		aml_vcodec_err(inst, "invalid get parameter type=%d", type);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"invalid get parameter type=%d\n", type);
 		ret = -EINVAL;
 	}
 
@@ -823,7 +892,7 @@ static void set_param_ps_info(struct vdec_vp9_inst *inst,
 	pic->c_len_sz		= pic->y_len_sz >> 1;
 
 	/* calc DPB size */
-	dec->dpb_sz		= 5;
+	dec->dpb_sz		= ps->dpb_size;
 
 	inst->parms.ps 	= *ps;
 	inst->parms.parms_status |=
@@ -832,7 +901,8 @@ static void set_param_ps_info(struct vdec_vp9_inst *inst,
 	/*wake up*/
 	complete(&inst->comp);
 
-	pr_info("Parse from ucode, crop(%d x %d), coded(%d x %d) dpb: %d\n",
+	v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+		"Parse from ucode, crop(%d x %d), coded(%d x %d) dpb: %d\n",
 		ps->visible_width, ps->visible_height,
 		ps->coded_width, ps->coded_height,
 		ps->dpb_size);
@@ -848,14 +918,16 @@ static void set_param_hdr_info(struct vdec_vp9_inst *inst,
 			V4L2_CONFIG_PARM_DECODE_HDRINFO;
 		aml_vdec_dispatch_event(inst->ctx,
 			V4L2_EVENT_SRC_CH_HDRINFO);
-		pr_info("VP9 set HDR infos\n");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+			"VP9 set HDR infos\n");
 	}
 }
 
 static void set_param_post_event(struct vdec_vp9_inst *inst, u32 *event)
 {
 		aml_vdec_dispatch_event(inst->ctx, *event);
-		pr_info("VP9 post event: %d\n", *event);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_PRINFO,
+			"VP9 post event: %d\n", *event);
 }
 
 static int vdec_vp9_set_param(unsigned long h_vdec,
@@ -865,7 +937,8 @@ static int vdec_vp9_set_param(unsigned long h_vdec,
 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
 
 	if (!inst) {
-		pr_err("the vp9 inst of dec is invalid.\n");
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"the vp9 inst of dec is invalid.\n");
 		return -1;
 	}
 
@@ -886,7 +959,8 @@ static int vdec_vp9_set_param(unsigned long h_vdec,
 		set_param_post_event(inst, in);
 		break;
 	default:
-		aml_vcodec_err(inst, "invalid set parameter type=%d", type);
+		v4l_dbg(inst->ctx, V4L_DEBUG_CODEC_ERROR,
+			"invalid set parameter type=%d\n", type);
 		ret = -EINVAL;
 	}
 

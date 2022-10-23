@@ -32,11 +32,16 @@
 #define GE2D_BPP_12  12
 #define GE2D_BPP_8   8
 
-static int  pixel_to_ge2d_format(int img_format, int *pge2d_format,int *p_bpp)
+static int  pixel_to_ge2d_format(int *img_format, int *pge2d_format,int *p_bpp)
 {
     int is_one_plane = -1;
+    int custom_matrix_used = 0;
 
-    switch (img_format) {
+    if (*img_format & MATRIX_CUSTOM) {
+        custom_matrix_used = 1;
+        *img_format &= ~MATRIX_CUSTOM;
+    }
+    switch (*img_format) {
         case PIXEL_FORMAT_RGBA_8888:
         case PIXEL_FORMAT_RGBX_8888:
         *pge2d_format = GE2D_FORMAT_S32_ABGR;
@@ -94,11 +99,14 @@ static int  pixel_to_ge2d_format(int img_format, int *pge2d_format,int *p_bpp)
         is_one_plane = 0;
         break;
         default:
-        E_GE2D("Image format %d not supported!", img_format);
+        E_GE2D("Image format %d not supported!", *img_format);
         *pge2d_format = 0xffffffff;
         *p_bpp = GE2D_BPP_32;
         break;
     }
+
+    if (custom_matrix_used)
+        *pge2d_format |= GE2D_MATRIX_CUSTOM;
     return is_one_plane;
 }
 
@@ -226,7 +234,7 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_ion_s ));
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -234,15 +242,15 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
         }
         ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
 
-        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }else {
-        is_one_plane = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
 
-        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }
@@ -286,7 +294,6 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
         default:
             break;
     }
-
 
     if (CANVAS_ALLOC == output_buffer_info->memtype) {
         if (is_one_plane == 1) {
@@ -342,8 +349,8 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
                         d_canvas_h;
                     ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[0];
                 } else if (output_buffer_info->plane_number == 3) {
-                    ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset[1];
-                    ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[1];
+                    ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset[2];
+                    ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[2];
                 }
                 break;
             case 2:
@@ -357,8 +364,8 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
                         d_canvas_h + CANVAS_ALIGNED(d_canvas_w/2) * d_canvas_h/2;
                     ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[0];
                 } else if (output_buffer_info->plane_number == 3) {
-                    ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset[2];
-                    ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[2];
+                    ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset[1];
+                    ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd[1];
                 }
                 break;
             default:
@@ -428,7 +435,7 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_ion_s ));
 
     if ((CANVAS_ALLOC == input_buffer_info->memtype)) {
-        is_one_plane_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        is_one_plane_input = pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -438,7 +445,7 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     }
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane_output = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -788,7 +795,7 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_ion_s ));
 
     if (CANVAS_ALLOC == input_buffer_info->memtype) {
-        is_one_plane_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        is_one_plane_input = pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -797,7 +804,7 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }
     if ((CANVAS_ALLOC == input2_buffer_info->memtype)) {
-        is_one_plane_input2 = pixel_to_ge2d_format(input2_buffer_info->format,&src2_format,&bpp);
+        is_one_plane_input2 = pixel_to_ge2d_format(&input2_buffer_info->format,&src2_format,&bpp);
         src2_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src2_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -807,7 +814,7 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     }
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane_output = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -834,11 +841,21 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex.src_para.color = input_buffer_info->def_color;
     ge2d_config_ex.src_para.fill_color_en = input_buffer_info->fill_color_en;
 
-    if (input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+    /* top layer factor, use premult/coverage/none
+     * depends on top layer mode
+     */
+    if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
+        pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
+        pge2dinfo->blend_mode = BLEND_MODE_COVERAGE;
+    else
+        pge2dinfo->blend_mode = BLEND_MODE_NONE;
+
+    if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
         ge2d_config_ex.src1_cmult_asel = 2;
-    else if (input_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
         ge2d_config_ex.src1_cmult_asel = 0;
-    else if (input_buffer_info->layer_mode == LAYER_MODE_NON)
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_NON)
         ge2d_config_ex.src1_cmult_asel = 0;
 
     ge2d_config_ex.src2_para.mem_type = input2_buffer_info->memtype;
@@ -850,21 +867,21 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex.src2_para.color = input2_buffer_info->def_color;
     ge2d_config_ex.src2_para.fill_color_en = input2_buffer_info->fill_color_en;
     if (pge2dinfo->cap_attr == 0x1) {
-        if (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+        if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED)
             ge2d_config_ex.src2_cmult_asel = 2;
-        else if (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+        else if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE)
             ge2d_config_ex.src2_cmult_asel = 1;
-        else if (input2_buffer_info->layer_mode == LAYER_MODE_NON)
+        else if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_NON)
             ge2d_config_ex.src2_cmult_asel= 0;
-        if ((input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED) && (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED))
+        if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED))
             ge2d_config_ex.src2_cmult_ad = 0;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED))
             ge2d_config_ex.src2_cmult_ad = 0;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED) && (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE))
             ge2d_config_ex.src2_cmult_ad = 1;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE))
             ge2d_config_ex.src2_cmult_ad = 1;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_NON))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_NON))
             ge2d_config_ex.src2_cmult_ad = 3;
         else
             ge2d_config_ex.src2_cmult_ad = 0;
@@ -1272,11 +1289,13 @@ static int ge2d_fillrectangle_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_mem_ex->src1_mem_alloc_type = AML_GE2D_MEM_INVALID;
     ge2d_config_mem_ex->src2_mem_alloc_type = AML_GE2D_MEM_INVALID;
     ge2d_config_mem_ex->dst_mem_alloc_type = output_buffer_info->mem_alloc_type;
+    memcpy(&ge2d_config_mem_ex->matrix_custom, &pge2dinfo->matrix_custom,
+           sizeof(struct ge2d_matrix_s));
 
     ge2d_config_ex = &(ge2d_config_mem_ex->_ge2d_config_ex);
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1284,15 +1303,15 @@ static int ge2d_fillrectangle_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
         }
         ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
 
-        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }else {
-        is_one_plane = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,output_buffer_info->canvas_w,output_buffer_info->canvas_h,&d_canvas_w,&d_canvas_h);
 
-        pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }
@@ -1336,7 +1355,6 @@ static int ge2d_fillrectangle_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
         default:
             break;
     }
-
 
     if (CANVAS_ALLOC == output_buffer_info->memtype) {
         if (is_one_plane == 1) {
@@ -1479,11 +1497,13 @@ static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_mem_ex->src1_mem_alloc_type = input_buffer_info->mem_alloc_type;
     ge2d_config_mem_ex->src2_mem_alloc_type = AML_GE2D_MEM_INVALID;
     ge2d_config_mem_ex->dst_mem_alloc_type = output_buffer_info->mem_alloc_type;
+    memcpy(&ge2d_config_mem_ex->matrix_custom, &pge2dinfo->matrix_custom,
+           sizeof(struct ge2d_matrix_s));
 
     ge2d_config_ex = &(ge2d_config_mem_ex->_ge2d_config_ex);
 
     if ((CANVAS_ALLOC == input_buffer_info->memtype)) {
-        is_one_plane_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        is_one_plane_input = pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1493,7 +1513,7 @@ static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     }
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane_output = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1700,8 +1720,8 @@ static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
                         d_canvas_h;
                     ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[0];
                 } else if (output_buffer_info->plane_number == 3) {
-                    ge2d_config_ex->dst_planes[0].addr = output_buffer_info->offset[1];
-                    ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[1];
+                    ge2d_config_ex->dst_planes[0].addr = output_buffer_info->offset[2];
+                    ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[2];
                 }
                 break;
             case 2:
@@ -1715,8 +1735,8 @@ static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
                         d_canvas_h + CANVAS_ALIGNED(d_canvas_w/2) * d_canvas_h/2;
                     ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[0];
                 } else if (output_buffer_info->plane_number == 3) {
-                    ge2d_config_ex->dst_planes[0].addr = output_buffer_info->offset[2];
-                    ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[2];
+                    ge2d_config_ex->dst_planes[0].addr = output_buffer_info->offset[1];
+                    ge2d_config_ex->dst_planes[0].shared_fd = output_buffer_info->shared_fd[1];
                 }
                 break;
             default:
@@ -1802,6 +1822,7 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     int is_one_plane_input2 = -1;
     int is_one_plane_output = -1;
     int bpp = 0;
+
     buffer_info_t* input_buffer_info = &pge2dinfo->src_info[0];
     buffer_info_t* input2_buffer_info = &pge2dinfo->src_info[1];
     buffer_info_t* output_buffer_info = &pge2dinfo->dst_info;
@@ -1842,11 +1863,13 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_mem_ex->src1_mem_alloc_type = input_buffer_info->mem_alloc_type;
     ge2d_config_mem_ex->src2_mem_alloc_type = input2_buffer_info->mem_alloc_type;;
     ge2d_config_mem_ex->dst_mem_alloc_type = output_buffer_info->mem_alloc_type;
+    memcpy(&ge2d_config_mem_ex->matrix_custom, &pge2dinfo->matrix_custom,
+           sizeof(struct ge2d_matrix_s));
 
     ge2d_config_ex = &(ge2d_config_mem_ex->_ge2d_config_ex);
 
     if (CANVAS_ALLOC == input_buffer_info->memtype) {
-        is_one_plane_input = pixel_to_ge2d_format(input_buffer_info->format,&src_format,&bpp);
+        is_one_plane_input = pixel_to_ge2d_format(&input_buffer_info->format,&src_format,&bpp);
         src_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1855,7 +1878,7 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
         ge2d_set_canvas(bpp,input_buffer_info->canvas_w,input_buffer_info->canvas_h,&s_canvas_w,&s_canvas_h);
     }
     if ((CANVAS_ALLOC == input2_buffer_info->memtype)) {
-        is_one_plane_input2 = pixel_to_ge2d_format(input2_buffer_info->format,&src2_format,&bpp);
+        is_one_plane_input2 = pixel_to_ge2d_format(&input2_buffer_info->format,&src2_format,&bpp);
         src2_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == src2_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1865,7 +1888,7 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     }
 
     if ((CANVAS_ALLOC == output_buffer_info->memtype)) {
-        is_one_plane_output = pixel_to_ge2d_format(output_buffer_info->format,&dst_format,&bpp);
+        is_one_plane_output = pixel_to_ge2d_format(&output_buffer_info->format,&dst_format,&bpp);
         dst_format |= GE2D_LITTLE_ENDIAN;
         if ((int)0xffffffff == dst_format) {
             E_GE2D("can't get proper ge2d format\n" );
@@ -1892,11 +1915,21 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex->src_para.color = input_buffer_info->def_color;
     ge2d_config_ex->src_para.fill_color_en = input_buffer_info->fill_color_en;
 
-    if (input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+    /* top layer factor, use premult/coverage/none
+     * depends on top layer mode
+     */
+    if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
+        pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
+        pge2dinfo->blend_mode = BLEND_MODE_COVERAGE;
+    else
+        pge2dinfo->blend_mode = BLEND_MODE_NONE;
+
+    if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
         ge2d_config_ex->src1_cmult_asel = 2;
-    else if (input_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
         ge2d_config_ex->src1_cmult_asel = 0;
-    else if (input_buffer_info->layer_mode == LAYER_MODE_NON)
+    else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_NON)
         ge2d_config_ex->src1_cmult_asel = 0;
 
     ge2d_config_ex->src2_para.mem_type = input2_buffer_info->memtype;
@@ -1907,22 +1940,24 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex->src2_para.height = input2_buffer_info->rect.h;
     ge2d_config_ex->src2_para.color = input2_buffer_info->def_color;
     ge2d_config_ex->src2_para.fill_color_en = input2_buffer_info->fill_color_en;
+
     if (pge2dinfo->cap_attr == 0x1) {
-        if (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+        if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED)
             ge2d_config_ex->src2_cmult_asel = 2;
-        else if (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+        else if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE)
             ge2d_config_ex->src2_cmult_asel = 1;
-        else if (input2_buffer_info->layer_mode == LAYER_MODE_NON)
+        else if (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_NON)
             ge2d_config_ex->src2_cmult_asel= 0;
-        if ((input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED) && (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED))
+
+        if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED))
             ge2d_config_ex->src2_cmult_ad = 0;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_PREMULTIPLIED))
             ge2d_config_ex->src2_cmult_ad = 0;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED) && (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE))
             ge2d_config_ex->src2_cmult_ad = 1;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_COVERAGE))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_COVERAGE))
             ge2d_config_ex->src2_cmult_ad = 1;
-        else if ((input_buffer_info->layer_mode == LAYER_MODE_COVERAGE) && (input2_buffer_info->layer_mode == LAYER_MODE_NON))
+        else if ((pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE) && (pge2dinfo->src_info[1].layer_mode == LAYER_MODE_NON))
             ge2d_config_ex->src2_cmult_ad = 3;
         else
             ge2d_config_ex->src2_cmult_ad = 0;
@@ -2928,6 +2963,7 @@ int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
             if (pge2dinfo->src_info[0].mem_alloc_type == AML_GE2D_MEM_DMABUF)
                 sync_src_dmabuf_to_device(pge2dinfo, 0);
             for (i = 0; i < op_number; i++) {
+				printf("nick debug: %d\n", i);
                 pge2dinfo->dst_op_cnt = i;
                 ret = ge2d_blit_config_ex(fd,pge2dinfo);
                 if (ret == ge2d_success) {
@@ -2953,12 +2989,7 @@ int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
                 return ge2d_fail;
             if (!is_rect_valid(&pge2dinfo->dst_info))
                 return ge2d_fail;
-            if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
-                pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
-            else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
-                pge2dinfo->blend_mode = BLEND_MODE_COVERAGE;
-            else
-                pge2dinfo->blend_mode = BLEND_MODE_NONE;
+
             dst_rect.w = pge2dinfo->dst_info.rect.w;
             dst_rect.h = pge2dinfo->dst_info.rect.h;
             dst_rect.x =  pge2dinfo->dst_info.rect.x;
@@ -3079,12 +3110,7 @@ int ge2d_process_ion(int fd,aml_ge2d_info_t *pge2dinfo)
                 return ge2d_fail;
             if (!is_rect_valid(&pge2dinfo->dst_info))
                 return ge2d_fail;
-            if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
-                pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
-            else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
-                pge2dinfo->blend_mode = BLEND_MODE_COVERAGE;
-            else
-                pge2dinfo->blend_mode = BLEND_MODE_NONE;
+
             dst_rect.w = pge2dinfo->dst_info.rect.w;
             dst_rect.h = pge2dinfo->dst_info.rect.h;
             dst_rect.x =  pge2dinfo->dst_info.rect.x;

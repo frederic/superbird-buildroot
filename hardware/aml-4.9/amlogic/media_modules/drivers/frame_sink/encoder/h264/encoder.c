@@ -1211,7 +1211,7 @@ static int scale_frame(struct encode_wq_s *wq,
 		GE2D_FORMAT_M24_NV21 | GE2D_LITTLE_ENDIAN;
 
 	if (wq->pic.encoder_width >= 1280 && wq->pic.encoder_height >= 720) {
-		ge2d_config->dst_para.format |= GE2D_FORMAT_BT_STANDARD;
+		ge2d_config->dst_para.format |= wq->pic.color_space;
 	}
 
 	ge2d_config->dst_para.fill_color_en = 0;
@@ -2708,11 +2708,12 @@ static s32 convert_request(struct encode_wq_s *wq, u32 *cmd_info)
 		enc_pr(LOG_INFO, "wq->pic.encoder_height:%d, request fmt=%d\n",
 		      wq->pic.encoder_height, wq->request.fmt);
 
-		if (wq->pic.encoder_width >= 1280 && wq->pic.encoder_height >= 720 && wq->request.fmt == FMT_RGBA8888) {
+		if (wq->pic.encoder_width >= 1280 && wq->pic.encoder_height >= 720
+			&& wq->request.fmt == FMT_RGBA8888 && wq->pic.color_space != GE2D_FORMAT_BT601) {
 			wq->request.scale_enable = 1;
 			wq->request.src_w = wq->pic.encoder_width;
 			wq->request.src_h = wq->pic.encoder_height;
-			pr_err("hwenc: force wq->request.scale_enable=%d\n", wq->request.scale_enable);
+			enc_pr(LOG_DEBUG, "hwenc: force wq->request.scale_enable=%d\n", wq->request.scale_enable);
 		}
 
 		wq->request.nr_mode =
@@ -2850,6 +2851,8 @@ void amvenc_avc_start_cmd(struct encode_wq_s *wq,
 
 	ie_me_mode = (0 & ME_PIXEL_MODE_MASK) << ME_PIXEL_MODE_SHIFT;
 	if (encode_manager.need_reset) {
+		amvenc_stop();
+		reload_flag = 1;
 		encode_manager.need_reset = false;
 		encode_manager.encode_hw_status = ENCODER_IDLE;
 		amvenc_reset();
@@ -3264,6 +3267,9 @@ static long amvenc_avc_ioctl(struct file *file, u32 cmd, ulong arg)
 		pr_err("hwenc: AMVENC_AVC_IOC_CONFIG_INIT: w:%d, h:%d\n", wq->pic.encoder_width, wq->pic.encoder_height);
 		wq->pic.encoder_width = addr_info[2];
 		wq->pic.encoder_height = addr_info[3];
+
+		wq->pic.color_space = addr_info[4];
+		pr_err("hwenc: AMVENC_AVC_IOC_CONFIG_INIT, wq->pic.color_space=%#x\n", wq->pic.color_space);
 		if (wq->pic.encoder_width *
 			wq->pic.encoder_height >= 1280 * 720)
 			clock_level = 6;

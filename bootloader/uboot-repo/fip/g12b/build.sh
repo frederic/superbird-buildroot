@@ -75,7 +75,6 @@ function fix_blx() {
 
 function cleanup() {
 	rm -f ${BUILD_PATH}/bl*.enc ${BUILD_PATH}/bl2*.sig
-	rm -f ${BUILD_PATH}/boot_new.bin
 }
 
 function encrypt_step() {
@@ -149,24 +148,12 @@ function build_fip() {
 		${BUILD_PATH}/bl2_new.bin \
 		bl2
 
-	# v2: bl30/bl301 merged since 2016.03.22
-	FIP_ARGS="--bl30 ${BUILD_PATH}/bl30_new.bin --bl31 ${BUILD_PATH}/bl31.${BL3X_SUFFIX}"
-
 	if [ "y" == "${CONFIG_NEED_BL32}" ]; then
 		FIP_BL32="`find ${BUILD_PATH} -name "bl32.${BL3X_SUFFIX}"`"
 		if [ "${FIP_BL32}" == "${BUILD_PATH}/bl32.${BL3X_SUFFIX}" ]; then
-			FIP_ARGS="${FIP_ARGS}"" --bl32 ${BUILD_PATH}/bl32.${BL3X_SUFFIX}"
 			FIP_BL32_PROCESS=" --bl32 ${BUILD_PATH}/bl32.${BL3X_SUFFIX}.enc"
 		fi
 	fi
-	FIP_ARGS="${FIP_ARGS}"" --bl33 ${BUILD_PATH}/bl33.bin"
-
-	# create fip.bin
-	./${FIP_FOLDER}/fip_create ${FIP_ARGS} ${BUILD_PATH}/fip.bin
-	./${FIP_FOLDER}/fip_create --dump ${BUILD_PATH}/fip.bin
-
-	# build final bootloader
-	cat ${BUILD_PATH}/bl2_new.bin ${BUILD_PATH}/fip.bin > ${BUILD_PATH}/boot_new.bin
 
 	return
 }
@@ -175,7 +162,7 @@ function copy_other_soc() {
 	cp ${BL33_BUILD_FOLDER}scp_task/bl301.bin ${BUILD_PATH} -f
 	#useless #cp ${UBOOT_SRC_FOLDER}/build/${BOARD_DIR}/firmware/bl21.bin ${BUILD_PATH} -f
 	cp ${BL33_BUILD_FOLDER}${BOARD_DIR}/firmware/acs.bin ${BUILD_PATH} -f
-	./${FIP_FOLDER}parse ${BUILD_PATH}/acs.bin
+	./${FIP_BUILD_FOLDER}/parse ${BUILD_PATH}/acs.bin
 	# todo. cp bl40?
 }
 

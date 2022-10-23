@@ -1,0 +1,15 @@
+config BR2_PACKAGE_H264BITSTREAM
+	bool "h264bitstream"
+	#depends on BR2_PACKAGE_HAS_UDEV
+	#depends on BR2_TOOLCHAIN_HAS_THREADS_NPTL
+	#select BR2_PACKAGE_LIBUSB
+	#select BR2_PACKAGE_LIBGUDEV
+	select BR2_PACKAGE_LIBICONV if !BR2_ENABLE_LOCALE
+	# runtime UTF conversion support
+	select BR2_TOOLCHAIN_GLIBC_GCONV_LIBS_COPY if BR2_TOOLCHAIN_USES_GLIBC
+	help
+	  h264bitstream is a self-contained library for manipulating h264 bit streams
+	  https://github.com/aizvorski/h264bitstream
+
+#comment "hidapi needs udev /dev management and a toolchain w/ NPTL threads"
+#	depends on !BR2_TOOLCHAIN_HAS_THREADS_NPTL || !BR2_PACKAGE_HAS_UDEV

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,17 @@
 
 typedef struct _vsi_nn_detection_postprocess_param
 {
-    vsi_enum     type;
+    float dy;
+    float dx;
+    float dh;
+    float dw;
+    int32_t nms_type;
+    int32_t max_num_detections;
+    int32_t maximum_class_per_detection;
+    int32_t maximum_detection_per_class;
+    float score_threshold;
+    float iou_threshold;
+    int32_t is_bg_in_label;
 } vsi_nn_detection_postprocess_param;
 
 #endif

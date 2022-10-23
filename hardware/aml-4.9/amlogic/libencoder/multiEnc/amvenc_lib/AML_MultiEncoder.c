@@ -75,7 +75,7 @@ static struct timeval end_test;
 static bool INIT_GE2D = false;
 #define MULTI_ENC_MAGIC ('A' << 24| 'M' <<16 | 'L' << 8 |'G')
 /* timeout in ms */
-#define VPU_WAIT_TIME_OUT_CQ    2
+#define VPU_WAIT_TIME_OUT_CQ    16
 /* extra source frame buffer required.*/
 #define EXTRA_SRC_BUFFER_NUM    0
 
@@ -149,6 +149,32 @@ typedef enum {
     ENCODER_STATE_ENCODE_HEADER,
     ENCODER_STATE_ENCODING,
 } EncoderState;
+
+static CustomGopPicParam AML_svc1[2] = {
+{PIC_TYPE_P, 1, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 2, 0, 1, 0,-1, 0},
+};
+
+static CustomGopPicParam AML_svc2[3] = {
+{PIC_TYPE_P, 1, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 2, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 3, 0, 1, 0,-1, 0},
+};
+
+static CustomGopPicParam AML_svc3[4] = {
+{PIC_TYPE_P, 1, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 2, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 3, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 4, 0, 1, 0,-1, 0},
+};
+
+static CustomGopPicParam AML_svc4[5] = {
+{PIC_TYPE_P, 1, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 2, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 3, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 4, 1, 1, 0,-1, 1},
+{PIC_TYPE_P, 5, 0, 1, 0,-1, 0},
+};
 
 typedef struct AMVEncContext_s {
   uint32 magic_num;
@@ -335,7 +361,8 @@ void static yuv_plane_memcpy(int coreIdx, int dst, char *src, uint32 width, uint
 
 static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitParam)
 {
-    int i;
+  int i;
+  CustomGopPicParam *GopParam;
   EncVpParam *param = &pEncOP->EncStdParam.vpParam;
   /*basic settings */
   if (InitParam->stream_type == AMV_AVC)
@@ -367,7 +394,7 @@ static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitPa
   param->losslessEnable = 0;
   param->constIntraPredFlag = 0;
   param->lfCrossSliceBoundaryEnable = 1;
-  param->useLongTerm = 0;
+  param->useLongTerm = InitParam->longterm_ref_enable;
 
   /* for CMD_ENC_SEQ_GOP_PARAM */
    //param->gopPresetIdx     = pCfg->vpCfg.gopPresetIdx;
@@ -386,6 +413,26 @@ static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitPa
   else if (InitParam->GopPreset == GOP_IBBBP) {
     param->gopPresetIdx = PRESET_IDX_IBBBP;
   }
+  else if (InitParam->GopPreset == GOP_IP_SVC1) {
+    param->gopPresetIdx = PRESET_IDX_CUSTOM_GOP;
+    param->gopParam.customGopSize = 2;
+    GopParam = AML_svc1;
+  }
+  else if (InitParam->GopPreset == GOP_IP_SVC2) {
+    param->gopPresetIdx = PRESET_IDX_CUSTOM_GOP;
+    param->gopParam.customGopSize = 3;
+    GopParam = AML_svc2;
+  }
+  else if (InitParam->GopPreset == GOP_IP_SVC3) {
+    param->gopPresetIdx = PRESET_IDX_CUSTOM_GOP;
+    param->gopParam.customGopSize = 4;
+    GopParam = AML_svc3;
+  }
+  else if (InitParam->GopPreset == GOP_IP_SVC4) {
+    param->gopPresetIdx = PRESET_IDX_CUSTOM_GOP;
+    param->gopParam.customGopSize = 5;
+    GopParam = AML_svc4;
+  }
   else {
     VLOG(ERR, "[ERROR] Not supported GOP format (%d)\n", InitParam->GopPreset);
     return FALSE;
@@ -403,8 +450,8 @@ static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitPa
   } else
     param->intraPeriod = InitParam ->idr_period;
 
-  VLOG(ERR, "GopPreset GOP format (%d) period %d \n",
-        param->gopPresetIdx, param->intraPeriod);
+  VLOG(ERR, "GopPreset GOP format (%d) period %d LongTermRef %d\n",
+        param->gopPresetIdx, param->intraPeriod, param->useLongTerm);
 
   param->intraQP = InitParam ->initQP; //pCfg->vpCfg.intraQP;
   param->forcedIdrHeaderEnable = 0; //pCfg->vpCfg.forcedIdrHeaderEnable;
@@ -482,24 +529,39 @@ static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitPa
     param->hvsMaxDeltaQp = 10;
   }
 
-#if 0
+  if (param->gopPresetIdx == PRESET_IDX_CUSTOM_GOP) {
     /* for CMD_ENC_CUSTOM_GOP_PARAM */
-    param->gopParam.customGopSize     = pCfg->vpCfg.gopParam.customGopSize;
+    if (param->intraPeriod % param->gopParam.customGopSize) {
+        VLOG(ERR, "[ERROR] Gop length %d have to be multiple of  %d\n",
+             param->intraPeriod, param->gopParam.customGopSize);
+        return FALSE;
+    }
 
     for (i= 0; i<param->gopParam.customGopSize; i++) {
-        param->gopParam.picParam[i].picType      = pCfg->vpCfg.gopParam.picParam[i].picType;
-        param->gopParam.picParam[i].pocOffset    = pCfg->vpCfg.gopParam.picParam[i].pocOffset;
-        param->gopParam.picParam[i].picQp        = pCfg->vpCfg.gopParam.picParam[i].picQp;
-        param->gopParam.picParam[i].refPocL0     = pCfg->vpCfg.gopParam.picParam[i].refPocL0;
-        param->gopParam.picParam[i].refPocL1     = pCfg->vpCfg.gopParam.picParam[i].refPocL1;
-        param->gopParam.picParam[i].temporalId   = pCfg->vpCfg.gopParam.picParam[i].temporalId;
-        param->gopParam.picParam[i].numRefPicL0  = pCfg->vpCfg.gopParam.picParam[i].numRefPicL0;
+        param->gopParam.picParam[i].picType = GopParam->picType;
+        param->gopParam.picParam[i].pocOffset = GopParam->pocOffset;
+        param->gopParam.picParam[i].picQp = GopParam->picQp + param->intraQP;
+        if (param->gopParam.picParam[i].picQp > 63)
+            param->gopParam.picParam[i].picQp = 63;
+        param->gopParam.picParam[i].refPocL0 = GopParam->refPocL0;
+        param->gopParam.picParam[i].refPocL1 = GopParam->refPocL1;
+        param->gopParam.picParam[i].temporalId = GopParam->temporalId;
+        param->gopParam.picParam[i].numRefPicL0 = GopParam->numRefPicL0;
+        GopParam++;
+        VLOG(INFO, "CustGop%d type %d offset %d, Qp %d, ref %d, %d, temp %d refn %d \n",
+        i, param->gopParam.picParam[i].picType, param->gopParam.picParam[i].pocOffset,
+        param->gopParam.picParam[i].picQp, param->gopParam.picParam[i].refPocL0,
+        param->gopParam.picParam[i].refPocL1, param->gopParam.picParam[i].temporalId,
+        param->gopParam.picParam[i].numRefPicL0);
     }
-#endif
+  }
   param->roiEnable = InitParam->roi_enable; //pCfg->vpCfg.roiEnable;
   // VPS & VUI
   param->numUnitsInTick = 1000;//pCfg->vpCfg.numUnitsInTick;
-  param->timeScale = pEncOP->frameRateInfo * 1000; //pCfg->vpCfg.timeScale;
+  if (pEncOP->bitstreamFormat == STD_AVC)
+    param->timeScale = pEncOP->frameRateInfo * 2000;
+  else
+    param->timeScale = pEncOP->frameRateInfo * 1000; //pCfg->vpCfg.timeScale;
   param->numTicksPocDiffOne = 0;//pCfg->vpCfg.numTicksPocDiffOne;
 
   param->chromaCbQpOffset = 0; //pCfg->vpCfg.chromaCbQpOffset;
@@ -601,7 +663,6 @@ static BOOL SetupEncoderOpenParam(EncOpenParam *pEncOP, AMVEncInitParams* InitPa
   pEncOP->coreIdx        = 0;
   pEncOP->cbcrOrder      = CBCR_ORDER_NORMAL;
   pEncOP->lowLatencyMode = 0; // 2bits lowlatency mode setting. bit[1]: low latency interrupt enable, bit[0]: fast bitstream-packing enable.
-  pEncOP->EncStdParam.vpParam.useLongTerm = 0;
   return TRUE;
 }
 
@@ -755,7 +816,7 @@ static BOOL SetSequenceInfo (AMVMultiCtx* ctx)
     return FALSE;
   }
   ctx->fb_num = initialInfo->minFrameBufferCount;
-  ctx->src_num = initialInfo->minSrcFrameCount + COMMAND_QUEUE_DEPTH
+  ctx->src_num = initialInfo->minSrcFrameCount + 2
                 + EXTRA_SRC_BUFFER_NUM;
 
   if (ctx->encOpenParam.sourceBufCount > ctx->src_num)
@@ -861,7 +922,7 @@ static BOOL AllocateYuvBufferHeader(AMVMultiCtx* ctx)
   srcFbAllocInfo.num     = ctx->src_num;
   srcFbAllocInfo.nv21    = encOpenParam.nv21;
 
-#if 1  //allocat later when use input buffer, in case DMA buffer no need copy.
+#if 0  //allocat later when use input buffer, in case DMA buffer no need copy.
     for (i = 0; i < ctx->src_num; i++) {
         ctx->pFbSrcMem[i].size = srcFbSize;
         if (vdi_allocate_dma_memory(encOpenParam.coreIdx, &ctx->pFbSrcMem[i],
@@ -877,7 +938,7 @@ static BOOL AllocateYuvBufferHeader(AMVMultiCtx* ctx)
     }
 #else
    for (i = 0; i < ctx->src_num; i++) {
-        ctx->pFbSrc[i].bufY  = (PhysicalAddress) - 1;
+        ctx->pFbSrc[i].bufY  = (PhysicalAddress) 0;
         ctx->pFbSrc[i].bufCb = (PhysicalAddress) - 1;
         ctx->pFbSrc[i].bufCr = (PhysicalAddress) - 1;
         ctx->pFbSrc[i].updateFbInfo = TRUE;
@@ -1118,7 +1179,8 @@ amv_enc_handle_t AML_MultiEncInitialize(AMVEncInitParams* encParam)
   ctx->frame_rate = encParam->frame_rate;
   ctx->mPrependSPSPPSToIDRFrames = encParam->prepend_spspps_to_idr_frames;
   ctx->mNumPlanes = 0;
-  SetupEncoderOpenParam(&(ctx->encOpenParam), encParam);
+  if (SetupEncoderOpenParam(&(ctx->encOpenParam), encParam) == FALSE)
+        goto fail_exit;
   coreIdx = ctx->encOpenParam.coreIdx;
   retCode = VPU_Init(coreIdx);
   if (retCode != RETCODE_SUCCESS && retCode != RETCODE_CALLED_BEFORE) {
@@ -1354,6 +1416,12 @@ AMVEnc_Status AML_MultiEncSetInput(amv_enc_handle_t ctx_handle,
         return AMVENC_FAIL;
        }
        ctx->pFbSrc[idx].bufY = ctx->pFbSrcMem[idx].phys_addr;
+       if (ctx->pFbSrc[idx].bufCb != -1)
+           ctx->pFbSrc[idx].bufCb += ctx->pFbSrc[idx].bufY;
+       if (ctx->pFbSrc[idx].bufCr != -1)
+           ctx->pFbSrc[idx].bufCr += ctx->pFbSrc[idx].bufY;
+       VLOG(INFO, "New allocate frame idx %d address y:0x%x cb:0x%x cr:0x%x\n",
+                  idx, ctx->pFbSrc[idx].bufY, ctx->pFbSrc[idx].bufCb,ctx->pFbSrc[idx].bufCr);
     }
 #if SUPPORT_SCALE
     if ((input->scale_width !=0 && input->scale_height !=0) || input->crop_left != 0 ||
@@ -1489,15 +1557,6 @@ AMVEnc_Status AML_MultiEncSetInput(amv_enc_handle_t ctx_handle,
   param->srcEndFlag                         = 0; //in->last;
 //    encParam->sourceFrame                        = &in->fb;
   param->sourceFrame->sourceLBurstEn        = 0;
-#if 0
-    if (testEncConfig.useAsLongtermPeriod > 0 && testEncConfig.refLongtermPeriod > 0) {
-        encParam->useCurSrcAsLongtermPic         = (frameIdx % testEncConfig.useAsLongtermPeriod) == 0 ? 1 : 0;
-        encParam->useLongtermRef                 = (frameIdx % testEncConfig.refLongtermPeriod)   == 0 ? 1 : 0;
-    }
-#else
-  param->useCurSrcAsLongtermPic         = 0;
-  param->useLongtermRef                 = 0;
-#endif
   param->skipPicture                        = 0;
   param->forceAllCtuCoefDropEnable	         = 0;
 
@@ -1512,7 +1571,18 @@ AMVEnc_Status AML_MultiEncSetInput(amv_enc_handle_t ctx_handle,
     param->forcePicTypeEnable = 0;
     param->forcePicType = 0;
   }
-
+  if (ctx->op_flag & AMVEncFrameIO_USE_AS_LTR_FLAG) {
+    VLOG(INFO, "Update seCurSrcAsLongtermPic\n");
+    param->useCurSrcAsLongtermPic = 1;
+  } else {
+    param->useCurSrcAsLongtermPic = 0;
+  }
+  if (ctx->op_flag & AMVEncFrameIO_USE_LTR_FLAG) {
+    VLOG(INFO, "Update useLongtermRef\n");
+    param->useLongtermRef = 1;
+  } else {
+    param->useLongtermRef = 0;
+  }
     // FW will encode header data implicitly when changing the header syntaxes
   param->codeOption.implicitHeaderEncode    = 1;
   param->codeOption.encodeAUD               = 0;
@@ -1698,10 +1768,12 @@ AMVEnc_Status AML_MultiEncHeader(amv_enc_handle_t ctx_handle,
 {
   EncHeaderParam encHeaderParam;
   EncOutputInfo  encOutputInfo;
+  QueueStatusInfo queueStatus;
   ENC_INT_STATUS status;
   PhysicalAddress paRdPtr = 0;
   PhysicalAddress paWrPtr = 0;
   int header_size = 0;
+  int need_reset = 0;
   RetCode result= RETCODE_SUCCESS;
   AMVMultiCtx * ctx = (AMVMultiCtx* ) ctx_handle;
   ENC_QUERY_WRPTR_SEL encWrPtrSel = GET_ENC_PIC_DONE_WRPTR;
@@ -1731,7 +1803,10 @@ AMVEnc_Status AML_MultiEncHeader(amv_enc_handle_t ctx_handle,
   while(1)
   {
         result = VPU_EncGiveCommand(ctx->enchandle, ENC_PUT_VIDEO_HEADER, &encHeaderParam);
-        if ( result == RETCODE_QUEUEING_FAILURE ) continue;
+        if ( result == RETCODE_QUEUEING_FAILURE ) {
+           usleep(1000);
+           continue;
+        }
 #if defined(HAPS_SIM) || defined(CNM_SIM_DPI_INTERFACE)
         usleep(1000); //osal_msleep(1);
 #endif
@@ -1741,15 +1816,21 @@ AMVEnc_Status AML_MultiEncHeader(amv_enc_handle_t ctx_handle,
       break;
     }
     else if (status == ENC_INT_STATUS_NONE) {
-      usleep(1000); //osal_msleep(1);
+        VLOG(INFO, "INSTANCE #%d INT timeout \n", ctx->enchandle->instIndex);
+        VPU_EncGiveCommand(ctx->enchandle, ENC_GET_QUEUE_STATUS, &queueStatus);
+        if (queueStatus.reportQueueCount >0) {
+            VLOG(ERR, "INSTANCE #%d need reset \n", ctx->enchandle->instIndex);
+            need_reset = 1;
+            break;
+        }
     }
     else if (status == ENC_INT_STATUS_TIMEOUT) {
-       VLOG(INFO, "INSTANCE #%d INTERRUPT TIMEOUT\n", ctx->enchandle->instIndex);
-       HandleEncoderError(ctx->enchandle, ctx->frameIdx, NULL);
-       return AMVENC_FAIL;
+        VLOG(ERR, "INSTANCE #%d INTERRUPT TIMEOUT\n", ctx->enchandle->instIndex);
+        HandleEncoderError(ctx->enchandle, ctx->frameIdx, NULL);
+        return AMVENC_TIMEOUT;
     } else {
-      VLOG(INFO, "Unknown interrupt status: %d\n",status);
-      return AMVENC_FAIL;
+        VLOG(ERR, "Unknown interrupt status: %d\n",status);
+        return AMVENC_FAIL;
     }
     usleep(1000); //osal_msleep(1);
   }
@@ -1760,7 +1841,7 @@ AMVEnc_Status AML_MultiEncHeader(amv_enc_handle_t ctx_handle,
   encOutputInfo.result = VPU_EncGetOutputInfo(ctx->enchandle, &encOutputInfo);
 
     if (encOutputInfo.result == RETCODE_REPORT_NOT_READY) {
-        return TRUE; /* Not encoded yet */
+        return AMVENC_SPS_FAIL; /* Not encoded yet */
     }
     else if (encOutputInfo.result == RETCODE_VLC_BUF_FULL) {
         VLOG(ERR, "VLC BUFFER FULL!!! ALLOCATE MORE TASK BUFFER(%d)!!!\n", ONE_TASKBUF_SIZE_FOR_CQ);
@@ -1770,20 +1851,25 @@ AMVEnc_Status AML_MultiEncHeader(amv_enc_handle_t ctx_handle,
         VLOG(ERR, "Failed to encode error = %d\n", encOutputInfo.result);
         HandleEncoderError(ctx->enchandle, encOutputInfo.encPicCnt, &encOutputInfo);
         VPU_SWReset(ctx->encOpenParam.coreIdx, SW_RESET_SAFETY, ctx->enchandle);
-        return FALSE;
+        return AMVENC_SPS_FAIL;
     }
     else {
         ;/* SUCCESS */
     }
-
+    if (need_reset) {
+        VLOG(ERR, "reset encoder error = %d\n", encOutputInfo.result);
+        HandleEncoderError(ctx->enchandle, encOutputInfo.encPicCnt, &encOutputInfo);
+        VPU_SWReset(ctx->encOpenParam.coreIdx, SW_RESET_SAFETY, ctx->enchandle);
+        return AMVENC_SPS_FAIL;
+    }
     paRdPtr = encOutputInfo.rdPtr;
     paWrPtr = encOutputInfo.wrPtr;
     header_size = encOutputInfo.bitstreamSize;
     VLOG(DEBUG, "header_size %d paWrPtr-paRdPtr %d", header_size, paWrPtr-paRdPtr);
-  if (paRdPtr != ctx->bsBuffer[0].phys_addr) {
-    VLOG(ERR, "BS buffer no match!! expect %x acutual %x size %d\n",
-        ctx->bsBuffer[0].phys_addr, paRdPtr, header_size);
-  }
+    if (paRdPtr != ctx->bsBuffer[0].phys_addr) {
+       VLOG(ERR, "BS buffer no match!! expect %x acutual %x size %d\n",
+            ctx->bsBuffer[0].phys_addr, paRdPtr, header_size);
+    }
 
 #if ENCODE_TIME_STATISTICS
   gettimeofday(&end_test, NULL);
@@ -1830,7 +1916,9 @@ retry_point:
     if(ctx ->param_change_flag) {
         result = VPU_EncGiveCommand(ctx->enchandle, ENC_SET_PARA_CHANGE, &ctx->changeParam);
         if (result == RETCODE_SUCCESS) {
-            VLOG(INFO, "ENC_SET_PARA_CHANGE queue success\n");
+            VLOG(INFO, "ENC_SET_PARA_CHANGE queue success option 0x%x\n",
+                        ctx->changeParam.enable_option);
+
             osal_memset(&ctx->changeParam, 0x00, sizeof(EncChangeParam));
             ctx->param_change_flag = 0;
             ctx->changedCount ++;
@@ -1918,7 +2006,12 @@ retry_pointB:
 
     if (encOutputInfo.reconFrameIndex == RECON_IDX_FLAG_CHANGE_PARAM) {
         VLOG(INFO, "CHANGE PARAMETER!\n");
-        retry_cnt =0;
+        retry_cnt = 0;
+        goto retry_pointB; //return TRUE; /* Try again */
+    }
+    else if (encOutputInfo.reconFrameIndex == RECON_IDX_FLAG_HEADER_ONLY) {
+        VLOG(INFO, "Only have encoded headers !\n");
+        retry_cnt = 0;
         goto retry_pointB; //return TRUE; /* Try again */
     }
     else {
@@ -1942,6 +2035,9 @@ retry_pointB:
         VLOG(ERR, "CHANGE PARAMETER!\n");
  //       return TRUE; /* Try again */
     }
+    if (encOutputInfo.reconFrameIndex == RECON_IDX_FLAG_HEADER_ONLY) {
+        VLOG(ERR, "ENCODED HEADER ONLY!\n");
+    }
 
 #if 0  //release flag
     for (i = 0; i < ctx->fbCount.srcFbNum; i++) {
@@ -1955,37 +2051,30 @@ retry_pointB:
         idx = ctx->encMEMSrcFrmIdxArr[encOutputInfo.encSrcIdx];
         ctx->encodedSrcFrmIdxArr[idx] = 0;
         ctx->fullInterrupt  = FALSE;
-    // copy frames
-    if (encOutputInfo.bitstreamBuffer !=
-        ctx->bsBuffer[idx].phys_addr) {
-        VLOG(ERR, "BS buffer no match!! expect %lx acutual %x size %d\n",
-                ctx->bsBuffer[idx].phys_addr,
-                encOutputInfo.bitstreamBuffer, encOutputInfo.bitstreamSize);
-     }
+        // copy frames
 
-  VLOG(DEBUG, "Enc bitstream size %d pic_type %d \n", encOutputInfo.bitstreamSize, encOutputInfo.picType);
-     *buf_nal_size = encOutputInfo.bitstreamSize;
-  // cache invalid to read out by CPU
-  //vdi_invalitate_memory(ctx->encOpenParam.coreIdx,
-  //              &ctx->bsBuffer[encOutputInfo.encSrcIdx]);
-  vdi_read_memory(ctx->encOpenParam.coreIdx,
-        encOutputInfo.bitstreamBuffer, buffer, encOutputInfo.bitstreamSize,
-        ctx->encOpenParam.streamEndian);
+        VLOG(DEBUG, "Enc bitstream size %d pic_type %d avgQP %d\n",
+             encOutputInfo.bitstreamSize, encOutputInfo.picType,
+             encOutputInfo.avgCtuQp);
+        *buf_nal_size = encOutputInfo.bitstreamSize;
+        vdi_read_memory(ctx->encOpenParam.coreIdx,
+                        encOutputInfo.bitstreamBuffer,
+                        buffer, encOutputInfo.bitstreamSize,
+                        ctx->encOpenParam.streamEndian);
 
-    *Retframe= ctx->FrameIO[idx];
-    Retframe->encoded_frame_type = encOutputInfo.picType;
-    Retframe->enc_average_qp = encOutputInfo.avgCtuQp;
-    Retframe->enc_intra_blocks = encOutputInfo.numOfIntra;
-    Retframe->enc_merged_blocks = encOutputInfo.numOfMerge;
-    Retframe->enc_skipped_blocks = encOutputInfo.numOfSkipBlock;
+        *Retframe= ctx->FrameIO[idx];
+        Retframe->encoded_frame_type = encOutputInfo.picType;
+        Retframe->enc_average_qp = encOutputInfo.avgCtuQp;
+        Retframe->enc_intra_blocks = encOutputInfo.numOfIntra;
+        Retframe->enc_merged_blocks = encOutputInfo.numOfMerge;
+        Retframe->enc_skipped_blocks = encOutputInfo.numOfSkipBlock;
 
-    } else if( encOutputInfo.encSrcIdx == 0xfffffffe)
-        {
+    } else if ( encOutputInfo.encSrcIdx == 0xfffffffe) {
         VLOG(INFO, "delay frame delay %d \n", ctx->frame_delay);
         ctx->frame_delay ++;
         *buf_nal_size = 0;
         Retframe ->YCbCr[0] = 0;
-    } else if(encOutputInfo.encSrcIdx == 0xfffffffb)  {
+    } else if (encOutputInfo.encSrcIdx == 0xfffffffb)  {
         VLOG(INFO, "non-reference picture !! \n");
         *buf_nal_size = 0;
         Retframe->YCbCr[0] = 0;

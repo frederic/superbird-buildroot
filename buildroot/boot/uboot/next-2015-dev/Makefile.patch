@@ -12,15 +12,3 @@ diff -Nur uboot-repo.orig/bl33/v2015/Makefile uboot-repo/bl33/v2015/Makefile
  export CROSS_COMPILE
  export CROSS_COMPILE_T32
  
-diff -Nur uboot-repo.orig/bl33/v2019/Makefile uboot-repo/bl33/v2019/Makefile
---- uboot-repo.orig/bl33/v2019/Makefile	2019-07-01 08:39:43.038119617 +0800
-+++ uboot-repo/bl33/v2019/Makefile	2019-07-01 08:50:26.311087792 +0800
-@@ -249,7 +249,7 @@
- CROSS_COMPILE ?=
- endif
- 
--CROSS_COMPILE ?=/opt/gcc-linaro-7.3.1-2018.05-i686_aarch64-elf/bin/aarch64-elf-
-+CROSS_COMPILE ?=aarch64-elf-
- export CROSS_COMPILE
- 
- KCONFIG_CONFIG	?= .config

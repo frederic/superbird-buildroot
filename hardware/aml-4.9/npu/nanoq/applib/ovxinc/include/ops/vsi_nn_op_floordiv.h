@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,17 +31,9 @@
 extern "C" {
 #endif
 
-#define _VSI_NN_FLOORDIV_LOCAL_TENSOR_NUM 3
-
-typedef struct _vsi_nn_floordiv_lcl_data
-{
-    vx_tensor   local_tensor[_VSI_NN_FLOORDIV_LOCAL_TENSOR_NUM];
-} vsi_nn_floordiv_lcl_data;
-
 typedef struct _vsi_nn_floordiv_param
 {
-    /* local data must be the first. */
-    vsi_nn_floordiv_lcl_data local;
+    void *reserve;
 } vsi_nn_floordiv_param;
 
 #ifdef __cplusplus

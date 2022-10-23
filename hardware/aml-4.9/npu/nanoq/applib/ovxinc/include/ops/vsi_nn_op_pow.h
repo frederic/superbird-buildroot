@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,24 +31,13 @@
 extern "C" {
 #endif
 
-enum {
-    POWER_INPUT0, //optional
-    POWER_INPUT1,
-
-    POWER_INPUTS_COUNT,
-
-    POWER_OUTPUT = 0,
-
-    POWER_OUTPUTS_COUNT,
-
-    POWER_PARAM_COUT = POWER_INPUTS_COUNT + POWER_OUTPUTS_COUNT,
-};
-
 #define _VSI_NN_POW_LOCAL_TENSOR_NUM 3
 
 typedef struct _vsi_nn_pow_lcl_data
 {
     vx_tensor   local_tensor[_VSI_NN_POW_LOCAL_TENSOR_NUM];
+    uint32_t hash_idx;
+    vsi_bool execute_on_sw;
 } vsi_nn_pow_lcl_data;
 
 typedef struct _vsi_nn_pow_param

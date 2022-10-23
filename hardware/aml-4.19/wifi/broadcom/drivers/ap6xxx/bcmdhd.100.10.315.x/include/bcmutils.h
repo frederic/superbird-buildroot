@@ -1,7 +1,7 @@
 /*
  * Misc useful os-independent macros and functions.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmutils.h 769659 2018-06-27 05:22:10Z $
+ * $Id: bcmutils.h 813798 2019-04-08 10:20:21Z $
  */
 
 #ifndef	_bcmutils_h_
@@ -165,12 +165,22 @@ extern void pktset8021xprio(void *pkt, int prio);
 #define DSCP_AF21	0x12
 #define DSCP_AF22	0x14
 #define DSCP_AF23	0x16
+/* CS2: OAM (RFC2474) */
+#define DSCP_CS2	0x10
 /* AF3x: Multimedia Streaming (RFC2597) */
 #define DSCP_AF31	0x1A
 #define DSCP_AF32	0x1C
 #define DSCP_AF33	0x1E
+/* CS3: Broadcast Video (RFC2474) */
+#define DSCP_CS3	0x18
+/* VA: VOCIE-ADMIT (RFC5865) */
+#define DSCP_VA		0x2C
 /* EF: Telephony (RFC3246) */
 #define DSCP_EF		0x2E
+/* CS6: Network Control (RFC2474) */
+#define DSCP_CS6	0x30
+/* CS7: Network Control (RFC2474) */
+#define DSCP_CS7	0x38
 
 extern uint pktsetprio(void *pkt, bool update_vtag);
 extern uint pktsetprio_qms(void *pkt, uint8* up_table, bool update_vtag);
@@ -580,7 +590,7 @@ int bcmstrnicmp(const char* s1, const char* s2, int cnt);
 #define SIZE_OF(type, field) sizeof(((type *)0)->field)
 
 #ifndef ARRAYSIZE
-#define ARRAYSIZE(a)		(sizeof(a) / sizeof(a[0]))
+#define ARRAYSIZE(a)		(uint32)(sizeof(a) / sizeof(a[0]))
 #endif // endif
 
 #ifndef ARRAYLAST /* returns pointer to last array element */
@@ -663,9 +673,9 @@ static INLINE uint32 getbit##NB(void *ptr, uint32 ix)               \
 	return ((*a >> pos) & MSK);                                     \
 }
 
-DECLARE_MAP_API(2, 4, 1, 15U, 0x0003) /* setbit2() and getbit2() */
-DECLARE_MAP_API(4, 3, 2, 7U, 0x000F) /* setbit4() and getbit4() */
-DECLARE_MAP_API(8, 2, 3, 3U, 0x00FF) /* setbit8() and getbit8() */
+DECLARE_MAP_API(2, 4, 1, 15U, 0x0003U) /* setbit2() and getbit2() */
+DECLARE_MAP_API(4, 3, 2, 7U, 0x000FU) /* setbit4() and getbit4() */
+DECLARE_MAP_API(8, 2, 3, 3U, 0x00FFU) /* setbit8() and getbit8() */
 
 /* basic mux operation - can be optimized on several architectures */
 #define MUX(pred, true, false) ((pred) ? (true) : (false))
@@ -838,7 +848,8 @@ extern uint bcmdumpfields(bcmutl_rdreg_rtn func_ptr, void *arg0, uint arg1, stru
                           char *buf, uint32 bufsize);
 extern uint bcm_bitcount(uint8 *bitmap, uint bytelength);
 
-extern int bcm_bprintf(struct bcmstrbuf *b, const char *fmt, ...);
+extern int bcm_bprintf(struct bcmstrbuf *b, const char *fmt, ...)
+	__attribute__ ((format (__printf__, 2, 0)));
 
 /* power conversion */
 extern uint16 bcm_qdbm_to_mw(uint8 qdbm);
@@ -920,7 +931,7 @@ C_bcm_count_leading_zeros(uint32 u32arg)
 	while (u32arg) {
 		shifts++; u32arg >>= 1;
 	}
-	return (32U - shifts);
+	return (32 - shifts);
 }
 
 /* the format of current TCM layout during boot
@@ -1267,6 +1278,7 @@ void counter_printlog(counter_tbl_t *ctr_tbl);
 #endif // endif
 #ifdef SHOW_LOGTRACE
 #define TRACE_LOG_BUF_MAX_SIZE 1700
+#define RTT_LOG_BUF_MAX_SIZE 1700
 #define BUF_NOT_AVAILABLE	0
 #define NEXT_BUF_NOT_AVAIL	1
 #define NEXT_BUF_AVAIL		2

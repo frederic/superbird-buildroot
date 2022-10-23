@@ -95,10 +95,6 @@ uint32_t sensor_boot_init( sensor_fsm_ptr_t p_fsm )
 
     for ( idx = 0; idx < param->modes_num; idx++ ) {
         param->modes_table[idx] = ksensor_info.modes[idx];
-
-        LOG( LOG_INFO, "Sensor_mode[%d]: wdr_mode: %d, exp: %d.", idx,
-             param->modes_table[idx].wdr_mode,
-             param->modes_table[idx].exposures );
     }
 #endif
 
@@ -107,7 +103,7 @@ uint32_t sensor_boot_init( sensor_fsm_ptr_t p_fsm )
 
 void sensor_hw_init( sensor_fsm_ptr_t p_fsm )
 {
-    struct timeval  txs,txe; 
+    struct timeval  txs,txe;
     do_gettimeofday(&txs);
     
 #if FW_DO_INITIALIZATION
@@ -145,7 +141,7 @@ void sensor_hw_init( sensor_fsm_ptr_t p_fsm )
 					LOG(LOG_CRIT, "preset not match user mode, execute switch and close seamless");
 					p_fsm->ctrl.set_mode( p_fsm->sensor_ctx, p_fsm->preset_mode );
 					p_fsm->p_fsm_mgr->isp_seamless = 0;
-			}		
+			}
 			if(param->modes_table[p_fsm->preset_mode].exposures != set_wdr_param.exp_number)
 			{
 				set_wdr_param.wdr_mode = param->modes_table[p_fsm->preset_mode].wdr_mode;
@@ -154,9 +150,8 @@ void sensor_hw_init( sensor_fsm_ptr_t p_fsm )
 		}
 	}
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_WDR_MODE, &set_wdr_param, sizeof( set_wdr_param ) );
-
     // 3): Init or update the calibration data.
-    acamera_init_calibrations( ACAMERA_FSM2CTX_PTR( p_fsm ) );
+    acamera_init_calibrations( ACAMERA_FSM2CTX_PTR( p_fsm ), ((sensor_param_t *)(p_fsm->sensor_ctx))->s_name.name );
 
     // 4). update new settings to ISP if necessary
     //acamera_update_cur_settings_to_isp(0xff);
@@ -171,7 +166,6 @@ void sensor_configure_buffers( sensor_fsm_ptr_t p_fsm )
     uint32_t temper_frame_size = acamera_isp_top_active_width_read( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base ) * acamera_isp_top_active_height_read( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base ) * 4;
     if ( temper_frames != NULL && temper_frames_num != 0 && ( ( temper_frames_num > 1 ) ? ( temper_frames[0].size + temper_frames[1].size >= temper_frame_size * 2 ) : ( temper_frames[0].size >= temper_frame_size ) ) ) {
         if ( temper_frames_num == 1 ) {
-            LOG( LOG_INFO, "Only one output buffer will be used for temper." );
             acamera_isp_temper_dma_lsb_bank_base_reader_write( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base, temper_frames[0].address );
             acamera_isp_temper_dma_lsb_bank_base_writer_write( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base, temper_frames[0].address );
             acamera_isp_temper_temper2_mode_write( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base, 1 ); //temper 2
@@ -195,10 +189,10 @@ void sensor_configure_buffers( sensor_fsm_ptr_t p_fsm )
         LOG( LOG_ERR, "No output buffers for temper block provided in settings. Temper is disabled" );
     }
 
-    if ( temper_frames_num == 2 && temper3_4k == 0 )
+    if ( temper3_4k == 0 )
     {
         const sensor_param_t *param = p_fsm->ctrl.get_parameters( p_fsm->sensor_ctx );
-        if ( param->modes_table[p_fsm->preset_mode].resolution.width > 1920 &&  param->modes_table[p_fsm->preset_mode].resolution.height > 1080 && param->modes_table[p_fsm->preset_mode].wdr_mode == WDR_MODE_FS_LIN )
+        if ( param->modes_table[p_fsm->preset_mode].resolution.width > 1920 &&  param->modes_table[p_fsm->preset_mode].resolution.height > 1080 )
         {
             LOG(LOG_CRIT, "Resolution: %dx%d > 1080P, close temper3",param->modes_table[p_fsm->preset_mode].resolution.width ,param->modes_table[p_fsm->preset_mode].resolution.height);
             acamera_isp_temper_temper2_mode_write( ACAMERA_FSM2CTX_PTR( p_fsm )->settings.isp_base, 1 );
@@ -207,6 +201,23 @@ void sensor_configure_buffers( sensor_fsm_ptr_t p_fsm )
 #endif
 }
 
+static void sensor_check_mirror_bayer(sensor_fsm_ptr_t p_fsm)
+{
+    uint8_t mirror_bypass = acamera_isp_top_bypass_mirror_read(p_fsm->cmn.isp_base);
+
+    if (mirror_bypass == 1)
+        return;
+
+    uint8_t bayer = acamera_isp_top_rggb_start_post_mirror_read(p_fsm->cmn.isp_base);
+    if (bayer == BAYER_RGGB)
+        acamera_isp_top_rggb_start_post_mirror_write( p_fsm->cmn.isp_base, BAYER_GRBG );
+    else if (bayer == BAYER_GRBG)
+        acamera_isp_top_rggb_start_post_mirror_write( p_fsm->cmn.isp_base, BAYER_RGGB );
+    else if (bayer == BAYER_GBRG)
+        acamera_isp_top_rggb_start_post_mirror_write( p_fsm->cmn.isp_base, BAYER_BGGR );
+    else if (bayer == BAYER_BGGR)
+        acamera_isp_top_rggb_start_post_mirror_write( p_fsm->cmn.isp_base, BAYER_GBRG );
+}
 
 static void sensor_update_bayer_bits(sensor_fsm_ptr_t p_fsm)
 {
@@ -242,6 +253,8 @@ static void sensor_update_bayer_bits(sensor_fsm_ptr_t p_fsm)
     acamera_isp_top_rggb_start_pre_mirror_write(p_fsm->cmn.isp_base, isp_bayer);
     acamera_isp_top_rggb_start_post_mirror_write(p_fsm->cmn.isp_base, isp_bayer);
     acamera_isp_input_formatter_input_bitwidth_select_write(p_fsm->cmn.isp_base, isp_bit_width);
+
+    sensor_check_mirror_bayer(p_fsm);
 }
 
 
@@ -291,6 +304,54 @@ void sensor_sw_init( sensor_fsm_ptr_t p_fsm )
     LOG( LOG_NOTICE, "Sensor initialization is complete, ID 0x%04X resolution %dx%d", p_fsm->ctrl.get_id( p_fsm->sensor_ctx ), param->active.width, param->active.height );
 }
 
+static void sqrt_ext_param_update(sensor_fsm_ptr_t p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct sqrt_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_SQRT_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to calculate sqrt ext");
+        return;
+    }
+
+    acamera_isp_sqrt_black_level_in_write(p_fsm->cmn.isp_base, p_result.black_level_in);
+    acamera_isp_sqrt_black_level_out_write(p_fsm->cmn.isp_base, p_result.black_level_out);
+}
+
+static void square_be_ext_param_update(sensor_fsm_ptr_t p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct square_be_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_SQUARE_BE_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to square be ext");
+        return;
+    }
+
+    acamera_isp_square_be_black_level_in_write(p_fsm->cmn.isp_base, p_result.black_level_in);
+    acamera_isp_square_be_black_level_out_write(p_fsm->cmn.isp_base, p_result.black_level_out);
+}
+
 void sensor_update_black( sensor_fsm_ptr_t p_fsm )
 {
     int32_t stub = 0;
@@ -327,6 +388,9 @@ void sensor_update_black( sensor_fsm_ptr_t p_fsm )
             acamera_isp_sensor_offset_pre_shading_offset_01_write( p_fsm->cmn.isp_base, (uint32_t)_GET_MOD_ENTRY16_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), idx_gr )->y << BLACK_LEVEL_SHIFT_WB );
             acamera_isp_sensor_offset_pre_shading_offset_10_write( p_fsm->cmn.isp_base, (uint32_t)_GET_MOD_ENTRY16_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), idx_gb )->y << BLACK_LEVEL_SHIFT_WB );
             acamera_isp_sensor_offset_pre_shading_offset_11_write( p_fsm->cmn.isp_base, (uint32_t)_GET_MOD_ENTRY16_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), idx_b )->y << BLACK_LEVEL_SHIFT_WB );
+
+            sqrt_ext_param_update(p_fsm);
+            square_be_ext_param_update(p_fsm);
         }
 
         acamera_isp_digital_gain_offset_write( p_fsm->cmn.isp_base, (uint32_t)_GET_MOD_ENTRY16_PTR( ACAMERA_FSM2CTX_PTR( p_fsm ), idx_gr )->y << BLACK_LEVEL_SHIFT_DG );
@@ -336,6 +400,9 @@ void sensor_update_black( sensor_fsm_ptr_t p_fsm )
             acamera_isp_sensor_offset_pre_shading_offset_01_write( p_fsm->cmn.isp_base, gr << BLACK_LEVEL_SHIFT_WB );
             acamera_isp_sensor_offset_pre_shading_offset_10_write( p_fsm->cmn.isp_base, gb << BLACK_LEVEL_SHIFT_WB );
             acamera_isp_sensor_offset_pre_shading_offset_11_write( p_fsm->cmn.isp_base, b << BLACK_LEVEL_SHIFT_WB );
+
+            sqrt_ext_param_update(p_fsm);
+            square_be_ext_param_update(p_fsm);
         }
 
         acamera_isp_digital_gain_offset_write( p_fsm->cmn.isp_base, (uint32_t)p_fsm->black_level << BLACK_LEVEL_SHIFT_DG );

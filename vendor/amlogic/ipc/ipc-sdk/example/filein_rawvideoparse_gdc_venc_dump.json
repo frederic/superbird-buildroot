@@ -1,0 +1,47 @@
+[
+  {
+    type: vbpool,
+    param: {
+      width: 1920,
+      height: 1080,
+      nbuf: 3
+    },
+    bind: {
+      output: gdc.ch1
+    }
+  },
+  {
+    type: filein,
+    param: {
+      path: "/data/raw_video_nv12_1920_1080.dat"
+    }
+  },
+  {
+    type: rawvideoparse,
+    param: {
+      pixfmt: NV12,
+      width: 1920,
+      height: 1080,
+      fps: 30
+    }
+  },
+  {
+    type:gdc,
+    param: {
+      name: gdc,
+      config-file: "/etc/gdc_config/equisolid-1920_1080_132_1080_0_0-0_0_1920_1080-0_0_0.95-1.36_1.39_0-nv12.bin"
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264
+    }
+  },
+  {
+    type: fileout,
+    param: {
+      path: "/data/filein_rawvideoparse_gdc_venc.dump"
+    }
+  }
+]

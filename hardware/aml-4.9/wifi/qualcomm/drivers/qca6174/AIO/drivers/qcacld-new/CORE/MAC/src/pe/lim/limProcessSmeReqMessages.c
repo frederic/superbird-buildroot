@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1906,6 +1906,32 @@ static void __limProcessClearDfsChannelList(tpAniSirGlobal pMac,
                   sizeof(tSirDFSChannelList), 0);
 }
 
+#ifdef WLAN_FEATURE_SAE
+/**
+ * lim_update_sae_config()- This API update SAE session info to csr config
+ * from join request.
+ * @session: PE session
+ * @sme_join_req: pointer to join request
+ *
+ * Return: None
+ */
+static void lim_update_sae_config(tpPESession session,
+				tpSirSmeJoinReq sme_join_req)
+{
+	session->sae_pmk_cached = sme_join_req->sae_pmk_cached;
+
+	VOS_TRACE(VOS_MODULE_ID_PE,
+		VOS_TRACE_LEVEL_DEBUG,
+		FL("pmk_cached %d for BSSID=" MAC_ADDRESS_STR),
+		session->sae_pmk_cached,
+		MAC_ADDR_ARRAY(sme_join_req->bssDescription.bssId));
+}
+#else
+static inline void lim_update_sae_config(tpPESession session,
+				tpSirSmeJoinReq sme_join_req)
+{}
+#endif
+
 /**
  * __limProcessSmeJoinReq()
  *
@@ -2241,6 +2267,7 @@ __limProcessSmeJoinReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 #endif
         psessionEntry->txLdpcIniFeatureEnabled = pSmeJoinReq->txLdpcIniFeatureEnabled;
         lim_update_fils_config(psessionEntry, pSmeJoinReq);
+        lim_update_sae_config(psessionEntry, pSmeJoinReq);
         if (psessionEntry->bssType == eSIR_INFRASTRUCTURE_MODE)
         {
             psessionEntry->limSystemRole = eLIM_STA_ROLE;
@@ -4252,7 +4279,7 @@ void limProcessSmeDelBssRsp(
   void
 __limProcessSmeAssocCnfNew(tpAniSirGlobal pMac, tANI_U32 msgType, tANI_U32 *pMsgBuf)
 {
-    tSirSmeAssocCnf    assocCnf;
+    tSirSmeAssocCnf    assocCnf = {0};
     tpDphHashNode      pStaDs = NULL;
     tpPESession        psessionEntry= NULL;
     tANI_U8            sessionId;
@@ -4339,24 +4366,40 @@ __limProcessSmeAssocCnfNew(tpAniSirGlobal pMac, tANI_U32 msgType, tANI_U32 *pMsg
          * Association Response frame to the requesting BTAMP-STA.
          */
         pStaDs->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
+        pStaDs->mlmStaContext.owe_ie = assocCnf.owe_ie;
+        pStaDs->mlmStaContext.owe_ie_len = assocCnf.owe_ie_len;
         limLog(pMac, LOG1, FL("sending Assoc Rsp frame to STA (assoc id=%d) "), pStaDs->assocId);
         limSendAssocRspMgmtFrame( pMac, eSIR_SUCCESS, pStaDs->assocId, pStaDs->staAddr,
                                   pStaDs->mlmStaContext.subType, pStaDs, psessionEntry);
+        pStaDs->mlmStaContext.owe_ie = NULL;
+        pStaDs->mlmStaContext.owe_ie_len = 0;
         goto end;
     } // (assocCnf.statusCode == eSIR_SME_SUCCESS)
     else
     {
+        uint8_t add_pre_auth_context = true;
         // SME_ASSOC_CNF status is non-success, so STA is not allowed to be associated
         /*Since the HAL sta entry is created for denied STA we need to remove this HAL entry.So to do that set updateContext to 1*/
+        tSirMacStatusCodes mac_status_code = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+
         if(!pStaDs->mlmStaContext.updateContext)
            pStaDs->mlmStaContext.updateContext = 1;
-        limLog(pMac, LOG1, FL("Receive Assoc Cnf with status Code : %d(assoc id=%d) "),
-                           assocCnf.statusCode, pStaDs->assocId);
+        limLog(pMac, LOG1,
+               FL("Receive Assoc Cnf with status Code : %d(assoc id=%d) Reason code: %d"),
+               assocCnf.statusCode, pStaDs->assocId, assocCnf.mac_status_code);
+        if (assocCnf.mac_status_code)
+            mac_status_code = assocCnf.mac_status_code;
+        if (assocCnf.mac_status_code == eSIR_MAC_INVALID_PMKID ||
+            assocCnf.mac_status_code ==
+            eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS)
+            add_pre_auth_context = false;
         limRejectAssociation(pMac, pStaDs->staAddr,
                              pStaDs->mlmStaContext.subType,
-                             true, pStaDs->mlmStaContext.authType,
+                             add_pre_auth_context,
+                             pStaDs->mlmStaContext.authType,
                              pStaDs->assocId, true,
-                             eSIR_MAC_UNSPEC_FAILURE_STATUS, psessionEntry);
+                             mac_status_code,
+                             psessionEntry);
     }
 
 end:
@@ -4375,7 +4418,7 @@ end:
             psessionEntry->parsedAssocReq[pStaDs->assocId] = NULL;
         }
     }
-
+    vos_mem_free(assocCnf.owe_ie);
 } /*** end __limProcessSmeAssocCnfNew() ***/
 
 #ifdef SAP_AUTH_OFFLOAD
@@ -5493,6 +5536,22 @@ __limProcessSmeAddStaSelfReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
    pAddStaSelfParams->nss_5g = pSmeReq->nss_5g;
    pAddStaSelfParams->tx_aggregation_size = pSmeReq->tx_aggregation_size;
    pAddStaSelfParams->rx_aggregation_size = pSmeReq->rx_aggregation_size;
+   pAddStaSelfParams->tx_aggr_sw_retry_threshhold_be =
+                      pSmeReq->tx_aggr_sw_retry_threshhold_be;
+   pAddStaSelfParams->tx_aggr_sw_retry_threshhold_bk =
+                      pSmeReq->tx_aggr_sw_retry_threshhold_bk;
+   pAddStaSelfParams->tx_aggr_sw_retry_threshhold_vi =
+                      pSmeReq->tx_aggr_sw_retry_threshhold_vi;
+   pAddStaSelfParams->tx_aggr_sw_retry_threshhold_vo =
+                      pSmeReq->tx_aggr_sw_retry_threshhold_vo;
+   pAddStaSelfParams->tx_non_aggr_sw_retry_threshhold_be =
+                      pSmeReq->tx_non_aggr_sw_retry_threshhold_be;
+   pAddStaSelfParams->tx_non_aggr_sw_retry_threshhold_bk =
+                      pSmeReq->tx_non_aggr_sw_retry_threshhold_bk;
+   pAddStaSelfParams->tx_non_aggr_sw_retry_threshhold_vi =
+                      pSmeReq->tx_non_aggr_sw_retry_threshhold_vi;
+   pAddStaSelfParams->tx_non_aggr_sw_retry_threshhold_vo =
+                      pSmeReq->tx_non_aggr_sw_retry_threshhold_vo;
 
    msg.type = SIR_HAL_ADD_STA_SELF_REQ;
    msg.reserved = 0;
@@ -6844,8 +6903,17 @@ limUpdateIBssPropAddIEs(tpAniSirGlobal pMac, tANI_U8 **pDstData_buff,
         vos_mem_copy(vendor_ie, pModifyIE->pIEBuffer,
                      pModifyIE->ieBufferlength);
     } else {
-        uint16_t new_length = pModifyIE->ieBufferlength + *pDstDataLen;
-        uint8_t *new_ptr = vos_mem_malloc(new_length);
+	uint8_t *new_ptr;
+	uint16_t new_length;
+
+	if (USHRT_MAX - pModifyIE->ieBufferlength < *pDstDataLen) {
+			limLog(pMac,LOGE,FL("U16 overflow due to %d + %d"),
+				pModifyIE->ieBufferlength, *pDstDataLen);
+			return false;
+		}
+
+        new_length = pModifyIE->ieBufferlength + *pDstDataLen;
+        new_ptr = vos_mem_malloc(new_length);
 
         if (NULL == new_ptr) {
             limLog(pMac, LOGE, FL("Memory allocation failed."));
@@ -7218,7 +7286,24 @@ limProcessUpdateAddIEs(tpAniSirGlobal pMac, tANI_U32 *pMsg)
                 /* In case of append, allocate new memory with combined length */
                 tANI_U16 new_length = pUpdateAddIEs->updateIE.ieBufferlength +
                                 psessionEntry->addIeParams.probeRespDataLen;
-                tANI_U8 *new_ptr = vos_mem_malloc(new_length);
+                tANI_U8 *new_ptr;
+                /* Multiple back to back append commands
+                 * can lead to a huge length.So, check
+                 * for the validity of the length.
+                 */
+                if (psessionEntry->addIeParams.probeRespDataLen >
+                     (USHRT_MAX - pUpdateAddIEs->updateIE.ieBufferlength))
+                {
+                    limLog(pMac, LOGE,
+                           FL("IE Length overflow, curr:%d, new:%d."),
+                           psessionEntry->addIeParams.probeRespDataLen,
+                           pUpdateAddIEs->updateIE.ieBufferlength);
+                    vos_mem_free(pUpdateAddIEs->updateIE.pAdditionIEBuffer);
+                    pUpdateAddIEs->updateIE.pAdditionIEBuffer = NULL;
+                    return;
+                }
+
+                new_ptr = vos_mem_malloc(new_length);
                 if (NULL == new_ptr)
                 {
                     limLog(pMac, LOGE, FL("Memory allocation failed."));
@@ -7588,8 +7673,6 @@ limProcessSmeDfsCsaIeRequest(tpAniSirGlobal pMac, tANI_U32 *pMsg)
                      psessionEntry->gLimChannelSwitch.secondarySubBand,
                      psessionEntry);
         }
-
-        psessionEntry->gLimChannelSwitch.switchCount--;
     }
     return;
 }

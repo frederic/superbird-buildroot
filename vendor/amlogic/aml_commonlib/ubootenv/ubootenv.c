@@ -67,6 +67,8 @@ static env_attribute * env_parse_attribute(void) {
         if (key != NULL) {
             *key=0;
             strcpy(attr->key, proc);
+            attr->value = (char *)malloc(strlen(key+1)+1);
+            memset(attr->value,0,strlen(key+1)+1);
             strcpy(attr->value, key+sizeof(char));
         } else {
             ERROR("[ubootenv] error need '=' skip this value\n");
@@ -137,7 +139,7 @@ int read_bootenv() {
         return -1;
     }
 
-    addr = malloc(ENV_PARTITIONS_SIZE);
+    addr = (char *)malloc(ENV_PARTITIONS_SIZE);
     if (addr == NULL) {
         ERROR("[ubootenv] Not enough memory for environment (%u bytes)\n",ENV_PARTITIONS_SIZE);
         close(fd);
@@ -203,6 +205,11 @@ int bootenv_set_value(const char * key,  const char * value,int creat_args_flag)
     env_attribute *last = attr;
     while (attr) {
         if (!strcmp(key,attr->key)) {
+            if (attr->value != NULL) {
+                free(attr->value);
+            }
+            attr->value = (char *)malloc(strlen(value)+1);
+            memset(attr->value,0,strlen(value)+1);
             strcpy(attr->value,value);
             return 2;
         }
@@ -217,6 +224,8 @@ int bootenv_set_value(const char * key,  const char * value,int creat_args_flag)
         last->next = attr;
         memset(attr, 0, sizeof(env_attribute));
         strcpy(attr->key,key);
+        attr->value = (char *)malloc(strlen(value)+1);
+        memset(attr->value,0,strlen(value)+1);
         strcpy(attr->value,value);
         return 1;
     }else {
@@ -515,6 +524,7 @@ int bootenv_reinit(void) {
    while (pAttr) {
        pTmp = pAttr;
        pAttr = pAttr->next;
+       free(pTmp->value);
        free(pTmp);
    }
    bootenv_init();

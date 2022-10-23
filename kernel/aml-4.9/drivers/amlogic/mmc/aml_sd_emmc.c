@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
+#include <linux/mmc/core.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sd.h>
 #include <linux/mmc/slot-gpio.h>
@@ -41,6 +42,11 @@
 #include <linux/mmc/emmc_partitions.h>
 #include <linux/amlogic/amlsd.h>
 #include <linux/amlogic/aml_sd_emmc_v3.h>
+#include <linux/amlogic/power_domain.h>
+#include <dt-bindings/power/amlogic,pd.h>
+#include <linux/pm_runtime.h>
+
+#define MMC_PM_TIMEOUT (2000)
 
 struct mmc_host *sdio_host;
 
@@ -2248,8 +2254,17 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	if (mrq->cmd->opcode == MMC_SEND_STATUS)
 		des_cmd_cur->timeout = 0xb;
-	if (mrq->cmd->opcode == MMC_ERASE)
+	if (mrq->cmd->opcode == MMC_ERASE) {
 		des_cmd_cur->timeout = 0xf;
+		if ((mrq->cmd->arg == MMC_SECURE_TRIM2_ARG)
+			|| (mrq->cmd->arg == MMC_SECURE_ERASE_ARG)) {
+			des_cmd_cur->timeout = 0;
+			INIT_DELAYED_WORK(&host->timeout,
+				aml_emmc_erase_timeout);
+			schedule_delayed_work(&host->timeout,
+				EMMC_ERASE_TIMEOUT);
+		}
+	}
 	if (mrq->cmd->opcode == MMC_SWITCH)
 		des_cmd_cur->timeout = 0xf;
 
@@ -3309,6 +3324,15 @@ static int meson_mmc_probe(struct platform_device *pdev)
 		else
 			mmc->ops = &meson_mmc_ops;
 		aml_reg_print(pdata);
+
+		if (aml_card_type_mmc(pdata) &&
+				(host->data->chip_type == MMC_CHIP_TM2_B)) {
+			pm_runtime_set_active(&pdev->dev);
+			pm_runtime_set_autosuspend_delay(&pdev->dev,
+					MMC_PM_TIMEOUT);
+			pm_runtime_use_autosuspend(&pdev->dev);
+			pm_runtime_enable(&pdev->dev);
+		}
 		ret = mmc_add_host(mmc);
 		if (ret) { /* error */
 			pr_err("Failed to add mmc host.\n");
@@ -3357,6 +3381,10 @@ static int meson_mmc_probe(struct platform_device *pdev)
 		if (ret)
 			dev_warn(mmc_dev(host->mmc),
 					"Unable to creat sysfs attributes\n");
+		ret = device_create_file(&pdev->dev, &dev_attr_emmc_tx_window);
+		if (ret)
+			dev_warn(mmc_dev(host->mmc),
+					"Unable to creat sysfs attributes\n");
 	}
 	return 0;
 
@@ -3401,11 +3429,61 @@ static int meson_mmc_remove(struct platform_device *pdev)
 
 	kfree(host->blk_test);
 	kfree(host->adj_win);
+
+	if (host->data->chip_type == MMC_CHIP_TM2_B)
+		pm_runtime_disable(&pdev->dev);
+
 	mmc_free_host(host->mmc);
 	kfree(pdata);
 	kfree(host);
 	return 0;
 }
+
+static int aml_sdio_runtime_suspend(struct device *dev)
+{
+	struct amlsd_host *host = dev_get_drvdata(dev);
+	int i, ret;
+
+	host->resume_clock = clk_get_rate(host->cfg_div_clk);
+
+	ret = clk_set_rate(host->cfg_div_clk, 40000000);
+	if (ret) {
+		dev_err(host->dev, "Unable to set  clk to 40M to ret = %d\n",
+				ret);
+		return ret;
+	}
+
+	for (i = 0; i < 20; i++)
+		host->reg_bak[i] = readl(host->base + (i * 4));
+	power_domain_switch(PM_EMMC_C, PWR_OFF);
+	pinctrl_pm_select_sleep_state(dev);
+
+	return 0;
+}
+
+static int aml_sdio_runtime_resume(struct device *dev)
+{
+	struct amlsd_host *host = dev_get_drvdata(dev);
+	int i, ret;
+
+	power_domain_switch(PM_EMMC_C, PWR_ON);
+	pinctrl_pm_select_default_state(dev);
+	for (i = 0; i < 20; i++)
+		writel(host->reg_bak[i], (host->base + (i * 4)));
+
+	ret = clk_set_rate(host->cfg_div_clk, host->resume_clock);
+	if (ret) {
+		dev_err(host->dev, "Unable to set resume clk ret = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops sdio_pm_ops = {
+	SET_RUNTIME_PM_OPS(aml_sdio_runtime_suspend,
+			aml_sdio_runtime_resume, NULL)
+};
 
 static struct meson_mmc_data mmc_data_gxbb = {
 	.chip_type = MMC_CHIP_GXBB,
@@ -3694,6 +3772,28 @@ static struct meson_mmc_data mmc_data_tm2 = {
 	.sdmmc.sdr104.core_phase = 2,
 };
 
+static struct meson_mmc_data mmc_data_tm2_b = {
+	.chip_type = MMC_CHIP_TM2_B,
+	.port_a_base = 0xffe03000,
+	.port_b_base = 0xffe05000,
+	.port_c_base = 0xffe07000,
+	.pinmux_base = 0xff634400,
+	.clksrc_base = 0xff63c000,
+	.ds_pin_poll = 0x3a,
+	.ds_pin_poll_en = 0x48,
+	.ds_pin_poll_bit = 13,
+	.sdmmc.init.core_phase = 3,
+	.sdmmc.init.tx_phase = 0,
+	.sdmmc.init.rx_phase = 0,
+	.sdmmc.hs.core_phase = 3,
+	.sdmmc.ddr.core_phase = 2,
+	.sdmmc.hs2.core_phase = 2,
+	.sdmmc.hs4.core_phase = 0,
+	.sdmmc.hs4.tx_delay = 11,
+	.sdmmc.sd_hs.core_phase = 2,
+	.sdmmc.sdr104.core_phase = 2,
+};
+
 static const struct of_device_id meson_mmc_of_match[] = {
 	{
 		.compatible = "amlogic, meson-mmc-gxbb",
@@ -3755,6 +3855,10 @@ static const struct of_device_id meson_mmc_of_match[] = {
 		.compatible = "amlogic, meson-mmc-tm2",
 		.data = &mmc_data_tm2,
 	},
+	{
+		.compatible = "amlogic, meson-mmc-tm2-b",
+		.data = &mmc_data_tm2_b,
+	},
 
 	{}
 };
@@ -3767,6 +3871,7 @@ static struct platform_driver meson_mmc_driver = {
 		.name = "meson-aml-mmc",
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(meson_mmc_of_match),
+		.pm = &sdio_pm_ops,
 	},
 };
 

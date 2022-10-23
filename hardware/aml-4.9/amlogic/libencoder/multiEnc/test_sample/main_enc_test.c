@@ -97,6 +97,13 @@ static BOOL ParseArgumentAndSetTestConfig(CommandLineArgument argument, TestEncC
         {"picWidth",              1, NULL, 0, "--picWidth                  source width\n"},
         {"picHeight",             1, NULL, 0, "--picHeight                 source height\n"},
         {"kbps",                  1, NULL, 0, "--kbps                      RC bitrate in kbps. In case of without cfg file, if this option has value then RC will be enabled\n"},
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+        {"mvHistogramEn",         1, NULL, 0, "--mvHistogramEn             1 : enable mvHistogram, 0:off\n"},
+        {"mvHistoThreshold0",     1, NULL, 0, "--mvHistoThreshold0         mvHistoThreshold0 value\n"},
+        {"mvHistoThreshold1",     1, NULL, 0, "--mvHistoThreshold1         mvHistoThreshold1 value\n"},
+        {"mvHistoThreshold2",     1, NULL, 0, "--mvHistoThreshold2         mvHistoThreshold2 value\n"},
+        {"mvHistoThreshold3",     1, NULL, 0, "--mvHistoThreshold3         mvHistoThreshold3 value\n"},
+#endif
 #ifdef SUPPORT_SOURCE_RELEASE_INTERRUPT
         {"srcReleaseInt",         1, NULL, 0, "--srcReleaseInt             1 : enable source release Interrupt\n"},
 #endif
@@ -158,6 +165,18 @@ static BOOL ParseArgumentAndSetTestConfig(CommandLineArgument argument, TestEncC
                 testConfig->picHeight = atoi(optarg);
             } else if (!strcmp(options[idx].name, "kbps")) {
                 testConfig->kbps = atoi(optarg);
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+            } else if (!strcmp(options[idx].name, "mvHistogramEn")) {
+                testConfig->mvHistogramEn = atoi(optarg);
+            } else if (!strcmp(options[idx].name, "mvHistoThreshold0")) {
+                testConfig->mvHistoThreshold0 = atoi(optarg);
+            } else if (!strcmp(options[idx].name, "mvHistoThreshold1")) {
+                testConfig->mvHistoThreshold1 = atoi(optarg);
+            } else if (!strcmp(options[idx].name, "mvHistoThreshold2")) {
+                testConfig->mvHistoThreshold2 = atoi(optarg);
+            } else if (!strcmp(options[idx].name, "mvHistoThreshold3")) {
+                testConfig->mvHistoThreshold3 = atoi(optarg);
+#endif
 #ifdef SUPPORT_SOURCE_RELEASE_INTERRUPT
             } else if (!strcmp(options[idx].name, "srcReleaseInt")) {
                 testConfig->srcReleaseIntEnable = atoi(optarg);

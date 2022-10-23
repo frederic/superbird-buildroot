@@ -70,6 +70,7 @@ enum SocIQ_ioctl {
     // The given input structure will have type request_data
     // Used to request the LUT data.
     V4L2_SOC_IQ_IOCTL_REQUEST_DATA,
+    V4L2_SOC_IQ_IOCTL_SET_SENSOR_NAME,
 };
 
 

@@ -8,8 +8,7 @@ ONVIF_SRVD_VERSION = 4c61623b6d3388ae1506957e62c943c71cac8545
 
 ONVIF_SRVD_LICENSE = BSD 3-Clause
 #ONVIF_SRVD_LICENSE_FILES = COPYING
-ONVIF_SRVD_DEPENDENCIES = host-openssl openssl zlib
-ONVIF_SRVD_DEPENDENCIES += onvif_wsdd onvif_rtsp
+ONVIF_SRVD_DEPENDENCIES = host-openssl openssl zlib ffmpeg
 
 ONVIF_SRVD_SITE = $(call github,KoynovStas,onvif_srvd,$(ONVIF_SRVD_VERSION))
 

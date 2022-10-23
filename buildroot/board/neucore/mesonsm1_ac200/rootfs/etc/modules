@@ -10,7 +10,9 @@ media_clock
 firmware
 decoder_common
 stream_input
+amvdec_ports
 amvdec_avs
+amvdec_mavs
 amvdec_h264
 amvdec_h264_4k2k
 amvdec_mh264
@@ -19,10 +21,12 @@ amvdec_h265
 amvdec_mjpeg
 amvdec_mmjpeg
 amvdec_mpeg12
+amvdec_mmpeg12
 amvdec_mpeg4
 amvdec_mmpeg4
 amvdec_real
 amvdec_vc1
 amvdec_vp9
+
 #NN
 galcore

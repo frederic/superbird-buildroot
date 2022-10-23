@@ -811,6 +811,9 @@ struct avs2_frame_s {
 	int max_mv;
 	int min_mv;
 	int avg_mv;
+
+	u32 hw_decode_time;
+	u32 frame_size; // For frame base mode
 };
 
 

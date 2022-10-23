@@ -88,14 +88,12 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
 {
 	struct optee *optee = tee_get_drvdata(ctx->teedev);
 	struct optee_supp *supp = &optee->supp;
-	struct optee_supp_req *req = NULL;
+	struct optee_supp_req *req = kzalloc(sizeof(*req), GFP_KERNEL);
 	bool interruptable;
 	u32 ret;
+	int id;
+	struct optee_supp_req *req_tmp;
 
-	if (!supp->ctx)
-		return TEEC_ERROR_COMMUNICATION;
-
-	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return TEEC_ERROR_OUT_OF_MEMORY;
 
@@ -112,6 +110,23 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
 
 	/* Tell an eventual waiter there's a new request */
 	complete(&supp->reqs_c);
+
+	if (!supp->ctx) {
+		mutex_lock(&supp->mutex);
+		if (req->in_queue) {
+			list_del(&req->link);
+		} else {
+			idr_for_each_entry(&supp->idr, req_tmp, id) {
+				if (req == req_tmp)
+					idr_remove(&supp->idr, id);
+			}
+		}
+		mutex_unlock(&supp->mutex);
+
+		kfree(req);
+
+		return TEEC_ERROR_COMMUNICATION;
+	}
 
 	/*
 	 * Wait for supplicant to process and return result, once we've

@@ -35,7 +35,7 @@
 #include "pattern_detection_corn_settings.h"
 #endif
 
-#define PATTERN_INDEX_MAX    PATTERN_GREEN_CORN
+#define PATTERN_INDEX_MAX    PATTERN_MULTICAST
 
 int pattern_detect_debug;
 #define pr_pattern_detect_dbg(fmt, args...)\
@@ -49,7 +49,8 @@ int detected_pattern = PATTERN_UNKNOWN;
 int last_detected_pattern = PATTERN_UNKNOWN;
 uint pattern_mask = PATTERN_MASK(PATTERN_75COLORBAR) |
 					PATTERN_MASK(PATTERN_SKIN_TONE_FACE) |
-					PATTERN_MASK(PATTERN_GREEN_CORN);
+					PATTERN_MASK(PATTERN_GREEN_CORN) |
+					PATTERN_MASK(PATTERN_MULTICAST);
 
 static uint pattern_param = PATTERN_PARAM_COUNT;
 
@@ -81,6 +82,14 @@ static uint pattern2_param_info[PATTERN_PARAM_COUNT] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+/*saturation hist*/
+static uint pattern3_param_info[PATTERN_PARAM_COUNT] = {
+	0x7e9000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
 module_param_array(
 	pattern0_param_info, uint,
 	&pattern_param, 0664);
@@ -95,6 +104,10 @@ module_param_array(
 	pattern2_param_info, uint,
 	&pattern_param, 0664);
 MODULE_PARM_DESC(pattern2_param_info, "\n pattern2_param_info\n");
+
+unsigned int mltcast_ratio1 = 9;
+unsigned int mltcast_ratio2 = 8;
+int mltcast_skip_en;
 
 static int default_pattern0_checker(struct vframe_s *vf)
 {
@@ -111,6 +124,12 @@ static int default_pattern1_checker(struct vframe_s *vf)
 static int default_pattern2_checker(struct vframe_s *vf)
 {
 	pr_pattern_detect_dbg("check for pattern2\n");
+	return 0;
+}
+
+static int default_pattern3_checker(struct vframe_s *vf)
+{
+	pr_pattern_detect_dbg("check for pattern3\n");
 	return 0;
 }
 
@@ -132,6 +151,12 @@ static int default_pattern2_handler(struct vframe_s *vf, int flag)
 	return 0;
 }
 
+static int default_pattern3_handler(struct vframe_s *vf, int flag)
+{
+	pr_pattern_detect_dbg("pattern3 detected and handled\n");
+	return 0;
+}
+
 static int default_pattern0_defaultloader(struct vframe_s *vf)
 {
 	pr_pattern_detect_dbg("pattern0 load default setting\n");
@@ -147,6 +172,12 @@ static int default_pattern1_defaultloader(struct vframe_s *vf)
 static int default_pattern2_defaultloader(struct vframe_s *vf)
 {
 	pr_pattern_detect_dbg("pattern2 load default setting\n");
+	return 0;
+}
+
+static int default_pattern3_defaultloader(struct vframe_s *vf)
+{
+	pr_pattern_detect_dbg("pattern3 load default setting\n");
 	return 0;
 }
 
@@ -178,6 +209,15 @@ static struct pattern pattern_list[] = {
 		default_pattern2_checker,
 		default_pattern2_defaultloader,
 		default_pattern2_handler,
+	},
+	{
+		PATTERN_MULTICAST,
+		pattern3_param_info,
+		NULL,
+		NULL,
+		default_pattern3_checker,
+		default_pattern3_defaultloader,
+		default_pattern3_handler,
 	},
 };
 
@@ -712,6 +752,14 @@ static int face_hist_checker(struct vframe_s *vf)
 		flag = 1;
 	}
 
+	/* patch */
+	if (cpu_after_eq(MESON_CPU_MAJOR_ID_TM2) &&
+	    !(is_meson_rev_a() && is_meson_tm2_cpu())) {
+		if (vf->source_type == VFRAME_SOURCE_TYPE_CVBS &&
+		    vf->source_mode == VFRAME_SOURCE_MODE_PAL)
+		flag = 0;
+	}
+
 	if (flag <= 0)
 		pr_pattern_detect_dbg(
 			"skin tone pattern is not detected\n");
@@ -882,6 +930,14 @@ static int corn_hist_checker(struct vframe_s *vf)
 		flag = 1;
 	}
 
+	/* patch */
+	if (cpu_after_eq(MESON_CPU_MAJOR_ID_TM2) &&
+	    !(is_meson_rev_a() && is_meson_tm2_cpu())) {
+		if (vf->source_type == VFRAME_SOURCE_TYPE_CVBS &&
+		    vf->source_mode == VFRAME_SOURCE_MODE_PAL)
+		flag = 0;
+	}
+
 	if (flag <= 0)
 		pr_pattern_detect_dbg(
 			"green corn pattern is not detected\n");
@@ -955,6 +1011,114 @@ static int corn_handler(struct vframe_s *vf, int flag)
 
 	return 0;
 }
+
+static struct di_reg_s di_patch[MULTICAST_REG_LEV] = {
+	{
+		{0xbf201080, 0xffffffff, 0xbf201080, 0xffffffff,
+			0xf7ffc, 0x8000},
+	},
+	{
+		{0xbf3f10ff, 0xffffffff, 0xbf3f10ff, 0xffffffff,
+			0xf7ffc, 0x8000},
+	}
+};
+
+static int multicast_detcnt;
+static int last_detflg;
+static bool blue_mltcast_en;
+static int multicast_color_checker(struct vframe_s *vf)
+{
+	int flag = -1;
+	int hue_hist[32], sat_hist[32];
+	int total_hue_hist = 0, total_sat_hist = 0;
+	int sat_flg = 0;
+	int hue_flg = 0;
+	int i;
+	int height, width, di_size;
+
+	if (!(vf->di_pulldown & 0x8))
+		return flag;
+
+	height = vf->height;
+	width = vf->width;
+
+	di_size = height * width / 2;
+
+	for (i = 0; i < 32; i++) {
+		sat_hist[i] = vf->prop.hist.vpp_sat_gamma[i];
+		hue_hist[i] = vf->prop.hist.vpp_hue_gamma[i];
+		total_sat_hist += sat_hist[i];
+		total_hue_hist += hue_hist[i];
+	}
+
+	pr_pattern_detect_dbg(
+		"total_sat_hist=%d, total_hue_hist= %d, sat_hist[0]= %d, hue_hist[31]= %d\n",
+		total_sat_hist, total_hue_hist, sat_hist[0], hue_hist[31]);
+
+	/*suggestion from vlsi-liuyanling,
+	 *1. sat_hist[0] > 99% total_sat
+	 *2. total_hue < 7/1000 * size
+	 */
+	sat_flg = sat_hist[0] * 100 - total_sat_hist * 99;
+	hue_flg = 3840 * 2160 * 7 - total_hue_hist * 1000;
+
+	if ((sat_flg > 0) && (hue_flg > 0) &&
+	    (vf->di_gmv > di_size * mltcast_ratio1 / 16) &&
+	    (vf->di_gmv < di_size * 15 / 16))
+		flag = 1;
+	else if ((sat_flg > 0) && (hue_flg > 0) &&
+		 (vf->di_gmv > di_size * mltcast_ratio2 / 16) &&
+		 (vf->di_gmv < di_size * 15 / 16))
+		flag = 2;
+	else if ((hue_hist[31] > total_hue_hist * 9 / 10) &&
+		 (vf->di_cm_cnt > di_size * mltcast_ratio1 / 16) &&
+		(vf->di_gmv < di_size * 15 / 16))
+		flag = 3;
+	else
+		flag = 0;
+
+	if ((flag > 0) && (flag == last_detflg))
+		multicast_detcnt++;
+	else
+		multicast_detcnt = 0;
+
+	last_detflg = flag;
+
+	pr_pattern_detect_dbg(
+		"flag:%d, di_gmv:%d, di_size:%d, di_cm_cnt:%d, sat_flg:%d, hue_flg: %d\n",
+		flag, vf->di_gmv, di_size, vf->di_cm_cnt, sat_flg, hue_flg);
+	if (multicast_detcnt > 2)
+		multicast_detcnt = 2;
+	if ((multicast_detcnt < 1) && mltcast_skip_en)
+		return 0;
+
+	return flag;
+}
+
+static int multicast_color_handler(struct vframe_s *vf, int flag)
+{
+	static int last_flag = -1;
+
+	pr_pattern_detect_dbg("enter\n");
+
+	if (flag == last_flag)
+		return 0;
+
+	if (flag == 1)
+		di_api_mov_sel(1, &di_patch[1].val[0]);
+	else if (flag == 2)
+		di_api_mov_sel(1, &di_patch[0].val[0]);
+	else if ((flag == 3) && blue_mltcast_en)
+		di_api_mov_sel(1, &di_patch[1].val[0]);
+	else
+		di_api_mov_sel(0, NULL);
+
+	last_flag = flag;
+
+	pr_pattern_detect_dbg("leave\n");
+	return 0;
+}
+
 #endif
 
 /* public api */
@@ -1050,6 +1214,19 @@ int init_pattern_detect(void)
 	pattern_detect_add_cvd2_setting_table(
 						PATTERN_GREEN_CORN,
 						corn_cvd2_settings);
+	/* install callback for multicast */
+	pattern_detect_add_checker(
+						PATTERN_MULTICAST,
+						multicast_color_checker);
+	pattern_detect_add_handler(
+						PATTERN_MULTICAST,
+						multicast_color_handler);
+	pattern_detect_add_defaultloader(
+						PATTERN_MULTICAST,
+						NULL);
+	pattern_detect_add_cvd2_setting_table(
+						PATTERN_MULTICAST,
+						NULL);
 #endif
 
 	return 0;
@@ -1058,6 +1235,7 @@ int init_pattern_detect(void)
 int pattern_detect(struct vframe_s *vf)
 {
 	int flag = 0, rc = PATTERN_UNKNOWN;
+	int i;
 
 	if (!vf)
 		return 0;
@@ -1078,6 +1256,13 @@ int pattern_detect(struct vframe_s *vf)
 				pattern_index);
 			pattern_list[pattern_index].default_loader(vf);
 		}
+	}
+
+	for (pattern_index = PATTERN_START;
+		pattern_index <= PATTERN_INDEX_MAX;
+		pattern_index++) {
+		if (!(pattern_mask & (1 << pattern_index)))
+			continue;
 
 		/* check the pattern */
 		if (pattern_list[pattern_index].checker) {
@@ -1117,6 +1302,15 @@ int pattern_detect(struct vframe_s *vf)
 	}
 
 finish_detect:
+	for (i = pattern_index + 1;
+	     i <= PATTERN_INDEX_MAX;
+	     i++) {
+		if (pattern_list[i].handler) {
+			pr_pattern_detect_dbg(
+			"recover default setting for left patterns %d:\n", i);
+			pattern_list[i].handler(vf, 0);
+		}
+	}
 	last_detected_pattern = detected_pattern;
 	if (pattern_detect_debug > 0)
 		pattern_detect_debug--;

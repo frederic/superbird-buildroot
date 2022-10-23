@@ -4,7 +4,11 @@
 #
 ################################################################################
 
-WESTON_VERSION = 6.0.0
+ifneq ($(BR2_PACKAGE_WESTON_VERSION),"")
+  WESTON_VERSION = $(call qstrip,$(BR2_PACKAGE_WESTON_VERSION))
+else
+  WESTON_VERSION = 6.0.1
+endif
 WESTON_SITE = http://wayland.freedesktop.org/releases
 WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
 WESTON_LICENSE = MIT
@@ -63,6 +67,19 @@ WESTON_CONF_OPTS += \
 	--disable-egl \
 	--disable-simple-dmabuf-drm-client \
 	--disable-simple-egl-clients
+endif
+
+#We need to keep some Weston 3.0.0. configuration.
+ifeq ($(WESTON_VERSION), 3.0.0)
+ifeq ($(BR2_PACKAGE_CAIRO)$(BR2_PACKAGE_HAS_LIBGLES),yy)
+  WESTON_CONF_OPTS += --with-cairo=glesv2
+endif
+
+ifeq ($(BR2_PACKAGE_LIBUNWIND),y)
+  WESTON_DEPENDENCIES += libunwind
+else
+  WESTON_CONF_OPTS += --disable-libunwind
+endif
 endif
 
 ifeq ($(BR2_PACKAGE_WESTON_RDP),y)
@@ -147,6 +164,12 @@ ifeq ($(BR2_PACKAGE_WESTON_DRM_HELPER),y)
 WESTON_CONF_OPTS += \
 	--enable-drm-helper
 WESTON_DEPENDENCIES += meson-display
+endif
+
+WESTON_CONF_OPTS +=  WESTON_MAX_OUTPUT_PIPLINE=$(BR2_PACKAGE_WESTON_MAX_OUTPUT_PIPLINE)
+
+ifeq ($(BR2_PACKAGE_WESTON_OUTPUT_DYNAMIC_SWITCH),y)
+WESTON_CONF_OPTS += --enable-output-dynamic-switch
 endif
 
 $(eval $(autotools-package))

@@ -116,7 +116,7 @@
         "osd_reverse=0\0"\
         "video_reverse=0\0"\
         "active_slot=normal\0"\
-        "lock=10001000\0"\
+        "lock=10101000\0"\
         "boot_part=boot\0"\
         "model_name=hdmitx\0" \
         "Irq_check_en=0\0"\
@@ -296,8 +296,6 @@
                 "fi;"\
                 "if keyman read oemkey ${loadaddr} str; then "\
                     "setenv bootargs ${bootargs} androidboot.oem.key1=${oemkey};"\
-                "else "\
-                    "setenv bootargs ${bootargs} androidboot.oem.key1=ATV00104319;"\
                 "fi;"\
             "fi;"\
             "\0"\

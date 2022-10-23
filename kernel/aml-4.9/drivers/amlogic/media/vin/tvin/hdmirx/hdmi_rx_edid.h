@@ -22,7 +22,8 @@
 #define EDID_HDR_SIZE		7
 #define EDID_HDR_HEAD_LEN	4
 #define MAX_HDR_LUMI_LEN	3
-#define MAX_EDID_BUF_SIZE	512
+#define MAX_EDID_BUF_SIZE	(EDID_SIZE * 6)
+#define PORT_NUM		3
 
 /* CTA-861G Table 54~57 CTA data block tag codes */
 /* tag code 0x0: reserved */
@@ -43,6 +44,9 @@
 /* extended tag code */
 #define VCDB_TAG 0 /* video capability data block */
 #define VSVDB_TAG 1 /* Vendor-Specific Video Data Block */
+#define VSVDB_OFFSET	0xF0
+#define VSVDB_DV_TAG	((USE_EXTENDED_TAG << 8) + VSVDB_TAG)
+#define VSVDB_HDR10P_TAG ((USE_EXTENDED_TAG << 8) + VSVDB_TAG + VSVDB_OFFSET)
 #define VDDDB_TAG 2 /* VESA Display Device Data Block */
 #define VVTBE_TAG 3 /* VESA Video Timing Block Extension */
 /* extend tag code 0x4: Reserved for HDMI Video Data Block */
@@ -78,6 +82,8 @@
 /* short audio descriptor length */
 #define SAD_LEN 3
 #define BLK_LENGTH(a) (a & 0x1F)
+/* maximum VSVDB length is VSVDB V0: 26bytes */
+#define VSVDB_LEN	26
 
 enum edid_audio_format_e {
 	AUDIO_FORMAT_HEADER,
@@ -706,8 +712,9 @@ extern bool new_hdr_lum;
 extern bool atmos_edid_update_hpd_en;
 extern bool en_take_dtd_space;
 extern bool earc_cap_ds_update_hpd_en;
-extern unsigned char edid_temp[EDID_SIZE * 2];
+extern unsigned char edid_temp[MAX_EDID_BUF_SIZE];
 extern unsigned int edid_select;
+extern bool vsvdb_update_hpd_en;
 
 int rx_set_hdr_lumi(unsigned char *data, int len);
 void rx_edid_physical_addr(int a, int b, int c, int d);
@@ -733,11 +740,23 @@ void edid_splice_earc_capds_dbg(uint8_t *p_edid);
 void edid_splice_data_blk_dbg(uint8_t *p_edid, uint8_t idx);
 void edid_rm_db_by_tag(uint8_t *p_edid, uint16_t tagid);
 void edid_rm_db_by_idx(uint8_t *p_edid, uint8_t blk_idx);
+void splice_tag_db_to_edid(u8 *p_edid, u8 *add_buf,
+			   u8 buf_len, u16 tagid);
 uint8_t *edid_tag_extract(uint8_t *p_edid, uint16_t tagid);
+void splice_data_blk_to_edid(u_char *p_edid, u_char *add_buf,
+			     u_char blk_idx);
 void rx_modify_edid(unsigned char *buffer,
 				int len, unsigned char *addition);
 void rx_edid_update_audio_info(unsigned char *p_edid,
 						unsigned int len);
 extern bool is_ddc_idle(unsigned char port_id);
 bool need_update_edid(void);
+enum edid_ver_e get_edid_selection(uint8_t port);
+enum edid_ver_e rx_parse_edid_ver(uint8_t *p_edid);
+u_char *rx_get_cur_edid(u_char port);
+bool rx_set_vsvdb(unsigned char *data, unsigned int len);
+#ifdef CONFIG_AMLOGIC_HDMITX
+bool rx_update_tx_edid_with_audio_block(unsigned char *edid_data,
+					unsigned char *audio_block);
+#endif
 #endif

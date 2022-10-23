@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -91,6 +91,7 @@ static inline uint32_t type_get_bytes
     {
     case VSI_NN_TYPE_INT8:
     case VSI_NN_TYPE_UINT8:
+    case VSI_NN_TYPE_BOOL8:
         return 1;
     case VSI_NN_TYPE_INT16:
     case VSI_NN_TYPE_UINT16:
@@ -153,7 +154,7 @@ static inline int32_t fp32_to_affine
     (
     const float  in,
     const float  scale,
-    const uint8_t    zero_point,
+    const int32_t    zero_point,
     const vsi_nn_type_e type
     )
 {
@@ -170,7 +171,7 @@ static inline float affine_to_fp32
     (
     const int32_t    val,
     const float  scale,
-    const uint8_t    zero_point,
+    const int32_t    zero_point,
     const vsi_nn_type_e type
     )
 {
@@ -252,24 +253,30 @@ static inline vsi_status integer_convert
     return status;
 } /* integer_convert() */
 
+typedef union
+{
+    uint32_t u;
+    float f;
+} _fp32_t;
+
 static inline float fp16_to_fp32
     (
     int16_t in
     )
 {
-    int32_t t1,t2,t3;
-    float out;
-
-    t1 = in & 0x7fff;         // Non-sign bits
-    t2 = in & 0x8000;         // Sign bit
-    t3 = in & 0x7c00;         // Exponent
-    t1 <<= 13;                // Align mantissa on MSB
-    t2 <<= 16;                // Shift sign bit into position
-    t1 += 0x38000000;         // Adjust bias
-    t1 = (t3 == 0 ? 0 : t1);  // Denormals-as-zero
-    t1 |= t2;                 // Re-insert sign bit
-    *((uint32_t*)&out) = t1;
-    return out;
+    const _fp32_t magic = { (254 - 15) << 23 };
+    const _fp32_t infnan = { (127 + 16) << 23 };
+    _fp32_t o;
+    // Non-sign bits
+    o.u = ( in & 0x7fff ) << 13;
+    o.f *= magic.f;
+    if(o.f  >= infnan.f)
+    {
+        o.u |= 255 << 23;
+    }
+    //Sign bit
+    o.u |= ( in & 0x8000 ) << 16;
+    return o.f;
 } /* fp16_to_fp32() */
 
 static inline float bfp16_to_fp32
@@ -330,6 +337,34 @@ static inline uint16_t fp32_to_bfp16
     return (uint16_t) t1;
 } /* fp32_to_bfp16() */
 
+static inline uint16_t fp32_to_bfp16_rtne
+    (
+    float in
+    )
+{
+    /*
+    Convert a float point to bfloat16, with round-nearest-to-even as rounding method.
+    */
+
+    uint32_t fp32 = *((unsigned int *) &in);
+    uint16_t out;
+
+    uint32_t lsb = (fp32 >> 16) & 1;    /* Least significant bit of resulting bfloat. */
+    uint32_t rounding_bias = 0x7fff + lsb;
+
+    if ( VSI_NN_FLOAT32_NAN == in )
+    {
+        out = 0x7fc0;
+    }
+    else
+    {
+        fp32 += rounding_bias;
+        out = (uint16_t) (fp32 >> 16);
+    }
+
+    return out;
+} /* fp32_to_bfp16_rtne */
+
 static inline vsi_status dtype_to_float32
     (
     uint8_t *src,
@@ -349,8 +384,10 @@ static inline vsi_status dtype_to_float32
         *dst = bfp16_to_fp32( *(int16_t *)src );
         break;
     case VSI_NN_TYPE_INT8:
+    case VSI_NN_TYPE_BOOL8:
     case VSI_NN_TYPE_UINT8:
     case VSI_NN_TYPE_INT16:
+    case VSI_NN_TYPE_INT32:
         {
             int32_t src_value = 0;
             integer_convert(src, src_dtype->vx_type, &src_value, VSI_NN_TYPE_INT32 );
@@ -393,9 +430,10 @@ static inline vsi_status float32_to_dtype
         *(int16_t *)dst = fp32_to_fp16( src );
         break;
     case VSI_NN_TYPE_BFLOAT16:
-        *(int16_t *)dst = fp32_to_bfp16( src );
+        *(int16_t *)dst = fp32_to_bfp16_rtne( src );
         break;
     case VSI_NN_TYPE_INT8:
+    case VSI_NN_TYPE_BOOL8:
     case VSI_NN_TYPE_UINT8:
     case VSI_NN_TYPE_INT16:
     case VSI_NN_TYPE_INT32:
@@ -428,5 +466,96 @@ static inline vsi_status float32_to_dtype
 #ifdef __cplusplus
 }
 #endif
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_symm8
+    (
+    const float * buffer, size_t size,
+    float scale, int32_t zero_point,
+    int8_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_symm16
+    (
+    const float * buffer, size_t size,
+    float scale, int32_t zero_point,
+    int16_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_symm32
+    (
+    const float * buffer, size_t size,
+    float scale, int32_t zero_point,
+    int32_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_symm64
+    (
+    const float * buffer, size_t size,
+    float scale, int32_t zero_point,
+    int64_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_asymm8
+    (
+    const float * buffer, size_t size,
+    float scale, int32_t zero_point,
+    uint8_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_float_to_quantize_symm8_perchannel
+    (
+    const float * buffer, size_t size,
+    const int32_t * shape, size_t rank,
+    const float * scale, size_t scale_size,
+    const int32_t * zero_point, size_t zero_point_size,
+    int32_t channel_dim,
+    int8_t * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_symm8_to_float
+    (
+    const int8_t * buffer, size_t size,
+    float scale, int32_t zero_point,
+    float * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_symm16_to_float
+    (
+    const int16_t * buffer, size_t size,
+    float scale, int32_t zero_point,
+    float * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_symm32_to_float
+    (
+    const int32_t * buffer, size_t size,
+    float scale, int32_t zero_point,
+    float * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_symm64_to_float
+    (
+    const int64_t * buffer, size_t size,
+    float scale, int32_t zero_point,
+    float * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_asymm8_to_float
+    (
+    const uint8_t * buffer, size_t size,
+    float scale, int32_t zero_point,
+    float * out_buffer
+    );
+
+vsi_bool vsi_nn_dtype_convert_quantize_symm8_perchannel_to_float
+    (
+    const int8_t * buffer, size_t size,
+    const int32_t * shape, size_t rank,
+    const float * scale, size_t scale_size,
+    const int32_t * zero_point, size_t zero_point_size,
+    int32_t channel_dim,
+    float * out_buffer
+    );
+
 
 #endif

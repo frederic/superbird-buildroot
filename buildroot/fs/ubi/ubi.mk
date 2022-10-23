@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-UBI_UBINIZE_OPTS := -m $(BR2_TARGET_ROOTFS_UBIFS_MINIOSIZE)
+UBI_UBINIZE_OPTS = -m $(BR2_TARGET_ROOTFS_UBIFS_MINIOSIZE)
 UBI_UBINIZE_OPTS += -p $(BR2_TARGET_ROOTFS_UBI_PEBSIZE)
 ifneq ($(BR2_TARGET_ROOTFS_UBI_SUBSIZE),0)
 UBI_UBINIZE_OPTS += -s $(BR2_TARGET_ROOTFS_UBI_SUBSIZE)
@@ -36,8 +36,8 @@ UPGRADE_DIR_OVERLAY := $(patsubst "%",%,$(BR2_ROOTFS_UPGRADE_DIR_OVERLAY))
 ifeq ($(BR2_TARGET_USBTOOL_UBI_AMLOGIC),y)
 ifneq ($(UPGRADE_DIR_OVERLAY),)
 define ROOTFS-USB-IMAGE-PACK-UBI
-	cp -rf $(UPGRADE_DIR)/* $(BINARIES_DIR)
-	cp -rf $(UPGRADE_DIR_OVERLAY)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR_OVERLAY)/* $(BINARIES_DIR)
 	BINARIES_DIR=$(BINARIES_DIR) \
 	TOOL_DIR=$(HOST_DIR)/usr/bin \
 	$(HOST_DIR)/usr/bin/aml_upgrade_pkg_gen.sh \
@@ -45,7 +45,7 @@ define ROOTFS-USB-IMAGE-PACK-UBI
 endef
 else
 define ROOTFS-USB-IMAGE-PACK-UBI
-	cp -rf $(UPGRADE_DIR)/* $(BINARIES_DIR)
+	cp -rfL $(UPGRADE_DIR)/* $(BINARIES_DIR)
 	BINARIES_DIR=$(BINARIES_DIR) \
 	TOOL_DIR=$(HOST_DIR)/usr/bin \
 	$(HOST_DIR)/usr/bin/aml_upgrade_pkg_gen.sh \

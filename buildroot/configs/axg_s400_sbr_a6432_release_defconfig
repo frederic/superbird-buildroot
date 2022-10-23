@@ -1,0 +1,7 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "a113_s400_PurelySBR.config"
+#include "flash_nand_2k.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/common/initramfs/initramfs-49/ramfslist-32-ubi-release"

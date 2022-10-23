@@ -49,7 +49,6 @@
 #include "hif_sdio_dev.h"
 #include "if_ath_sdio.h"
 #include "regtable.h"
-#include "hif_sdio_internal.h"
 
 #define ATH_MODULE_NAME hif_sdio
 
@@ -121,10 +120,6 @@ void HIFPostInit(HIF_DEVICE *hif_device, void *target,
     if (htc_sdio_device)
     HIFDevSetup(htc_sdio_device);
 
-#if HIF_SCATTER_GATHER
-    HIFDevSetupMsgBundling(htc_sdio_device);
-#endif
-
     return;
 }
 
@@ -155,5 +150,5 @@ void HIFDump(HIF_DEVICE *hif_device, u_int8_t cmd_id, bool start) {
 
 void HIFSetBundleMode(HIF_DEVICE *hif_device, bool enabled, int rx_bundle_cnt)
 {
-       return;
+
 }

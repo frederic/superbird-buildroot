@@ -480,11 +480,11 @@ restart:
 	}
 
 	/*if (buffer_index % 2 == 1) {
-		adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[0], 0, 32);
-		adap_wr_reg_bits(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[2], 0, 32);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[0]);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[2]);
 	} else {
-		adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[1], 0, 32);
-		adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[3], 0, 32);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[1]);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[3]);
 	}*/
 
 Err:
@@ -985,23 +985,26 @@ int am_adap_frontend_init(void)
 
 	if (para.mode == DDR_MODE) {
 		//config ddr_buf[0] address
-		adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, ddr_buf[wbuf_index], 0, 32);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, ddr_buf[wbuf_index]);
 	} else if (para.mode == DOL_MODE) {
-		adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[0], 0, 32);
-		adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[1], 0, 32);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[0]);
+		mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[1]);
 
 		if (frontend1_flag) {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[2], 0, 32);
-				adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[3], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[2]);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[3]);
 		}
 	}
 
-	//enable vs_rise_isp interrupt & enable ddr_wdone interrupt
-	mipi_adap_reg_wr(CSI2_INTERRUPT_CTRL_STAT, FRONTEND_IO, 0x5);
+	if (para.mode == DDR_MODE || (para.mode == DOL_MODE && frontend1_flag)) {
+		//enable vs_rise_isp interrupt & enable ddr_wdone interrupt
+		mipi_adap_reg_wr(CSI2_INTERRUPT_CTRL_STAT, FRONTEND_IO, 0x5);
 
-	if (frontend1_flag) {
-		mipi_adap_reg_wr(CSI2_INTERRUPT_CTRL_STAT + FTE1_OFFSET, FRONTEND_IO, 0x5);
+		if (frontend1_flag) {
+		    mipi_adap_reg_wr(CSI2_INTERRUPT_CTRL_STAT + FTE1_OFFSET, FRONTEND_IO, 0x5);
+		}
 	}
+
 	return 0;
 }
 
@@ -1034,16 +1037,16 @@ int am_adap_reader_init(void)
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL0, RD_IO, 0xb5000004);
 	} else if (para.mode == DDR_MODE) {
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL1, RD_IO, 0x02d00078);
-		adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, ddr_buf[wbuf_index], 0, 32);//ddr mode config frame address
+		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, ddr_buf[wbuf_index]);//ddr mode config frame address
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL0, RD_IO, 0x70000000);
 	} else if (para.mode == DOL_MODE) {
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL1, RD_IO, 0x04380096);
-		adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, dol_buf[0], 0, 32);
-		adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL3, RD_IO, dol_buf[1], 0, 32);
+		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, dol_buf[0]);
+		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL3, RD_IO, dol_buf[1]);
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL0, RD_IO, 0xb5800000);
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD1_CNTL1, RD_IO, 0x04380096);
-		adap_wr_reg_bits(MIPI_ADAPT_DDR_RD1_CNTL2, RD_IO, dol_buf[0], 0, 32);
-		adap_wr_reg_bits(MIPI_ADAPT_DDR_RD1_CNTL3, RD_IO, dol_buf[1], 0, 32);
+		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD1_CNTL2, RD_IO, dol_buf[0]);
+		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD1_CNTL3, RD_IO, dol_buf[1]);
 		mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD1_CNTL0, RD_IO, 0xf1c10004);
 	} else {
 		pr_err("%s, Not supported Mode.\n", __func__);
@@ -1212,7 +1215,7 @@ static irqreturn_t adpapter_isr(int irq, void *para)
 
 			next_buf_index = get_next_wr_buf_index(inject_data_flag);
 			val = ddr_buf[next_buf_index];
-			adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, val, 0, 32);
+			mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, val);
 		}
 		if ((!control_flag) && (kfifo_len(&adapt_fifo) > 0)) {
 			adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL0, RD_IO, 1, 31, 1);
@@ -1226,9 +1229,9 @@ static irqreturn_t adpapter_isr(int irq, void *para)
 	if (data & (1 << 13)) {
 		adap_wr_reg_bits(MIPI_ADAPT_IRQ_PENDING0, ALIGN_IO, 1, 13, 1);
 		if (inject_data_flag) {
-			adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, ddr_buf[DDR_BUF_SIZE - 1], 0, 32);
+			mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, ddr_buf[DDR_BUF_SIZE - 1]);
 		} else {
-			adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, read_buf, 0, 32);
+			mipi_adap_reg_wr(MIPI_ADAPT_DDR_RD0_CNTL2, RD_IO, read_buf);
 		}
 		control_flag = 0;
 	}
@@ -1258,26 +1261,26 @@ static irqreturn_t dol_isr(int irq, void *para)
 		pr_info("frontend0 index:%d, frontend1 index:%d\n",fte0_index, fte1_index);
 		if (fte0_index == fte1_index) {
 			/*if (fte0_index % 2 == 1) {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[4], 0, 32);
-				adap_wr_reg_bits(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[5], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[4]);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[5]);
 			} else {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[4], 0, 32);
-				adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[5], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[4]);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[5]);
 			}*/
 			buffer_index = fte0_index;
 			dump_dol_frame = 0;
 			complete(&wakeupdump);
 		} /*else if (fte0_index > fte1_index){
 			if (fte0_index % 2 == 1) {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[4], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX, FRONTEND_IO, dol_buf[4]);
 			} else {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[4], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT, FRONTEND_IO, dol_buf[4]);
 			}
 		} else {
 			if (fte1_index % 2 == 1) {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[5], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX + FTE1_OFFSET, FRONTEND_IO, dol_buf[5]);
 			} else {
-				adap_wr_reg_bits(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[5], 0, 32);
+				mipi_adap_reg_wr(CSI2_DDR_START_PIX_ALT + FTE1_OFFSET, FRONTEND_IO, dol_buf[5]);
 			}
 		}*/
 	}
@@ -1467,10 +1470,14 @@ int am_adap_start(int idx)
 
 int am_adap_reset(void)
 {
+	mipi_adap_reg_wr(CSI2_GEN_CTRL0, FRONTEND_IO, 0x00000000);
+	adap_wr_reg_bits(MIPI_ADAPT_DDR_RD0_CNTL0, RD_IO, 0, 0, 1);
+	adap_wr_reg_bits(MIPI_ADAPT_DDR_RD1_CNTL0, RD_IO, 0, 0, 1);
+	system_timer_usleep(1000);
 	mipi_adap_reg_wr(CSI2_CLK_RESET, FRONTEND_IO, 0x7);
 	mipi_adap_reg_wr(CSI2_CLK_RESET, FRONTEND_IO, 0x6);
 	mipi_adap_reg_wr(CSI2_CLK_RESET, FRONTEND_IO, 0x6);
-	mipi_adap_reg_wr(CSI2_GEN_CTRL0, FRONTEND_IO, 0x00010000);
+	mipi_adap_reg_wr(CSI2_GEN_CTRL0, FRONTEND_IO, 0x00000000);
 	mipi_adap_reg_wr(MIPI_OTHER_CNTL0, ALIGN_IO, 0xf0000000);
 	mipi_adap_reg_wr(MIPI_OTHER_CNTL0, ALIGN_IO, 0x00000000);
 

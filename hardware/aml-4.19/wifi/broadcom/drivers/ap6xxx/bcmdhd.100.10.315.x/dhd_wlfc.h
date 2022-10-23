@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -315,13 +315,13 @@ typedef struct athost_wl_status_info {
 	int requested_entry_count;
 
 	/* pkt counts for each interface and ac */
-	int	pkt_cnt_in_q[WLFC_MAX_IFNUM][AC_COUNT + 1];
-	int	pkt_cnt_per_ac[AC_COUNT + 1];
-	int	pkt_cnt_in_drv[WLFC_MAX_IFNUM][AC_COUNT + 1];
+	int	pkt_cnt_in_q[WLFC_MAX_IFNUM][AC_COUNT+1];
+	int	pkt_cnt_per_ac[AC_COUNT+1];
+	int	pkt_cnt_in_drv[WLFC_MAX_IFNUM][AC_COUNT+1];
 	int	pkt_cnt_in_psq;
 	uint8	allow_fc;              /**< Boolean */
 	uint32  fc_defer_timestamp;
-	uint32	rx_timestamp[AC_COUNT + 1];
+	uint32	rx_timestamp[AC_COUNT+1];
 
 	/** ON/OFF state for flow control to the host network interface */
 	uint8	hostif_flow_state[WLFC_MAX_IFNUM];
@@ -518,10 +518,10 @@ typedef struct dhd_pkttag {
 
 /* public functions */
 int dhd_wlfc_parse_header_info(dhd_pub_t *dhd, void* pktbuf, int tlv_hdr_len,
-							   uchar *reorder_info_buf, uint *reorder_info_len);
+	uchar *reorder_info_buf, uint *reorder_info_len);
 KERNEL_THREAD_RETURN_TYPE dhd_wlfc_transfer_packets(void *data);
 int dhd_wlfc_commit_packets(dhd_pub_t *dhdp, f_commitpkt_t fcommit,
-							void* commit_ctx, void *pktbuf, bool need_toggle_host_if);
+	void* commit_ctx, void *pktbuf, bool need_toggle_host_if);
 int dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success);
 int dhd_wlfc_init(dhd_pub_t *dhd);
 #ifdef SUPPORT_P2P_GO_PS

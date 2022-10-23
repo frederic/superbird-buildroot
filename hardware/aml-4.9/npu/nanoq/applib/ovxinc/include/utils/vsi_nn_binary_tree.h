@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,9 @@
 extern "C"{
 #endif
 
-typedef long long vsi_nn_binary_tree_key_t;
+#include <stdint.h>
+
+typedef int64_t vsi_nn_binary_tree_key_t;
 
 #define vsi_nn_BinaryTreeInitRoot(n) do{n = NULL;} while (0);
 

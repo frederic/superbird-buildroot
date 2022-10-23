@@ -1,4 +1,0 @@
-config AML_VPU
-	bool "AML VPU drivers Support"
-	help
-	  Enable support for the Amlogic VPU drivers.

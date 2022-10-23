@@ -67,7 +67,12 @@ static int do_rsvmem_check(cmd_tbl_t *cmdtp, int flag, int argc,
 	}
 
 	memset(cmdbuf, 0, sizeof(cmdbuf));
-	sprintf(cmdbuf, "fdt addr %s;", fdtaddr);
+	if (strlen(fdtaddr) + strlen("fdt addr ;") < sizeof(cmdbuf)) {
+		sprintf(cmdbuf, "fdt addr %s;", fdtaddr);
+	} else {
+		rsvmem_err("cmdbuf length not enough!\n");
+		return -1;
+	}
 	rsvmem_dbg("CMD: %s\n", cmdbuf);
 	ret = run_command(cmdbuf, 0);
 	if (ret != 0 ) {
@@ -226,6 +231,23 @@ static int do_rsvmem_check(cmd_tbl_t *cmdtp, int flag, int argc,
 				ret = run_command(cmdbuf, 0);
 				if (ret != 0 ) {
 					rsvmem_err("bl32 reserved memory set reserve_mem_size error.\n");
+					return -3;
+				}
+
+				memset(cmdbuf, 0, sizeof(cmdbuf));
+				if (aarch32)
+					sprintf(cmdbuf, "fdt set /reserved-memory/ramoops reg <0x%x 0x%x>;",
+							((bl31_rsvmem_start + bl31_rsvmem_size + bl32_rsvmem_size + 0x400000 - 1) / 0x400000)*0x400000,
+							0x100000);
+				else
+					sprintf(cmdbuf, "fdt set /reserved-memory/ramoops reg <0x0 0x%x 0x0 0x%x>;",
+							((bl31_rsvmem_start + bl31_rsvmem_size + bl32_rsvmem_size + 0x400000 - 1) / 0x400000)*0x400000,
+							0x100000);
+
+				rsvmem_dbg("CMD: %s\n", cmdbuf);
+				ret = run_command(cmdbuf, 0);
+				if (ret != 0 ) {
+					rsvmem_err("fdt set /reserved-memory/ramoops reg  error.\n");
 					return -3;
 				}
 

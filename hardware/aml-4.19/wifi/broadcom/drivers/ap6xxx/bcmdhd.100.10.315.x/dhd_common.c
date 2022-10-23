@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), common DHD core.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,13 +24,14 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_common.c 771671 2018-07-11 06:58:25Z $
+ * $Id: dhd_common.c 826445 2019-06-20 04:47:47Z $
  */
 #include <typedefs.h>
 #include <osl.h>
 
 #include <epivers.h>
 #include <bcmutils.h>
+#include <bcmstdlib_s.h>
 
 #include <bcmendian.h>
 #include <dngl_stats.h>
@@ -66,9 +67,9 @@
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
 #endif // endif
-#ifdef PNO_SUPPORT
+#if defined(PNO_SUPPORT)
 #include <dhd_pno.h>
-#endif // endif
+#endif /* OEM_ANDROID && PNO_SUPPORT */
 #ifdef RTT_SUPPORT
 #include <dhd_rtt.h>
 #endif // endif
@@ -89,6 +90,10 @@
 #include <dhd_wlfc.h>
 #endif // endif
 
+#if defined(DHD_POST_EAPOL_M1_AFTER_ROAM_EVT)
+#include <dhd_linux.h>
+#endif // endif
+
 #ifdef DHD_L2_FILTER
 #include <dhd_l2_filter.h>
 #endif /* DHD_L2_FILTER */
@@ -105,7 +110,12 @@
 #include <dhd_dbg.h>
 #endif /* DHD_LOG_DUMP */
 
-int dhd_msg_level = DHD_ERROR_VAL | DHD_FWLOG_VAL;
+#ifdef DHD_LOG_PRINT_RATE_LIMIT
+int log_print_threshold = 0;
+#endif /* DHD_LOG_PRINT_RATE_LIMIT */
+int dhd_msg_level = DHD_ERROR_VAL;// | DHD_FWLOG_VAL | DHD_EVENT_VAL
+	/* For CUSTOMER_HW4 do not enable DHD_IOVAR_MEM_VAL by default */
+//	| DHD_PKT_MON_VAL;
 
 #if defined(WL_WIRELESS_EXT)
 #include <wl_iw.h>
@@ -179,9 +189,9 @@ extern void dhd_set_packet_filter(dhd_pub_t *dhd);
 
 #ifdef DNGL_EVENT_SUPPORT
 static void dngl_host_event_process(dhd_pub_t *dhdp, bcm_dngl_event_t *event,
-									bcm_dngl_event_msg_t *dngl_event, size_t pktlen);
+	bcm_dngl_event_msg_t *dngl_event, size_t pktlen);
 static int dngl_host_event(dhd_pub_t *dhdp, void *pktdata, bcm_dngl_event_msg_t *dngl_event,
-						   size_t pktlen);
+	size_t pktlen);
 #endif /* DNGL_EVENT_SUPPORT */
 
 #define MAX_CHUNK_LEN 1408 /* 8 * 8 * 22 */
@@ -289,6 +299,24 @@ enum {
 	IOV_TPUT_TEST,
 	IOV_FIS_TRIGGER,
 	IOV_DEBUG_BUF_DEST_STAT,
+#ifdef DHD_DEBUG
+	IOV_INDUCE_ERROR,
+#endif /* DHD_DEBUG */
+#ifdef WL_IFACE_MGMT_CONF
+#ifdef WL_CFG80211
+#ifdef WL_NANP2P
+	IOV_CONC_DISC,
+#endif /* WL_NANP2P */
+#ifdef WL_IFACE_MGMT
+	IOV_IFACE_POLICY,
+#endif /* WL_IFACE_MGMT */
+#endif /* WL_CFG80211 */
+#endif /* WL_IFACE_MGMT_CONF */
+#ifdef RTT_GEOFENCE_CONT
+#if defined(RTT_SUPPORT) && defined(WL_NAN)
+	IOV_RTT_GEOFENCE_TYPE_OVRD,
+#endif /* RTT_SUPPORT && WL_NAN */
+#endif /* RTT_GEOFENCE_CONT */
 	IOV_LAST
 };
 
@@ -329,9 +357,8 @@ const bcm_iovar_t dhd_iovars[] = {
 #endif /* PROP_TXSTATUS */
 	{"bustype", IOV_BUS_TYPE, 0, 0, IOVT_UINT32, 0},
 	{"changemtu", IOV_CHANGEMTU, 0, 0, IOVT_UINT32, 0 },
-	{	"host_reorder_flows", IOV_HOSTREORDER_FLOWS, 0, 0, IOVT_BUFFER,
-		(WLHOST_REORDERDATA_MAXFLOWS + 1)
-	},
+	{"host_reorder_flows", IOV_HOSTREORDER_FLOWS, 0, 0, IOVT_BUFFER,
+	(WLHOST_REORDERDATA_MAXFLOWS + 1) },
 #ifdef DHDTCPACK_SUPPRESS
 	{"tcpack_suppress",	IOV_TCPACK_SUPPRESS,	0,	0, IOVT_UINT8,	0 },
 #endif /* DHDTCPACK_SUPPRESS */
@@ -370,13 +397,30 @@ const bcm_iovar_t dhd_iovars[] = {
 #ifdef DHD_DEBUG
 	{"bpaddr", IOV_BPADDR,	0, 0, IOVT_BUFFER,	sizeof(sdreg_t) },
 #endif /* DHD_DEBUG */
-	{	"dump_dongle", IOV_DUMP_DONGLE, 0, 0, IOVT_BUFFER,
-		MAX(sizeof(dump_dongle_in_t), sizeof(dump_dongle_out_t))
-	},
+	{"dump_dongle", IOV_DUMP_DONGLE, 0, 0, IOVT_BUFFER,
+	MAX(sizeof(dump_dongle_in_t), sizeof(dump_dongle_out_t)) },
 #if defined(DHD_LOG_DUMP)
 	{"log_dump", IOV_LOG_DUMP,	0, 0, IOVT_UINT8, 0},
 #endif /* DHD_LOG_DUMP */
 	{"debug_buf_dest_stat", IOV_DEBUG_BUF_DEST_STAT, 0, 0, IOVT_UINT32, 0 },
+#ifdef DHD_DEBUG
+	{"induce_error", IOV_INDUCE_ERROR, (0), 0, IOVT_UINT16, 0 },
+#endif /* DHD_DEBUG */
+#ifdef WL_IFACE_MGMT_CONF
+#ifdef WL_CFG80211
+#ifdef WL_NANP2P
+	{"conc_disc", IOV_CONC_DISC, (0), 0, IOVT_UINT16, 0 },
+#endif /* WL_NANP2P */
+#ifdef WL_IFACE_MGMT
+	{"if_policy", IOV_IFACE_POLICY, (0), 0, IOVT_BUFFER, sizeof(iface_mgmt_data_t)},
+#endif /* WL_IFACE_MGMT */
+#endif /* WL_CFG80211 */
+#endif /* WL_IFACE_MGMT_CONF */
+#ifdef RTT_GEOFENCE_CONT
+#if defined(RTT_SUPPORT) && defined(WL_NAN)
+	{"rtt_geofence_type_ovrd", IOV_RTT_GEOFENCE_TYPE_OVRD, (0), 0, IOVT_BOOL, 0},
+#endif /* RTT_SUPPORT && WL_NAN */
+#endif /* RTT_GEOFENCE_CONT */
 	{NULL, 0, 0, 0, 0, 0 }
 };
 
@@ -388,41 +432,102 @@ dhd_query_bus_erros(dhd_pub_t *dhdp)
 	bool ret = FALSE;
 
 	if (dhdp->dongle_reset) {
-		DHD_ERROR(("%s: Dongle Reset occurred, cannot proceed\n",
-				   __FUNCTION__));
+		DHD_ERROR_RLMT(("%s: Dongle Reset occurred, cannot proceed\n",
+			__FUNCTION__));
 		ret = TRUE;
 	}
 
 	if (dhdp->dongle_trap_occured) {
-		DHD_ERROR(("%s: FW TRAP has occurred, cannot proceed\n",
-				   __FUNCTION__));
+		DHD_ERROR_RLMT(("%s: FW TRAP has occurred, cannot proceed\n",
+			__FUNCTION__));
 		ret = TRUE;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
 		dhdp->hang_reason = HANG_REASON_DONGLE_TRAP;
 		dhd_os_send_hang_message(dhdp);
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27) */
 	}
 
 	if (dhdp->iovar_timeout_occured) {
-		DHD_ERROR(("%s: Resumed on timeout for previous IOVAR, cannot proceed\n",
-				   __FUNCTION__));
+		DHD_ERROR_RLMT(("%s: Resumed on timeout for previous IOVAR, cannot proceed\n",
+			__FUNCTION__));
 		ret = TRUE;
 	}
 
 #ifdef PCIE_FULL_DONGLE
 	if (dhdp->d3ack_timeout_occured) {
-		DHD_ERROR(("%s: Resumed on timeout for previous D3ACK, cannot proceed\n",
-				   __FUNCTION__));
+		DHD_ERROR_RLMT(("%s: Resumed on timeout for previous D3ACK, cannot proceed\n",
+			__FUNCTION__));
 		ret = TRUE;
 	}
 	if (dhdp->livelock_occured) {
-		DHD_ERROR(("%s: LIVELOCK occurred for previous msg, cannot proceed\n",
-				   __FUNCTION__));
+		DHD_ERROR_RLMT(("%s: LIVELOCK occurred for previous msg, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
+	if (dhdp->pktid_audit_failed) {
+		DHD_ERROR_RLMT(("%s: pktid_audit_failed, cannot proceed\n",
+			__FUNCTION__));
 		ret = TRUE;
 	}
 #endif /* PCIE_FULL_DONGLE */
 
+	if (dhdp->iface_op_failed) {
+		DHD_ERROR_RLMT(("%s: iface_op_failed, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
+	if (dhdp->scan_timeout_occurred) {
+		DHD_ERROR_RLMT(("%s: scan_timeout_occurred, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
+	if (dhdp->scan_busy_occurred) {
+		DHD_ERROR_RLMT(("%s: scan_busy_occurred, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
+#ifdef DNGL_AXI_ERROR_LOGGING
+	if (dhdp->axi_error) {
+		DHD_ERROR_RLMT(("%s: AXI error occurred, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+#endif /* DNGL_AXI_ERROR_LOGGING */
+
+	if (dhd_bus_get_linkdown(dhdp)) {
+		DHD_ERROR_RLMT(("%s : PCIE Link down occurred, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
+	if (dhd_bus_get_cto(dhdp)) {
+		DHD_ERROR_RLMT(("%s : CTO Recovery reported, cannot proceed\n",
+			__FUNCTION__));
+		ret = TRUE;
+	}
+
 	return ret;
+}
+
+void
+dhd_clear_bus_errors(dhd_pub_t *dhdp)
+{
+	if (!dhdp)
+		return;
+
+	dhdp->dongle_reset = FALSE;
+	dhdp->dongle_trap_occured = FALSE;
+	dhdp->iovar_timeout_occured = FALSE;
+#ifdef PCIE_FULL_DONGLE
+	dhdp->d3ack_timeout_occured = FALSE;
+	dhdp->livelock_occured = FALSE;
+	dhdp->pktid_audit_failed = FALSE;
+#endif // endif
+	dhdp->iface_op_failed = FALSE;
+	dhdp->scan_timeout_occurred = FALSE;
+	dhdp->scan_busy_occurred = FALSE;
 }
 
 #ifdef DHD_SSSR_DUMP
@@ -436,7 +541,7 @@ dhd_sssr_mempool_init(dhd_pub_t *dhd)
 	dhd->sssr_mempool = (uint8 *) MALLOCZ(dhd->osh, DHD_SSSR_MEMPOOL_SIZE);
 	if (dhd->sssr_mempool == NULL) {
 		DHD_ERROR(("%s: MALLOC of sssr_mempool failed\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		return BCME_ERROR;
 	}
 	return BCME_OK;
@@ -463,10 +568,10 @@ dhd_get_sssr_reg_info(dhd_pub_t *dhd)
 	/* get sssr_reg_info from firmware */
 	memset((void *)&dhd->sssr_reg_info, 0, sizeof(dhd->sssr_reg_info));
 	ret = dhd_iovar(dhd, 0, "sssr_reg_info", NULL, 0,  (char *)&dhd->sssr_reg_info,
-					sizeof(dhd->sssr_reg_info), FALSE);
+		sizeof(dhd->sssr_reg_info), FALSE);
 	if (ret < 0) {
 		DHD_ERROR(("%s: sssr_reg_info failed (error=%d)\n",
-				   __FUNCTION__, ret));
+			__FUNCTION__, ret));
 		return BCME_ERROR;
 	}
 
@@ -508,7 +613,7 @@ dhd_sssr_dump_init(dhd_pub_t *dhd)
 	/* check if sssr mempool is allocated */
 	if (dhd->sssr_mempool == NULL) {
 		DHD_ERROR(("%s: sssr_mempool is not allocated\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		return BCME_ERROR;
 	}
 
@@ -521,15 +626,15 @@ dhd_sssr_dump_init(dhd_pub_t *dhd)
 	/* Validate structure version */
 	if (dhd->sssr_reg_info.version > SSSR_REG_INFO_VER_1) {
 		DHD_ERROR(("%s: dhd->sssr_reg_info.version (%d : %d) mismatch\n",
-				   __FUNCTION__, (int)dhd->sssr_reg_info.version, SSSR_REG_INFO_VER));
+			__FUNCTION__, (int)dhd->sssr_reg_info.version, SSSR_REG_INFO_VER));
 		return BCME_ERROR;
 	}
 
 	/* Validate structure length */
 	if (dhd->sssr_reg_info.length < sizeof(sssr_reg_info_v0_t)) {
 		DHD_ERROR(("%s: dhd->sssr_reg_info.length (%d : %d) mismatch\n",
-				   __FUNCTION__, (int)dhd->sssr_reg_info.length,
-				   (int)sizeof(dhd->sssr_reg_info)));
+			__FUNCTION__, (int)dhd->sssr_reg_info.length,
+			(int)sizeof(dhd->sssr_reg_info)));
 		return BCME_ERROR;
 	}
 
@@ -537,7 +642,7 @@ dhd_sssr_dump_init(dhd_pub_t *dhd)
 	sssr_bufsize = dhd_get_sssr_bufsize(dhd);
 	if (sssr_bufsize > DHD_SSSR_MEMPOOL_SIZE) {
 		DHD_ERROR(("%s: sssr_bufsize(%d) is greater than sssr_mempool(%d)\n",
-				   __FUNCTION__, (int)sssr_bufsize, DHD_SSSR_MEMPOOL_SIZE));
+			__FUNCTION__, (int)sssr_bufsize, DHD_SSSR_MEMPOOL_SIZE));
 		return BCME_ERROR;
 	}
 
@@ -567,7 +672,7 @@ dhd_sssr_dump_init(dhd_pub_t *dhd)
 		dhd->sssr_dig_buf_after = (uint32 *)(dhd->sssr_mempool + mempool_used);
 		mempool_used += dhd->sssr_reg_info.vasip_regs.vasip_sr_size;
 	} else if ((dhd->sssr_reg_info.length > OFFSETOF(sssr_reg_info_v1_t, dig_mem_info)) &&
-			   dhd->sssr_reg_info.dig_mem_info.dig_sr_addr) {
+		dhd->sssr_reg_info.dig_mem_info.dig_sr_addr) {
 		dhd->sssr_dig_buf_before = (uint32 *)(dhd->sssr_mempool + mempool_used);
 		mempool_used += dhd->sssr_reg_info.dig_mem_info.dig_sr_size;
 
@@ -598,6 +703,52 @@ dhd_sssr_dump_deinit(dhd_pub_t *dhd)
 	return;
 }
 
+void
+dhd_sssr_print_filepath(dhd_pub_t *dhd, char *path)
+{
+	bool print_info = FALSE;
+	int dump_mode;
+
+	if (!dhd || !path) {
+		DHD_ERROR(("%s: dhd or memdump_path is NULL\n",
+			__FUNCTION__));
+		return;
+	}
+
+	if (!dhd->sssr_dump_collected) {
+		/* SSSR dump is not collected */
+		return;
+	}
+
+	dump_mode = dhd->sssr_dump_mode;
+
+	if (bcmstrstr(path, "core_0_before")) {
+		if (dhd->sssr_d11_outofreset[0] &&
+			dump_mode == SSSR_DUMP_MODE_SSSR) {
+			print_info = TRUE;
+		}
+	} else if (bcmstrstr(path, "core_0_after")) {
+		if (dhd->sssr_d11_outofreset[0]) {
+			print_info = TRUE;
+		}
+	} else if (bcmstrstr(path, "core_1_before")) {
+		if (dhd->sssr_d11_outofreset[1] &&
+			dump_mode == SSSR_DUMP_MODE_SSSR) {
+			print_info = TRUE;
+		}
+	} else if (bcmstrstr(path, "core_1_after")) {
+		if (dhd->sssr_d11_outofreset[1]) {
+			print_info = TRUE;
+		}
+	} else {
+		print_info = TRUE;
+	}
+
+	if (print_info) {
+		DHD_ERROR(("%s: file_path = %s%s\n", __FUNCTION__,
+			path, FILE_NAME_HAL_TAG));
+	}
+}
 #endif /* DHD_SSSR_DUMP */
 
 #ifdef DHD_FW_COREDUMP
@@ -606,7 +757,7 @@ void* dhd_get_fwdump_buf(dhd_pub_t *dhd_pub, uint32 length)
 	if (!dhd_pub->soc_ram) {
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_MEMDUMP)
 		dhd_pub->soc_ram = (uint8*)DHD_OS_PREALLOC(dhd_pub,
-						   DHD_PREALLOC_MEMDUMP_RAM, length);
+			DHD_PREALLOC_MEMDUMP_RAM, length);
 #else
 		dhd_pub->soc_ram = (uint8*) MALLOC(dhd_pub->osh, length);
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_MEMDUMP */
@@ -614,7 +765,7 @@ void* dhd_get_fwdump_buf(dhd_pub_t *dhd_pub, uint32 length)
 
 	if (dhd_pub->soc_ram == NULL) {
 		DHD_ERROR(("%s: Failed to allocate memory for fw crash snap shot.\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		dhd_pub->soc_ram_length = 0;
 	} else {
 		memset(dhd_pub->soc_ram, 0, length);
@@ -656,59 +807,59 @@ dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 	bcm_bprintf(strbuf, "%s\n", dhd_version);
 	bcm_bprintf(strbuf, "\n");
 	bcm_bprintf(strbuf, "pub.up %d pub.txoff %d pub.busstate %d\n",
-				dhdp->up, dhdp->txoff, dhdp->busstate);
+	            dhdp->up, dhdp->txoff, dhdp->busstate);
 	bcm_bprintf(strbuf, "pub.hdrlen %u pub.maxctl %u pub.rxsz %u\n",
-				dhdp->hdrlen, dhdp->maxctl, dhdp->rxsz);
+	            dhdp->hdrlen, dhdp->maxctl, dhdp->rxsz);
 	bcm_bprintf(strbuf, "pub.iswl %d pub.drv_version %ld pub.mac "MACDBG"\n",
-				dhdp->iswl, dhdp->drv_version, MAC2STRDBG(&dhdp->mac));
+	            dhdp->iswl, dhdp->drv_version, MAC2STRDBG(&dhdp->mac));
 	bcm_bprintf(strbuf, "pub.bcmerror %d tickcnt %u\n", dhdp->bcmerror, dhdp->tickcnt);
 
 	bcm_bprintf(strbuf, "dongle stats:\n");
 	bcm_bprintf(strbuf, "tx_packets %lu tx_bytes %lu tx_errors %lu tx_dropped %lu\n",
-				dhdp->dstats.tx_packets, dhdp->dstats.tx_bytes,
-				dhdp->dstats.tx_errors, dhdp->dstats.tx_dropped);
+	            dhdp->dstats.tx_packets, dhdp->dstats.tx_bytes,
+	            dhdp->dstats.tx_errors, dhdp->dstats.tx_dropped);
 	bcm_bprintf(strbuf, "rx_packets %lu rx_bytes %lu rx_errors %lu rx_dropped %lu\n",
-				dhdp->dstats.rx_packets, dhdp->dstats.rx_bytes,
-				dhdp->dstats.rx_errors, dhdp->dstats.rx_dropped);
+	            dhdp->dstats.rx_packets, dhdp->dstats.rx_bytes,
+	            dhdp->dstats.rx_errors, dhdp->dstats.rx_dropped);
 	bcm_bprintf(strbuf, "multicast %lu\n", dhdp->dstats.multicast);
 
 	bcm_bprintf(strbuf, "bus stats:\n");
 	bcm_bprintf(strbuf, "tx_packets %lu  tx_dropped %lu tx_multicast %lu tx_errors %lu\n",
-				dhdp->tx_packets, dhdp->tx_dropped, dhdp->tx_multicast, dhdp->tx_errors);
+	            dhdp->tx_packets, dhdp->tx_dropped, dhdp->tx_multicast, dhdp->tx_errors);
 	bcm_bprintf(strbuf, "tx_ctlpkts %lu tx_ctlerrs %lu\n",
-				dhdp->tx_ctlpkts, dhdp->tx_ctlerrs);
+	            dhdp->tx_ctlpkts, dhdp->tx_ctlerrs);
 	bcm_bprintf(strbuf, "rx_packets %lu rx_multicast %lu rx_errors %lu \n",
-				dhdp->rx_packets, dhdp->rx_multicast, dhdp->rx_errors);
+	            dhdp->rx_packets, dhdp->rx_multicast, dhdp->rx_errors);
 	bcm_bprintf(strbuf, "rx_ctlpkts %lu rx_ctlerrs %lu rx_dropped %lu\n",
-				dhdp->rx_ctlpkts, dhdp->rx_ctlerrs, dhdp->rx_dropped);
+	            dhdp->rx_ctlpkts, dhdp->rx_ctlerrs, dhdp->rx_dropped);
 	bcm_bprintf(strbuf, "rx_readahead_cnt %lu tx_realloc %lu\n",
-				dhdp->rx_readahead_cnt, dhdp->tx_realloc);
+	            dhdp->rx_readahead_cnt, dhdp->tx_realloc);
 	bcm_bprintf(strbuf, "tx_pktgetfail %lu rx_pktgetfail %lu\n",
-				dhdp->tx_pktgetfail, dhdp->rx_pktgetfail);
+	            dhdp->tx_pktgetfail, dhdp->rx_pktgetfail);
 	bcm_bprintf(strbuf, "tx_big_packets %lu\n",
-				dhdp->tx_big_packets);
+	            dhdp->tx_big_packets);
 	bcm_bprintf(strbuf, "\n");
 #ifdef DMAMAP_STATS
 	/* Add DMA MAP info */
 	bcm_bprintf(strbuf, "DMA MAP stats: \n");
 	bcm_bprintf(strbuf, "txdata: %lu size: %luK, rxdata: %lu size: %luK\n",
-				dhdp->dma_stats.txdata, KB(dhdp->dma_stats.txdata_sz),
-				dhdp->dma_stats.rxdata, KB(dhdp->dma_stats.rxdata_sz));
+			dhdp->dma_stats.txdata, KB(dhdp->dma_stats.txdata_sz),
+			dhdp->dma_stats.rxdata, KB(dhdp->dma_stats.rxdata_sz));
 #ifndef IOCTLRESP_USE_CONSTMEM
 	bcm_bprintf(strbuf, "IOCTL RX: %lu size: %luK ,",
-				dhdp->dma_stats.ioctl_rx, KB(dhdp->dma_stats.ioctl_rx_sz));
+			dhdp->dma_stats.ioctl_rx, KB(dhdp->dma_stats.ioctl_rx_sz));
 #endif /* !IOCTLRESP_USE_CONSTMEM */
 	bcm_bprintf(strbuf, "EVENT RX: %lu size: %luK, INFO RX: %lu size: %luK, "
-				"TSBUF RX: %lu size %luK\n",
-				dhdp->dma_stats.event_rx, KB(dhdp->dma_stats.event_rx_sz),
-				dhdp->dma_stats.info_rx, KB(dhdp->dma_stats.info_rx_sz),
-				dhdp->dma_stats.tsbuf_rx, KB(dhdp->dma_stats.tsbuf_rx_sz));
+			"TSBUF RX: %lu size %luK\n",
+			dhdp->dma_stats.event_rx, KB(dhdp->dma_stats.event_rx_sz),
+			dhdp->dma_stats.info_rx, KB(dhdp->dma_stats.info_rx_sz),
+			dhdp->dma_stats.tsbuf_rx, KB(dhdp->dma_stats.tsbuf_rx_sz));
 	bcm_bprintf(strbuf, "Total : %luK \n",
-				KB(dhdp->dma_stats.txdata_sz + dhdp->dma_stats.rxdata_sz +
-				   dhdp->dma_stats.ioctl_rx_sz + dhdp->dma_stats.event_rx_sz +
-				   dhdp->dma_stats.tsbuf_rx_sz));
+			KB(dhdp->dma_stats.txdata_sz + dhdp->dma_stats.rxdata_sz +
+			dhdp->dma_stats.ioctl_rx_sz + dhdp->dma_stats.event_rx_sz +
+			dhdp->dma_stats.tsbuf_rx_sz));
 #endif /* DMAMAP_STATS */
-
+	bcm_bprintf(strbuf, "dhd_induce_error : %u\n", dhdp->dhd_induce_error);
 	/* Add any prot info */
 	dhd_prot_dump(dhdp, strbuf);
 	bcm_bprintf(strbuf, "\n");
@@ -723,7 +874,7 @@ dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 	if (dhd_get_wet_mode(dhdp)) {
 		bcm_bprintf(strbuf, "Wet Dump:\n");
 		dhd_wet_dump(dhdp, strbuf);
-	}
+		}
 #endif /* DHD_WET */
 
 	/* return remaining buffer length */
@@ -733,16 +884,11 @@ dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 void
 dhd_dump_to_kernelog(dhd_pub_t *dhdp)
 {
-	char *buf;
+	char buf[512];
 
 	DHD_ERROR(("F/W version: %s\n", fw_version));
 	bcm_bprintf_bypass = TRUE;
-	if ((buf = kmalloc(512, GFP_KERNEL)) == NULL) {
-		DHD_ERROR(("%s: No memory\n", __FUNCTION__));
-		return;
-	}
 	dhd_dump(dhdp, buf, sizeof(buf));
-	kfree(buf);
 	bcm_bprintf_bypass = FALSE;
 }
 
@@ -761,7 +907,7 @@ dhd_wl_ioctl_cmd(dhd_pub_t *dhd_pub, int cmd, void *arg, int len, uint8 set, int
 
 int
 dhd_wl_ioctl_get_intiovar(dhd_pub_t *dhd_pub, char *name, uint *pval,
-						  int cmd, uint8 set, int ifidx)
+	int cmd, uint8 set, int ifidx)
 {
 	char iovbuf[WLC_IOCTL_SMLEN];
 	int ret = -1;
@@ -773,11 +919,11 @@ dhd_wl_ioctl_get_intiovar(dhd_pub_t *dhd_pub, char *name, uint *pval,
 			*pval = ltoh32(*((uint*)iovbuf));
 		} else {
 			DHD_ERROR(("%s: get int iovar %s failed, ERR %d\n",
-					   __FUNCTION__, name, ret));
+				__FUNCTION__, name, ret));
 		}
 	} else {
 		DHD_ERROR(("%s: mkiovar %s failed\n",
-				   __FUNCTION__, name));
+			__FUNCTION__, name));
 	}
 
 	return ret;
@@ -785,7 +931,7 @@ dhd_wl_ioctl_get_intiovar(dhd_pub_t *dhd_pub, char *name, uint *pval,
 
 int
 dhd_wl_ioctl_set_intiovar(dhd_pub_t *dhd_pub, char *name, uint val,
-						  int cmd, uint8 set, int ifidx)
+	int cmd, uint8 set, int ifidx)
 {
 	char iovbuf[WLC_IOCTL_SMLEN];
 	int ret = -1;
@@ -798,11 +944,11 @@ dhd_wl_ioctl_set_intiovar(dhd_pub_t *dhd_pub, char *name, uint val,
 		ret = dhd_wl_ioctl_cmd(dhd_pub, cmd, iovbuf, len, set, ifidx);
 		if (ret) {
 			DHD_ERROR(("%s: set int iovar %s failed, ERR %d\n",
-					   __FUNCTION__, name, ret));
+				__FUNCTION__, name, ret));
 		}
 	} else {
 		DHD_ERROR(("%s: mkiovar %s failed\n",
-				   __FUNCTION__, name));
+			__FUNCTION__, name));
 	}
 
 	return ret;
@@ -876,24 +1022,24 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 #endif /* DHD_PCIE_NATIVE_RUNTIMEPM */
 
 #ifdef KEEPIF_ON_DEVICE_RESET
-	if (ioc->cmd == WLC_GET_VAR) {
-		dbus_config_t config;
-		config.general_param = 0;
-		if (buf) {
-			if (!strcmp(buf, "wowl_activate")) {
-				/* 1 (TRUE) after decreased by 1 */
-				config.general_param = 2;
-			} else if (!strcmp(buf, "wowl_clear")) {
-				/* 0 (FALSE) after decreased by 1 */
-				config.general_param = 1;
+		if (ioc->cmd == WLC_GET_VAR) {
+			dbus_config_t config;
+			config.general_param = 0;
+			if (buf) {
+				if (!strcmp(buf, "wowl_activate")) {
+					 /* 1 (TRUE) after decreased by 1 */
+					config.general_param = 2;
+				} else if (!strcmp(buf, "wowl_clear")) {
+					 /* 0 (FALSE) after decreased by 1 */
+					config.general_param = 1;
+				}
+			}
+			if (config.general_param) {
+				config.config_id = DBUS_CONFIG_ID_KEEPIF_ON_DEVRESET;
+				config.general_param--;
+				dbus_set_config(dhd_pub->dbus, &config);
 			}
 		}
-		if (config.general_param) {
-			config.config_id = DBUS_CONFIG_ID_KEEPIF_ON_DEVRESET;
-			config.general_param--;
-			dbus_set_config(dhd_pub->dbus, &config);
-		}
-	}
 #endif /* KEEPIF_ON_DEVICE_RESET */
 
 	if (dhd_os_proto_block(dhd_pub))
@@ -913,10 +1059,11 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 
 #ifdef DHD_DISCONNECT_TRACE
 		if ((WLC_DISASSOC == ioc->cmd) || (WLC_DOWN == ioc->cmd) ||
-				(WLC_DISASSOC_MYAP == ioc->cmd)) {
+			(WLC_DISASSOC_MYAP == ioc->cmd)) {
 			DHD_ERROR(("IOCTL Disconnect WiFi: %d\n", ioc->cmd));
 		}
 #endif /* HW_DISCONNECT_TRACE */
+
 		/* logging of iovars that are send to the dongle, ./dhd msglevel +iovar */
 		if (ioc->set == TRUE) {
 			char *pars = (char *)buf; // points at user buffer
@@ -929,7 +1076,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 				}
 			} else {
 				DHD_DNGL_IOVAR_SET(("ioctl:%d: set %d %s",
-									ifidx, ioc->cmd, ioctl2str(ioc->cmd)));
+					ifidx, ioc->cmd, ioctl2str(ioc->cmd)));
 			}
 			if (pars != NULL) {
 				DHD_DNGL_IOVAR_SET((" 0x%x\n", *(uint32*)pars));
@@ -941,7 +1088,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 		DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
 		if (DHD_BUS_CHECK_DOWN_OR_DOWN_IN_PROGRESS(dhd_pub)) {
 			DHD_INFO(("%s: returning as busstate=%d\n",
-					  __FUNCTION__, dhd_pub->busstate));
+				__FUNCTION__, dhd_pub->busstate));
 			DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
 			dhd_os_proto_unblock(dhd_pub);
 			return -ENODEV;
@@ -952,7 +1099,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 		DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
 		if (DHD_BUS_CHECK_SUSPEND_OR_SUSPEND_IN_PROGRESS(dhd_pub)) {
 			DHD_ERROR(("%s: bus is in suspend(%d) or suspending(0x%x) state!!\n",
-					   __FUNCTION__, dhd_pub->busstate, dhd_pub->dhd_bus_busy_state));
+				__FUNCTION__, dhd_pub->busstate, dhd_pub->dhd_bus_busy_state));
 			DHD_BUS_BUSY_CLEAR_IN_IOVAR(dhd_pub);
 			dhd_os_busbusy_wake(dhd_pub);
 			DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
@@ -968,15 +1115,15 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 			} else {
 				iov_li->cmd = ioc->cmd;
 				if (buf)
-					bcopy((char *)buf, iov_li->buff, strlen((char *)buf) + 1);
+					bcopy((char *)buf, iov_li->buff, strlen((char *)buf)+1);
 				dhd_iov_li_append(dhd_pub, &dhd_pub->dump_iovlist_head,
-								  &iov_li->list);
+						&iov_li->list);
 			}
 		}
 #endif /* DUMP_IOCTL_IOV_LIST */
 
 		if (dhd_conf_check_hostsleep(dhd_pub, ioc->cmd, ioc->buf, len,
-									 &hostsleep_set, &hostsleep_val, &ret))
+				&hostsleep_set, &hostsleep_val, &ret))
 			goto exit;
 		ret = dhd_prot_ioctl(dhd_pub, ifidx, ioc, buf, len);
 		dhd_conf_get_hostsleep(dhd_pub, hostsleep_set, hostsleep_val, ret);
@@ -984,7 +1131,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 #ifdef DUMP_IOCTL_IOV_LIST
 		if (ret == -ETIMEDOUT) {
 			DHD_ERROR(("Last %d issued commands: Latest one is at bottom.\n",
-					   IOV_LIST_MAX_LEN));
+				IOV_LIST_MAX_LEN));
 			dhd_iov_li_print(&dhd_pub->dump_iovlist_head);
 		}
 #endif /* DUMP_IOCTL_IOV_LIST */
@@ -1004,22 +1151,22 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 						bcopy((msg + slen), &lval, min_len);
 					}
 					if (!strncmp(msg, "cur_etheraddr",
-								 strlen("cur_etheraddr"))) {
+						strlen("cur_etheraddr"))) {
 						lval = 0;
 					}
 				}
 				DHD_IOVAR_MEM((
-								  "%s: cmd: %d, msg: %s val: 0x%x,"
-								  " len: %d, set: %d, txn-id: %d\n",
-								  ioc->cmd == WLC_GET_VAR ?
-								  "WLC_GET_VAR" : "WLC_SET_VAR",
-								  ioc->cmd, msg, lval, ioc->len, ioc->set,
-								  dhd_prot_get_ioctl_trans_id(dhd_pub)));
+					"%s: cmd: %d, msg: %s val: 0x%x,"
+					" len: %d, set: %d, txn-id: %d\n",
+					ioc->cmd == WLC_GET_VAR ?
+					"WLC_GET_VAR" : "WLC_SET_VAR",
+					ioc->cmd, msg, lval, ioc->len, ioc->set,
+					dhd_prot_get_ioctl_trans_id(dhd_pub)));
 			} else {
 				DHD_IOVAR_MEM(("%s: cmd: %d, len: %d, set: %d, txn-id: %d\n",
-							   ioc->cmd == WLC_GET_VAR ? "WLC_GET_VAR" : "WLC_SET_VAR",
-							   ioc->cmd, ioc->len, ioc->set,
-							   dhd_prot_get_ioctl_trans_id(dhd_pub)));
+					ioc->cmd == WLC_GET_VAR ? "WLC_GET_VAR" : "WLC_SET_VAR",
+					ioc->cmd, ioc->len, ioc->set,
+					dhd_prot_get_ioctl_trans_id(dhd_pub)));
 			}
 		} else {
 			slen = ioc->len;
@@ -1034,7 +1181,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 				/* Do not dump for WLC_GET_MAGIC and WLC_GET_VERSION */
 				if (ioc->cmd != WLC_GET_MAGIC && ioc->cmd != WLC_GET_VERSION)
 					DHD_IOVAR_MEM(("WLC_IOCTL: cmd: %d, val: %d, len: %d, "
-								   "set: %d\n", ioc->cmd, val, ioc->len, ioc->set));
+						"set: %d\n", ioc->cmd, val, ioc->len, ioc->set));
 			} else {
 				DHD_IOVAR_MEM(("WLC_IOCTL: cmd: %d, buf is NULL\n", ioc->cmd));
 			}
@@ -1047,9 +1194,8 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 
 		if (ret == -ETIMEDOUT && !dhd_pub->up) {
 			DHD_ERROR(("%s: 'resumed on timeout' error is "
-					   "occurred before the interface does not"
-					   " bring up\n", __FUNCTION__));
-			dhd_pub->busstate = DHD_BUS_DOWN;
+				"occurred before the interface does not"
+				" bring up\n", __FUNCTION__));
 		}
 
 exit:
@@ -1145,7 +1291,7 @@ dhd_mem_debug(dhd_pub_t *dhd, uchar *msg, uint msglen)
 		/* space should be converted to null as separation flag for firmware */
 		*p = '\0';
 		/* store the argument in int_arg */
-		int_arg = bcm_strtoul(p + 1, &end_ptr, 10);
+		int_arg = bcm_strtoul(p+1, &end_ptr, 10);
 	}
 
 	if (!p && !strcmp(msg, "query")) {
@@ -1163,14 +1309,14 @@ dhd_mem_debug(dhd_pub_t *dhd, uchar *msg, uint msglen)
 	} else if (p && end_ptr && (*end_ptr == '\0') && !strcmp(msg, "alloc")) {
 		int32 alloc_handle;
 		/* convert size into KB and append as integer */
-		*((int32 *)(p + 1)) = int_arg * 1024;
-		*(p + 1 + sizeof(int32)) = '\0';
+		*((int32 *)(p+1)) = int_arg*1024;
+		*(p+1+sizeof(int32)) = '\0';
 
 		/* recalculated length -> 5 bytes for "alloc" + 4 bytes for size +
 		 * 1 bytes for null caracter
 		 */
 		msglen = strlen(msg) + sizeof(int32) + 1;
-		if (dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, msg, msglen + 1, FALSE, 0) < 0) {
+		if (dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, msg, msglen+1, FALSE, 0) < 0) {
 			DHD_ERROR(("IOCTL failed for memdebug alloc\n"));
 		}
 
@@ -1214,14 +1360,14 @@ dhd_mem_debug(dhd_pub_t *dhd, uchar *msg, uint msglen)
 			/* append the free handle and the chunk size in first 8 bytes
 			 * after the command and null character
 			 */
-			*((int32 *)(p + 1)) = handle;
-			*((int32 *)((p + 1) + sizeof(int32))) = size;
+			*((int32 *)(p+1)) = handle;
+			*((int32 *)((p+1)+sizeof(int32))) = size;
 			/* append null as terminator */
-			*(p + 1 + 2 * sizeof(int32)) = '\0';
+			*(p+1+2*sizeof(int32)) = '\0';
 			/* recalculated length -> 4 bytes for "free" + 8 bytes for hadnle and size
 			 * + 1 bytes for null caracter
 			 */
-			len = strlen(msg) + 2 * sizeof(int32) + 1;
+			len = strlen(msg) + 2*sizeof(int32) + 1;
 			/* send iovar to free the chunk */
 			if (dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, msg, len, FALSE, 0) < 0) {
 				DHD_ERROR(("IOCTL failed for memdebug free\n"));
@@ -1310,7 +1456,7 @@ dhd_flow_ring_debug(dhd_pub_t *dhd, char *msg, uint msglen)
 		prio = (uint8)bcm_strtoul(msg, &end_ptr, 10);
 		if (prio > MAXPRIO) {
 			DHD_ERROR(("%s: invalid priority. Must be between 0-7 inclusive\n",
-					   __FUNCTION__));
+				__FUNCTION__));
 			return BCME_ERROR;
 		}
 
@@ -1362,7 +1508,7 @@ extern void dhdsdio_txpktstatics(void);
 
 static int
 dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const char *name,
-			void *params, int plen, void *arg, int len, int val_size)
+            void *params, int plen, void *arg, int len, int val_size)
 {
 	int bcmerror = 0;
 	int32 int_val = 0;
@@ -1386,7 +1532,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 			bcm_strncpy_s((char*)arg, dhd_ver_len, dhd_version, dhd_ver_len);
 		if (bus_api_rev_len)
 			bcm_strncat_s((char*)arg + dhd_ver_len, bus_api_rev_len, bus_api_revision,
-						  bus_api_rev_len);
+				bus_api_rev_len);
 #ifdef PKT_STATICS
 		memset((uint8*) &tx_statics, 0, sizeof(pkt_statics_t));
 #endif
@@ -1488,8 +1634,13 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 
 #if defined(DHD_DEBUG)
 	case IOV_SVAL(IOV_CONS):
-		if (len > 0)
+		if (len > 0) {
+#ifdef CONSOLE_DPC
+			bcmerror = dhd_bus_txcons(dhd_pub, arg, len - 1);
+#else
 			bcmerror = dhd_bus_console_in(dhd_pub, arg, len - 1);
+#endif
+		}
 		break;
 #endif /* DHD_DEBUG */
 #endif /* !BCMDBUS */
@@ -1671,7 +1822,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		const char *val;
 		if (dhd_iovar_parse_bssidx(dhd_pub, name, &bssidx, &val) != BCME_OK) {
 			DHD_ERROR(("%s: IOV_DHCP_UNICAST: bad parameterand name = %s\n",
-					   __FUNCTION__, name));
+				__FUNCTION__, name));
 			bcmerror = BCME_BADARG;
 			break;
 		}
@@ -1684,7 +1835,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		const char *val;
 		if (dhd_iovar_parse_bssidx(dhd_pub, name, &bssidx, &val) != BCME_OK) {
 			DHD_ERROR(("%s: IOV_DHCP_UNICAST: bad parameterand name = %s\n",
-					   __FUNCTION__, name));
+				__FUNCTION__, name));
 			bcmerror = BCME_BADARG;
 			break;
 		}
@@ -1746,7 +1897,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		 * in the Extended Capability IE of beacons/probe responses.
 		 */
 		bcmerror = dhd_iovar(dhd_pub, bssidx, "proxy_arp_advertise", val, sizeof(int_val),
-							 NULL, 0, TRUE);
+				NULL, 0, TRUE);
 		if (bcmerror == BCME_OK) {
 			dhd_set_parp_status(dhd_pub, bssidx, int_val ? 1 : 0);
 		}
@@ -1851,7 +2002,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		int_val = dhd_get_psta_mode(dhd_pub);
 		bcopy(&int_val, arg, val_size);
 		break;
-	}
+		}
 	case IOV_SVAL(IOV_PSTA): {
 		if (int_val >= DHD_MODE_PSTA_DISABLED && int_val <= DHD_MODE_PSR) {
 			dhd_set_psta_mode(dhd_pub, int_val);
@@ -1859,30 +2010,30 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 			bcmerror = BCME_RANGE;
 		}
 		break;
-	}
+		}
 #endif /* DHD_PSTA */
 #ifdef DHD_WET
 	case IOV_GVAL(IOV_WET):
-		int_val = dhd_get_wet_mode(dhd_pub);
-		bcopy(&int_val, arg, val_size);
-		break;
+		 int_val = dhd_get_wet_mode(dhd_pub);
+		 bcopy(&int_val, arg, val_size);
+		 break;
 
 	case IOV_SVAL(IOV_WET):
-		if (int_val == 0 || int_val == 1) {
-			dhd_set_wet_mode(dhd_pub, int_val);
-			/* Delete the WET DB when disabled */
-			if (!int_val) {
-				dhd_wet_sta_delete_list(dhd_pub);
-			}
-		} else {
-			bcmerror = BCME_RANGE;
-		}
-		break;
+		 if (int_val == 0 || int_val == 1) {
+			 dhd_set_wet_mode(dhd_pub, int_val);
+			 /* Delete the WET DB when disabled */
+			 if (!int_val) {
+				 dhd_wet_sta_delete_list(dhd_pub);
+			 }
+		 } else {
+			 bcmerror = BCME_RANGE;
+		 }
+				 break;
 	case IOV_SVAL(IOV_WET_HOST_IPV4):
-		dhd_set_wet_host_ipv4(dhd_pub, params, plen);
-		break;
+			dhd_set_wet_host_ipv4(dhd_pub, params, plen);
+			break;
 	case IOV_SVAL(IOV_WET_HOST_MAC):
-		dhd_set_wet_host_mac(dhd_pub, params, plen);
+			dhd_set_wet_host_mac(dhd_pub, params, plen);
 		break;
 #endif /* DHD_WET */
 #ifdef DHD_MCAST_REGEN
@@ -1922,7 +2073,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		int_val = (int32)dhd_pub->op_mode;
 		bcopy(&int_val, arg, sizeof(int_val));
 		break;
-	}
+		}
 	case IOV_SVAL(IOV_CFG80211_OPMODE): {
 		if (int_val <= 0)
 			bcmerror = BCME_BADARG;
@@ -1953,7 +2104,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		else {
 			lmtest = (uint)val;
 			DHD_ERROR(("%s: lmtest %s\n",
-					   __FUNCTION__, (lmtest == FALSE) ? "OFF" : "ON"));
+				__FUNCTION__, (lmtest == FALSE)? "OFF" : "ON"));
 		}
 		break;
 	}
@@ -1961,16 +2112,21 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 
 #ifdef SHOW_LOGTRACE
 	case IOV_GVAL(IOV_DUMP_TRACE_LOG): {
-		trace_buf_info_t *trace_buf_info;
+		trace_buf_info_t *trace_buf_info = (trace_buf_info_t *)arg;
+		dhd_dbg_ring_t *dbg_verbose_ring = NULL;
 
-		trace_buf_info = (trace_buf_info_t *)MALLOC(dhd_pub->osh,
-						 sizeof(trace_buf_info_t));
+		dbg_verbose_ring = dhd_dbg_get_ring_from_ring_id(dhd_pub, FW_VERBOSE_RING_ID);
+		if (dbg_verbose_ring == NULL) {
+			DHD_ERROR(("dbg_verbose_ring is NULL\n"));
+			bcmerror = BCME_UNSUPPORTED;
+			break;
+		}
+
 		if (trace_buf_info != NULL) {
-			dhd_get_read_buf_ptr(dhd_pub, trace_buf_info);
-			memcpy((void*)arg, (void*)trace_buf_info, sizeof(trace_buf_info_t));
-			MFREE(dhd_pub->osh, trace_buf_info, sizeof(trace_buf_info_t));
+			bzero(trace_buf_info, sizeof(trace_buf_info_t));
+			dhd_dbg_read_ring_into_trace_buf(dbg_verbose_ring, trace_buf_info);
 		} else {
-			DHD_ERROR(("Memory allocation Failed\n"));
+			DHD_ERROR(("%s: arg is NULL\n", __FUNCTION__));
 			bcmerror = BCME_NOMEM;
 		}
 		break;
@@ -1999,46 +2155,46 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 	}
 
 	case IOV_GVAL(IOV_BPADDR):
-	{
-		sdreg_t sdreg;
-		uint32 addr, size;
+		{
+			sdreg_t sdreg;
+			uint32 addr, size;
 
-		memcpy(&sdreg, params, sizeof(sdreg));
+			memcpy(&sdreg, params, sizeof(sdreg));
 
-		addr = sdreg.offset;
-		size = sdreg.func;
+			addr = sdreg.offset;
+			size = sdreg.func;
 
-		bcmerror = dhd_bus_readwrite_bp_addr(dhd_pub, addr, size,
-											 (uint *)&int_val, TRUE);
+			bcmerror = dhd_bus_readwrite_bp_addr(dhd_pub, addr, size,
+				(uint *)&int_val, TRUE);
 
-		memcpy(arg, &int_val, sizeof(int32));
+			memcpy(arg, &int_val, sizeof(int32));
 
-		break;
-	}
+			break;
+		}
 
 	case IOV_SVAL(IOV_BPADDR):
-	{
-		sdreg_t sdreg;
-		uint32 addr, size;
+		{
+			sdreg_t sdreg;
+			uint32 addr, size;
 
-		memcpy(&sdreg, params, sizeof(sdreg));
+			memcpy(&sdreg, params, sizeof(sdreg));
 
-		addr = sdreg.offset;
-		size = sdreg.func;
+			addr = sdreg.offset;
+			size = sdreg.func;
 
-		bcmerror = dhd_bus_readwrite_bp_addr(dhd_pub, addr, size,
-											 (uint *)&sdreg.value,
-											 FALSE);
+			bcmerror = dhd_bus_readwrite_bp_addr(dhd_pub, addr, size,
+				(uint *)&sdreg.value,
+				FALSE);
 
-		break;
-	}
+			break;
+		}
 #endif /* BCMSDIO || BCMPCIE */
 #ifdef BCMPCIE
 	case IOV_SVAL(IOV_FLOW_RING_DEBUG):
-	{
-		bcmerror = dhd_flow_ring_debug(dhd_pub, arg, len);
-		break;
-	}
+		{
+			bcmerror = dhd_flow_ring_debug(dhd_pub, arg, len);
+			break;
+		}
 #endif /* BCMPCIE */
 	case IOV_SVAL(IOV_MEM_DEBUG):
 		if (len > 0) {
@@ -2048,24 +2204,83 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 #endif /* DHD_DEBUG */
 #if defined(DHD_LOG_DUMP)
 	case IOV_GVAL(IOV_LOG_DUMP):
-	{
-		dhd_prot_debug_info_print(dhd_pub);
-		dhd_log_dump_trigger(dhd_pub, CMD_DEFAULT);
-		break;
-	}
+		{
+			dhd_prot_debug_info_print(dhd_pub);
+			dhd_log_dump_trigger(dhd_pub, CMD_DEFAULT);
+			break;
+		}
 #endif /* DHD_LOG_DUMP */
 	case IOV_GVAL(IOV_DEBUG_BUF_DEST_STAT):
-	{
-		if (dhd_pub->debug_buf_dest_support) {
-			debug_buf_dest_stat_t *debug_buf_dest_stat =
-				(debug_buf_dest_stat_t *)arg;
-			memcpy(debug_buf_dest_stat, dhd_pub->debug_buf_dest_stat,
-				   sizeof(dhd_pub->debug_buf_dest_stat));
+		{
+			if (dhd_pub->debug_buf_dest_support) {
+				debug_buf_dest_stat_t *debug_buf_dest_stat =
+					(debug_buf_dest_stat_t *)arg;
+				memcpy(debug_buf_dest_stat, dhd_pub->debug_buf_dest_stat,
+					sizeof(dhd_pub->debug_buf_dest_stat));
+			} else {
+				bcmerror = BCME_DISABLED;
+			}
+			break;
+		}
+
+#ifdef DHD_DEBUG
+	case IOV_SVAL(IOV_INDUCE_ERROR): {
+		if (int_val >= DHD_INDUCE_ERROR_MAX) {
+			DHD_ERROR(("%s: Invalid command : %u\n", __FUNCTION__, (uint16)int_val));
 		} else {
-			bcmerror = BCME_DISABLED;
+			dhd_pub->dhd_induce_error = (uint16)int_val;
 		}
 		break;
 	}
+#endif /* DHD_DEBUG */
+
+#ifdef WL_IFACE_MGMT_CONF
+#ifdef WL_CFG80211
+#ifdef WL_NANP2P
+	case IOV_GVAL(IOV_CONC_DISC): {
+		int_val = wl_cfg80211_get_iface_conc_disc(
+			dhd_linux_get_primary_netdev(dhd_pub));
+		bcopy(&int_val, arg, sizeof(int_val));
+		break;
+	}
+	case IOV_SVAL(IOV_CONC_DISC): {
+		bcmerror = wl_cfg80211_set_iface_conc_disc(
+			dhd_linux_get_primary_netdev(dhd_pub), (uint8)int_val);
+		break;
+	}
+#endif /* WL_NANP2P */
+#ifdef WL_IFACE_MGMT
+	case IOV_GVAL(IOV_IFACE_POLICY): {
+		int_val = wl_cfg80211_get_iface_policy(
+			dhd_linux_get_primary_netdev(dhd_pub));
+		bcopy(&int_val, arg, sizeof(int_val));
+		break;
+	}
+	case IOV_SVAL(IOV_IFACE_POLICY): {
+		bcmerror = wl_cfg80211_set_iface_policy(
+			dhd_linux_get_primary_netdev(dhd_pub),
+			arg, len);
+		break;
+	}
+#endif /* WL_IFACE_MGMT */
+#endif /* WL_CFG80211 */
+#endif /* WL_IFACE_MGMT_CONF */
+#ifdef RTT_GEOFENCE_CONT
+#if defined(RTT_SUPPORT) && defined(WL_NAN)
+	case IOV_GVAL(IOV_RTT_GEOFENCE_TYPE_OVRD): {
+		bool enable = 0;
+		dhd_rtt_get_geofence_cont_ind(dhd_pub, &enable);
+		int_val = enable ? 1 : 0;
+		bcopy(&int_val, arg, val_size);
+		break;
+	}
+	case IOV_SVAL(IOV_RTT_GEOFENCE_TYPE_OVRD): {
+		bool enable = *(bool *)arg;
+		dhd_rtt_set_geofence_cont_ind(dhd_pub, enable);
+		break;
+	}
+#endif /* RTT_SUPPORT && WL_NAN */
+#endif /* RTT_GEOFENCE_CONT */
 	default:
 		bcmerror = BCME_UNSUPPORTED;
 		break;
@@ -2085,7 +2300,7 @@ dhd_store_conn_status(uint32 event, uint32 status, uint32 reason)
 	 * the important information is in the WLC_E_PRUNE.
 	 */
 	if (!(event == WLC_E_SET_SSID && status == WLC_E_STATUS_FAIL &&
-			dhd_conn_event == WLC_E_PRUNE)) {
+	      dhd_conn_event == WLC_E_PRUNE)) {
 		dhd_conn_event = event;
 		dhd_conn_status = status;
 		dhd_conn_reason = reason;
@@ -2130,7 +2345,7 @@ dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, void *pkt, int prec)
 #ifdef DHDTCPACK_SUPPRESS
 		if (dhd_tcpack_check_xmit(dhdp, p) == BCME_ERROR) {
 			DHD_ERROR(("%s %d: tcpack_suppress ERROR!!! Stop using it\n",
-					   __FUNCTION__, __LINE__));
+				__FUNCTION__, __LINE__));
 			dhd_tcpack_suppress_set(dhdp, TCPACK_SUP_OFF);
 		}
 #endif /* DHDTCPACK_SUPPRESS */
@@ -2237,7 +2452,7 @@ dhd_prec_drop_pkts(dhd_pub_t *dhdp, struct pktq *pq, int prec, f_droppkt_t fn)
 
 static int
 dhd_iovar_op(dhd_pub_t *dhd_pub, const char *name,
-			 void *params, int plen, void *arg, int len, bool set)
+	void *params, int plen, void *arg, int len, bool set)
 {
 	int bcmerror = 0;
 	int val_size;
@@ -2261,7 +2476,7 @@ dhd_iovar_op(dhd_pub_t *dhd_pub, const char *name,
 	}
 
 	DHD_CTL(("%s: %s %s, len %d plen %d\n", __FUNCTION__,
-			 name, (set ? "set" : "get"), len, plen));
+		name, (set ? "set" : "get"), len, plen));
 
 	/* set up 'params' pointer in case this is a set command so that
 	 * the convenience int and bool code can be common to set and get
@@ -2301,130 +2516,136 @@ dhd_ioctl(dhd_pub_t * dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 
 	dhd_os_dhdiovar_lock(dhd_pub);
 	switch (ioc->cmd) {
-	case DHD_GET_MAGIC:
-		if (buflen < sizeof(int))
-			bcmerror = BCME_BUFTOOSHORT;
-		else
-			*(int*)buf = DHD_IOCTL_MAGIC;
-		break;
+		case DHD_GET_MAGIC:
+			if (buflen < sizeof(int))
+				bcmerror = BCME_BUFTOOSHORT;
+			else
+				*(int*)buf = DHD_IOCTL_MAGIC;
+			break;
 
-	case DHD_GET_VERSION:
-		if (buflen < sizeof(int))
-			bcmerror = BCME_BUFTOOSHORT;
-		else
-			*(int*)buf = DHD_IOCTL_VERSION;
-		break;
+		case DHD_GET_VERSION:
+			if (buflen < sizeof(int))
+				bcmerror = BCME_BUFTOOSHORT;
+			else
+				*(int*)buf = DHD_IOCTL_VERSION;
+			break;
 
-	case DHD_GET_VAR:
-	case DHD_SET_VAR:
-	{
-		char *arg;
-		uint arglen;
+		case DHD_GET_VAR:
+		case DHD_SET_VAR:
+			{
+				char *arg;
+				uint arglen;
 
-		DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
-		if (DHD_BUS_CHECK_DOWN_OR_DOWN_IN_PROGRESS(dhd_pub) &&
-				bcmstricmp((char *)buf, "devreset")) {
-			/* In platforms like FC19, the FW download is done via IOCTL
-			 * and should not return error for IOCTLs fired before FW
-			 * Download is done
-			 */
-			if (dhd_fw_download_status(dhd_pub)) {
-				DHD_ERROR(("%s: returning as busstate=%d\n",
-						   __FUNCTION__, dhd_pub->busstate));
+				DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
+				if (DHD_BUS_CHECK_DOWN_OR_DOWN_IN_PROGRESS(dhd_pub) &&
+					bcmstricmp((char *)buf, "devreset")) {
+					/* In platforms like FC19, the FW download is done via IOCTL
+					 * and should not return error for IOCTLs fired before FW
+					 * Download is done
+					 */
+					if (dhd_fw_download_status(dhd_pub) == FW_DOWNLOAD_DONE) {
+						DHD_ERROR(("%s: returning as busstate=%d\n",
+								__FUNCTION__, dhd_pub->busstate));
+						DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
+						dhd_os_dhdiovar_unlock(dhd_pub);
+						return -ENODEV;
+					}
+				}
+				DHD_BUS_BUSY_SET_IN_DHD_IOVAR(dhd_pub);
 				DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
-				dhd_os_dhdiovar_unlock(dhd_pub);
-				return -ENODEV;
-			}
-		}
-		DHD_BUS_BUSY_SET_IN_DHD_IOVAR(dhd_pub);
-		DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
 
-		DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
-		if (DHD_BUS_CHECK_SUSPEND_OR_SUSPEND_IN_PROGRESS(dhd_pub)) {
-			/* If Suspend/Resume is tested via pcie_suspend IOVAR
-			 * then continue to execute the IOVAR, return from here for
-			 * other IOVARs, also include pciecfgreg and devreset to go
-			 * through.
-			 */
-			if (bcmstricmp((char *)buf, "pcie_suspend") &&
-					bcmstricmp((char *)buf, "pciecfgreg") &&
-					bcmstricmp((char *)buf, "devreset") &&
-					bcmstricmp((char *)buf, "sdio_suspend")) {
-				DHD_ERROR(("%s: bus is in suspend(%d)"
-						   "or suspending(0x%x) state\n",
-						   __FUNCTION__, dhd_pub->busstate,
-						   dhd_pub->dhd_bus_busy_state));
-				DHD_BUS_BUSY_CLEAR_IN_DHD_IOVAR(dhd_pub);
-				dhd_os_busbusy_wake(dhd_pub);
+				DHD_LINUX_GENERAL_LOCK(dhd_pub, flags);
+				if (DHD_BUS_CHECK_SUSPEND_OR_SUSPEND_IN_PROGRESS(dhd_pub)) {
+					/* If Suspend/Resume is tested via pcie_suspend IOVAR
+					 * then continue to execute the IOVAR, return from here for
+					 * other IOVARs, also include pciecfgreg and devreset to go
+					 * through.
+					 */
+					if (bcmstricmp((char *)buf, "pcie_suspend") &&
+					    bcmstricmp((char *)buf, "pciecfgreg") &&
+					    bcmstricmp((char *)buf, "devreset") &&
+					    bcmstricmp((char *)buf, "sdio_suspend")) {
+						DHD_ERROR(("%s: bus is in suspend(%d)"
+							"or suspending(0x%x) state\n",
+							__FUNCTION__, dhd_pub->busstate,
+							dhd_pub->dhd_bus_busy_state));
+						DHD_BUS_BUSY_CLEAR_IN_DHD_IOVAR(dhd_pub);
+						dhd_os_busbusy_wake(dhd_pub);
+						DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
+						dhd_os_dhdiovar_unlock(dhd_pub);
+						return -ENODEV;
+					}
+				}
+				/* During devreset ioctl, we call dhdpcie_advertise_bus_cleanup,
+				 * which will wait for all the busy contexts to get over for
+				 * particular time and call ASSERT if timeout happens. As during
+				 * devreset ioctal, we made DHD_BUS_BUSY_SET_IN_DHD_IOVAR,
+				 * to avoid ASSERT, clear the IOCTL busy state. "devreset" ioctl is
+				 * not used in Production platforms but only used in FC19 setups.
+				 */
+				if (!bcmstricmp((char *)buf, "devreset") ||
+#ifdef BCMPCIE
+					(dhd_bus_is_multibp_capable(dhd_pub->bus) &&
+					!bcmstricmp((char *)buf, "dwnldstate")) ||
+#endif /* BCMPCIE */
+					FALSE)
+				{
+					DHD_BUS_BUSY_CLEAR_IN_DHD_IOVAR(dhd_pub);
+				}
 				DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
-				dhd_os_dhdiovar_unlock(dhd_pub);
-				return -ENODEV;
+
+				/* scan past the name to any arguments */
+				for (arg = buf, arglen = buflen; *arg && arglen; arg++, arglen--)
+					;
+
+				if (*arg) {
+					bcmerror = BCME_BUFTOOSHORT;
+					goto unlock_exit;
+				}
+
+				/* account for the NUL terminator */
+				arg++, arglen--;
+				/* call with the appropriate arguments */
+				if (ioc->cmd == DHD_GET_VAR) {
+					bcmerror = dhd_iovar_op(dhd_pub, buf, arg, arglen,
+							buf, buflen, IOV_GET);
+				} else {
+					bcmerror = dhd_iovar_op(dhd_pub, buf, NULL, 0,
+							arg, arglen, IOV_SET);
+				}
+				if (bcmerror != BCME_UNSUPPORTED) {
+					goto unlock_exit;
+				}
+
+				/* not in generic table, try protocol module */
+				if (ioc->cmd == DHD_GET_VAR) {
+					bcmerror = dhd_prot_iovar_op(dhd_pub, buf, arg,
+							arglen, buf, buflen, IOV_GET);
+				} else {
+					bcmerror = dhd_prot_iovar_op(dhd_pub, buf,
+							NULL, 0, arg, arglen, IOV_SET);
+				}
+				if (bcmerror != BCME_UNSUPPORTED) {
+					goto unlock_exit;
+				}
+
+				/* if still not found, try bus module */
+				if (ioc->cmd == DHD_GET_VAR) {
+					bcmerror = dhd_bus_iovar_op(dhd_pub, buf,
+							arg, arglen, buf, buflen, IOV_GET);
+				} else {
+					bcmerror = dhd_bus_iovar_op(dhd_pub, buf,
+							NULL, 0, arg, arglen, IOV_SET);
+				}
+				if (bcmerror != BCME_UNSUPPORTED) {
+					goto unlock_exit;
+				}
+
 			}
-		}
-		/* During devreset ioctl, we call dhdpcie_advertise_bus_cleanup,
-		 * which will wait for all the busy contexts to get over for
-		 * particular time and call ASSERT if timeout happens. As during
-		 * devreset ioctal, we made DHD_BUS_BUSY_SET_IN_DHD_IOVAR,
-		 * to avoid ASSERT, clear the IOCTL busy state. "devreset" ioctl is
-		 * not used in Production platforms but only used in FC19 setups.
-		 */
-		if (!bcmstricmp((char *)buf, "devreset")) {
-			DHD_BUS_BUSY_CLEAR_IN_DHD_IOVAR(dhd_pub);
-		}
-		DHD_LINUX_GENERAL_UNLOCK(dhd_pub, flags);
-
-		/* scan past the name to any arguments */
-		for (arg = buf, arglen = buflen; *arg && arglen; arg++, arglen--)
-			;
-
-		if (*arg) {
-			bcmerror = BCME_BUFTOOSHORT;
 			goto unlock_exit;
-		}
 
-		/* account for the NUL terminator */
-		arg++, arglen--;
-		/* call with the appropriate arguments */
-		if (ioc->cmd == DHD_GET_VAR) {
-			bcmerror = dhd_iovar_op(dhd_pub, buf, arg, arglen,
-									buf, buflen, IOV_GET);
-		} else {
-			bcmerror = dhd_iovar_op(dhd_pub, buf, NULL, 0,
-									arg, arglen, IOV_SET);
-		}
-		if (bcmerror != BCME_UNSUPPORTED) {
-			goto unlock_exit;
-		}
-
-		/* not in generic table, try protocol module */
-		if (ioc->cmd == DHD_GET_VAR) {
-			bcmerror = dhd_prot_iovar_op(dhd_pub, buf, arg,
-										 arglen, buf, buflen, IOV_GET);
-		} else {
-			bcmerror = dhd_prot_iovar_op(dhd_pub, buf,
-										 NULL, 0, arg, arglen, IOV_SET);
-		}
-		if (bcmerror != BCME_UNSUPPORTED) {
-			goto unlock_exit;
-		}
-
-		/* if still not found, try bus module */
-		if (ioc->cmd == DHD_GET_VAR) {
-			bcmerror = dhd_bus_iovar_op(dhd_pub, buf,
-										arg, arglen, buf, buflen, IOV_GET);
-		} else {
-			bcmerror = dhd_bus_iovar_op(dhd_pub, buf,
-										NULL, 0, arg, arglen, IOV_SET);
-		}
-		if (bcmerror != BCME_UNSUPPORTED) {
-			goto unlock_exit;
-		}
-
-	}
-	goto unlock_exit;
-
-	default:
-		bcmerror = BCME_UNSUPPORTED;
+		default:
+			bcmerror = BCME_UNSUPPORTED;
 	}
 	dhd_os_dhdiovar_unlock(dhd_pub);
 	return bcmerror;
@@ -2442,7 +2663,7 @@ unlock_exit:
 
 static void
 wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
-				   void *raw_event_ptr, char *eventmask)
+	void *raw_event_ptr, char *eventmask)
 {
 	uint i, status, reason;
 	bool group = FALSE, flush_txq = FALSE, link = FALSE;
@@ -2495,11 +2716,11 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 		} else if (status == WLC_E_STATUS_TIMEOUT) {
 			DHD_EVENT(("MACEVENT: %s, MAC %s, TIMEOUT\n", event_name, eabuf));
 		} else if (status == WLC_E_STATUS_FAIL) {
-			DHD_EVENT(("MACEVENT: %s, MAC %s, FAILURE, reason %d\n",
-					   event_name, eabuf, (int)reason));
+			DHD_EVENT(("MACEVENT: %s, MAC %s, FAILURE, status %d reason %d\n",
+			       event_name, eabuf, (int)status, (int)reason));
 		} else {
 			DHD_EVENT(("MACEVENT: %s, MAC %s, unexpected status %d\n",
-					   event_name, eabuf, (int)status));
+			       event_name, eabuf, (int)status));
 		}
 
 		break;
@@ -2515,6 +2736,8 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 			auth_str = "Open System";
 		else if (auth_type == DOT11_SHARED_KEY)
 			auth_str = "Shared Key";
+		else if (auth_type == DOT11_SAE)
+			auth_str = "SAE";
 		else {
 			snprintf(err_msg, sizeof(err_msg), "AUTH unknown: %d", (int)auth_type);
 			auth_str = err_msg;
@@ -2524,13 +2747,19 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 			DHD_EVENT(("MACEVENT: %s, MAC %s, %s\n", event_name, eabuf, auth_str));
 		} else if (status == WLC_E_STATUS_SUCCESS) {
 			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, SUCCESS\n",
-					   event_name, eabuf, auth_str));
+				event_name, eabuf, auth_str));
 		} else if (status == WLC_E_STATUS_TIMEOUT) {
 			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, TIMEOUT\n",
-					   event_name, eabuf, auth_str));
+				event_name, eabuf, auth_str));
 		} else if (status == WLC_E_STATUS_FAIL) {
-			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, FAILURE, reason %d\n",
-					   event_name, eabuf, auth_str, (int)reason));
+			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, FAILURE, status %d reason %d\n",
+			       event_name, eabuf, auth_str, (int)status, (int)reason));
+		} else if (status == WLC_E_STATUS_NO_ACK) {
+			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, NOACK\n",
+			       event_name, eabuf, auth_str));
+		} else {
+			DHD_EVENT(("MACEVENT: %s, MAC %s, %s, status %d reason %d\n",
+				event_name, eabuf, auth_str, (int)status, (int)reason));
 		}
 		BCM_REFERENCE(auth_str);
 
@@ -2543,12 +2772,12 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 			DHD_EVENT(("MACEVENT: %s, MAC %s\n", event_name, eabuf));
 		} else {
 			if (status == WLC_E_STATUS_FAIL) {
-				DHD_EVENT(("MACEVENT: %s, failed\n", event_name));
+				DHD_EVENT(("MACEVENT: %s, failed status %d\n", event_name, status));
 			} else if (status == WLC_E_STATUS_NO_NETWORKS) {
 				DHD_EVENT(("MACEVENT: %s, no networks found\n", event_name));
 			} else {
 				DHD_EVENT(("MACEVENT: %s, unexpected status %d\n",
-						   event_name, (int)status));
+					event_name, (int)status));
 			}
 		}
 		break;
@@ -2565,13 +2794,13 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 
 	case WLC_E_LINK:
 		DHD_EVENT(("MACEVENT: %s %s flags:0x%x status:%d\n",
-				   event_name, link ? "UP" : "DOWN", flags, status));
+			event_name, link?"UP":"DOWN", flags, status));
 		BCM_REFERENCE(link);
 		break;
 
 	case WLC_E_MIC_ERROR:
 		DHD_EVENT(("MACEVENT: %s, MAC %s, Group %d, Flush %d\n",
-				   event_name, eabuf, group, flush_txq));
+		       event_name, eabuf, group, flush_txq));
 		BCM_REFERENCE(group);
 		BCM_REFERENCE(flush_txq);
 		break;
@@ -2580,7 +2809,7 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 	case WLC_E_UNICAST_DECODE_ERROR:
 	case WLC_E_MULTICAST_DECODE_ERROR:
 		DHD_EVENT(("MACEVENT: %s, MAC %s\n",
-				   event_name, eabuf));
+		       event_name, eabuf));
 		break;
 
 	case WLC_E_TXFAIL:
@@ -2610,13 +2839,13 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 	case WLC_E_PFN_SCAN_BACKOFF:
 	case WLC_E_PFN_BSSID_SCAN_BACKOFF:
 		DHD_EVENT(("PNOEVENT: %s, status %d, reason %d\n",
-				   event_name, (int)status, (int)reason));
+		           event_name, (int)status, (int)reason));
 		break;
 
 	case WLC_E_PSK_SUP:
 	case WLC_E_PRUNE:
 		DHD_EVENT(("MACEVENT: %s, status %d, reason %d\n",
-				   event_name, (int)status, (int)reason));
+		           event_name, (int)status, (int)reason));
 		break;
 
 #ifdef WIFI_ACT_FRAME
@@ -2652,57 +2881,86 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 	case WLC_E_CCA_CHAN_QUAL:
 		if (datalen) {
 			cca_chan_qual_event_t *cca_event = (cca_chan_qual_event_t *)event_data;
-			if (cca_event->id == WL_CHAN_QUAL_FULL_CCA) {
+			if (cca_event->id == WL_CHAN_QUAL_FULLPM_CCA) {
+				cca_only_chan_qual_event_t *cca_only_event =
+					(cca_only_chan_qual_event_t *)cca_event;
+				BCM_REFERENCE(cca_only_event);
 				DHD_EVENT((
-							  "MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
-							  " channel 0x%02x (dur %dms ibss %dms obss %dms interf %dms"
-							  " ts 0x%08x)\n",
-							  event_name, event_type, eabuf, (int)status,
-							  (int)reason, (int)auth_type, cca_event->chanspec,
-							  cca_event->cca_busy_ext.duration,
-							  cca_event->cca_busy_ext.congest_ibss,
-							  cca_event->cca_busy_ext.congest_obss,
-							  cca_event->cca_busy_ext.interference,
-							  cca_event->cca_busy_ext.timestamp));
+					"MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
+					" channel 0x%02x\n",
+					event_name, event_type, eabuf, (int)status,
+					(int)reason, (int)auth_type, cca_event->chanspec));
+				DHD_EVENT((
+					"\tTOTAL (dur %dms me %dms notme %dms interf %dms"
+					" ts 0x%08x)\n",
+					cca_only_event->cca_busy_ext.duration,
+					cca_only_event->cca_busy_ext.congest_ibss,
+					cca_only_event->cca_busy_ext.congest_obss,
+					cca_only_event->cca_busy_ext.interference,
+					cca_only_event->cca_busy_ext.timestamp));
+				DHD_EVENT((
+					"\t  !PM (dur %dms me %dms notme %dms interf %dms)\n",
+					cca_only_event->cca_busy_nopm.duration,
+					cca_only_event->cca_busy_nopm.congest_ibss,
+					cca_only_event->cca_busy_nopm.congest_obss,
+					cca_only_event->cca_busy_nopm.interference));
+				DHD_EVENT((
+					"\t   PM (dur %dms me %dms notme %dms interf %dms)\n",
+					cca_only_event->cca_busy_pm.duration,
+					cca_only_event->cca_busy_pm.congest_ibss,
+					cca_only_event->cca_busy_pm.congest_obss,
+					cca_only_event->cca_busy_pm.interference));
+			} else if (cca_event->id == WL_CHAN_QUAL_FULL_CCA) {
+				DHD_EVENT((
+					"MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
+					" channel 0x%02x (dur %dms ibss %dms obss %dms interf %dms"
+					" ts 0x%08x)\n",
+					event_name, event_type, eabuf, (int)status,
+					(int)reason, (int)auth_type, cca_event->chanspec,
+					cca_event->cca_busy_ext.duration,
+					cca_event->cca_busy_ext.congest_ibss,
+					cca_event->cca_busy_ext.congest_obss,
+					cca_event->cca_busy_ext.interference,
+					cca_event->cca_busy_ext.timestamp));
 			} else if (cca_event->id == WL_CHAN_QUAL_CCA) {
 				DHD_EVENT((
-							  "MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
-							  " channel 0x%02x (dur %dms busy %dms ts 0x%08x)\n",
-							  event_name, event_type, eabuf, (int)status,
-							  (int)reason, (int)auth_type, cca_event->chanspec,
-							  cca_event->cca_busy.duration,
-							  cca_event->cca_busy.congest,
-							  cca_event->cca_busy.timestamp));
+					"MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
+					" channel 0x%02x (dur %dms busy %dms ts 0x%08x)\n",
+					event_name, event_type, eabuf, (int)status,
+					(int)reason, (int)auth_type, cca_event->chanspec,
+					cca_event->cca_busy.duration,
+					cca_event->cca_busy.congest,
+					cca_event->cca_busy.timestamp));
 			} else if ((cca_event->id == WL_CHAN_QUAL_NF) ||
-					   (cca_event->id == WL_CHAN_QUAL_NF_LTE)) {
+			           (cca_event->id == WL_CHAN_QUAL_NF_LTE)) {
 				DHD_EVENT((
-							  "MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
-							  " channel 0x%02x (NF[%d] %ddB)\n",
-							  event_name, event_type, eabuf, (int)status,
-							  (int)reason, (int)auth_type, cca_event->chanspec,
-							  cca_event->id, cca_event->noise));
+					"MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
+					" channel 0x%02x (NF[%d] %ddB)\n",
+					event_name, event_type, eabuf, (int)status,
+					(int)reason, (int)auth_type, cca_event->chanspec,
+					cca_event->id, cca_event->noise));
 			} else {
 				DHD_EVENT((
-							  "MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
-							  " channel 0x%02x (unknown ID %d)\n",
-							  event_name, event_type, eabuf, (int)status,
-							  (int)reason, (int)auth_type, cca_event->chanspec,
-							  cca_event->id));
+					"MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d,"
+					" channel 0x%02x (unknown ID %d)\n",
+					event_name, event_type, eabuf, (int)status,
+					(int)reason, (int)auth_type, cca_event->chanspec,
+					cca_event->id));
 			}
 		}
 		break;
 	case WLC_E_ESCAN_RESULT:
 	{
 		wl_escan_result_v2_t *escan_result =
-			(wl_escan_result_v2_t *)event_data;
+				(wl_escan_result_v2_t *)event_data;
 		BCM_REFERENCE(escan_result);
 		if ((status == WLC_E_STATUS_SUCCESS) || (status == WLC_E_STATUS_ABORT)) {
 			DHD_EVENT(("MACEVENT: %s %d, status %d sync-id %u\n",
-					   event_name, event_type, (int)status,
-					   dtoh16(escan_result->sync_id)));
+				event_name, event_type, (int)status,
+				dtoh16(escan_result->sync_id)));
 		} else {
 			DHD_TRACE(("MACEVENT: %s %d, MAC %s, status %d \n",
-					   event_name, event_type, eabuf, (int)status));
+				event_name, event_type, eabuf, (int)status));
 		}
 
 		break;
@@ -2713,7 +2971,7 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 		BCM_REFERENCE(ifevent);
 
 		DHD_EVENT(("MACEVENT: %s, opcode:0x%d  ifidx:%d role:%d\n",
-				   event_name, ifevent->opcode, ifevent->ifidx, ifevent->role));
+		event_name, ifevent->opcode, ifevent->ifidx, ifevent->role));
 		break;
 	}
 #ifdef SHOW_LOGTRACE
@@ -2726,66 +2984,101 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 
 	case WLC_E_PSK_AUTH:
 		DHD_EVENT(("MACEVENT: %s, RA %s status %d Reason:%d\n",
-				   event_name, eabuf, status, reason));
+			event_name, eabuf, status, reason));
 		break;
 	case WLC_E_AGGR_EVENT:
-	{
-		event_aggr_data_t *aggrbuf = event_data;
-		int j = 0, len = 0;
-		uint8 *data = aggrbuf->data;
-		DHD_EVENT(("MACEVENT: %s, num of events %d total len %d sub events: ",
-				   event_name, aggrbuf->num_events, aggrbuf->len));
-		for (j = 0; j < aggrbuf->num_events; j++)
 		{
-			wl_event_msg_t * sub_event = (wl_event_msg_t *)data;
-			if (len > aggrbuf->len) {
-				DHD_ERROR(("%s: Aggr events corrupted!",
-						   __FUNCTION__));
+			event_aggr_data_t *aggrbuf = event_data;
+			int j = 0, len = 0;
+			uint8 *data = aggrbuf->data;
+			DHD_EVENT(("MACEVENT: %s, num of events %d total len %d sub events: ",
+					event_name, aggrbuf->num_events, aggrbuf->len));
+			for (j = 0; j < aggrbuf->num_events; j++)
+			{
+				wl_event_msg_t * sub_event = (wl_event_msg_t *)data;
+				if (len > aggrbuf->len) {
+					DHD_ERROR(("%s: Aggr events corrupted!",
+						__FUNCTION__));
+					break;
+				}
+				DHD_EVENT(("\n Event type: %d ", ntoh32(sub_event->event_type)));
+				len += ALIGN_SIZE((ntoh32(sub_event->datalen) +
+						sizeof(wl_event_msg_t)), sizeof(uint64));
+				buf = (uchar *)(data + sizeof(wl_event_msg_t));
+				BCM_REFERENCE(buf);
+				DHD_EVENT((" data (%d) : ", ntoh32(sub_event->datalen)));
+				for (i = 0; i < ntoh32(sub_event->datalen); i++) {
+					DHD_EVENT((" 0x%02x ", buf[i]));
+				}
+				data = aggrbuf->data + len;
+			}
+			DHD_EVENT(("\n"));
+		}
+		break;
+	case WLC_E_NAN_CRITICAL:
+		{
+			DHD_LOG_MEM(("MACEVENT: %s, type:%d\n", event_name, reason));
+			break;
+		}
+	case WLC_E_NAN_NON_CRITICAL:
+		{
+			DHD_TRACE(("MACEVENT: %s, type:%d\n", event_name, reason));
+			break;
+		}
+	case WLC_E_PROXD:
+		{
+			wl_proxd_event_t *proxd = (wl_proxd_event_t*)event_data;
+			DHD_LOG_MEM(("MACEVENT: %s, event:%d, status:%d\n",
+				event_name, proxd->type, reason));
+			break;
+		}
+	case WLC_E_RPSNOA:
+		{
+			rpsnoa_stats_t *stat = event_data;
+			if (datalen == sizeof(*stat)) {
+				DHD_EVENT(("MACEVENT: %s, band %s, status %d, pps %d\n", event_name,
+					(stat->band == WLC_BAND_2G) ? "2G":"5G",
+					stat->state, stat->last_pps));
+			}
+			break;
+		}
+	case WLC_E_PHY_CAL:
+		{
+			DHD_EVENT(("MACEVENT: %s, reason:%d\n", event_name, reason));
+			break;
+		}
+	case WLC_E_WA_LQM:
+		{
+			wl_event_wa_lqm_t *event_wa_lqm = (wl_event_wa_lqm_t *)event_data;
+			bcm_xtlv_t *subevent;
+			wl_event_wa_lqm_basic_t *elqm_basic;
+
+			if ((event_wa_lqm->ver != WL_EVENT_WA_LQM_VER) ||
+			    (event_wa_lqm->len < sizeof(wl_event_wa_lqm_t) + BCM_XTLV_HDR_SIZE)) {
+				DHD_ERROR(("MACEVENT: %s invalid (ver=%d len=%d)\n",
+					event_name, event_wa_lqm->ver, event_wa_lqm->len));
 				break;
 			}
-			DHD_EVENT(("\n Event type: %d ", ntoh32(sub_event->event_type)));
-			len += ALIGN_SIZE((ntoh32(sub_event->datalen) +
-							   sizeof(wl_event_msg_t)), sizeof(uint64));
-			buf = (uchar *)(data + sizeof(wl_event_msg_t));
-			BCM_REFERENCE(buf);
-			DHD_EVENT((" data (%d) : ", ntoh32(sub_event->datalen)));
-			for (i = 0; i < ntoh32(sub_event->datalen); i++) {
-				DHD_EVENT((" 0x%02x ", buf[i]));
+
+			subevent = (bcm_xtlv_t *)event_wa_lqm->subevent;
+			 if ((subevent->id != WL_EVENT_WA_LQM_BASIC) ||
+			     (subevent->len < sizeof(wl_event_wa_lqm_basic_t))) {
+				DHD_ERROR(("MACEVENT: %s invalid sub-type (id=%d len=%d)\n",
+					event_name, subevent->id, subevent->len));
+				break;
 			}
-			data = aggrbuf->data + len;
+
+			elqm_basic = (wl_event_wa_lqm_basic_t *)subevent->data;
+			BCM_REFERENCE(elqm_basic);
+			DHD_EVENT(("MACEVENT: %s (RSSI=%d SNR=%d TxRate=%d RxRate=%d)\n",
+				event_name, elqm_basic->rssi, elqm_basic->snr,
+				elqm_basic->tx_rate, elqm_basic->rx_rate));
+			break;
 		}
-		DHD_EVENT(("\n"));
-	}
-	break;
-	case WLC_E_NAN_CRITICAL:
-	{
-		DHD_LOG_MEM(("MACEVENT: %s, type:%d\n", event_name, reason));
-		break;
-	}
-	case WLC_E_NAN_NON_CRITICAL:
-	{
-		DHD_TRACE(("MACEVENT: %s, type:%d\n", event_name, reason));
-		break;
-	}
-	case WLC_E_RPSNOA:
-	{
-		rpsnoa_stats_t *stat = event_data;
-		if (datalen == sizeof(*stat)) {
-			DHD_EVENT(("MACEVENT: %s, band %s, status %d, pps %d\n", event_name,
-					   (stat->band == WLC_BAND_2G) ? "2G" : "5G",
-					   stat->state, stat->last_pps));
-		}
-		break;
-	}
-	case WLC_E_PHY_CAL:
-	{
-		DHD_EVENT(("MACEVENT: %s, reason:%d\n", event_name, reason));
-		break;
-	}
 	default:
 		DHD_INFO(("MACEVENT: %s %d, MAC %s, status %d, reason %d, auth %d\n",
-				  event_name, event_type, eabuf, (int)status, (int)reason,
-				  (int)auth_type));
+		       event_name, event_type, eabuf, (int)status, (int)reason,
+		       (int)auth_type));
 		break;
 	}
 
@@ -2813,9 +3106,98 @@ dngl_host_event(dhd_pub_t *dhdp, void *pktdata, bcm_dngl_event_msg_t *dngl_event
 	return BCME_OK;
 }
 
+#ifdef PARSE_DONGLE_HOST_EVENT
+typedef struct hck_id_to_str_s {
+	uint32 id;
+	char *name;
+} hck_id_to_str_t;
+
+hck_id_to_str_t hck_sw_id_to_str[] = {
+	{WL_HC_DD_PCIE, "WL_HC_DD_PCIE"},
+	{WL_HC_DD_RX_DMA_STALL, "WL_HC_DD_RX_DMA_STALL"},
+	{WL_HC_DD_RX_STALL, "WL_HC_DD_RX_STALL"},
+	{WL_HC_DD_TX_STALL, "WL_HC_DD_TX_STALL"},
+	{WL_HC_DD_SCAN_STALL, "WL_HC_DD_SCAN_STALL"},
+	{WL_HC_DD_PHY, "WL_HC_DD_PHY"},
+	{WL_HC_DD_REINIT, "WL_HC_DD_REINIT"},
+	{WL_HC_DD_TXQ_STALL, "WL_HC_DD_TXQ_STALL"},
+	{0, NULL}
+};
+
+hck_id_to_str_t hck_pcie_module_to_str[] = {
+	{HEALTH_CHECK_PCIEDEV_INDUCED_IND, "PCIEDEV_INDUCED_IND"},
+	{HEALTH_CHECK_PCIEDEV_H2D_DMA_IND, "PCIEDEV_H2D_DMA_IND"},
+	{HEALTH_CHECK_PCIEDEV_D2H_DMA_IND, "PCIEDEV_D2H_DMA_IND"},
+	{HEALTH_CHECK_PCIEDEV_IOCTL_STALL_IND, "PCIEDEV_IOCTL_STALL_IND"},
+	{HEALTH_CHECK_PCIEDEV_D3ACK_STALL_IND, "PCIEDEV_D3ACK_STALL_IND"},
+	{HEALTH_CHECK_PCIEDEV_NODS_IND, "PCIEDEV_NODS_IND"},
+	{HEALTH_CHECK_PCIEDEV_LINKSPEED_FALLBACK_IND, "PCIEDEV_LINKSPEED_FALLBACK_IND"},
+	{HEALTH_CHECK_PCIEDEV_DSACK_STALL_IND, "PCIEDEV_DSACK_STALL_IND"},
+	{0, NULL}
+};
+
+hck_id_to_str_t hck_rx_stall_v2_to_str[] = {
+	{BCM_RX_HC_RESERVED, "BCM_RX_HC_RESERVED"},
+	{BCM_RX_HC_UNSPECIFIED, "BCM_RX_HC_UNSPECIFIED"},
+	{BCM_RX_HC_UNICAST_DECRYPT_FAIL, "BCM_RX_HC_UNICAST_DECRYPT_FAIL"},
+	{BCM_RX_HC_BCMC_DECRYPT_FAIL, "BCM_RX_HC_BCMC_DECRYPT_FAIL"},
+	{BCM_RX_HC_UNICAST_REPLAY, "BCM_RX_HC_UNICAST_REPLAY"},
+	{BCM_RX_HC_BCMC_REPLAY, "BCM_RX_HC_BCMC_REPLAY"},
+	{BCM_RX_HC_AMPDU_DUP, "BCM_RX_HC_AMPDU_DUP"},
+	{0, NULL}
+};
+
+static void
+dhd_print_dongle_hck_id(uint32 id, hck_id_to_str_t *hck)
+{
+	while (hck->name != NULL) {
+		if (hck->id == id) {
+			DHD_ERROR(("DONGLE_HCK_EVENT: %s\n", hck->name));
+			return;
+		}
+		hck++;
+	}
+}
+
+void
+dhd_parse_hck_common_sw_event(bcm_xtlv_t *wl_hc)
+{
+
+	wl_rx_hc_info_v2_t *hck_rx_stall_v2;
+	uint16 id;
+
+	id = ltoh16(wl_hc->id);
+
+	if (id == WL_HC_DD_RX_STALL_V2) {
+		/*  map the hck_rx_stall_v2 structure to the value of the XTLV */
+		hck_rx_stall_v2 =
+			(wl_rx_hc_info_v2_t*)wl_hc;
+		DHD_ERROR(("type:%d len:%d if_idx:%d ac:%d pkts:%d"
+			" drop:%d alert_th:%d reason:%d peer_ea:"MACF"\n",
+			hck_rx_stall_v2->type,
+			hck_rx_stall_v2->length,
+			hck_rx_stall_v2->if_idx,
+			hck_rx_stall_v2->ac,
+			hck_rx_stall_v2->rx_hc_pkts,
+			hck_rx_stall_v2->rx_hc_dropped_all,
+			hck_rx_stall_v2->rx_hc_alert_th,
+			hck_rx_stall_v2->reason,
+			ETHER_TO_MACF(hck_rx_stall_v2->peer_ea)));
+		dhd_print_dongle_hck_id(
+				ltoh32(hck_rx_stall_v2->reason),
+				hck_rx_stall_v2_to_str);
+	} else {
+		dhd_print_dongle_hck_id(ltoh16(wl_hc->id),
+				hck_sw_id_to_str);
+	}
+
+}
+
+#endif /* PARSE_DONGLE_HOST_EVENT */
+
 void
 dngl_host_event_process(dhd_pub_t *dhdp, bcm_dngl_event_t *event,
-						bcm_dngl_event_msg_t *dngl_event, size_t pktlen)
+	bcm_dngl_event_msg_t *dngl_event, size_t pktlen)
 {
 	uint8 *p = (uint8 *)(event + 1);
 	uint16 type = ntoh16_ua((void *)&dngl_event->event_type);
@@ -2828,117 +3210,130 @@ dngl_host_event_process(dhd_pub_t *dhdp, bcm_dngl_event_t *event,
 	}
 	if (version != BCM_DNGL_EVENT_MSG_VERSION) {
 		DHD_ERROR(("%s:version mismatch:%d:%d\n", __FUNCTION__,
-				   version, BCM_DNGL_EVENT_MSG_VERSION));
+			version, BCM_DNGL_EVENT_MSG_VERSION));
 		return;
 	}
 	switch (type) {
-	case DNGL_E_SOCRAM_IND:
-	{
-		bcm_dngl_socramind_t *socramind_ptr = (bcm_dngl_socramind_t *)p;
-		uint16 tag = ltoh32(socramind_ptr->tag);
-		uint16 taglen = ltoh32(socramind_ptr->length);
-		p = (uint8 *)socramind_ptr->value;
-		DHD_EVENT(("Tag:%d Len:%d Datalen:%d\n", tag, taglen, datalen));
-		switch (tag) {
-		case SOCRAM_IND_ASSERT_TAG:
+	   case DNGL_E_SOCRAM_IND:
 		{
-			/*
-			* The payload consists of -
-			* null terminated function name padded till 32 bit boundary +
-			* Line number - (32 bits)
-			* Caller address (32 bits)
-			*/
-			char *fnname = (char *)p;
-			if (datalen < (ROUNDUP(strlen(fnname) + 1, sizeof(uint32)) +
-						   sizeof(uint32) * 2)) {
-				DHD_ERROR(("Wrong length:%d\n", datalen));
-				return;
-			}
-			DHD_EVENT(("ASSRT Function:%s ", p));
-			p += ROUNDUP(strlen(p) + 1, sizeof(uint32));
-			DHD_EVENT(("Line:%d ", *(uint32 *)p));
-			p += sizeof(uint32);
-			DHD_EVENT(("Caller Addr:0x%x\n", *(uint32 *)p));
-			break;
-		}
-		case SOCRAM_IND_TAG_HEALTH_CHECK:
-		{
-			bcm_dngl_healthcheck_t *dngl_hc = (bcm_dngl_healthcheck_t *)p;
-			DHD_EVENT(("SOCRAM_IND_HEALTHCHECK_TAG:%d Len:%d datalen:%d\n",
-					   ltoh32(dngl_hc->top_module_tag),
-					   ltoh32(dngl_hc->top_module_len),
-					   datalen));
-			if (DHD_EVENT_ON()) {
-				prhex("HEALTHCHECK", p, MIN(ltoh32(dngl_hc->top_module_len)
-											+ BCM_XTLV_HDR_SIZE, datalen));
-			}
+		   bcm_dngl_socramind_t *socramind_ptr = (bcm_dngl_socramind_t *)p;
+		   uint16 tag = ltoh32(socramind_ptr->tag);
+		   uint16 taglen = ltoh32(socramind_ptr->length);
+		   p = (uint8 *)socramind_ptr->value;
+		   DHD_EVENT(("Tag:%d Len:%d Datalen:%d\n", tag, taglen, datalen));
+		   switch (tag) {
+			case SOCRAM_IND_ASSERT_TAG:
+			    {
+				/*
+				* The payload consists of -
+				* null terminated function name padded till 32 bit boundary +
+				* Line number - (32 bits)
+				* Caller address (32 bits)
+				*/
+				char *fnname = (char *)p;
+				if (datalen < (ROUNDUP(strlen(fnname) + 1, sizeof(uint32)) +
+					sizeof(uint32) * 2)) {
+					DHD_ERROR(("Wrong length:%d\n", datalen));
+					return;
+				}
+				DHD_EVENT(("ASSRT Function:%s ", p));
+				p += ROUNDUP(strlen(p) + 1, sizeof(uint32));
+				DHD_EVENT(("Line:%d ", *(uint32 *)p));
+				p += sizeof(uint32);
+				DHD_EVENT(("Caller Addr:0x%x\n", *(uint32 *)p));
+#ifdef PARSE_DONGLE_HOST_EVENT
+				DHD_ERROR(("DONGLE_HCK_EVENT: SOCRAM_IND_ASSERT_TAG\n"));
+#endif /* PARSE_DONGLE_HOST_EVENT */
+				break;
+			    }
+			case SOCRAM_IND_TAG_HEALTH_CHECK:
+			   {
+				bcm_dngl_healthcheck_t *dngl_hc = (bcm_dngl_healthcheck_t *)p;
+				DHD_EVENT(("SOCRAM_IND_HEALTHCHECK_TAG:%d Len:%d datalen:%d\n",
+					ltoh32(dngl_hc->top_module_tag),
+					ltoh32(dngl_hc->top_module_len),
+					datalen));
+				if (DHD_EVENT_ON()) {
+					prhex("HEALTHCHECK", p, MIN(ltoh32(dngl_hc->top_module_len)
+						+ BCM_XTLV_HDR_SIZE, datalen));
+				}
 #ifdef DHD_LOG_DUMP
-			memset(dhdp->health_chk_event_data, 0, HEALTH_CHK_BUF_SIZE);
-			memcpy(dhdp->health_chk_event_data, p,
-				   MIN(ltoh32(dngl_hc->top_module_len),
-					   HEALTH_CHK_BUF_SIZE));
+				memset(dhdp->health_chk_event_data, 0, HEALTH_CHK_BUF_SIZE);
+				memcpy(dhdp->health_chk_event_data, p,
+						MIN(ltoh32(dngl_hc->top_module_len),
+						HEALTH_CHK_BUF_SIZE));
 #endif /* DHD_LOG_DUMP */
-			p = (uint8 *)dngl_hc->value;
+				p = (uint8 *)dngl_hc->value;
 
-			switch (ltoh32(dngl_hc->top_module_tag)) {
-			case HEALTH_CHECK_TOP_LEVEL_MODULE_PCIEDEV_RTE:
-			{
-				bcm_dngl_pcie_hc_t *pcie_hc;
-				pcie_hc = (bcm_dngl_pcie_hc_t *)p;
-				BCM_REFERENCE(pcie_hc);
-				if (ltoh32(dngl_hc->top_module_len) <
-						sizeof(bcm_dngl_pcie_hc_t)) {
-					DHD_ERROR(("Wrong length:%d\n",
-							   ltoh32(dngl_hc->top_module_len)));
-					return;
-				}
-				DHD_EVENT(("%d:PCIE HC error:%d flag:0x%x,"
-						   " control:0x%x\n",
-						   ltoh32(pcie_hc->version),
-						   ltoh32(pcie_hc->pcie_err_ind_type),
-						   ltoh32(pcie_hc->pcie_flag),
-						   ltoh32(pcie_hc->pcie_control_reg)));
-				break;
-			}
+				switch (ltoh32(dngl_hc->top_module_tag)) {
+					case HEALTH_CHECK_TOP_LEVEL_MODULE_PCIEDEV_RTE:
+					   {
+						bcm_dngl_pcie_hc_t *pcie_hc;
+						pcie_hc = (bcm_dngl_pcie_hc_t *)p;
+						BCM_REFERENCE(pcie_hc);
+						if (ltoh32(dngl_hc->top_module_len) <
+								sizeof(bcm_dngl_pcie_hc_t)) {
+							DHD_ERROR(("Wrong length:%d\n",
+								ltoh32(dngl_hc->top_module_len)));
+							return;
+						}
+						DHD_EVENT(("%d:PCIE HC error:%d flag:0x%x,"
+							" control:0x%x\n",
+							ltoh32(pcie_hc->version),
+							ltoh32(pcie_hc->pcie_err_ind_type),
+							ltoh32(pcie_hc->pcie_flag),
+							ltoh32(pcie_hc->pcie_control_reg)));
+#ifdef PARSE_DONGLE_HOST_EVENT
+						dhd_print_dongle_hck_id(
+							ltoh32(pcie_hc->pcie_err_ind_type),
+								hck_pcie_module_to_str);
+#endif /* PARSE_DONGLE_HOST_EVENT */
+						break;
+					   }
 #ifdef HCHK_COMMON_SW_EVENT
-			case HCHK_SW_ENTITY_WL_PRIMARY:
-			case HCHK_SW_ENTITY_WL_SECONDARY:
-			{
-				bcm_xtlv_t *wl_hc = (bcm_xtlv_t*)p;
+					case HCHK_SW_ENTITY_WL_PRIMARY:
+					case HCHK_SW_ENTITY_WL_SECONDARY:
+					{
+						bcm_xtlv_t *wl_hc = (bcm_xtlv_t*)p;
 
-				if (ltoh32(dngl_hc->top_module_len) <
-						sizeof(bcm_xtlv_t)) {
-					DHD_ERROR(("WL SW HC Wrong length:%d\n",
-							   ltoh32(dngl_hc->top_module_len)));
-					return;
-				}
-				BCM_REFERENCE(wl_hc);
-				DHD_EVENT(("WL SW HC type %d len %d",
-						   ltoh16(wl_hc->id), ltoh16(wl_hc->len)));
-				break;
-			}
+						if (ltoh32(dngl_hc->top_module_len) <
+								sizeof(bcm_xtlv_t)) {
+							DHD_ERROR(("WL SW HC Wrong length:%d\n",
+								ltoh32(dngl_hc->top_module_len)));
+							return;
+						}
+						BCM_REFERENCE(wl_hc);
+						DHD_EVENT(("WL SW HC type %d len %d\n",
+						ltoh16(wl_hc->id), ltoh16(wl_hc->len)));
+
+#ifdef PARSE_DONGLE_HOST_EVENT
+						dhd_parse_hck_common_sw_event(wl_hc);
+#endif /* PARSE_DONGLE_HOST_EVENT */
+						break;
+
+					}
 #endif /* HCHK_COMMON_SW_EVENT */
-			default:
-			{
-				DHD_ERROR(("%s:Unknown module TAG:%d\n",
-						   __FUNCTION__,
-						   ltoh32(dngl_hc->top_module_tag)));
+					default:
+					{
+						DHD_ERROR(("%s:Unknown module TAG:%d\n",
+						  __FUNCTION__,
+						  ltoh32(dngl_hc->top_module_tag)));
+						break;
+					}
+				}
 				break;
-			}
-			}
-			break;
+			   }
+			default:
+			   DHD_ERROR(("%s:Unknown TAG\n", __FUNCTION__));
+			   if (p && DHD_EVENT_ON()) {
+				   prhex("SOCRAMIND", p, taglen);
+			   }
+			   break;
+		   }
+		   break;
 		}
-		default:
-			DHD_ERROR(("%s:Unknown TAG", __FUNCTION__));
-			if (p && DHD_EVENT_ON()) {
-				prhex("SOCRAMIND", p, taglen);
-			}
-			break;
-		}
-		break;
-	}
-	default:
-		DHD_ERROR(("%s:Unknown DNGL Event Type:%d", __FUNCTION__, type));
+	   default:
+		DHD_ERROR(("%s:Unknown DNGL Event Type:%d\n", __FUNCTION__, type));
 		if (p && DHD_EVENT_ON()) {
 			prhex("SOCRAMIND", p, datalen);
 		}
@@ -2971,7 +3366,7 @@ wl_event_process_default(wl_event_msg_t *event, struct wl_evt_pport *evt_pport)
 
 int
 wl_event_process(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
-				 uint pktlen, void **data_ptr, void *raw_event)
+	uint pktlen, void **data_ptr, void *raw_event)
 {
 	wl_evt_pport_t evt_pport;
 	wl_event_msg_t event;
@@ -3011,7 +3406,7 @@ wl_host_event_get_data(void *pktdata, uint pktlen, bcm_event_msg_u_t *evu)
 	ret = is_wlc_event_frame(pktdata, pktlen, 0, evu);
 	if (ret != BCME_OK) {
 		DHD_ERROR(("%s: Invalid event frame, err = %d\n",
-				   __FUNCTION__, ret));
+			__FUNCTION__, ret));
 	}
 
 	return ret;
@@ -3019,7 +3414,7 @@ wl_host_event_get_data(void *pktdata, uint pktlen, bcm_event_msg_u_t *evu)
 
 int
 wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen,
-					  wl_event_msg_t *event, void **data_ptr, void *raw_event)
+	wl_event_msg_t *event, void **data_ptr, void *raw_event)
 {
 	bcm_event_t *pvt_data = (bcm_event_t *)pktdata;
 	bcm_event_msg_u_t evu;
@@ -3029,6 +3424,9 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 	uint evlen;
 	int ret;
 	uint16 usr_subtype;
+#ifdef DHD_POST_EAPOL_M1_AFTER_ROAM_EVT
+	dhd_if_t *ifp = NULL;
+#endif /* DHD_POST_EAPOL_M1_AFTER_ROAM_EVT */
 
 	ret = wl_host_event_get_data(pktdata, pktlen, &evu);
 	if (ret != BCME_OK) {
@@ -3072,9 +3470,9 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		dhd_wlfc_enable(dhd_pub);
 		dhd_wlfc_FIFOcreditmap_event(dhd_pub, event_data);
 		WLFC_DBGMESG(("WLC_E_FIFO_CREDIT_MAP:(AC0,AC1,AC2,AC3),(BC_MC),(OTHER): "
-					  "(%d,%d,%d,%d),(%d),(%d)\n", event_data[0], event_data[1],
-					  event_data[2],
-					  event_data[3], event_data[4], event_data[5]));
+			"(%d,%d,%d,%d),(%d),(%d)\n", event_data[0], event_data[1],
+			event_data[2],
+			event_data[3], event_data[4], event_data[5]));
 		break;
 
 	case WLC_E_BCMC_CREDIT_SUPPORT:
@@ -3103,17 +3501,17 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		}
 	}
 #endif /* DHD_ULP */
-	break;
+		break;
 	case WLC_E_TDLS_PEER_EVENT:
 #if defined(WLTDLS) && defined(PCIE_FULL_DONGLE)
-	{
-		dhd_tdls_event_handler(dhd_pub, event);
-	}
+		{
+			dhd_tdls_event_handler(dhd_pub, event);
+		}
 #endif // endif
-	break;
+		break;
 
 	case WLC_E_IF:
-	{
+		{
 		struct wl_event_data_if *ifevent = (struct wl_event_data_if *)event_data;
 
 		/* Ignore the event if NOIF is set */
@@ -3123,27 +3521,27 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		}
 #ifdef PCIE_FULL_DONGLE
 		dhd_update_interface_flow_info(dhd_pub, ifevent->ifidx,
-									   ifevent->opcode, ifevent->role);
+			ifevent->opcode, ifevent->role);
 #endif // endif
 #ifdef PROP_TXSTATUS
 		{
 			uint8* ea = pvt_data->eth.ether_dhost;
 			WLFC_DBGMESG(("WLC_E_IF: idx:%d, action:%s, iftype:%s, ["MACDBG"]\n"
 						  ifevent->ifidx,
-						  ((ifevent->opcode == WLC_E_IF_ADD) ? "ADD" : "DEL"),
-						  ((ifevent->role == 0) ? "STA" : "AP "),
+						  ((ifevent->opcode == WLC_E_IF_ADD) ? "ADD":"DEL"),
+						  ((ifevent->role == 0) ? "STA":"AP "),
 						  MAC2STRDBG(ea)));
 			(void)ea;
 
 			if (ifevent->opcode == WLC_E_IF_CHANGE)
 				dhd_wlfc_interface_event(dhd_pub,
-										 eWLFC_MAC_ENTRY_ACTION_UPDATE,
-										 ifevent->ifidx, ifevent->role, ea);
+					eWLFC_MAC_ENTRY_ACTION_UPDATE,
+					ifevent->ifidx, ifevent->role, ea);
 			else
 				dhd_wlfc_interface_event(dhd_pub,
-										 ((ifevent->opcode == WLC_E_IF_ADD) ?
-										  eWLFC_MAC_ENTRY_ACTION_ADD : eWLFC_MAC_ENTRY_ACTION_DEL),
-										 ifevent->ifidx, ifevent->role, ea);
+					((ifevent->opcode == WLC_E_IF_ADD) ?
+					eWLFC_MAC_ENTRY_ACTION_ADD : eWLFC_MAC_ENTRY_ACTION_DEL),
+					ifevent->ifidx, ifevent->role, ea);
 
 			/* dhd already has created an interface by default, for 0 */
 			if (ifevent->ifidx == 0)
@@ -3154,36 +3552,36 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		if (ifevent->ifidx > 0 && ifevent->ifidx < DHD_MAX_IFS) {
 			if (ifevent->opcode == WLC_E_IF_ADD) {
 				if (dhd_event_ifadd(dhd_pub->info, ifevent, event->ifname,
-									event->addr.octet)) {
+					event->addr.octet)) {
 
 					DHD_ERROR(("%s: dhd_event_ifadd failed ifidx: %d  %s\n",
-							   __FUNCTION__, ifevent->ifidx, event->ifname));
+						__FUNCTION__, ifevent->ifidx, event->ifname));
 					return (BCME_ERROR);
 				}
 			} else if (ifevent->opcode == WLC_E_IF_DEL) {
 #ifdef PCIE_FULL_DONGLE
 				/* Delete flowrings unconditionally for i/f delete */
 				dhd_flow_rings_delete(dhd_pub, (uint8)dhd_ifname2idx(dhd_pub->info,
-									  event->ifname));
+					event->ifname));
 #endif /* PCIE_FULL_DONGLE */
 				dhd_event_ifdel(dhd_pub->info, ifevent, event->ifname,
-								event->addr.octet);
+					event->addr.octet);
 			} else if (ifevent->opcode == WLC_E_IF_CHANGE) {
 #ifdef WL_CFG80211
 				dhd_event_ifchange(dhd_pub->info, ifevent, event->ifname,
-								   event->addr.octet);
+					event->addr.octet);
 #endif /* WL_CFG80211 */
 			}
 		} else {
 #if !defined(PROP_TXSTATUS) && !defined(PCIE_FULL_DONGLE) && defined(WL_CFG80211)
 			DHD_INFO(("%s: Invalid ifidx %d for %s\n",
-					  __FUNCTION__, ifevent->ifidx, event->ifname));
+			   __FUNCTION__, ifevent->ifidx, event->ifname));
 #endif /* !PROP_TXSTATUS && !PCIE_FULL_DONGLE && WL_CFG80211 */
 		}
-		/* send up the if event: btamp user needs it */
-		*ifidx = dhd_ifname2idx(dhd_pub->info, event->ifname);
-		/* push up to external supp/auth */
-		dhd_event(dhd_pub->info, (char *)pvt_data, evlen, *ifidx);
+			/* send up the if event: btamp user needs it */
+			*ifidx = dhd_ifname2idx(dhd_pub->info, event->ifname);
+			/* push up to external supp/auth */
+			dhd_event(dhd_pub->info, (char *)pvt_data, evlen, *ifidx);
 		break;
 	}
 
@@ -3201,7 +3599,9 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 #endif // endif
 #if defined(RTT_SUPPORT)
 	case WLC_E_PROXD:
+#ifndef WL_CFG80211
 		dhd_rtt_event_handler(dhd_pub, event, (void *)event_data);
+#endif /* WL_CFG80211 */
 		break;
 #endif /* RTT_SUPPORT */
 		/* These are what external supplicant/authenticator wants */
@@ -3209,8 +3609,8 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 	case WLC_E_AUTH_IND:
 	case WLC_E_REASSOC_IND:
 		dhd_findadd_sta(dhd_pub,
-						dhd_ifname2idx(dhd_pub->info, event->ifname),
-						&event->addr.octet);
+			dhd_ifname2idx(dhd_pub->info, event->ifname),
+			&event->addr.octet);
 		break;
 #ifndef BCMDBUS
 #if defined(DHD_FW_COREDUMP)
@@ -3219,7 +3619,7 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		if (dhd_socram_dump(dhd_pub->bus) != BCME_OK) {
 			DHD_ERROR(("%s: socram dump ERROR : \n", __FUNCTION__));
 		}
-		break;
+	break;
 #endif // endif
 #endif /* !BCMDBUS */
 	case WLC_E_NATOE_NFCT:
@@ -3227,45 +3627,62 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 		DHD_EVENT(("%s: WLC_E_NATOE_NFCT event received \n", __FUNCTION__));
 		dhd_natoe_ct_event(dhd_pub, event_data);
 #endif /* WL_NATOE */
-		break;
+	break;
 #ifdef WL_NAN
 	case WLC_E_SLOTTED_BSS_PEER_OP:
 		DHD_EVENT(("%s: WLC_E_SLOTTED_BSS_PEER_OP event received for peer: "
-				   "" MACDBG ", status = %d\n",
-				   __FUNCTION__, MAC2STRDBG(event->addr.octet), status));
+			"" MACDBG ", status = %d\n",
+			__FUNCTION__, MAC2STRDBG(event->addr.octet), status));
 		if (status == WLC_E_STATUS_SLOTTED_PEER_ADD) {
 			dhd_findadd_sta(dhd_pub, dhd_ifname2idx(dhd_pub->info,
-													event->ifname), &event->addr.octet);
+				event->ifname), &event->addr.octet);
 		} else if (status == WLC_E_STATUS_SLOTTED_PEER_DEL) {
 			uint8 ifindex = (uint8)dhd_ifname2idx(dhd_pub->info, event->ifname);
 			BCM_REFERENCE(ifindex);
 			dhd_del_sta(dhd_pub, dhd_ifname2idx(dhd_pub->info,
-												event->ifname), &event->addr.octet);
+				event->ifname), &event->addr.octet);
 #ifdef PCIE_FULL_DONGLE
 			dhd_flow_rings_delete_for_peer(dhd_pub, ifindex,
-										   (char *)&event->addr.octet[0]);
+				(char *)&event->addr.octet[0]);
 #endif // endif
 		} else {
 			DHD_ERROR(("%s: WLC_E_SLOTTED_BSS_PEER_OP: Status is not expected = %d\n",
-					   __FUNCTION__, status));
+				__FUNCTION__, status));
 		}
 		break;
 #endif /* WL_NAN */
+#ifdef DHD_POST_EAPOL_M1_AFTER_ROAM_EVT
+	case WLC_E_REASSOC:
+		ifp = dhd_get_ifp(dhd_pub, event->ifidx);
+
+		if (!ifp)
+			break;
+
+		/* Consider STA role only since roam is disabled on P2P GC.
+		 * Drop EAPOL M1 frame only if roam is done to same BSS.
+		 */
+		if ((status == WLC_E_STATUS_SUCCESS) &&
+			IS_STA_IFACE(ndev_to_wdev(ifp->net)) &&
+			wl_cfg80211_is_event_from_connected_bssid(ifp->net, event, event->ifidx)) {
+			ifp->recv_reassoc_evt = TRUE;
+		}
+		break;
+#endif /* DHD_POST_EAPOL_M1_AFTER_ROAM_EVT */
 	case WLC_E_LINK:
 #ifdef PCIE_FULL_DONGLE
 		if (dhd_update_interface_link_status(dhd_pub, (uint8)dhd_ifname2idx(dhd_pub->info,
-											 event->ifname), (uint8)flags) != BCME_OK) {
+			event->ifname), (uint8)flags) != BCME_OK) {
 			DHD_ERROR(("%s: dhd_update_interface_link_status Failed.\n",
-					   __FUNCTION__));
+				__FUNCTION__));
 			break;
 		}
 		if (!flags) {
 			DHD_ERROR(("%s: Deleting all STA from assoc list and flowrings.\n",
-					   __FUNCTION__));
+				__FUNCTION__));
 			/* Delete all sta and flowrings */
 			dhd_del_all_sta(dhd_pub, dhd_ifname2idx(dhd_pub->info, event->ifname));
 			dhd_flow_rings_delete(dhd_pub, (uint8)dhd_ifname2idx(dhd_pub->info,
-								  event->ifname));
+				event->ifname));
 		}
 		/* fall through */
 #endif /* PCIE_FULL_DONGLE */
@@ -3280,47 +3697,54 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 			uint8 del_sta = TRUE;
 #ifdef WL_CFG80211
 			if (role == WLC_E_IF_ROLE_STA &&
-					!wl_cfg80211_is_roam_offload(dhd_idx2net(dhd_pub, ifindex)) &&
+				!wl_cfg80211_is_roam_offload(dhd_idx2net(dhd_pub, ifindex)) &&
 					!wl_cfg80211_is_event_from_connected_bssid(
 						dhd_idx2net(dhd_pub, ifindex), event, *ifidx)) {
 				del_sta = FALSE;
 			}
 #endif /* WL_CFG80211 */
 			DHD_EVENT(("%s: Link event %d, flags %x, status %x, role %d, del_sta %d\n",
-					   __FUNCTION__, type, flags, status, role, del_sta));
+				__FUNCTION__, type, flags, status, role, del_sta));
 
 			if (del_sta) {
 				DHD_EVENT(("%s: Deleting STA " MACDBG "\n",
-						   __FUNCTION__, MAC2STRDBG(event->addr.octet)));
+					__FUNCTION__, MAC2STRDBG(event->addr.octet)));
 
 				dhd_del_sta(dhd_pub, dhd_ifname2idx(dhd_pub->info,
-													event->ifname), &event->addr.octet);
+					event->ifname), &event->addr.octet);
 				/* Delete all flowrings for STA and P2P Client */
 				if (role == WLC_E_IF_ROLE_STA || role == WLC_E_IF_ROLE_P2P_CLIENT) {
 					dhd_flow_rings_delete(dhd_pub, ifindex);
 				} else {
 					dhd_flow_rings_delete_for_peer(dhd_pub, ifindex,
-												   (char *)&event->addr.octet[0]);
+						(char *)&event->addr.octet[0]);
 				}
 			}
 		}
 #endif /* PCIE_FULL_DONGLE */
+#ifdef DHD_POST_EAPOL_M1_AFTER_ROAM_EVT
 		/* fall through */
-
+		ifp = dhd_get_ifp(dhd_pub, event->ifidx);
+		if (ifp) {
+			ifp->recv_reassoc_evt = FALSE;
+			ifp->post_roam_evt = FALSE;
+		}
+#endif /* DHD_POST_EAPOL_M1_AFTER_ROAM_EVT */
+		/* fall through */
 	default:
 		*ifidx = dhd_ifname2idx(dhd_pub->info, event->ifname);
 #ifdef DHD_UPDATE_INTF_MAC
-		if ((WLC_E_LINK == type) && (WLC_EVENT_MSG_LINK & flags)) {
+		if ((WLC_E_LINK==type)&&(WLC_EVENT_MSG_LINK&flags)) {
 			dhd_event_ifchange(dhd_pub->info,
-							   (struct wl_event_data_if *)event,
-							   event->ifname,
-							   event->addr.octet);
+			(struct wl_event_data_if *)event,
+			event->ifname,
+			event->addr.octet);
 		}
 #endif /* DHD_UPDATE_INTF_MAC */
 		/* push up to external supp/auth */
 		dhd_event(dhd_pub->info, (char *)pvt_data, evlen, *ifidx);
 		DHD_TRACE(("%s: MAC event %d, flags %x, status %x\n",
-				   __FUNCTION__, type, flags, status));
+			__FUNCTION__, type, flags, status));
 		BCM_REFERENCE(flags);
 		BCM_REFERENCE(status);
 		BCM_REFERENCE(reason);
@@ -3335,10 +3759,17 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 	memcpy(pvt_data->event.ifname, dhd_ifname(dhd_pub, *ifidx), IFNAMSIZ);
 #endif // endif
 
+#ifdef DHD_STATUS_LOGGING
+	if (dhd_pub->statlog) {
+		dhd_statlog_process_event(dhd_pub, type, *ifidx,
+			status, reason, flags);
+	}
+#endif /* DHD_STATUS_LOGGING */
+
 #ifdef SHOW_EVENTS
 	if (DHD_FWLOG_ON() || DHD_EVENT_ON()) {
 		wl_show_host_event(dhd_pub, event,
-						   (void *)event_data, raw_event, dhd_pub->enable_log);
+			(void *)event_data, raw_event, dhd_pub->enable_log);
 	}
 #endif /* SHOW_EVENTS */
 
@@ -3347,10 +3778,10 @@ wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen
 
 int
 wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen,
-			  wl_event_msg_t *event, void **data_ptr, void *raw_event)
+	wl_event_msg_t *event, void **data_ptr, void *raw_event)
 {
 	return wl_process_host_event(dhd_pub, ifidx, pktdata, pktlen, event, data_ptr,
-								 raw_event);
+			raw_event);
 }
 
 void
@@ -3387,7 +3818,7 @@ wl_pattern_atoh(char *src, char *dst)
 {
 	int i;
 	if (strncmp(src, "0x", 2) != 0 &&
-			strncmp(src, "0X", 2) != 0) {
+	    strncmp(src, "0X", 2) != 0) {
 		DHD_ERROR(("Mask invalid format. Needs to start with 0x\n"));
 		return -1;
 	}
@@ -3488,37 +3919,37 @@ dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_
 
 	buf_len += sizeof(enable_parm);
 	memcpy((char *)pkt_filterp,
-		   &enable_parm,
-		   sizeof(enable_parm));
+	       &enable_parm,
+	       sizeof(enable_parm));
 
 	/* Enable/disable the specified filter. */
 	rc = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, buf, buf_len, TRUE, 0);
 	rc = rc >= 0 ? 0 : rc;
 	if (rc) {
 		DHD_ERROR(("%s: failed to %s pktfilter %s, retcode = %d\n",
-				   __FUNCTION__, enable ? "enable" : "disable", arg, rc));
+		__FUNCTION__, enable?"enable":"disable", arg, rc));
 		dhd_set_packet_filter(dhd);
 		rc = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, buf, buf_len, TRUE, 0);
 		rc = rc >= 0 ? 0 : rc;
 		if (rc) {
 			DHD_TRACE_HW4(("%s: 2nd retry failed to add pktfilter %s, retcode = %d\n",
-						   __FUNCTION__, arg, rc));
+			__FUNCTION__, arg, rc));
 		} else {
 			DHD_TRACE_HW4(("%s: 2nd retry successfully added pktfilter %s\n",
-						   __FUNCTION__, arg));
+			__FUNCTION__, arg));
 		}
 	}
 	else
 		DHD_TRACE(("%s: successfully %s pktfilter %s\n",
-				   __FUNCTION__, enable ? "enable" : "disable", arg));
+		__FUNCTION__, enable?"enable":"disable", arg));
 
 	/* Contorl the master mode */
 	rc = dhd_wl_ioctl_set_intiovar(dhd, "pkt_filter_mode",
-								   master_mode, WLC_SET_VAR, TRUE, 0);
+		master_mode, WLC_SET_VAR, TRUE, 0);
 	rc = rc >= 0 ? 0 : rc;
 	if (rc)
 		DHD_TRACE(("%s: failed to set pkt_filter_mode %d, retcode = %d\n",
-				   __FUNCTION__, master_mode, rc));
+			__FUNCTION__, master_mode, rc));
 
 fail:
 	if (arg_org)
@@ -3569,7 +4000,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	int				rc = -1;
 	uint32				mask_size;
 	uint32				pattern_size;
-	char				*argv[16], * buf = 0;
+	char				*argv[MAXPKT_ARG] = {0}, * buf = 0;
 	int				i = 0;
 	char				*arg_save = 0, *arg_org = 0;
 
@@ -3597,8 +4028,13 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	}
 
 	argv[i] = bcmstrtok(&arg_save, " ", 0);
-	while (argv[i++])
+	while (argv[i++]) {
+		if (i >= MAXPKT_ARG) {
+			DHD_ERROR(("Invalid args provided\n"));
+			goto fail;
+		}
 		argv[i] = bcmstrtok(&arg_save, " ", 0);
+	}
 
 	i = 0;
 	if (argv[i] == NULL) {
@@ -3649,7 +4085,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 
 		/* Parse pattern filter mask. */
 		rc  = wl_pattern_atoh(argv[i],
-							  (char *) pkt_filterp->u.pattern.mask_and_pattern);
+			(char *) pkt_filterp->u.pattern.mask_and_pattern);
 
 		if (rc == -1) {
 			DHD_ERROR(("Rejecting: %s\n", argv[i]));
@@ -3663,7 +4099,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 
 		/* Parse pattern filter pattern. */
 		rc = wl_pattern_atoh(argv[i],
-							 (char *) &pkt_filterp->u.pattern.mask_and_pattern[mask_size]);
+			(char *) &pkt_filterp->u.pattern.mask_and_pattern[mask_size]);
 
 		if (rc == -1) {
 			DHD_ERROR(("Rejecting: %s\n", argv[i]));
@@ -3684,8 +4120,8 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		 * guarantee that the buffer is properly aligned.
 		 */
 		memcpy((char *)pkt_filterp,
-			   &pkt_filter,
-			   WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
+			&pkt_filter,
+			WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
 	} else if ((pkt_filter.type == 2) || (pkt_filter.type == 6)) {
 		int list_cnt = 0;
 		char *endptr = NULL;
@@ -3787,7 +4223,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 
 			/* Move to next element location in ioctl buffer */
 			pf_el = (wl_pkt_filter_pattern_listel_t*)
-					((uint8*)pf_el + WL_PKT_FILTER_PATTERN_LISTEL_FIXED_LEN + 2 * rc);
+				((uint8*)pf_el + WL_PKT_FILTER_PATTERN_LISTEL_FIXED_LEN + 2 * rc);
 
 			/* Count list element */
 			list_cnt++;
@@ -3807,7 +4243,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		pkt_filter.u.patlist.totsize -= WL_PKT_FILTER_FIXED_LEN;
 
 		memcpy((char *)pkt_filterp, &pkt_filter,
-			   WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_LIST_FIXED_LEN);
+			WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_LIST_FIXED_LEN);
 	} else {
 		DHD_ERROR(("Invalid filter type %d\n", pkt_filter.type));
 		goto fail;
@@ -3818,10 +4254,10 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 
 	if (rc)
 		DHD_ERROR(("%s: failed to add pktfilter %s, retcode = %d\n",
-				   __FUNCTION__, arg, rc));
+		__FUNCTION__, arg, rc));
 	else
 		DHD_TRACE(("%s: successfully added pktfilter %s\n",
-				   __FUNCTION__, arg));
+		__FUNCTION__, arg));
 
 fail:
 	if (arg_org)
@@ -3837,14 +4273,14 @@ dhd_pktfilter_offload_delete(dhd_pub_t *dhd, int id)
 	int ret;
 
 	ret = dhd_wl_ioctl_set_intiovar(dhd, "pkt_filter_delete",
-									id, WLC_SET_VAR, TRUE, 0);
+		id, WLC_SET_VAR, TRUE, 0);
 	if (ret < 0) {
 		DHD_ERROR(("%s: Failed to delete filter ID:%d, ret=%d\n",
-				   __FUNCTION__, id, ret));
+			__FUNCTION__, id, ret));
 	}
 	else
 		DHD_TRACE(("%s: successfully deleted pktfilter %d\n",
-				   __FUNCTION__, id));
+		__FUNCTION__, id));
 }
 #endif /* PKT_FILTER_SUPPORT */
 
@@ -3858,39 +4294,52 @@ dhd_arp_offload_set(dhd_pub_t * dhd, int arp_mode)
 	int retcode;
 
 	retcode = dhd_wl_ioctl_set_intiovar(dhd, "arp_ol",
-										arp_mode, WLC_SET_VAR, TRUE, 0);
+		arp_mode, WLC_SET_VAR, TRUE, 0);
 
 	retcode = retcode >= 0 ? 0 : retcode;
 	if (retcode)
 		DHD_ERROR(("%s: failed to set ARP offload mode to 0x%x, retcode = %d\n",
-				   __FUNCTION__, arp_mode, retcode));
+			__FUNCTION__, arp_mode, retcode));
 	else
 		DHD_ARPOE(("%s: successfully set ARP offload mode to 0x%x\n",
-				   __FUNCTION__, arp_mode));
+			__FUNCTION__, arp_mode));
 }
 
 void
 dhd_arp_offload_enable(dhd_pub_t * dhd, int arp_enable)
 {
 	int retcode;
-
+#ifdef WL_CFG80211
+	/* Do not enable arp offload in case of non-STA interfaces active */
+	if (arp_enable &&
+		(wl_cfg80211_check_vif_in_use(dhd_linux_get_primary_netdev(dhd)))) {
+		DHD_TRACE(("%s: Virtual interfaces active, ignore arp offload request \n",
+			__FUNCTION__));
+		return;
+	}
+#endif /* WL_CFG80211 */
 	retcode = dhd_wl_ioctl_set_intiovar(dhd, "arpoe",
-										arp_enable, WLC_SET_VAR, TRUE, 0);
+		arp_enable, WLC_SET_VAR, TRUE, 0);
 
 	retcode = retcode >= 0 ? 0 : retcode;
 	if (retcode)
 		DHD_ERROR(("%s: failed to enabe ARP offload to %d, retcode = %d\n",
-				   __FUNCTION__, arp_enable, retcode));
+			__FUNCTION__, arp_enable, retcode));
 	else
+#ifdef DHD_LOG_DUMP
+		DHD_LOG_MEM(("%s: successfully enabed ARP offload to %d\n",
+			__FUNCTION__, arp_enable));
+#else
 		DHD_ARPOE(("%s: successfully enabed ARP offload to %d\n",
-				   __FUNCTION__, arp_enable));
+			__FUNCTION__, arp_enable));
+#endif /* DHD_LOG_DUMP */
 	if (arp_enable) {
 		uint32 version;
 		retcode = dhd_wl_ioctl_get_intiovar(dhd, "arp_version",
-											&version, WLC_GET_VAR, FALSE, 0);
+			&version, WLC_GET_VAR, FALSE, 0);
 		if (retcode) {
 			DHD_INFO(("%s: fail to get version (maybe version 1:retcode = %d\n",
-					  __FUNCTION__, retcode));
+				__FUNCTION__, retcode));
 			dhd->arp_version = 1;
 		}
 		else {
@@ -3912,6 +4361,15 @@ dhd_aoe_arp_clr(dhd_pub_t *dhd, int idx)
 	ret = dhd_iovar(dhd, idx, "arp_table_clear", NULL, 0, NULL, 0, TRUE);
 	if (ret < 0)
 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+	else {
+#ifdef DHD_LOG_DUMP
+		DHD_LOG_MEM(("%s: ARP table clear\n", __FUNCTION__));
+#else
+		DHD_TRACE(("%s: ARP table clear\n", __FUNCTION__));
+#endif /* DHD_LOG_DUMP */
+	}
+	/* mac address isn't cleared here but it will be cleared after dongle off */
+	dhd->hmac_updated = 0;
 }
 
 void
@@ -3926,6 +4384,13 @@ dhd_aoe_hostip_clr(dhd_pub_t *dhd, int idx)
 	ret = dhd_iovar(dhd, idx, "arp_hostip_clear", NULL, 0, NULL, 0, TRUE);
 	if (ret < 0)
 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+	else {
+#ifdef DHD_LOG_DUMP
+		DHD_LOG_MEM(("%s: ARP host ip clear\n", __FUNCTION__));
+#else
+		DHD_TRACE(("%s: ARP host ip clear\n", __FUNCTION__));
+#endif /* DHD_LOG_DUMP */
+	}
 }
 
 void
@@ -3938,12 +4403,18 @@ dhd_arp_offload_add_ip(dhd_pub_t *dhd, uint32 ipaddr, int idx)
 		idx = 0;
 
 	ret = dhd_iovar(dhd, idx, "arp_hostip", (char *)&ipaddr, sizeof(ipaddr),
-					NULL, 0, TRUE);
-	if (ret)
+			NULL, 0, TRUE);
+	if (ret < 0)
 		DHD_ERROR(("%s: ARP ip addr add failed, ret = %d\n", __FUNCTION__, ret));
-	else
-		DHD_ARPOE(("%s: sARP H ipaddr entry added \n",
-				   __FUNCTION__));
+	else {
+		/* mac address is updated in the dongle */
+		dhd->hmac_updated = 1;
+#ifdef DHD_LOG_DUMP
+		DHD_LOG_MEM(("%s: ARP ip addr entry added \n", __FUNCTION__));
+#else
+		DHD_ARPOE(("%s: ARP ip addr entry added \n", __FUNCTION__));
+#endif /* DHD_LOG_DUMP */
+	}
 }
 
 int
@@ -3960,10 +4431,10 @@ dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen, int idx)
 		idx = 0;
 
 	ret = dhd_iovar(dhd, idx, "arp_hostip", NULL, 0, (char *)buf, buflen,
-					FALSE);
+			FALSE);
 	if (ret) {
 		DHD_ERROR(("%s: ioctl WLC_GET_VAR error %d\n",
-				   __FUNCTION__, ret));
+		__FUNCTION__, ret));
 
 		return -1;
 	}
@@ -4009,13 +4480,13 @@ dhd_ndo_enable(dhd_pub_t * dhd, int ndo_enable)
 	}
 #endif /* WL_CFG80211 */
 	retcode = dhd_wl_ioctl_set_intiovar(dhd, "ndoe",
-										ndo_enable, WLC_SET_VAR, TRUE, 0);
+		ndo_enable, WLC_SET_VAR, TRUE, 0);
 	if (retcode)
 		DHD_ERROR(("%s: failed to enabe ndo to %d, retcode = %d\n",
-				   __FUNCTION__, ndo_enable, retcode));
+			__FUNCTION__, ndo_enable, retcode));
 	else
 		DHD_TRACE(("%s: successfully enabed ndo offload to %d\n",
-				   __FUNCTION__, ndo_enable));
+			__FUNCTION__, ndo_enable));
 
 	return retcode;
 }
@@ -4035,20 +4506,20 @@ dhd_ndo_add_ip(dhd_pub_t *dhd, char* ipv6addr, int idx)
 		return -1;
 
 	iov_len = bcm_mkiovar("nd_hostip", (char *)ipv6addr,
-						  IPV6_ADDR_LEN, iovbuf, sizeof(iovbuf));
+		IPV6_ADDR_LEN, iovbuf, sizeof(iovbuf));
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return -1;
 	}
 	retcode = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, iov_len, TRUE, idx);
 
 	if (retcode)
 		DHD_ERROR(("%s: ndo ip addr add failed, retcode = %d\n",
-				   __FUNCTION__, retcode));
+		__FUNCTION__, retcode));
 	else
 		DHD_TRACE(("%s: ndo ipaddr entry added \n",
-				   __FUNCTION__));
+		__FUNCTION__));
 
 	return retcode;
 }
@@ -4068,20 +4539,20 @@ dhd_ndo_remove_ip(dhd_pub_t *dhd, int idx)
 		return -1;
 
 	iov_len = bcm_mkiovar("nd_hostip_clear", NULL,
-						  0, iovbuf, sizeof(iovbuf));
+		0, iovbuf, sizeof(iovbuf));
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return -1;
 	}
 	retcode = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, iov_len, TRUE, idx);
 
 	if (retcode)
 		DHD_ERROR(("%s: ndo ip addr remove failed, retcode = %d\n",
-				   __FUNCTION__, retcode));
+		__FUNCTION__, retcode));
 	else
 		DHD_TRACE(("%s: ndo ipaddr entry removed \n",
-				   __FUNCTION__));
+		__FUNCTION__));
 
 	return retcode;
 }
@@ -4105,11 +4576,11 @@ dhd_ndo_get_version(dhd_pub_t *dhdp)
 	ndo_get_ver.length = htod32(WL_ND_HOSTIP_FIXED_LEN + sizeof(uint16));
 	ndo_get_ver.u.version = 0;
 	iov_len = bcm_mkiovar("nd_hostip", (char *)&ndo_get_ver,
-						  WL_ND_HOSTIP_FIXED_LEN + sizeof(uint16), iovbuf, sizeof(iovbuf));
+		WL_ND_HOSTIP_FIXED_LEN + sizeof(uint16), iovbuf, sizeof(iovbuf));
 
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return BCME_ERROR;
 	}
 
@@ -4125,7 +4596,7 @@ dhd_ndo_get_version(dhd_pub_t *dhdp)
 		if ((dtoh16(ndo_ver_ret->version) == WL_ND_HOSTIP_IOV_VER) &&
 				(dtoh16(ndo_ver_ret->op_type) == WL_ND_HOSTIP_OP_VER) &&
 				(dtoh32(ndo_ver_ret->length) == WL_ND_HOSTIP_FIXED_LEN
-				 + sizeof(uint16))) {
+					+ sizeof(uint16))) {
 			/* nd_hostip iovar version */
 			ver = dtoh16(ndo_ver_ret->u.version);
 		}
@@ -4157,10 +4628,10 @@ dhd_ndo_add_ip_with_type(dhd_pub_t *dhdp, char *ipv6addr, uint8 type, int idx)
 	ndo_add_addr.u.host_ip.type = type;
 
 	iov_len = bcm_mkiovar("nd_hostip", (char *)&ndo_add_addr,
-						  WL_ND_HOSTIP_WITH_ADDR_LEN, iovbuf, sizeof(iovbuf));
+		WL_ND_HOSTIP_WITH_ADDR_LEN, iovbuf, sizeof(iovbuf));
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return BCME_ERROR;
 	}
 
@@ -4171,7 +4642,7 @@ dhd_ndo_add_ip_with_type(dhd_pub_t *dhdp, char *ipv6addr, uint8 type, int idx)
 		if (retcode == BCME_NORESOURCE) {
 			/* number of host ip addr exceeds FW capacity, Deactivate ND offload */
 			DHD_INFO(("%s: Host IP count exceed device capacity,"
-					  "ND offload deactivated\n", __FUNCTION__));
+				"ND offload deactivated\n", __FUNCTION__));
 			dhdp->ndo_host_ip_overflow = TRUE;
 			dhd_ndo_enable(dhdp, FALSE);
 		}
@@ -4204,11 +4675,11 @@ dhd_ndo_remove_ip_by_addr(dhd_pub_t *dhdp, char *ipv6addr, int idx)
 	ndo_del_addr.u.host_ip.type = 0;	/* don't care */
 
 	iov_len = bcm_mkiovar("nd_hostip", (char *)&ndo_del_addr,
-						  WL_ND_HOSTIP_WITH_ADDR_LEN, iovbuf, sizeof(iovbuf));
+		WL_ND_HOSTIP_WITH_ADDR_LEN, iovbuf, sizeof(iovbuf));
 
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return BCME_ERROR;
 	}
 
@@ -4246,11 +4717,11 @@ dhd_ndo_remove_ip_by_type(dhd_pub_t *dhdp, uint8 type, int idx)
 	ndo_del_addr.length = htod32(WL_ND_HOSTIP_FIXED_LEN);
 
 	iov_len = bcm_mkiovar("nd_hostip", (char *)&ndo_del_addr, WL_ND_HOSTIP_FIXED_LEN,
-						  iovbuf, sizeof(iovbuf));
+			iovbuf, sizeof(iovbuf));
 
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return BCME_ERROR;
 	}
 
@@ -4276,21 +4747,21 @@ dhd_ndo_unsolicited_na_filter_enable(dhd_pub_t *dhdp, int enable)
 	}
 
 	iov_len = bcm_mkiovar("nd_unsolicited_na_filter", (char *)&enable, sizeof(int),
-						  iovbuf, sizeof(iovbuf));
+			iovbuf, sizeof(iovbuf));
 
 	if (!iov_len) {
 		DHD_ERROR(("%s: Insufficient iovar buffer size %zu \n",
-				   __FUNCTION__, sizeof(iovbuf)));
+			__FUNCTION__, sizeof(iovbuf)));
 		return BCME_ERROR;
 	}
 
 	retcode = dhd_wl_ioctl_cmd(dhdp, WLC_SET_VAR, iovbuf, iov_len, TRUE, 0);
 	if (retcode)
 		DHD_ERROR(("%s: failed to enable Unsolicited NA filter to %d, retcode = %d\n",
-				   __FUNCTION__, enable, retcode));
+			__FUNCTION__, enable, retcode));
 	else {
 		DHD_TRACE(("%s: successfully enabled Unsolicited NA filter to %d\n",
-				   __FUNCTION__, enable));
+			__FUNCTION__, enable));
 	}
 
 	return retcode;
@@ -4317,8 +4788,8 @@ dhd_iscan_allocate_buf(dhd_pub_t *dhd, iscan_buf_t **iscanbuf)
 	iscanbuf_head = *iscanbuf;
 
 	DHD_ISCAN(("%s: addr of allocated node = 0x%X"
-			   "addr of iscanbuf_head = 0x%X dhd = 0x%X\n",
-			   __FUNCTION__, iscanbuf_alloc, iscanbuf_head, dhd));
+		   "addr of iscanbuf_head = 0x%X dhd = 0x%X\n",
+		   __FUNCTION__, iscanbuf_alloc, iscanbuf_head, dhd));
 
 	if (iscanbuf_head == NULL) {
 		*iscanbuf = iscanbuf_alloc;
@@ -4401,16 +4872,16 @@ dhd_iscan_issue_request(void * dhdp, wl_iscan_params_t *pParams, uint32 size)
 		if ((allocSize < size) || (allocSize < strlen(iovar)))
 		{
 			DHD_ERROR(("%s: overflow - allocation size too large %d < %d + %d!\n",
-					   __FUNCTION__, allocSize, size, strlen(iovar)));
+				__FUNCTION__, allocSize, size, strlen(iovar)));
 			goto cleanUp;
 		}
 		buf = MALLOC(dhd->osh, allocSize);
 
 		if (buf == NULL)
-		{
+			{
 			DHD_ERROR(("%s: malloc of size %d failed!\n", __FUNCTION__, allocSize));
 			goto cleanUp;
-		}
+			}
 		ioctl.cmd = WLC_SET_VAR;
 		len = bcm_mkiovar(iovar, (char *)pParams, size, buf, allocSize);
 		if (len == 0) {
@@ -4464,7 +4935,7 @@ dhd_iscan_get_partial_result(void *dhdp, uint *scan_count)
 	memset(&list, 0, sizeof(list));
 	list.results.buflen = htod32(WLC_IW_ISCAN_MAXLEN);
 	len = bcm_mkiovar("iscanresults", (char *)&list, WL_ISCAN_RESULTS_FIXED_SIZE,
-					  iscan_cur->iscan_buf, WLC_IW_ISCAN_MAXLEN);
+		iscan_cur->iscan_buf, WLC_IW_ISCAN_MAXLEN);
 	if (len == 0) {
 		dhd_iscan_free_buf(dhdp, 0);
 		dhd_iscan_request(dhdp, WL_SCAN_ACTION_ABORT);
@@ -4485,7 +4956,7 @@ dhd_iscan_get_partial_result(void *dhdp, uint *scan_count)
 	dhd_iscan_unlock();
 
 	if (!(*scan_count)) {
-		/* TODO: race condition when FLUSH already called */
+		 /* TODO: race condition when FLUSH already called */
 		dhd_iscan_free_buf(dhdp, 0);
 	}
 fail:
@@ -4506,7 +4977,7 @@ bool dhd_is_associated(dhd_pub_t *dhd, uint8 ifidx, int *retval)
 	bzero(zbuf, 6);
 
 	ret  = dhd_wl_ioctl_cmd(dhd, WLC_GET_BSSID, (char *)&bssid,
-							ETHER_ADDR_LEN, FALSE, ifidx);
+		ETHER_ADDR_LEN, FALSE, ifidx);
 	DHD_TRACE((" %s WLC_GET_BSSID ioctl res = %d\n", __FUNCTION__, ret));
 
 	if (ret == BCME_NOTASSOCIATED) {
@@ -4535,6 +5006,12 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd, int *dtim_period, int *bcn_interval)
 	int ret = -1;
 	int allowed_skip_dtim_cnt = 0;
 
+	if (dhd->disable_dtim_in_suspend) {
+		DHD_ERROR(("%s Disable bcn_li_dtim in suspend\n", __FUNCTION__));
+		bcn_li_dtim = 0;
+		return bcn_li_dtim;
+	}
+
 	/* Check if associated */
 	if (dhd_is_associated(dhd, 0, NULL) == FALSE) {
 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
@@ -4546,14 +5023,14 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd, int *dtim_period, int *bcn_interval)
 
 	/* read associated AP beacon interval */
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_BCNPRD,
-								bcn_interval, sizeof(*bcn_interval), FALSE, 0)) < 0) {
+		bcn_interval, sizeof(*bcn_interval), FALSE, 0)) < 0) {
 		DHD_ERROR(("%s get beacon failed code %d\n", __FUNCTION__, ret));
 		return bcn_li_dtim;
 	}
 
 	/* read associated AP dtim setup */
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_DTIMPRD,
-								dtim_period, sizeof(*dtim_period), FALSE, 0)) < 0) {
+		dtim_period, sizeof(*dtim_period), FALSE, 0)) < 0) {
 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
 		return bcn_li_dtim;
 	}
@@ -4578,7 +5055,7 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd, int *dtim_period, int *bcn_interval)
 			/* AP DTIM to big for our Listen Interval : no dtim skiping */
 			bcn_li_dtim = NO_DTIM_SKIP;
 			DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
-					   __FUNCTION__, *dtim_period, CUSTOM_LISTEN_INTERVAL));
+				__FUNCTION__, *dtim_period, CUSTOM_LISTEN_INTERVAL));
 			return bcn_li_dtim;
 		}
 
@@ -4596,8 +5073,10 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd, int *dtim_period, int *bcn_interval)
 		}
 	}
 
+	if (dhd->conf->suspend_bcn_li_dtim >= 0)
+		bcn_li_dtim = dhd->conf->suspend_bcn_li_dtim;
 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
-			   __FUNCTION__, *bcn_interval, bcn_li_dtim, *dtim_period, CUSTOM_LISTEN_INTERVAL));
+		__FUNCTION__, *bcn_interval, bcn_li_dtim, *dtim_period, CUSTOM_LISTEN_INTERVAL));
 
 	return bcn_li_dtim;
 }
@@ -4611,6 +5090,12 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 	int ap_beacon = 0;
 	int allowed_skip_dtim_cnt = 0;
 
+	if (dhd->disable_dtim_in_suspend) {
+		DHD_ERROR(("%s Disable bcn_li_dtim in suspend\n", __FUNCTION__));
+		bcn_li_dtim = 0;
+		goto exit;
+	}
+
 	/* Check if associated */
 	if (dhd_is_associated(dhd, 0, NULL) == FALSE) {
 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
@@ -4619,14 +5104,14 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 
 	/* read associated AP beacon interval */
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_BCNPRD,
-								&ap_beacon, sizeof(ap_beacon), FALSE, 0)) < 0) {
+		&ap_beacon, sizeof(ap_beacon), FALSE, 0)) < 0) {
 		DHD_ERROR(("%s get beacon failed code %d\n", __FUNCTION__, ret));
 		goto exit;
 	}
 
 	/* read associated ap's dtim setup */
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_DTIMPRD,
-								&dtim_period, sizeof(dtim_period), FALSE, 0)) < 0) {
+		&dtim_period, sizeof(dtim_period), FALSE, 0)) < 0) {
 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
 		goto exit;
 	}
@@ -4642,7 +5127,6 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 		if (bcn_li_dtim == 0) {
 			bcn_li_dtim = 1;
 		}
-		bcn_li_dtim = MAX(dhd->suspend_bcn_li_dtim, bcn_li_dtim);
 	} else {
 		/* attemp to use platform defined dtim skip interval */
 		bcn_li_dtim = dhd->suspend_bcn_li_dtim;
@@ -4652,7 +5136,7 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 			/* AP DTIM to big for our Listen Interval : no dtim skiping */
 			bcn_li_dtim = NO_DTIM_SKIP;
 			DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
-					   __FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
+				__FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
 			goto exit;
 		}
 
@@ -4673,12 +5157,72 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 	if (dhd->conf->suspend_bcn_li_dtim >= 0)
 		bcn_li_dtim = dhd->conf->suspend_bcn_li_dtim;
 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
-			   __FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));
+		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));
 
 exit:
 	return bcn_li_dtim;
 }
 #endif /* OEM_ANDROID && BCMPCIE */
+
+#ifdef CONFIG_SILENT_ROAM
+int
+dhd_sroam_set_mon(dhd_pub_t *dhd, bool set)
+{
+	int ret = BCME_OK;
+	wlc_sroam_t *psroam;
+	wlc_sroam_info_t *sroam;
+	uint sroamlen = sizeof(*sroam) + SROAM_HDRLEN;
+
+	/* Check if associated */
+	if (dhd_is_associated(dhd, 0, NULL) == FALSE) {
+		DHD_TRACE(("%s NOT assoc\n", __FUNCTION__));
+		return ret;
+	}
+
+	if (set && (dhd->op_mode &
+		(DHD_FLAG_HOSTAP_MODE | DHD_FLAG_P2P_GC_MODE | DHD_FLAG_P2P_GO_MODE))) {
+		DHD_INFO((" Failed to set sroam %d, op_mode 0x%04x\n", set, dhd->op_mode));
+		return ret;
+	}
+
+	if (!dhd->sroam_turn_on) {
+		DHD_INFO((" Failed to set sroam %d, sroam turn %d\n", set, dhd->sroam_turn_on));
+		return ret;
+	}
+	psroam = (wlc_sroam_t *)MALLOCZ(dhd->osh, sroamlen);
+	if (!psroam) {
+		DHD_ERROR(("%s Fail to malloc buffer\n", __FUNCTION__));
+		return BCME_NOMEM;
+	}
+
+	ret = dhd_iovar(dhd, 0, "sroam", NULL, 0, (char *)psroam, sroamlen, FALSE);
+	if (ret < 0) {
+		DHD_ERROR(("%s Failed to Get sroam %d\n", __FUNCTION__, ret));
+		goto done;
+	}
+
+	if (psroam->ver != WLC_SILENT_ROAM_CUR_VER) {
+		ret = BCME_VERSION;
+		goto done;
+	}
+
+	sroam = (wlc_sroam_info_t *)psroam->data;
+	sroam->sroam_on = set;
+	DHD_INFO((" Silent roam monitor mode %s\n", set ? "On" : "Off"));
+
+	ret = dhd_iovar(dhd, 0, "sroam", (char *)psroam, sroamlen, NULL, 0, TRUE);
+	if (ret < 0) {
+		DHD_ERROR(("%s Failed to Set sroam %d\n", __FUNCTION__, ret));
+	}
+
+done:
+	if (psroam) {
+		MFREE(dhd->osh, psroam, sroamlen);
+	}
+	return ret;
+
+}
+#endif /* CONFIG_SILENT_ROAM */
 
 /* Check if the mode supports STA MODE */
 bool dhd_support_sta_mode(dhd_pub_t *dhd)
@@ -4786,7 +5330,7 @@ wl_parse_ssid_list_tlv(char** list_str, wlc_ssid_ext_t* ssid, int max, int *byte
 			/* Get SSID */
 			if (ssid[idx].SSID_len > *bytes_left) {
 				DHD_ERROR(("%s out of memory range len=%d but left=%d\n",
-						   __FUNCTION__, ssid[idx].SSID_len, *bytes_left));
+				__FUNCTION__, ssid[idx].SSID_len, *bytes_left));
 				return BCME_BADARG;
 			}
 			str += 1;
@@ -4797,7 +5341,7 @@ wl_parse_ssid_list_tlv(char** list_str, wlc_ssid_ext_t* ssid, int max, int *byte
 			ssid[idx].hidden = TRUE;
 
 			DHD_TRACE(("%s :size=%d left=%d\n",
-					   (char*)ssid[idx].SSID, ssid[idx].SSID_len, *bytes_left));
+				(char*)ssid[idx].SSID, ssid[idx].SSID_len, *bytes_left));
 		} else {
 			DHD_ERROR(("### SSID size more than %d\n", str[0]));
 			return BCME_BADARG;
@@ -4817,13 +5361,13 @@ wl_parse_ssid_list_tlv(char** list_str, wlc_ssid_ext_t* ssid, int max, int *byte
 */
 int
 wl_iw_parse_data_tlv(char** list_str, void *dst, int dst_size, const char token,
-					 int input_size, int *bytes_left)
+                     int input_size, int *bytes_left)
 {
 	char* str;
 	uint16 short_temp;
 	uint32 int_temp;
 
-	if ((list_str == NULL) || (*list_str == NULL) || (bytes_left == NULL) || (*bytes_left < 0)) {
+	if ((list_str == NULL) || (*list_str == NULL) ||(bytes_left == NULL) || (*bytes_left < 0)) {
 		DHD_ERROR(("%s error paramters\n", __FUNCTION__));
 		return -1;
 	}
@@ -4835,7 +5379,7 @@ wl_iw_parse_data_tlv(char** list_str, void *dst, int dst_size, const char token,
 
 		if (str[0] != token) {
 			DHD_TRACE(("%s NOT Type=%d get=%d left_parse=%d \n",
-					   __FUNCTION__, token, str[0], *bytes_left));
+				__FUNCTION__, token, str[0], *bytes_left));
 			return -1;
 		}
 
@@ -4847,11 +5391,11 @@ wl_iw_parse_data_tlv(char** list_str, void *dst, int dst_size, const char token,
 		}
 		else if (input_size == 2) {
 			memcpy(dst, (char *)htod16(memcpy(&short_temp, str, input_size)),
-				   input_size);
+				input_size);
 		}
 		else if (input_size == 4) {
 			memcpy(dst, (char *)htod32(memcpy(&int_temp, str, input_size)),
-				   input_size);
+				input_size);
 		}
 
 		*bytes_left -= input_size;
@@ -4867,12 +5411,12 @@ wl_iw_parse_data_tlv(char** list_str, void *dst, int dst_size, const char token,
 */
 int
 wl_iw_parse_channel_list_tlv(char** list_str, uint16* channel_list,
-							 int channel_num, int *bytes_left)
+                             int channel_num, int *bytes_left)
 {
 	char* str;
 	int idx = 0;
 
-	if ((list_str == NULL) || (*list_str == NULL) || (bytes_left == NULL) || (*bytes_left < 0)) {
+	if ((list_str == NULL) || (*list_str == NULL) ||(bytes_left == NULL) || (*bytes_left < 0)) {
 		DHD_ERROR(("%s error paramters\n", __FUNCTION__));
 		return -1;
 	}
@@ -4964,7 +5508,7 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 	char* str;
 	char* endptr = NULL;
 
-	if ((list_str == NULL) || (*list_str == NULL))
+	if ((list_str == NULL)||(*list_str == NULL))
 		return -1;
 
 	str = *list_str;
@@ -4973,15 +5517,15 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 		val = (int)strtoul(str, &endptr, 0);
 		if (endptr == str) {
 			printf("could not parse channel number starting at"
-				   " substring \"%s\" in list:\n%s\n",
-				   str, *list_str);
+				" substring \"%s\" in list:\n%s\n",
+				str, *list_str);
 			return -1;
 		}
 		str = endptr + strspn(endptr, " ,");
 
 		if (num == channel_num) {
 			DHD_ERROR(("too many channels (more than %d) in channel list:\n%s\n",
-					   channel_num, *list_str));
+				channel_num, *list_str));
 			return -1;
 		}
 
@@ -4997,7 +5541,7 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 *
 */
 int dhd_get_download_buffer(dhd_pub_t	*dhd, char *file_path, download_type_t component,
-							char ** buffer, int *length)
+	char ** buffer, int *length)
 
 {
 	int ret = BCME_ERROR;
@@ -5023,7 +5567,7 @@ int dhd_get_download_buffer(dhd_pub_t	*dhd, char *file_path, download_type_t com
 		buf = MALLOCZ(dhd->osh, file_len);
 		if (buf == NULL) {
 			DHD_ERROR(("%s: Failed to allocate memory %d bytes\n",
-					   __FUNCTION__, file_len));
+				__FUNCTION__, file_len));
 			goto err;
 		}
 
@@ -5050,7 +5594,7 @@ err:
 
 int
 dhd_download_2_dongle(dhd_pub_t	*dhd, char *iovar, uint16 flag, uint16 dload_type,
-					  unsigned char *dload_buf, int len)
+	unsigned char *dload_buf, int len)
 {
 	struct wl_dload_data *dload_ptr = (struct wl_dload_data *)dload_buf;
 	int err = 0;
@@ -5068,22 +5612,22 @@ dhd_download_2_dongle(dhd_pub_t	*dhd, char *iovar, uint16 flag, uint16 dload_typ
 	len = ROUNDUP(len, 8);
 
 	iovar_len = bcm_mkiovar(iovar, (char *)dload_buf,
-							(uint)len, iovar_buf, sizeof(iovar_buf));
+		(uint)len, iovar_buf, sizeof(iovar_buf));
 	if (iovar_len == 0) {
 		DHD_ERROR(("%s: insufficient buffer space passed to bcm_mkiovar for '%s' \n",
-				   __FUNCTION__, iovar));
+		           __FUNCTION__, iovar));
 		return BCME_BUFTOOSHORT;
 	}
 
 	err = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovar_buf,
-						   iovar_len, IOV_SET, 0);
+			iovar_len, IOV_SET, 0);
 
 	return err;
 }
 
 int
 dhd_download_blob(dhd_pub_t *dhd, unsigned char *buf,
-				  uint32 len, char *iovar)
+		uint32 len, char *iovar)
 
 {
 	int chunk_len;
@@ -5099,10 +5643,10 @@ dhd_download_blob(dhd_pub_t *dhd, unsigned char *buf,
 	if ((new_buf = (unsigned char *)MALLOCZ(dhd->osh, size2alloc)) != NULL) {
 		do {
 			chunk_len = dhd_os_get_image_block((char *)(new_buf + data_offset),
-											   MAX_CHUNK_LEN, buf);
+				MAX_CHUNK_LEN, buf);
 			if (chunk_len < 0) {
 				DHD_ERROR(("%s: dhd_os_get_image_block failed (%d)\n",
-						   __FUNCTION__, chunk_len));
+					__FUNCTION__, chunk_len));
 				err = BCME_ERROR;
 				goto exit;
 			}
@@ -5110,7 +5654,7 @@ dhd_download_blob(dhd_pub_t *dhd, unsigned char *buf,
 				dl_flag |= DL_END;
 
 			err = dhd_download_2_dongle(dhd, iovar, dl_flag, DL_TYPE_CLM,
-										new_buf, data_offset + chunk_len);
+				new_buf, data_offset + chunk_len);
 
 			dl_flag &= ~DL_BEGIN;
 
@@ -5154,11 +5698,11 @@ dhd_check_current_clm_data(dhd_pub_t *dhd)
 	cspec = (wl_country_t *)iovbuf;
 	if ((strncmp(cspec->ccode, WL_CCODE_NULL_COUNTRY, WLC_CNTRY_BUF_SZ)) == 0) {
 		DHD_ERROR(("%s: ----- This FW is not included CLM data -----\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		return FALSE;
 	}
 	DHD_ERROR(("%s: ----- This FW is included CLM data -----\n",
-			   __FUNCTION__));
+		__FUNCTION__));
 	return TRUE;
 }
 
@@ -5220,8 +5764,8 @@ dhd_apply_default_clm(dhd_pub_t *dhd, char *clm_path)
 			}
 #else
 			DHD_ERROR(("%s: CLM already exist in F/W, "
-					   "new CLM data will be added to the end of existing CLM data!\n",
-					   __FUNCTION__));
+				"new CLM data will be added to the end of existing CLM data!\n",
+				__FUNCTION__));
 #endif /* DHD_BLOB_EXISTENCE_CHECK */
 		} else if (status != FALSE) {
 			err = status;
@@ -5243,10 +5787,10 @@ dhd_apply_default_clm(dhd_pub_t *dhd, char *clm_path)
 			err = dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, iovbuf, sizeof(iovbuf), FALSE, 0);
 			if (err) {
 				DHD_ERROR(("%s: clmload_status get failed err=%d \n",
-						   __FUNCTION__, err));
+					__FUNCTION__, err));
 			} else {
 				DHD_ERROR(("%s: clmload_status: %d \n",
-						   __FUNCTION__, *((int *)iovbuf)));
+					__FUNCTION__, *((int *)iovbuf)));
 				if (*((int *)iovbuf) == CHIPID_MISMATCH) {
 					DHD_ERROR(("Chip ID mismatch error \n"));
 				}
@@ -5282,107 +5826,10 @@ void dhd_free_download_buffer(dhd_pub_t	*dhd, void *buffer, int length)
 	MFREE(dhd->osh, buffer, length);
 }
 
-#if defined(DHD_8021X_DUMP)
-#define EAP_PRINT(str) \
-	DHD_ERROR(("[dhd-%s] ETHER_TYPE_802_1X[%s]: " str "\n", \
-	ifname, direction ? "TX" : "RX"));
-#else
-#define EAP_PRINT(str)
-#endif /* DHD_8021X_DUMP */
-/* Parse EAPOL 4 way handshake messages */
-void
-dhd_dump_eapol_4way_message(dhd_pub_t *dhd, char *ifname,
-							char *dump_data, bool direction)
-{
-	unsigned char type;
-	int pair, ack, mic, kerr, req, sec, install;
-	unsigned short us_tmp;
-
-	type = dump_data[15];
-	if (type == 0) {
-		if ((dump_data[22] == 1) && (dump_data[18] == 1)) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPS_REQID;
-			EAP_PRINT("EAP Packet, Request, Identity");
-		} else if ((dump_data[22] == 1) && (dump_data[18] == 2)) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPS_RSPID;
-			EAP_PRINT("EAP Packet, Response, Identity");
-		} else if (dump_data[22] == 254) {
-			if (dump_data[30] == 1) {
-				dhd->conf->eapol_status = EAPOL_STATUS_WPS_WSC_START;
-				EAP_PRINT("EAP Packet, WSC Start");
-			} else if (dump_data[30] == 4) {
-				if (dump_data[41] == 4) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M1;
-					EAP_PRINT("EAP Packet, WPS M1");
-				} else if (dump_data[41] == 5) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M2;
-					EAP_PRINT("EAP Packet, WPS M2");
-				} else if (dump_data[41] == 7) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M3;
-					EAP_PRINT("EAP Packet, WPS M3");
-				} else if (dump_data[41] == 8) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M4;
-					EAP_PRINT("EAP Packet, WPS M4");
-				} else if (dump_data[41] == 9) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M5;
-					EAP_PRINT("EAP Packet, WPS M5");
-				} else if (dump_data[41] == 10) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M6;
-					EAP_PRINT("EAP Packet, WPS M6");
-				} else if (dump_data[41] == 11) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M7;
-					EAP_PRINT("EAP Packet, WPS M7");
-				} else if (dump_data[41] == 12) {
-					dhd->conf->eapol_status = EAPOL_STATUS_WPS_M8;
-					EAP_PRINT("EAP Packet, WPS M8");
-				}
-			} else if (dump_data[30] == 5) {
-				dhd->conf->eapol_status = EAPOL_STATUS_WPS_DONE;
-				EAP_PRINT("EAP Packet, WSC Done");
-			}
-		} else {
-			DHD_ERROR(("[dhd-%s] ETHER_TYPE_802_1X[%s]: ver %d, type %d, replay %d\n",
-					   ifname, direction ? "TX" : "RX",
-					   dump_data[14], dump_data[15], dump_data[30]));
-		}
-	} else if (type == 3 && dump_data[18] == 2) {
-		us_tmp = (dump_data[19] << 8) | dump_data[20];
-		pair =  0 != (us_tmp & 0x08);
-		ack = 0  != (us_tmp & 0x80);
-		mic = 0  != (us_tmp & 0x100);
-		kerr =  0 != (us_tmp & 0x400);
-		req = 0  != (us_tmp & 0x800);
-		sec = 0  != (us_tmp & 0x200);
-		install  = 0 != (us_tmp & 0x40);
-
-		if (!sec && !mic && ack && !install && pair && !kerr && !req) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPA_M1;
-			EAP_PRINT("EAPOL Packet, 4-way handshake, M1");
-		} else if (pair && !install && !ack && mic && !sec && !kerr && !req) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPA_M2;
-			EAP_PRINT("EAPOL Packet, 4-way handshake, M2");
-		} else if (pair && ack && mic && sec && !kerr && !req) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPA_M3;
-			EAP_PRINT("EAPOL Packet, 4-way handshake, M3");
-		} else if (pair && !install && !ack && mic && sec && !req && !kerr) {
-			dhd->conf->eapol_status = EAPOL_STATUS_WPA_M4;
-			EAP_PRINT("EAPOL Packet, 4-way handshake, M4");
-		} else {
-			DHD_ERROR(("[dhd-%s] ETHER_TYPE_802_1X[%s]: ver %d, type %d, replay %d\n",
-					   ifname, direction ? "TX" : "RX",
-					   dump_data[14], dump_data[15], dump_data[30]));
-		}
-	} else {
-		DHD_ERROR(("[%s] ETHER_TYPE_802_1X[%s]: ver %d, type %d, replay %d\n",
-				   ifname, direction ? "TX" : "RX",
-				   dump_data[14], dump_data[15], dump_data[30]));
-	}
-}
-
 #ifdef SHOW_LOGTRACE
 int
 dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
-					   dhd_event_log_t *event_log)
+		dhd_event_log_t *event_log)
 {
 	uint32 *lognums = NULL;
 	char *logstrs = NULL;
@@ -5401,7 +5848,7 @@ dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
 
 	/* Read last three words in the logstrs.bin file */
 	trailer = (logstr_trailer_t *) (raw_fmts + logstrs_size -
-									sizeof(logstr_trailer_t));
+		sizeof(logstr_trailer_t));
 
 	if (trailer->log_magic == LOGSTRS_MAGIC) {
 		/*
@@ -5409,20 +5856,20 @@ dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
 		*/
 		if (trailer->version == 1) {
 			logstr_header_v1_t *hdr_v1 = (logstr_header_v1_t *) (raw_fmts +
-										 logstrs_size - sizeof(logstr_header_v1_t));
+					logstrs_size - sizeof(logstr_header_v1_t));
 			DHD_INFO(("%s: logstr header version = %u\n",
-					  __FUNCTION__, hdr_v1->version));
+					__FUNCTION__, hdr_v1->version));
 			num_fmts =	hdr_v1->rom_logstrs_offset / sizeof(uint32);
 			ram_index = (hdr_v1->ram_lognums_offset -
-						 hdr_v1->rom_lognums_offset) / sizeof(uint32);
+				hdr_v1->rom_lognums_offset) / sizeof(uint32);
 			lognums = (uint32 *) &raw_fmts[hdr_v1->rom_lognums_offset];
 			logstrs = (char *)	 &raw_fmts[hdr_v1->rom_logstrs_offset];
 			hdr_logstrs_size = hdr_v1->logstrs_size;
 		} else if (trailer->version == 2) {
 			logstr_header_t *hdr = (logstr_header_t *) (raw_fmts + logstrs_size -
-								   sizeof(logstr_header_t));
+					sizeof(logstr_header_t));
 			DHD_INFO(("%s: logstr header version = %u; flags = %x\n",
-					  __FUNCTION__, hdr->trailer.version, hdr->trailer.flags));
+					__FUNCTION__, hdr->trailer.version, hdr->trailer.flags));
 
 			/* For ver. 2 of the header, need to match fwid of
 			 *  both logstrs.bin and fw bin
@@ -5440,7 +5887,7 @@ dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
 				goto error;
 			}
 			/* fwid is at the end of fw bin in string format */
-			if (dhd_os_seek_file(file, file_len - sizeof(fwid_str) - 1) < 0) {
+			if (dhd_os_seek_file(file, file_len - (sizeof(fwid_str) - 1)) < 0) {
 				DHD_ERROR(("%s: can't seek file \n", __FUNCTION__));
 				goto error;
 			}
@@ -5451,13 +5898,13 @@ dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
 				goto error;
 			}
 			pfw_id = (uint8 *)bcmstrnstr(fwid_str, sizeof(fwid_str) - 1,
-										 FWID_STR_1, strlen(FWID_STR_1));
+					FWID_STR_1, strlen(FWID_STR_1));
 			if (!pfw_id) {
 				pfw_id = (uint8 *)bcmstrnstr(fwid_str, sizeof(fwid_str) - 1,
-											 FWID_STR_2, strlen(FWID_STR_2));
+					FWID_STR_2, strlen(FWID_STR_2));
 				if (!pfw_id) {
 					DHD_ERROR(("%s: could not find id in FW bin!\n",
-							   __FUNCTION__));
+						__FUNCTION__));
 					goto error;
 				}
 			}
@@ -5472,14 +5919,16 @@ dhd_parse_logstrs_file(osl_t *osh, char *raw_fmts, int logstrs_size,
 
 			/* check if fw id in logstrs.bin matches the fw one */
 			if (hdr->trailer.fw_id != fwid) {
-				DHD_ERROR(("%s: logstr id does not match FW!\n", __FUNCTION__));
+				DHD_ERROR(("%s: logstr id does not match FW!"
+					"logstrs_fwid:0x%x, rtecdc_fwid:0x%x\n",
+					__FUNCTION__, hdr->trailer.fw_id, fwid));
 				goto error;
 			}
 
 			match_fail = FALSE;
 			num_fmts = hdr->rom_logstrs_offset / sizeof(uint32);
 			ram_index = (hdr->ram_lognums_offset -
-						 hdr->rom_lognums_offset) / sizeof(uint32);
+				hdr->rom_lognums_offset) / sizeof(uint32);
 			lognums = (uint32 *) &raw_fmts[hdr->rom_lognums_offset];
 			logstrs = (char *)	 &raw_fmts[hdr->rom_logstrs_offset];
 			hdr_logstrs_size = hdr->logstrs_size;
@@ -5493,7 +5942,7 @@ error:
 			}
 		} else {
 			DHD_ERROR(("%s: Invalid logstr version %u\n", __FUNCTION__,
-					   trailer->version));
+					trailer->version));
 			return BCME_ERROR;
 		}
 		if (logstrs_size != hdr_logstrs_size) {
@@ -5548,7 +5997,7 @@ error:
 } /* dhd_parse_logstrs_file */
 
 int dhd_parse_map_file(osl_t *osh, void *file, uint32 *ramstart, uint32 *rodata_start,
-					   uint32 *rodata_end)
+		uint32 *rodata_end)
 {
 	char *raw_fmts =  NULL, *raw_fmts_loc = NULL;
 	uint32 read_size = READ_NUM_BYTES;
@@ -5574,7 +6023,7 @@ int dhd_parse_map_file(osl_t *osh, void *file, uint32 *ramstart, uint32 *rodata_
 		error = dhd_os_read_file(file, raw_fmts, read_size);
 		if (error < 0) {
 			DHD_ERROR(("%s: map file read failed err:%d \n", __FUNCTION__,
-					   error));
+					error));
 			goto fail;
 		}
 
@@ -5584,8 +6033,8 @@ int dhd_parse_map_file(osl_t *osh, void *file, uint32 *ramstart, uint32 *rodata_
 		/* Get ramstart address */
 		raw_fmts_loc = raw_fmts;
 		if (!(count & RAMSTART_BIT) &&
-				(cptr = bcmstrnstr(raw_fmts_loc, read_size, ramstart_str,
-								   strlen(ramstart_str)))) {
+			(cptr = bcmstrnstr(raw_fmts_loc, read_size, ramstart_str,
+			strlen(ramstart_str)))) {
 			cptr = cptr - BYTES_AHEAD_NUM;
 			sscanf(cptr, "%x %c text_start", ramstart, &c);
 			count |= RAMSTART_BIT;
@@ -5594,8 +6043,8 @@ int dhd_parse_map_file(osl_t *osh, void *file, uint32 *ramstart, uint32 *rodata_
 		/* Get ram rodata start address */
 		raw_fmts_loc = raw_fmts;
 		if (!(count & RDSTART_BIT) &&
-				(cptr = bcmstrnstr(raw_fmts_loc, read_size, rodata_start_str,
-								   strlen(rodata_start_str)))) {
+			(cptr = bcmstrnstr(raw_fmts_loc, read_size, rodata_start_str,
+			strlen(rodata_start_str)))) {
 			cptr = cptr - BYTES_AHEAD_NUM;
 			sscanf(cptr, "%x %c rodata_start", rodata_start, &c);
 			count |= RDSTART_BIT;
@@ -5604,8 +6053,8 @@ int dhd_parse_map_file(osl_t *osh, void *file, uint32 *ramstart, uint32 *rodata_
 		/* Get ram rodata end address */
 		raw_fmts_loc = raw_fmts;
 		if (!(count & RDEND_BIT) &&
-				(cptr = bcmstrnstr(raw_fmts_loc, read_size, rodata_end_str,
-								   strlen(rodata_end_str)))) {
+			(cptr = bcmstrnstr(raw_fmts_loc, read_size, rodata_end_str,
+			strlen(rodata_end_str)))) {
 			cptr = cptr - BYTES_AHEAD_NUM;
 			sscanf(cptr, "%x %c rodata_end", rodata_end, &c);
 			count |= RDEND_BIT;
@@ -5639,7 +6088,7 @@ fail:
 	}
 	else {
 		DHD_ERROR(("%s: readmap error 0X%x \n", __FUNCTION__,
-				   count));
+				count));
 		return BCME_ERROR;
 	}
 
@@ -5648,7 +6097,7 @@ fail:
 #ifdef PCIE_FULL_DONGLE
 int
 dhd_event_logtrace_infobuf_pkt_process(dhd_pub_t *dhdp, void *pktbuf,
-									   dhd_event_log_t *event_data)
+		dhd_event_log_t *event_data)
 {
 	uint32 infobuf_version;
 	info_buf_payload_hdr_t *payload_hdr_ptr;
@@ -5659,21 +6108,21 @@ dhd_event_logtrace_infobuf_pkt_process(dhd_pub_t *dhdp, void *pktbuf,
 
 	if (PKTLEN(dhdp->osh, pktbuf) < sizeof(uint32)) {
 		DHD_ERROR(("%s: infobuf too small for version field\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		goto exit;
 	}
 	infobuf_version = *((uint32 *)PKTDATA(dhdp->osh, pktbuf));
 	PKTPULL(dhdp->osh, pktbuf, sizeof(uint32));
 	if (infobuf_version != PCIE_INFOBUF_V1) {
 		DHD_ERROR(("%s: infobuf version %d is not PCIE_INFOBUF_V1\n",
-				   __FUNCTION__, infobuf_version));
+			__FUNCTION__, infobuf_version));
 		goto exit;
 	}
 
 	/* Version 1 infobuf has a single type/length (and then value) field */
 	if (PKTLEN(dhdp->osh, pktbuf) < sizeof(info_buf_payload_hdr_t)) {
 		DHD_ERROR(("%s: infobuf too small for v1 type/length  fields\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		goto exit;
 	}
 	/* Process/parse the common info payload header (type/length) */
@@ -5682,7 +6131,7 @@ dhd_event_logtrace_infobuf_pkt_process(dhd_pub_t *dhdp, void *pktbuf,
 	payload_hdr_length = ltoh16(payload_hdr_ptr->length);
 	if (payload_hdr_type != PCIE_INFOBUF_V1_TYPE_LOGTRACE) {
 		DHD_ERROR(("%s: payload_hdr_type %d is not V1_TYPE_LOGTRACE\n",
-				   __FUNCTION__, payload_hdr_type));
+			__FUNCTION__, payload_hdr_type));
 		goto exit;
 	}
 	PKTPULL(dhdp->osh, pktbuf, sizeof(info_buf_payload_hdr_t));
@@ -5692,11 +6141,11 @@ dhd_event_logtrace_infobuf_pkt_process(dhd_pub_t *dhdp, void *pktbuf,
 	 */
 	if (payload_hdr_length > PKTLEN(dhdp->osh, pktbuf)) {
 		DHD_ERROR(("%s: infobuf logtrace length is bigger"
-				   " than actual buffer data\n", __FUNCTION__));
+			" than actual buffer data\n", __FUNCTION__));
 		goto exit;
 	}
 	dhd_dbg_trace_evnt_handler(dhdp, PKTDATA(dhdp->osh, pktbuf),
-							   event_data, payload_hdr_length);
+		event_data, payload_hdr_length);
 
 	return BCME_OK;
 
@@ -5810,7 +6259,7 @@ dhd_iov_li_append(dhd_pub_t *dhd, dll_t *list_head, dll_t *node)
 	dhd_iov_li_t *iov_li;
 	dhd->dump_iovlist_len++;
 
-	if (dhd->dump_iovlist_len == IOV_LIST_MAX_LEN + 1) {
+	if (dhd->dump_iovlist_len == IOV_LIST_MAX_LEN+1) {
 		item = dll_head_p(list_head);
 		iov_li = (dhd_iov_li_t *)CONTAINEROF(item, dhd_iov_li_t, list);
 		dll_delete(item);
@@ -5870,13 +6319,13 @@ static ecounters_cfg_t ecounters_cfg_tbl[] = {
 
 static event_ecounters_cfg_t event_ecounters_cfg_tbl[] = {
 	/* Interface specific event ecounters */
-	{WLC_E_LINK, ECOUNTERS_STATS_TYPES_FLAG_IFACE, 0x0, WL_IFSTATS_XTLV_IF_EVENT_STATS},
+	{WLC_E_DEAUTH_IND, ECOUNTERS_STATS_TYPES_FLAG_IFACE, 0x0, WL_IFSTATS_XTLV_IF_EVENT_STATS},
 };
 
 /* Accepts an argument to -s, -g or -f and creates an XTLV */
 int
 dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
-							uint16 stats_rep, uint8 **xtlv)
+	uint16 stats_rep, uint8 **xtlv)
 {
 	uint8 *req_xtlv = NULL;
 	ecounters_stats_types_report_req_t *req;
@@ -5894,7 +6343,7 @@ dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
 
 	/* Total length of the container */
 	total_len = BCM_XTLV_HDR_SIZE +
-				OFFSETOF(ecounters_stats_types_report_req_t, stats_types_req) + xtlv_len;
+		OFFSETOF(ecounters_stats_types_report_req_t, stats_types_req) + xtlv_len;
 
 	/* Now allocate a structure for the entire request */
 	if ((req_xtlv = (uint8 *)MALLOCZ(dhd->osh, total_len)) == NULL) {
@@ -5904,7 +6353,7 @@ dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
 
 	/* container XTLV context */
 	bcm_xtlv_buf_init(&container_xtlvbuf, (uint8 *)req_xtlv, total_len,
-					  BCM_XTLV_OPTION_ALIGN32);
+		BCM_XTLV_OPTION_ALIGN32);
 
 	/* Fill other XTLVs in the container. Leave space for XTLV headers */
 	req = (ecounters_stats_types_report_req_t *)(req_xtlv + BCM_XTLV_HDR_SIZE);
@@ -5917,7 +6366,7 @@ dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
 
 	/* Fill remaining XTLVs */
 	bcm_xtlv_buf_init(&xtlvbuf, (uint8*) req->stats_types_req, xtlv_len,
-					  BCM_XTLV_OPTION_ALIGN32);
+		BCM_XTLV_OPTION_ALIGN32);
 	if (bcm_xtlv_put_data(&xtlvbuf, temp.id, NULL, temp.len)) {
 		DHD_ERROR(("Error creating XTLV for requested stats type = %d\n", temp.id));
 		rc = BCME_ERROR;
@@ -5926,8 +6375,8 @@ dhd_create_ecounters_params(dhd_pub_t *dhd, uint16 type, uint16 if_slice_idx,
 
 	/* fill the top level container and get done with the XTLV container */
 	rc = bcm_xtlv_put_data(&container_xtlvbuf, WL_ECOUNTERS_XTLV_REPORT_REQ, NULL,
-						   bcm_xtlv_buf_len(&xtlvbuf) + OFFSETOF(ecounters_stats_types_report_req_t,
-								   stats_types_req));
+		bcm_xtlv_buf_len(&xtlvbuf) + OFFSETOF(ecounters_stats_types_report_req_t,
+		stats_types_req));
 
 	if (rc) {
 		DHD_ERROR(("Error creating parent XTLV for type = %d\n", req->flags));
@@ -5960,10 +6409,10 @@ dhd_get_preserve_log_numbers(dhd_pub_t *dhd, uint32 *logset_mask)
 	memset(&logset_op, 0, sizeof(logset_op));
 	logset_type.version = htod16(EVENT_LOG_SET_TYPE_CURRENT_VERSION);
 	logset_type.len = htod16(sizeof(wl_el_set_type_t));
-	for (i = 0; i < WL_MAX_PRESERVE_BUFFER; i++) {
+	for (i = 0; i < dhd->event_log_max_sets; i++) {
 		logset_type.set = i;
 		err = dhd_iovar(dhd, 0, "event_log_set_type", (char *)&logset_type,
-						sizeof(logset_type), (char *)&logset_op, sizeof(logset_op), FALSE);
+				sizeof(logset_type), (char *)&logset_op, sizeof(logset_op), FALSE);
 		/* the iovar may return 'unsupported' error if a log set number is not present
 		* in the fw, so we should not return on error !
 		*/
@@ -5978,12 +6427,53 @@ dhd_get_preserve_log_numbers(dhd_pub_t *dhd, uint32 *logset_mask)
 	return ret;
 }
 
+static int
+dhd_ecounter_autoconfig(dhd_pub_t *dhd)
+{
+	int rc = BCME_OK;
+	uint32 buf;
+	rc = dhd_iovar(dhd, 0, "ecounters_autoconfig", NULL, 0, (char *)&buf, sizeof(buf), FALSE);
+
+	if (rc != BCME_OK) {
+
+		if (rc != BCME_UNSUPPORTED) {
+			rc = BCME_OK;
+			DHD_ERROR(("%s Ecounter autoconfig in fw failed : %d\n", __FUNCTION__, rc));
+		} else {
+			DHD_ERROR(("%s Ecounter autoconfig in FW not supported\n", __FUNCTION__));
+		}
+	}
+
+	return rc;
+}
+
+int
+dhd_ecounter_configure(dhd_pub_t *dhd, bool enable)
+{
+	int rc = BCME_OK;
+	if (enable) {
+		if (dhd_ecounter_autoconfig(dhd) != BCME_OK) {
+			if ((rc = dhd_start_ecounters(dhd)) != BCME_OK) {
+				DHD_ERROR(("%s Ecounters start failed\n", __FUNCTION__));
+			} else if ((rc = dhd_start_event_ecounters(dhd)) != BCME_OK) {
+				DHD_ERROR(("%s Event_Ecounters start failed\n", __FUNCTION__));
+			}
+		}
+	} else {
+		if ((rc = dhd_stop_ecounters(dhd)) != BCME_OK) {
+			DHD_ERROR(("%s Ecounters stop failed\n", __FUNCTION__));
+		} else if ((rc = dhd_stop_event_ecounters(dhd)) != BCME_OK) {
+			DHD_ERROR(("%s Event_Ecounters stop failed\n", __FUNCTION__));
+		}
+	}
+	return rc;
+}
+
 int
 dhd_start_ecounters(dhd_pub_t *dhd)
 {
 	uint8 i = 0;
 	uint8 *start_ptr;
-	uint32 buf;
 	int rc = BCME_OK;
 	bcm_xtlv_t *elt;
 	ecounters_config_request_v2_t *req = NULL;
@@ -5991,28 +6481,21 @@ dhd_start_ecounters(dhd_pub_t *dhd)
 	ecountersv2_processed_xtlv_list_elt *processed_containers_list = NULL;
 	uint16 total_processed_containers_len = 0;
 
-	rc = dhd_iovar(dhd, 0, "ecounters_autoconfig", NULL, 0, (char *)&buf, sizeof(buf), FALSE);
-
-	if (rc != BCME_UNSUPPORTED)
-		return rc;
-
-	rc = BCME_OK;
-
 	for (i = 0; i < ARRAYSIZE(ecounters_cfg_tbl); i++) {
 		ecounters_cfg_t *ecounter_stat = &ecounters_cfg_tbl[i];
 
 		if ((list_elt = (ecountersv2_processed_xtlv_list_elt *)
-						MALLOCZ(dhd->osh, sizeof(*list_elt))) == NULL) {
+			MALLOCZ(dhd->osh, sizeof(*list_elt))) == NULL) {
 			DHD_ERROR(("Ecounters v2: No memory to process\n"));
 			goto fail;
 		}
 
 		rc = dhd_create_ecounters_params(dhd, ecounter_stat->type,
-										 ecounter_stat->if_slice_idx, ecounter_stat->stats_rep, &list_elt->data);
+			ecounter_stat->if_slice_idx, ecounter_stat->stats_rep, &list_elt->data);
 
 		if (rc) {
 			DHD_ERROR(("Ecounters v2: Could not process: stat: %d return code: %d\n",
-					   ecounter_stat->stats_rep, rc));
+				ecounter_stat->stats_rep, rc));
 
 			/* Free allocated memory and go to fail to release any memories allocated
 			 * in previous iterations. Note that list_elt->data gets populated in
@@ -6037,7 +6520,7 @@ dhd_start_ecounters(dhd_pub_t *dhd)
 
 	/* Now create ecounters config request with totallength */
 	req = (ecounters_config_request_v2_t *)MALLOCZ(dhd->osh, sizeof(*req) +
-			total_processed_containers_len);
+		total_processed_containers_len);
 
 	if (req == NULL) {
 		rc = BCME_NOMEM;
@@ -6049,7 +6532,7 @@ dhd_start_ecounters(dhd_pub_t *dhd)
 	req->reporting_period = ECOUNTERS_DEFAULT_PERIOD;
 	req->num_reports = ECOUNTERS_NUM_REPORTS;
 	req->len = total_processed_containers_len +
-			   OFFSETOF(ecounters_config_request_v2_t, ecounters_xtlvs);
+		OFFSETOF(ecounters_config_request_v2_t, ecounters_xtlvs);
 
 	/* Copy config */
 	start_ptr = req->ecounters_xtlvs;
@@ -6162,7 +6645,7 @@ dhd_start_event_ecounters(dhd_pub_t *dhd)
 	event_ecounters_config_request_v2_t *req = NULL;
 
 	id_array = (event_id_array_t *)MALLOCZ(dhd->osh, sizeof(event_id_array_t) *
-										   ARRAYSIZE(event_ecounters_cfg_tbl));
+		ARRAYSIZE(event_ecounters_cfg_tbl));
 
 	if (id_array == NULL) {
 		rc = BCME_NOMEM;
@@ -6171,12 +6654,12 @@ dhd_start_event_ecounters(dhd_pub_t *dhd)
 	event_id_cnt = __dhd_event_ecounters_get_event_id_array(id_array);
 
 	max_xtlv_len = ((BCM_XTLV_HDR_SIZE +
-					 OFFSETOF(event_ecounters_config_request_v2_t, ecounters_xtlvs)) *
-					ECNTRS_MAX_XTLV_NUM);
+		OFFSETOF(event_ecounters_config_request_v2_t, ecounters_xtlvs)) *
+		ECNTRS_MAX_XTLV_NUM);
 
 	/* Now create ecounters config request with max allowed length */
 	req = (event_ecounters_config_request_v2_t *)MALLOCZ(dhd->osh,
-			sizeof(event_ecounters_config_request_v2_t *) + max_xtlv_len);
+		sizeof(event_ecounters_config_request_v2_t *) + max_xtlv_len);
 
 	if (req == NULL) {
 		rc = BCME_NOMEM;
@@ -6201,12 +6684,12 @@ dhd_start_event_ecounters(dhd_pub_t *dhd)
 				break;
 
 			rc = dhd_create_ecounters_params(dhd, event_ecounter_stat->type,
-											 event_ecounter_stat->if_slice_idx, event_ecounter_stat->stats_rep,
-											 &data);
+				event_ecounter_stat->if_slice_idx, event_ecounter_stat->stats_rep,
+				&data);
 
 			if (rc) {
 				DHD_ERROR(("%s: Could not process: stat: %d return code: %d\n",
-						   __FUNCTION__, event_ecounter_stat->stats_rep, rc));
+					__FUNCTION__, event_ecounter_stat->stats_rep, rc));
 				goto fail;
 			}
 
@@ -6221,24 +6704,24 @@ dhd_start_event_ecounters(dhd_pub_t *dhd)
 
 			if (processed_containers_len > max_xtlv_len) {
 				DHD_ERROR(("%s XTLV NUM IS OVERFLOWED THAN ALLOWED!!\n",
-						   __FUNCTION__));
+					__FUNCTION__));
 				rc = BCME_BADLEN;
 				goto fail;
 			}
 		}
 
 		req->len = processed_containers_len +
-				   OFFSETOF(event_ecounters_config_request_v2_t, ecounters_xtlvs);
+			OFFSETOF(event_ecounters_config_request_v2_t, ecounters_xtlvs);
 
 		DHD_INFO(("%s req version %d logset %d event_id %d flags %d len %d\n",
-				  __FUNCTION__, req->version, req->logset, req->event_id,
-				  req->flags, req->len));
+			__FUNCTION__, req->version, req->logset, req->event_id,
+			req->flags, req->len));
 
 		rc = dhd_iovar(dhd, 0, "event_ecounters", (char *)req, req->len, NULL, 0, TRUE);
 
 		if (rc < 0) {
 			DHD_ERROR(("failed to start event_ecounters(event id %d) with rc %d\n",
-					   req->event_id, rc));
+				req->event_id, rc));
 			goto fail;
 		}
 	}
@@ -6250,7 +6733,7 @@ fail:
 	}
 	if (id_array) {
 		MFREE(dhd->osh, id_array, sizeof(event_id_array_t) *
-			  ARRAYSIZE(event_ecounters_cfg_tbl));
+			ARRAYSIZE(event_ecounters_cfg_tbl));
 	}
 
 	return rc;
@@ -6287,8 +6770,77 @@ fail:
 
 #ifdef DHD_LOG_DUMP
 int
+dhd_dump_debug_ring(dhd_pub_t *dhdp, void *ring_ptr, const void *user_buf,
+		log_dump_section_hdr_t *sec_hdr,
+		char *text_hdr, int buflen, uint32 sec_type)
+{
+	uint32 rlen = 0;
+	uint32 data_len = 0;
+	void *data = NULL;
+	unsigned long flags = 0;
+	int ret = 0;
+	dhd_dbg_ring_t *ring = (dhd_dbg_ring_t *)ring_ptr;
+	int pos = 0;
+	int fpos_sechdr = 0;
+
+	if (!dhdp || !ring || !user_buf || !sec_hdr || !text_hdr) {
+		return BCME_BADARG;
+	}
+	/* do not allow further writes to the ring
+	 * till we flush it
+	 */
+	DHD_DBG_RING_LOCK(ring->lock, flags);
+	ring->state = RING_SUSPEND;
+	DHD_DBG_RING_UNLOCK(ring->lock, flags);
+
+	if (dhdp->concise_dbg_buf) {
+		/* re-use concise debug buffer temporarily
+		 * to pull ring data, to write
+		 * record by record to file
+		 */
+		data_len = CONCISE_DUMP_BUFLEN;
+		data = dhdp->concise_dbg_buf;
+		ret = dhd_export_debug_data(text_hdr, NULL, user_buf, strlen(text_hdr), &pos);
+		/* write the section header now with zero length,
+		 * once the correct length is found out, update
+		 * it later
+		 */
+		fpos_sechdr = pos;
+		sec_hdr->type = sec_type;
+		sec_hdr->length = 0;
+		ret = dhd_export_debug_data((char *)sec_hdr, NULL, user_buf,
+			sizeof(*sec_hdr), &pos);
+		do {
+			rlen = dhd_dbg_ring_pull_single(ring, data, data_len, TRUE);
+			if (rlen > 0) {
+				/* write the log */
+				ret = dhd_export_debug_data(data, NULL, user_buf, rlen, &pos);
+			}
+			DHD_DBGIF(("%s: rlen : %d\n", __FUNCTION__, rlen));
+		} while ((rlen > 0));
+		/* now update the section header length in the file */
+		/* Complete ring size is dumped by HAL, hence updating length to ring size */
+		sec_hdr->length = ring->ring_size;
+		ret = dhd_export_debug_data((char *)sec_hdr, NULL, user_buf,
+			sizeof(*sec_hdr), &fpos_sechdr);
+	} else {
+		DHD_ERROR(("%s: No concise buffer available !\n", __FUNCTION__));
+	}
+	DHD_DBG_RING_LOCK(ring->lock, flags);
+	ring->state = RING_ACTIVE;
+	/* Resetting both read and write pointer,
+	 * since all items are read.
+	 */
+	ring->rp = ring->wp = 0;
+	DHD_DBG_RING_UNLOCK(ring->lock, flags);
+
+	return ret;
+}
+
+int
 dhd_log_dump_ring_to_file(dhd_pub_t *dhdp, void *ring_ptr, void *file,
-						  unsigned long *file_posn, log_dump_section_hdr_t *sec_hdr)
+		unsigned long *file_posn, log_dump_section_hdr_t *sec_hdr,
+		char *text_hdr, uint32 sec_type)
 {
 	uint32 rlen = 0;
 	uint32 data_len = 0, total_len = 0;
@@ -6298,7 +6850,8 @@ dhd_log_dump_ring_to_file(dhd_pub_t *dhdp, void *ring_ptr, void *file,
 	int ret = 0;
 	dhd_dbg_ring_t *ring = (dhd_dbg_ring_t *)ring_ptr;
 
-	if (!dhdp || !ring || !file || !sec_hdr || !file_posn)
+	if (!dhdp || !ring || !file || !sec_hdr ||
+		!file_posn || !text_hdr)
 		return BCME_BADARG;
 
 	/* do not allow further writes to the ring
@@ -6315,17 +6868,18 @@ dhd_log_dump_ring_to_file(dhd_pub_t *dhdp, void *ring_ptr, void *file,
 		 */
 		data_len = CONCISE_DUMP_BUFLEN;
 		data = dhdp->concise_dbg_buf;
-		dhd_os_write_file_posn(file, file_posn, ECNTRS_LOG_HDR,
-							   strlen(ECNTRS_LOG_HDR));
+		dhd_os_write_file_posn(file, file_posn, text_hdr,
+				strlen(text_hdr));
 		/* write the section header now with zero length,
 		 * once the correct length is found out, update
 		 * it later
 		 */
+		dhd_init_sec_hdr(sec_hdr);
 		fpos_sechdr = *file_posn;
-		sec_hdr->type = LOG_DUMP_SECTION_ECNTRS;
+		sec_hdr->type = sec_type;
 		sec_hdr->length = 0;
 		dhd_os_write_file_posn(file, file_posn, (char *)sec_hdr,
-							   sizeof(*sec_hdr));
+				sizeof(*sec_hdr));
 		do {
 			rlen = dhd_dbg_ring_pull_single(ring, data, data_len, TRUE);
 			if (rlen > 0) {
@@ -6350,8 +6904,11 @@ dhd_log_dump_ring_to_file(dhd_pub_t *dhdp, void *ring_ptr, void *file,
 
 	DHD_DBG_RING_LOCK(ring->lock, flags);
 	ring->state = RING_ACTIVE;
+	/* Resetting both read and write pointer,
+	 * since all items are read.
+	 */
+	ring->rp = ring->wp = 0;
 	DHD_DBG_RING_UNLOCK(ring->lock, flags);
-
 	return BCME_OK;
 }
 
@@ -6371,12 +6928,13 @@ dhd_logdump_cookie_init(dhd_pub_t *dhdp, uint8 *buf, uint32 buf_size)
 	ring_size = dhd_ring_get_hdr_size() + LOGDUMP_COOKIE_STR_LEN * MAX_LOGUDMP_COOKIE_CNT;
 	if (buf_size < ring_size) {
 		DHD_ERROR(("BUF SIZE IS TO SHORT: req:%d buf_size:%d\n",
-				   ring_size, buf_size));
+			ring_size, buf_size));
 		return BCME_ERROR;
 	}
 
-	dhdp->logdump_cookie = dhd_ring_init(buf, buf_size,
-										 LOGDUMP_COOKIE_STR_LEN, MAX_LOGUDMP_COOKIE_CNT);
+	dhdp->logdump_cookie = dhd_ring_init(dhdp, buf, buf_size,
+		LOGDUMP_COOKIE_STR_LEN, MAX_LOGUDMP_COOKIE_CNT,
+		DHD_RING_TYPE_FIXED);
 	if (!dhdp->logdump_cookie) {
 		DHD_ERROR(("FAIL TO INIT COOKIE RING\n"));
 		return BCME_ERROR;
@@ -6392,7 +6950,7 @@ dhd_logdump_cookie_deinit(dhd_pub_t *dhdp)
 		return;
 	}
 	if (dhdp->logdump_cookie) {
-		dhd_ring_deinit(dhdp->logdump_cookie);
+		dhd_ring_deinit(dhdp, dhdp->logdump_cookie);
 	}
 
 	return;
@@ -6405,8 +6963,8 @@ dhd_logdump_cookie_save(dhd_pub_t *dhdp, char *cookie, char *type)
 
 	if (!dhdp || !cookie || !type || !dhdp->logdump_cookie) {
 		DHD_ERROR(("%s: At least one buffer ptr is NULL dhdp=%p cookie=%p"
-				   " type = %p, cookie_cfg:%p\n", __FUNCTION__,
-				   dhdp, cookie, type, dhdp ? dhdp->logdump_cookie : NULL));
+			" type = %p, cookie_cfg:%p\n", __FUNCTION__,
+			dhdp, cookie, type, dhdp?dhdp->logdump_cookie: NULL));
 		return;
 	}
 	ptr = (char *)dhd_ring_get_empty(dhdp->logdump_cookie);
@@ -6425,8 +6983,8 @@ dhd_logdump_cookie_get(dhd_pub_t *dhdp, char *ret_cookie, uint32 buf_size)
 
 	if (!dhdp || !ret_cookie || !dhdp->logdump_cookie) {
 		DHD_ERROR(("%s: At least one buffer ptr is NULL dhdp=%p"
-				   "cookie=%p cookie_cfg:%p\n", __FUNCTION__,
-				   dhdp, ret_cookie, dhdp ? dhdp->logdump_cookie : NULL));
+			"cookie=%p cookie_cfg:%p\n", __FUNCTION__,
+			dhdp, ret_cookie, dhdp?dhdp->logdump_cookie: NULL));
 		return BCME_ERROR;
 	}
 	ptr = (char *)dhd_ring_get_first(dhdp->logdump_cookie);
@@ -6444,7 +7002,7 @@ dhd_logdump_cookie_count(dhd_pub_t *dhdp)
 {
 	if (!dhdp || !dhdp->logdump_cookie) {
 		DHD_ERROR(("%s: At least one buffer ptr is NULL dhdp=%p cookie=%p\n",
-				   __FUNCTION__, dhdp, dhdp ? dhdp->logdump_cookie : NULL));
+			__FUNCTION__, dhdp, dhdp?dhdp->logdump_cookie: NULL));
 		return 0;
 	}
 	return dhd_ring_get_cur_size(dhdp->logdump_cookie);
@@ -6452,13 +7010,19 @@ dhd_logdump_cookie_count(dhd_pub_t *dhdp)
 
 static inline int
 __dhd_log_dump_cookie_to_file(
-	dhd_pub_t *dhdp, void *fp, unsigned long *f_pos, char *buf, uint32 buf_size)
+	dhd_pub_t *dhdp, void *fp, const void *user_buf, unsigned long *f_pos,
+	char *buf, uint32 buf_size)
 {
 
 	uint32 remain = buf_size;
 	int ret = BCME_ERROR;
 	char tmp_buf[LOGDUMP_COOKIE_STR_LEN];
 	log_dump_section_hdr_t sec_hdr;
+	uint32 read_idx;
+	uint32 write_idx;
+
+	read_idx = dhd_ring_get_read_idx(dhdp->logdump_cookie);
+	write_idx = dhd_ring_get_write_idx(dhdp->logdump_cookie);
 	while (dhd_logdump_cookie_count(dhdp) > 0) {
 		memset(tmp_buf, 0, sizeof(tmp_buf));
 		ret = dhd_logdump_cookie_get(dhdp, tmp_buf, LOGDUMP_COOKIE_STR_LEN);
@@ -6467,7 +7031,10 @@ __dhd_log_dump_cookie_to_file(
 		}
 		remain -= scnprintf(&buf[buf_size - remain], remain, "%s", tmp_buf);
 	}
-	ret = dhd_os_write_file_posn(fp, f_pos, COOKIE_LOG_HDR, strlen(COOKIE_LOG_HDR));
+	dhd_ring_set_read_idx(dhdp->logdump_cookie, read_idx);
+	dhd_ring_set_write_idx(dhdp->logdump_cookie, write_idx);
+
+	ret = dhd_export_debug_data(COOKIE_LOG_HDR, fp, user_buf, strlen(COOKIE_LOG_HDR), f_pos);
 	if (ret < 0) {
 		DHD_ERROR(("%s : Write file Error for cookie hdr\n", __FUNCTION__));
 		return ret;
@@ -6476,13 +7043,14 @@ __dhd_log_dump_cookie_to_file(
 	sec_hdr.timestamp = local_clock();
 	sec_hdr.type = LOG_DUMP_SECTION_COOKIE;
 	sec_hdr.length = buf_size - remain;
-	ret = dhd_os_write_file_posn(fp, f_pos, (char *)&sec_hdr, sizeof(sec_hdr));
+
+	ret = dhd_export_debug_data((char *)&sec_hdr, fp, user_buf, sizeof(sec_hdr), f_pos);
 	if (ret < 0) {
 		DHD_ERROR(("%s : Write file Error for section hdr\n", __FUNCTION__));
 		return ret;
 	}
 
-	ret = dhd_os_write_file_posn(fp, f_pos, buf, sec_hdr.length);
+	ret = dhd_export_debug_data(buf, fp, user_buf, sec_hdr.length, f_pos);
 	if (ret < 0) {
 		DHD_ERROR(("%s : Write file Error for cookie data\n", __FUNCTION__));
 	}
@@ -6490,17 +7058,119 @@ __dhd_log_dump_cookie_to_file(
 	return ret;
 }
 
+uint32
+dhd_log_dump_cookie_len(dhd_pub_t *dhdp)
+{
+	int len = 0;
+	char tmp_buf[LOGDUMP_COOKIE_STR_LEN];
+	log_dump_section_hdr_t sec_hdr;
+	char *buf = NULL;
+	int ret = BCME_ERROR;
+	uint32 buf_size = MAX_LOGUDMP_COOKIE_CNT * LOGDUMP_COOKIE_STR_LEN;
+	uint32 read_idx;
+	uint32 write_idx;
+	uint32 remain;
+
+	remain = buf_size;
+
+	if (!dhdp || !dhdp->logdump_cookie) {
+		DHD_ERROR(("%s At least one ptr is NULL "
+			"dhdp = %p cookie %p\n",
+			__FUNCTION__, dhdp, dhdp?dhdp->logdump_cookie:NULL));
+		goto exit;
+	}
+
+	buf = (char *)MALLOCZ(dhdp->osh, buf_size);
+	if (!buf) {
+		DHD_ERROR(("%s Fail to malloc buffer\n", __FUNCTION__));
+		goto exit;
+	}
+
+	read_idx = dhd_ring_get_read_idx(dhdp->logdump_cookie);
+	write_idx = dhd_ring_get_write_idx(dhdp->logdump_cookie);
+	while (dhd_logdump_cookie_count(dhdp) > 0) {
+		memset(tmp_buf, 0, sizeof(tmp_buf));
+		ret = dhd_logdump_cookie_get(dhdp, tmp_buf, LOGDUMP_COOKIE_STR_LEN);
+		if (ret != BCME_OK) {
+			goto exit;
+		}
+		remain -= (uint32)strlen(tmp_buf);
+	}
+	dhd_ring_set_read_idx(dhdp->logdump_cookie, read_idx);
+	dhd_ring_set_write_idx(dhdp->logdump_cookie, write_idx);
+	len += strlen(COOKIE_LOG_HDR);
+	len += sizeof(sec_hdr);
+	len += (buf_size - remain);
+exit:
+	if (buf)
+		MFREE(dhdp->osh, buf, buf_size);
+	return len;
+}
+
 int
-dhd_log_dump_cookie_to_file(dhd_pub_t *dhdp, void *fp, unsigned long *f_pos)
+dhd_log_dump_cookie(dhd_pub_t *dhdp, const void *user_buf)
+{
+	int ret = BCME_ERROR;
+	char tmp_buf[LOGDUMP_COOKIE_STR_LEN];
+	log_dump_section_hdr_t sec_hdr;
+	char *buf = NULL;
+	uint32 buf_size = MAX_LOGUDMP_COOKIE_CNT * LOGDUMP_COOKIE_STR_LEN;
+	int pos = 0;
+	uint32 read_idx;
+	uint32 write_idx;
+	uint32 remain;
+
+	remain = buf_size;
+
+	if (!dhdp || !dhdp->logdump_cookie) {
+		DHD_ERROR(("%s At least one ptr is NULL "
+			"dhdp = %p cookie %p\n",
+			__FUNCTION__, dhdp, dhdp?dhdp->logdump_cookie:NULL));
+		goto exit;
+	}
+
+	buf = (char *)MALLOCZ(dhdp->osh, buf_size);
+	if (!buf) {
+		DHD_ERROR(("%s Fail to malloc buffer\n", __FUNCTION__));
+		goto exit;
+	}
+
+	read_idx = dhd_ring_get_read_idx(dhdp->logdump_cookie);
+	write_idx = dhd_ring_get_write_idx(dhdp->logdump_cookie);
+	while (dhd_logdump_cookie_count(dhdp) > 0) {
+		memset(tmp_buf, 0, sizeof(tmp_buf));
+		ret = dhd_logdump_cookie_get(dhdp, tmp_buf, LOGDUMP_COOKIE_STR_LEN);
+		if (ret != BCME_OK) {
+			goto exit;
+		}
+		remain -= scnprintf(&buf[buf_size - remain], remain, "%s", tmp_buf);
+	}
+	dhd_ring_set_read_idx(dhdp->logdump_cookie, read_idx);
+	dhd_ring_set_write_idx(dhdp->logdump_cookie, write_idx);
+	ret = dhd_export_debug_data(COOKIE_LOG_HDR, NULL, user_buf, strlen(COOKIE_LOG_HDR), &pos);
+	sec_hdr.magic = LOG_DUMP_MAGIC;
+	sec_hdr.timestamp = local_clock();
+	sec_hdr.type = LOG_DUMP_SECTION_COOKIE;
+	sec_hdr.length = buf_size - remain;
+	ret = dhd_export_debug_data((char *)&sec_hdr, NULL, user_buf, sizeof(sec_hdr), &pos);
+	ret = dhd_export_debug_data(buf, NULL, user_buf, sec_hdr.length, &pos);
+exit:
+	if (buf)
+		MFREE(dhdp->osh, buf, buf_size);
+	return ret;
+}
+
+int
+dhd_log_dump_cookie_to_file(dhd_pub_t *dhdp, void *fp, const void *user_buf, unsigned long *f_pos)
 {
 	char *buf;
 	int ret = BCME_ERROR;
 	uint32 buf_size = MAX_LOGUDMP_COOKIE_CNT * LOGDUMP_COOKIE_STR_LEN;
 
-	if (!dhdp || !dhdp->logdump_cookie || !fp || !f_pos) {
+	if (!dhdp || !dhdp->logdump_cookie || (!fp && !user_buf) || !f_pos) {
 		DHD_ERROR(("%s At least one ptr is NULL "
-				   "dhdp = %p cookie %p fp = %p f_pos = %p\n",
-				   __FUNCTION__, dhdp, dhdp ? dhdp->logdump_cookie : NULL, fp, f_pos));
+			"dhdp = %p cookie %p fp = %p f_pos = %p\n",
+			__FUNCTION__, dhdp, dhdp?dhdp->logdump_cookie:NULL, fp, f_pos));
 		return ret;
 	}
 
@@ -6509,7 +7179,7 @@ dhd_log_dump_cookie_to_file(dhd_pub_t *dhdp, void *fp, unsigned long *f_pos)
 		DHD_ERROR(("%s Fail to malloc buffer\n", __FUNCTION__));
 		return ret;
 	}
-	ret = __dhd_log_dump_cookie_to_file(dhdp, fp, f_pos, buf, buf_size);
+	ret = __dhd_log_dump_cookie_to_file(dhdp, fp, user_buf, f_pos, buf, buf_size);
 	MFREE(dhdp->osh, buf, buf_size);
 
 	return ret;
@@ -6518,10 +7188,14 @@ dhd_log_dump_cookie_to_file(dhd_pub_t *dhdp, void *fp, unsigned long *f_pos)
 #endif /* DHD_LOG_DUMP */
 
 #ifdef DHD_LOG_DUMP
+#define DEBUG_DUMP_TRIGGER_INTERVAL_SEC	4
 void
 dhd_log_dump_trigger(dhd_pub_t *dhdp, int subcmd)
 {
+#if defined(DHD_DUMP_FILE_WRITE_FROM_KERNEL)
 	log_dump_type_t *flush_type;
+#endif /* DHD_DUMP_FILE_WRITE_FROM_KERNEL */
+	uint64 current_time_sec;
 
 	if (!dhdp) {
 		DHD_ERROR(("dhdp is NULL !\n"));
@@ -6533,23 +7207,45 @@ dhd_log_dump_trigger(dhd_pub_t *dhdp, int subcmd)
 		return;
 	}
 
-	flush_type = MALLOCZ(dhdp->osh, sizeof(log_dump_type_t));
-	if (!flush_type) {
-		DHD_ERROR(("%s Fail to malloc flush_type\n", __FUNCTION__));
+	current_time_sec = DIV_U64_BY_U32(OSL_LOCALTIME_NS(), NSEC_PER_SEC);
+
+	DHD_ERROR(("%s: current_time_sec=%lld debug_dump_time_sec=%lld interval=%d\n",
+		__FUNCTION__, current_time_sec, dhdp->debug_dump_time_sec,
+		DEBUG_DUMP_TRIGGER_INTERVAL_SEC));
+
+	if ((current_time_sec - dhdp->debug_dump_time_sec) < DEBUG_DUMP_TRIGGER_INTERVAL_SEC) {
+		DHD_ERROR(("%s : Last debug dump triggered(%lld) within %d seconds, so SKIP\n",
+			__FUNCTION__, dhdp->debug_dump_time_sec, DEBUG_DUMP_TRIGGER_INTERVAL_SEC));
 		return;
 	}
+
 	clear_debug_dump_time(dhdp->debug_dump_time_str);
 	/*  */
 	dhdp->debug_dump_subcmd = subcmd;
 
+	dhdp->debug_dump_time_sec = DIV_U64_BY_U32(OSL_LOCALTIME_NS(), NSEC_PER_SEC);
+
+#if defined(DHD_DUMP_FILE_WRITE_FROM_KERNEL)
+	/* flush_type is freed at do_dhd_log_dump function */
+	flush_type = MALLOCZ(dhdp->osh, sizeof(log_dump_type_t));
 	if (flush_type) {
 		*flush_type = DLD_BUF_TYPE_ALL;
 		dhd_schedule_log_dump(dhdp, flush_type);
+	} else {
+		DHD_ERROR(("%s Fail to malloc flush_type\n", __FUNCTION__));
+		return;
 	}
+#endif /* DHD_DUMP_FILE_WRITE_FROM_KERNEL */
+
+	/* Inside dhd_mem_dump, event notification will be sent to HAL and
+	 * from other context DHD pushes memdump, debug_dump and pktlog dump
+	 * to HAL and HAL will write into file
+	 */
 #if (defined(BCMPCIE) || defined(BCMSDIO)) && defined(DHD_FW_COREDUMP)
 	dhdp->memdump_type = DUMP_TYPE_BY_SYSDUMP;
 	dhd_bus_mem_dump(dhdp);
 #endif /* BCMPCIE && DHD_FW_COREDUMP */
+
 }
 #endif /* DHD_LOG_DUMP */
 
@@ -6567,7 +7263,7 @@ dhd_edl_mem_init(dhd_pub_t *dhd)
 	ret = dhd_dma_buf_alloc(dhd, &dhd->edl_ring_mem, DHD_EDL_RING_SIZE);
 	if (ret != BCME_OK) {
 		DHD_ERROR(("%s: alloc of edl_ring_mem failed\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		return BCME_ERROR;
 	}
 	return BCME_OK;
@@ -6585,7 +7281,7 @@ dhd_edl_mem_deinit(dhd_pub_t *dhd)
 
 int
 dhd_event_logtrace_process_edl(dhd_pub_t *dhdp, uint8 *data,
-							   void *evt_decode_data)
+		void *evt_decode_data)
 {
 	msg_hdr_edl_t *msg = NULL;
 	cmn_msg_hdr_t *cmn_msg_hdr = NULL;
@@ -6606,43 +7302,43 @@ dhd_event_logtrace_process_edl(dhd_pub_t *dhdp, uint8 *data,
 	/* validate the fields */
 	if (ltoh32(msg->infobuf_ver) != PCIE_INFOBUF_V1) {
 		DHD_ERROR(("%s: Skipping msg with invalid infobuf ver (0x%x)"
-				   " expected (0x%x)\n", __FUNCTION__,
-				   msg->infobuf_ver, PCIE_INFOBUF_V1));
+			" expected (0x%x)\n", __FUNCTION__,
+			msg->infobuf_ver, PCIE_INFOBUF_V1));
 		return BCME_VERSION;
 	}
 
 	/* in EDL, the request_id field of cmn_msg_hdr is overloaded to carry payload length */
 	if (sizeof(info_buf_payload_hdr_t) > cmn_msg_hdr->request_id) {
 		DHD_ERROR(("%s: infobuf too small for v1 type/length fields\n",
-				   __FUNCTION__));
+			__FUNCTION__));
 		return BCME_BUFTOOLONG;
 	}
 
 	if (ltoh16(msg->pyld_hdr.type) != PCIE_INFOBUF_V1_TYPE_LOGTRACE) {
 		DHD_ERROR(("%s: payload_hdr_type %d is not V1_TYPE_LOGTRACE\n",
-				   __FUNCTION__, ltoh16(msg->pyld_hdr.type)));
+			__FUNCTION__, ltoh16(msg->pyld_hdr.type)));
 		return BCME_BADOPTION;
 	}
 
 	if (ltoh16(msg->pyld_hdr.length) > cmn_msg_hdr->request_id) {
 		DHD_ERROR(("%s: infobuf logtrace length %u is bigger"
-				   " than available buffer size %u\n", __FUNCTION__,
-				   ltoh16(msg->pyld_hdr.length), cmn_msg_hdr->request_id));
+			" than available buffer size %u\n", __FUNCTION__,
+			ltoh16(msg->pyld_hdr.length), cmn_msg_hdr->request_id));
 		return BCME_BADLEN;
 	}
 
 	/* dhd_dbg_trace_evnt_handler expects the data to start from msgtrace_hdr_t */
 	buf += sizeof(msg->infobuf_ver) + sizeof(msg->pyld_hdr);
 	dhd_dbg_trace_evnt_handler(dhdp, buf, evt_decode_data,
-							   ltoh16(msg->pyld_hdr.length));
+		ltoh16(msg->pyld_hdr.length));
 
 	/* check 'dhdp->logtrace_pkt_sendup' and if true alloc an skb
 	* copy the event data to the skb and send it up the stack
 	*/
 	if (dhdp->logtrace_pkt_sendup) {
 		DHD_INFO(("%s: send up event log, len %u bytes\n", __FUNCTION__,
-				  (uint32)(ltoh16(msg->pyld_hdr.length) +
-						   sizeof(info_buf_payload_hdr_t) + 4)));
+			(uint32)(ltoh16(msg->pyld_hdr.length) +
+			sizeof(info_buf_payload_hdr_t) + 4)));
 		dhd_sendup_info_buf(dhdp, (uint8 *)msg);
 	}
 
@@ -6694,7 +7390,7 @@ dhd_print_fw_ver_from_file(dhd_pub_t *dhdp, char *fwpath)
 	}
 	/* go back in the buffer to the last ascii character */
 	while (str != buf &&
-			(*str >= ' ' && *str <= '~')) {
+		(*str >= ' ' && *str <= '~')) {
 		--str;
 	}
 	/* reverse the final decrement, so that str is pointing
@@ -6745,3 +7441,34 @@ void dhd_h2d_log_time_sync(dhd_pub_t *dhd)
 	}
 }
 #endif /* DHD_H2D_LOG_TIME_SYNC */
+
+#if defined(DISABLE_HE_ENAB) || defined(CUSTOM_CONTROL_HE_ENAB)
+int
+dhd_control_he_enab(dhd_pub_t * dhd, uint8 he_enab)
+{
+	int ret = BCME_OK;
+	bcm_xtlv_t *pxtlv = NULL;
+	uint8 mybuf[DHD_IOVAR_BUF_SIZE];
+	uint16 mybuf_len = sizeof(mybuf);
+	pxtlv = (bcm_xtlv_t *)mybuf;
+
+	ret = bcm_pack_xtlv_entry((uint8**)&pxtlv, &mybuf_len, WL_HE_CMD_ENAB, sizeof(he_enab),
+			&he_enab, BCM_XTLV_OPTION_ALIGN32);
+
+	if (ret != BCME_OK) {
+		ret = -EINVAL;
+		DHD_ERROR(("%s failed to pack he enab, err: %s\n", __FUNCTION__, bcmerrorstr(ret)));
+		return ret;
+	}
+
+	ret = dhd_iovar(dhd, 0, "he", (char *)&mybuf, sizeof(mybuf), NULL, 0, TRUE);
+	if (ret < 0) {
+		DHD_ERROR(("%s he_enab (%d) set failed, err: %s\n",
+			__FUNCTION__, he_enab, bcmerrorstr(ret)));
+	} else {
+		DHD_ERROR(("%s he_enab (%d) set successed\n", __FUNCTION__, he_enab));
+	}
+
+	return ret;
+}
+#endif /* DISABLE_HE_ENAB || CUSTOM_CONTROL_HE_ENAB */

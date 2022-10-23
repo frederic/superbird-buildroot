@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 #define _VSI_NN_OP_PRE_PROCESS_H
 
 #include "vsi_nn_types.h"
+#include "vsi_nn_pre_post_process.h"
+
+typedef  vsi_nn_preprocess_source_format_e vsi_nn_pre_process_type_e;
 
 enum
 {
@@ -40,15 +43,11 @@ enum
     PRE_PROCESS_OUTPUT_CNT
 };
 
-typedef uint32_t vsi_nn_pre_process_type_e; enum
+#define _VSI_NN_PRE_PROCESS_LOCAL_TENSOR_NUM 10
+typedef struct _vsi_nn_pre_process_lcl_data
 {
-    VSI_NN_PRE_PROCESS_TENSOR = 0,
-    VSI_NN_PRE_PROCESS_GRAY,
-    VSI_NN_PRE_PROCESS_RGB,
-    VSI_NN_PRE_PROCESS_YUV420,
-    VSI_NN_PRE_PROCESS_BGRA,
-};
-
+    vsi_nn_tensor_t *local_tensor[_VSI_NN_PRE_PROCESS_LOCAL_TENSOR_NUM];
+} vsi_nn_pre_process_lcl_data;
 
 typedef struct _vsi_nn_pre_process_param
 {
@@ -78,6 +77,8 @@ typedef struct _vsi_nn_pre_process_param
     vsi_bool reverse_channel;
 
     vsi_nn_pre_process_type_e type;
+
+    vsi_nn_pre_process_lcl_data *local;
 } vsi_nn_pre_process_param;
 #endif
 

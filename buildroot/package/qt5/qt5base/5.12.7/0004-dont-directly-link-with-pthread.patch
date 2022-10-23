@@ -1,0 +1,12 @@
+diff -Nru qt5base-5.12.7.Orig/mkspecs/features/qt_configure.prf qt5base-5.12.7/mkspecs/features/qt_configure.prf
+--- qt5base-5.12.7.Orig/mkspecs/features/qt_configure.prf	2020-01-24 13:54:31.000000000 +0800
++++ qt5base-5.12.7/mkspecs/features/qt_configure.prf	2020-04-22 18:46:46.304664749 +0800
+@@ -816,7 +816,7 @@
+     export($${1}.version)
+ 
+     qtRunLoggedCommand("$$pkg_config --libs-only-L $$args", libpaths)|return(false)
+-    qtRunLoggedCommand("$$pkg_config --libs-only-l $$args", libs)|return(false)
++    qtRunLoggedCommand("$$pkg_config --libs-only-l $$args | sed 's/-lpthread//'", libs)|return(false)
+     eval(libs = $$libpaths $$libs)
+     !qtConfResolveLibs($${1}.libs, $$libs): \
+         return(false)

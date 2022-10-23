@@ -221,7 +221,7 @@ extern "C" {
     int vdi_get_clock_gate(u32 core_idx);
     /**
      * @brief       make clock stable before changing clock frequency
-     * @detail      Before inoking vdi_set_clock_freg() caller MUST invoke vdi_ready_change_clock() function. 
+     * @detail      Before inoking vdi_set_clock_freg() caller MUST invoke vdi_ready_change_clock() function.
      *              after changing clock frequency caller also invoke vdi_done_change_clock() function.
      * @return  0   failure
      *          1   success
@@ -237,6 +237,7 @@ extern "C" {
     void vdi_fio_write_register(u32 core_idx, unsigned int addr, unsigned int data);
     unsigned int vdi_fio_read_register(u32 core_idx, unsigned int addr);
     int vdi_clear_memory(u32 core_idx, PhysicalAddress addr, int len, int endian);
+    int vdi_set_memory(u32 core_idx, PhysicalAddress addr, int len, int endian, Uint32 data);
     int vdi_write_memory(u32 core_idx, PhysicalAddress addr, unsigned char *data, int len, int endian);
     int vdi_read_memory(u32 core_idx, PhysicalAddress addr, unsigned char *data, int len, int endian);
 
@@ -255,7 +256,6 @@ extern "C" {
 #endif
 #if defined (__cplusplus)
 }
-#endif 
+#endif
 
-#endif //#ifndef _VDI_H_ 
- 
+#endif//#ifndef _VDI_H_

@@ -28,6 +28,7 @@
 #include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 #include <linux/amlogic/aml_atvdemod.h>
+#include <linux/amlogic/aml_tuner.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
@@ -47,7 +48,16 @@
 /********************************CODE CHANGE LIST*****************************/
 /* Date --- Version --- Note *************************************************/
 /* 2019/11/05 --- V2.15 --- Add dynamic monitoring line frequency deviation. */
-#define AMLATVDEMOD_VER "V2.15"
+/* 2019/11/25 --- V2.16 --- Add pal-m/n ring filter processing. */
+/* 2019/12/31 --- V2.17 --- Fix atv vif setting and offset error. */
+/* 2020/01/06 --- V2.18 --- Optimize MTS(Multi-channel sound) control flow. */
+/* 2020/01/08 --- V2.19 --- Fix afc frequency offset. */
+/* 2020/03/24 --- V2.20 --- Fix ntsc(443)-bg/dk/i no audio output. */
+/* 2020/04/23 --- V2.21 --- Fix pal-n config. */
+/*                          Fix r842 stable delay when scanning. */
+/*                          Fix visual carrier if amp when playing. */
+/* 2020/04/30 --- V2.22 --- Add demod power control in suspend and resume. */
+#define AMLATVDEMOD_VER "V2.22"
 
 struct aml_atvdemod_device *amlatvdemod_devp;
 
@@ -68,7 +78,7 @@ static ssize_t aml_atvdemod_store(struct class *class,
 	unsigned long tmp = 0, data = 0;
 	struct aml_atvdemod_device *dev =
 			container_of(class, struct aml_atvdemod_device, cls);
-	/*struct atv_demod_priv *priv = dev->v4l2_fe.fe.analog_demod_priv;*/
+	struct atv_demod_priv *priv = dev->v4l2_fe.fe.analog_demod_priv;
 
 	buf_orig = kstrdup(buf, GFP_KERNEL);
 	ps = buf_orig;
@@ -312,23 +322,43 @@ static ssize_t aml_atvdemod_store(struct class *class,
 		pr_info("audio_set std %d\n", std);
 	} else if (!strncmp(parm[0], "atvdemod_status", 15)) {
 		struct v4l2_analog_parameters *p = &dev->v4l2_fe.params;
+		int vpll_lock = 0;
+		int line_lock = 0;
 
-		pr_info("[atvdemod] afc_range: %d\n", p->afc_range);
-		pr_info("[atvdemod] frequency: %d\n", p->frequency);
-		pr_info("[atvdemod] soundsys: %d\n", p->soundsys);
-		pr_info("[atvdemod] std: 0x%x (%s %s)\n",
+		if (priv->state == ATVDEMOD_STATE_WORK) {
+			retrieve_vpll_carrier_lock(&vpll_lock);
+			pr_info("vpp lock: %s.\n",
+				vpll_lock == 0 ? "Locked" : "Unlocked");
+
+			retrieve_vpll_carrier_line_lock(&line_lock);
+			pr_info("line lock: %s (0x%x).\n",
+				line_lock == 0 ? "Locked" : "Unlocked",
+				line_lock);
+
+			data_afc = retrieve_vpll_carrier_afc();
+			pr_info("afc: %d Khz.\n", data_afc);
+
+			data_snr_avg = atvdemod_get_snr_val();
+			pr_info("snr: %d.\n", data_snr_avg);
+		}
+
+		pr_info("[params] afc_range: %d\n", p->afc_range);
+		pr_info("[params] frequency: %d Hz\n", p->frequency);
+		pr_info("[params] soundsys: %d\n", p->soundsys);
+		pr_info("[params] std: 0x%x (%s, %s)\n",
 				(unsigned int) dev->std,
 				v4l2_std_to_str((0xff000000 & dev->std)),
 				v4l2_std_to_str((0xffffff & dev->std)));
-		pr_info("[atvdemod] audmode: 0x%x\n", dev->audmode);
-		pr_info("[atvdemod] flag: %d\n", p->flag);
-		pr_info("[atvdemod] tuner_cur: %d\n", dev->tuner_cur);
-		pr_info("[atvdemod] tuner_id: %d\n",
+		pr_info("[params] audmode: 0x%x (%s)\n", dev->audmode,
+				v4l2_std_to_str(0xffffff & dev->audmode));
+		pr_info("[params] flag: %d\n", p->flag);
+		pr_info("[params] tuner_cur: %d\n", dev->tuner_cur);
+		pr_info("[params] tuner_id: %d\n",
 				dev->tuners[dev->tuner_cur].cfg.id);
-		pr_info("[atvdemod] if_freq: %d\n", dev->if_freq);
-		pr_info("[atvdemod] if_inv: %d\n", dev->if_inv);
-		pr_info("[atvdemod] fre_offset: %d\n", dev->fre_offset);
-		pr_info("[atvdemod] version: %s.\n", AMLATVDEMOD_VER);
+		pr_info("[params] if_freq: %d\n", dev->if_freq);
+		pr_info("[params] if_inv: %d\n", dev->if_inv);
+		pr_info("[params] fre_offset: %d\n", dev->fre_offset);
+		pr_info("version: %s.\n", AMLATVDEMOD_VER);
 	} else if (!strncmp(parm[0], "attach_tuner", 12)) {
 		int tuner_id = 0;
 
@@ -350,7 +380,7 @@ static ssize_t aml_atvdemod_store(struct class *class,
 
 			dev->tuner_cur = i;
 
-			ret = aml_attach_tuner(dev);
+			ret = aml_atvdemod_attach_tuner(dev);
 			if (ret)
 				pr_info("attach_tuner error.\n");
 			else
@@ -361,8 +391,8 @@ static ssize_t aml_atvdemod_store(struct class *class,
 
 		for (blk = 0; blk <= APB_BLOCK_ADDR_TOP; ++blk) {
 			for (reg = 0; reg < 0x40; ++reg) {
-				val = atv_dmd_rd_long(blk, reg);
-				pr_err("[0x%04x] = 0x%x.\n",
+				val = atv_dmd_rd_long(blk, reg << 2);
+				pr_err("[0x%04x] = 0x%X\n",
 						(blk << 8) + (reg << 2), val);
 			}
 		}
@@ -372,7 +402,7 @@ static ssize_t aml_atvdemod_store(struct class *class,
 		if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX)) {
 			for (reg = 0; reg <= 0x1ff; ++reg) {
 				val = adec_rd_reg(reg);
-				pr_err("[0x%04x] = 0x%x.\n", (reg << 2), val);
+				pr_err("[0x%04x] = 0x%X\n", reg << 2, val);
 			}
 		}
 	} else
@@ -384,9 +414,18 @@ EXIT:
 	return count;
 }
 
-static ssize_t aml_atvdemod_show(struct class *cls,
+static ssize_t aml_atvdemod_show(struct class *class,
 		struct class_attribute *attr, char *buff)
 {
+	struct aml_atvdemod_device *dev =
+			container_of(class, struct aml_atvdemod_device, cls);
+	struct atv_demod_priv *priv = dev->v4l2_fe.fe.analog_demod_priv;
+	struct v4l2_analog_parameters *p = &dev->v4l2_fe.params;
+	int vpll_lock = 0;
+	int line_lock = 0;
+	int data = 0;
+	int len = 0;
+
 	pr_dbg("\n usage:\n");
 	pr_dbg("[get soft version] echo ver_info > /sys/class/amlatvdemod/atvdemod_debug\n");
 	pr_dbg("[get afc value] echo afc_info > /sys/class/amlatvdemod/atvdemod_debug\n");
@@ -395,7 +434,51 @@ static ssize_t aml_atvdemod_show(struct class *cls,
 				"echo get av_gain/av_offset/atv_gain/atv_offset > /sys/class/amlatvdemod/atvdemod_debug\n");
 	pr_dbg("[set av-out-gain/av-out-offset/atv-gain/atv-offset]:\n"
 				"echo set av_gain/av_offset/atv_gain/atv_offset val(0~255) > /sys/class/amlatvdemod/atvdemod_debug\n");
-	return 0;
+
+	len += sprintf(buff + len, "ATV Demod Status:\n");
+	if (priv->state == ATVDEMOD_STATE_WORK) {
+		retrieve_vpll_carrier_lock(&vpll_lock);
+		len += sprintf(buff + len, "atv_demod: vpp lock: %s.\n",
+			vpll_lock == 0 ? "Locked" : "Unlocked");
+
+		retrieve_vpll_carrier_line_lock(&line_lock);
+		len += sprintf(buff + len, "atv_demod: line lock: %s(0x%x).\n",
+			line_lock == 0 ? "Locked" : "Unlocked", line_lock);
+
+		data = retrieve_vpll_carrier_afc();
+		len += sprintf(buff + len, "atv_demod: afc: %d Khz.\n", data);
+
+		data = atvdemod_get_snr_val();
+		len += sprintf(buff + len, "atv_demod: snr: %d.\n", data);
+	}
+
+	len += sprintf(buff + len, "atv_demod: [params] afc_range: %d\n",
+			p->afc_range);
+	len += sprintf(buff + len, "atv_demod: [params] frequency: %d Hz\n",
+			p->frequency);
+	len += sprintf(buff + len, "atv_demod: [params] soundsys: %d\n",
+			p->soundsys);
+	len += sprintf(buff + len, "atv_demod: [params] std: 0x%x (%s, %s)\n",
+			(unsigned int) dev->std,
+			v4l2_std_to_str((0xff000000 & dev->std)),
+			v4l2_std_to_str((0xffffff & dev->std)));
+	len += sprintf(buff + len, "atv_demod: [params] audmode: 0x%x (%s)\n",
+			dev->audmode, v4l2_std_to_str(0xffffff & dev->audmode));
+	len += sprintf(buff + len, "atv_demod: [params] flag: %d\n", p->flag);
+	len += sprintf(buff + len, "atv_demod: [params] tuner_cur: %d\n",
+			dev->tuner_cur);
+	len += sprintf(buff + len, "atv_demod: [params] tuner_id: %d\n",
+			dev->tuners[dev->tuner_cur].cfg.id);
+	len += sprintf(buff + len, "atv_demod: [params] if_freq: %d\n",
+			dev->if_freq);
+	len += sprintf(buff + len, "atv_demod: [params] if_inv: %d\n",
+			dev->if_inv);
+	len += sprintf(buff + len, "atv_demod: [params] fre_offset: %d\n",
+			dev->fre_offset);
+	len += sprintf(buff + len, "atv_demod: version: %s.\n",
+			AMLATVDEMOD_VER);
+
+	return len;
 }
 
 static struct class_attribute aml_atvdemod_attrs[] = {
@@ -407,10 +490,7 @@ static void aml_atvdemod_dt_parse(struct aml_atvdemod_device *pdev)
 {
 	struct device_node *node = NULL;
 	struct device_node *node_tuner = NULL;
-	struct device_node *node_i2c = NULL;
 	unsigned int val = 0;
-	const char *str = NULL;
-	char buf[20] = { 0 };
 	int ret = 0;
 	int i = 0;
 
@@ -483,76 +563,21 @@ static void aml_atvdemod_dt_parse(struct aml_atvdemod_device *pdev)
 		pdev->tuner_cur = val;
 
 	for (i = 0; i < pdev->tuner_num; ++i) {
-		snprintf(buf, sizeof(buf), "tuner_name_%d", i);
-		ret = of_property_read_string(node_tuner, buf, &str);
-		if (ret) {
+		ret = aml_get_dts_tuner_config(node_tuner,
+				&pdev->tuners[i].cfg, i);
+		if (ret)
 			pr_err("can't find tuner %d.\n", i);
-			continue;
-		}
-
-		if (!strncmp(str, "mxl661_tuner", 12))
-			pdev->tuners[i].cfg.id = AM_TUNER_MXL661;
-		else if (!strncmp(str, "si2151_tuner", 12))
-			pdev->tuners[i].cfg.id = AM_TUNER_SI2151;
-		else if (!strncmp(str, "si2159_tuner", 12))
-			pdev->tuners[i].cfg.id = AM_TUNER_SI2159;
-		else if (!strncmp(str, "r840_tuner", 10))
-			pdev->tuners[i].cfg.id = AM_TUNER_R840;
-		else if (!strncmp(str, "r842_tuner", 10))
-			pdev->tuners[i].cfg.id = AM_TUNER_R842;
-		else if (!strncmp(str, "atbm2040_tuner", 14))
-			pdev->tuners[i].cfg.id = AM_TUNER_ATBM2040;
 		else {
-			pr_err("can't support tuner: %s.\n", str);
-			pdev->tuners[i].cfg.id = AM_TUNER_NONE;
+			pr_err("find tuner %d, id %d, i2c_addr 0x%x.\n",
+				i, pdev->tuners[i].cfg.id,
+				pdev->tuners[i].cfg.i2c_addr);
 		}
-
-		snprintf(buf, sizeof(buf), "tuner_i2c_adap_%d", i);
-		node_i2c = of_parse_phandle(node_tuner, buf, 0);
-		if (node_i2c) {
-			pdev->tuners[i].i2c_adp =
-					of_find_i2c_adapter_by_node(node_i2c);
-			of_node_put(node_i2c);
-
-			if (!pdev->tuners[i].i2c_adp)
-				pr_err("can't find tuner_i2c_adap.\n");
-		}
-
-		snprintf(buf, sizeof(buf), "tuner_i2c_addr_%d", i);
-		ret = of_property_read_u32(node_tuner, buf, &val);
-		if (ret)
-			pr_err("can't find tuner_i2c_addr.\n");
-		else
-			pdev->tuners[i].cfg.i2c_addr = val;
-
-		snprintf(buf, sizeof(buf), "tuner_xtal_%d", i);
-		ret = of_property_read_u32(node_tuner, buf, &val);
-		if (ret)
-			pr_err("can't find tuner_xtal.\n");
-		else
-			pdev->tuners[i].cfg.xtal = val;
-
-		snprintf(buf, sizeof(buf), "tuner_xtal_mode_%d", i);
-		ret = of_property_read_u32(node_tuner, buf, &val);
-		if (ret)
-			pr_err("can't find tuner_xtal_mode.\n");
-		else
-			pdev->tuners[i].cfg.xtal_mode = val;
-
-		snprintf(buf, sizeof(buf), "tuner_xtal_cap_%d", i);
-		ret = of_property_read_u32(node_tuner, buf, &val);
-		if (ret)
-			pr_err("can't find tuner_xtal_cap.\n");
-		else
-			pdev->tuners[i].cfg.xtal_cap = val;
-
-		pr_err("find tuner %s [%d].\n", str, pdev->tuners[i].cfg.id);
 	}
 
 	of_node_put(node_tuner);
 }
 
-int aml_attach_demod(struct aml_atvdemod_device *dev)
+int aml_atvdemod_attach_demod(struct aml_atvdemod_device *dev)
 {
 	void *p = NULL;
 	struct v4l2_frontend *v4l2_fe = &dev->v4l2_fe;
@@ -565,7 +590,7 @@ int aml_attach_demod(struct aml_atvdemod_device *dev)
 	}
 
 	p = v4l2_attach(aml_atvdemod_attach, fe, v4l2_fe,
-				dev->tuners[dev->tuner_cur].i2c_adp,
+				dev->tuners[dev->tuner_cur].cfg.i2c_adap,
 				dev->tuners[dev->tuner_cur].cfg.i2c_addr,
 				dev->tuners[dev->tuner_cur].cfg.id);
 	if (p != NULL)
@@ -578,7 +603,7 @@ int aml_attach_demod(struct aml_atvdemod_device *dev)
 	return 0;
 }
 
-int aml_attach_tuner(struct aml_atvdemod_device *dev)
+int aml_atvdemod_attach_tuner(struct aml_atvdemod_device *dev)
 {
 	void *p = NULL;
 	struct v4l2_frontend *v4l2_fe = &dev->v4l2_fe;
@@ -594,35 +619,7 @@ int aml_attach_tuner(struct aml_atvdemod_device *dev)
 
 	cfg = &dev->tuners[dev->tuner_cur].cfg;
 
-	switch (cfg->id) {
-	case AM_TUNER_R840:
-		p = v4l2_attach(r840_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	case AM_TUNER_R842:
-		p = v4l2_attach(r842_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	case AM_TUNER_SI2151:
-		p = v4l2_attach(si2151_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	case AM_TUNER_SI2159:
-		p = v4l2_attach(si2159_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	case AM_TUNER_MXL661:
-		p = v4l2_attach(mxl661_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	case AM_TUNER_ATBM2040:
-		p = v4l2_attach(atbm2040_attach, fe,
-				dev->tuners[dev->tuner_cur].i2c_adp, cfg);
-		break;
-	default:
-		pr_err("%s: Nonsupport tuner [%d].\n", __func__, cfg->id);
-		break;
-	}
+	p = aml_attach_tuner(cfg->id, fe, cfg);
 
 	if (p != NULL) {
 		dev->tuner_attached = true;
@@ -769,8 +766,8 @@ static int aml_atvdemod_probe(struct platform_device *pdev)
 
 	aml_atvdemod_dt_parse(dev);
 
-	aml_attach_demod(dev);
-	aml_attach_tuner(dev);
+	aml_atvdemod_attach_demod(dev);
+	aml_atvdemod_attach_tuner(dev);
 
 	dev->v4l2_fe.dev = dev->dev;
 

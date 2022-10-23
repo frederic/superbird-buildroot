@@ -67,17 +67,6 @@ static struct snd_pcm_hardware aml_pdm_hardware = {
 	.fifo_size		=	0,
 };
 
-static unsigned int period_sizes[] = {
-	64, 128, 256, 512, 1024, 2048, 4096,
-	8192, 16384, 32768, 65536, 65536 * 2, 65536 * 4
-};
-
-static struct snd_pcm_hw_constraint_list hw_constraints_period_sizes = {
-	.count = ARRAY_SIZE(period_sizes),
-	.list = period_sizes,
-	.mask = 0
-};
-
 static const char *const pdm_filter_mode_texts[] = {
 	"Filter Mode 0",
 	"Filter Mode 1",
@@ -556,9 +545,14 @@ static irqreturn_t aml_pdm_isr_handler(int irq, void *data)
 	struct device *dev = rtd->platform->dev;
 	struct aml_pdm *p_pdm = (struct aml_pdm *)dev_get_drvdata(dev);
 	unsigned int status;
-	int train_sts = pdm_train_sts();
+	int train_sts = 0;
 
 	pr_debug("%s\n", __func__);
+
+	if (p_pdm->chipinfo &&
+	    p_pdm->chipinfo->train &&
+	    p_pdm->train_en)
+		train_sts = pdm_train_sts();
 
 	if (!snd_pcm_running(substream))
 		return IRQ_NONE;
@@ -597,17 +591,6 @@ static int aml_pdm_open(struct snd_pcm_substream *substream)
 	snd_soc_set_runtime_hwparams(substream, &aml_pdm_hardware);
 
 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-
-	/* Ensure that period size is a multiple of 32bytes */
-	ret = snd_pcm_hw_constraint_list(runtime, 0,
-					   SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
-					   &hw_constraints_period_sizes);
-	if (ret < 0) {
-		dev_err(substream->pcm->card->dev,
-			"%s() setting constraints failed: %d\n",
-			__func__, ret);
-		return -EINVAL;
-	}
 
 	/* Ensure that buffer size is a multiple of period size */
 	ret = snd_pcm_hw_constraint_integer(runtime,
@@ -648,7 +631,6 @@ static int aml_pdm_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-
 static int aml_pdm_hw_params(
 	struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
@@ -682,10 +664,20 @@ static int aml_pdm_prepare(
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		struct toddr *to = p_pdm->tddr;
 		unsigned int start_addr, end_addr, int_addr;
+		unsigned int period, threshold;
 
 		start_addr = runtime->dma_addr;
-		end_addr = start_addr + runtime->dma_bytes - 8;
-		int_addr = frames_to_bytes(runtime, runtime->period_size) / 8;
+		end_addr = start_addr + runtime->dma_bytes - FIFO_BURST;
+		period   = frames_to_bytes(runtime, runtime->period_size);
+		int_addr = period / FIFO_BURST;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, p_pdm->tddr->fifo_depth);
+		threshold /= 2;
+		aml_toddr_set_fifos(to, threshold);
 
 		aml_toddr_set_buf(to, start_addr, end_addr);
 		aml_toddr_set_intrpt(to, int_addr);
@@ -880,7 +872,6 @@ static int aml_pdm_dai_prepare(
 		fmt.rate      = runtime->rate;
 		aml_toddr_select_src(to, PDMIN);
 		aml_toddr_set_format(to, &fmt);
-		aml_toddr_set_fifos(to, 0x40);
 
 		/* force pdm sysclk to 24m */
 		if (p_pdm->isLowPower) {

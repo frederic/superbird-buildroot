@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -33,8 +33,10 @@
 #include "a_osapi.h"
 #include "adf_os_timer.h"
 #include "adf_os_atomic.h"
+#include <adf_os_lock.h>
 #include "hif.h"
 #include "hif_sdio_common.h"
+#include "hif_oob.h"
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 #include <linux/scatterlist.h>
 #define HIF_LINUX_MMC_SCATTER_SUPPORT
@@ -53,9 +55,11 @@ struct bus_request_record {
 	u_int32_t len;
 	u_int64_t time;
 };
-
+#ifdef QCA_TXRX_PERF
 #define BUS_REQUEST_MAX_NUM                163
-
+#else
+#define BUS_REQUEST_MAX_NUM                105
+#endif
 #define SDIO_CLOCK_FREQUENCY_DEFAULT       25000000
 #define SDWLAN_ENABLE_DISABLE_TIMEOUT      20
 #define FLAGS_CARD_ENAB                    0x02
@@ -91,13 +95,9 @@ typedef enum {
 } HIF_MBOX_STATE;
 #endif
 
-#ifdef CONFIG_QCA_SDIO_OOB
-typedef void (*oob_irq_handler_t) (void *dev);
-#endif
-
 struct hif_device {
     struct sdio_func *func;
-    spinlock_t asynclock;
+    adf_os_spinlock_t asynclock;
     struct task_struct* async_task;             /* task to handle async commands */
     struct semaphore sem_async;                 /* wake up for async task */
     int    async_shutdown;                      /* stop the async task */
@@ -109,11 +109,11 @@ struct hif_device {
     struct semaphore sem_tx_completion;
     int    tx_completion_shutdown;
     struct completion tx_completion_exit;
-    spinlock_t tx_completion_lock;
+    adf_os_spinlock_t tx_completion_lock;
     BUS_REQUEST *tx_completion_req;
     BUS_REQUEST **last_tx_completion;
 #endif
-    spinlock_t lock;
+    adf_os_spinlock_t lock;
     BUS_REQUEST *s_busRequestFreeQueue;         /* free list */
     BUS_REQUEST busRequest[BUS_REQUEST_MAX_NUM]; /* available bus requests */
     void     *claimedContext;
@@ -126,14 +126,6 @@ struct hif_device {
     atomic_t   irqHandling;
     HIF_DEVICE_POWER_CHANGE_TYPE powerConfig;
     HIF_DEVICE_STATE DeviceState;
-#ifdef CONFIG_QCA_SDIO_OOB
-    oob_irq_handler_t oob_irq_handler;		/*Firmware will use GPIO10, Host will use what */
-    int oob_irq_num;                           /* oob wifi irq num */
-    struct task_struct *oob_task;              /* task to handle oob interrupts */
-    struct semaphore sem_oob;                  /* wake up for oob task */
-    int oob_shutdown;                          /* stop the oob task */
-    struct completion oob_completion;          /* oob thread completion */
-#endif
 #ifdef HIF_MBOX_SLEEP_WAR
     adf_os_atomic_t   mbox_state;
     adf_os_timer_t sleep_timer;
@@ -146,6 +138,9 @@ struct hif_device {
     /* mailbox swapping for control and data svc*/
     A_BOOL swap_mailbox;
     bool ctrl_response_timeout;
+#ifdef CONFIG_GPIO_OOB
+    struct hif_oob_ctx hif_oob;
+#endif
 };
 
 #define HIF_DMA_BUFFER_SIZE (4 * 1024)
@@ -160,7 +155,7 @@ void HIFDumpCCCR(HIF_DEVICE *hif_device);
 #ifdef HIF_LINUX_MMC_SCATTER_SUPPORT
 
 #define MAX_SCATTER_REQUESTS             4
-#define MAX_SCATTER_ENTRIES_PER_REQ      64
+#define MAX_SCATTER_ENTRIES_PER_REQ      16
 #define MAX_SCATTER_REQ_TRANSFER_SIZE    32*1024
 
 typedef struct _HIF_SCATTER_REQ_PRIV {

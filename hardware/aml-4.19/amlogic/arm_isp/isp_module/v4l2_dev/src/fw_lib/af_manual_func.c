@@ -73,7 +73,7 @@ static void af_update_lens_position( AF_fsm_ptr_t p_fsm )
         p_status_info->af_info.lens_pos = p_fsm->last_position;
         p_status_info->af_info.focus_value = p_fsm->last_sharp_done;
     } else {
-        LOG( LOG_INFO, "last position(%u) not changed.", p_fsm->last_position );
+        LOG( LOG_DEBUG, "last position(%u) not changed.", p_fsm->last_position );
     }
 }
 

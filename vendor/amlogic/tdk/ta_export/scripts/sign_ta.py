@@ -12,194 +12,249 @@ def get_args():
 	from argparse import ArgumentParser
 
 	parser = ArgumentParser()
-	parser.add_argument('--ta_rsa_key', required=True, help='Name of TA rsa private key file')
-	parser.add_argument('--ta_rsa_key_sig', required=True, help='Name of TA rsa public key signature file')
-	parser.add_argument('--ta_aes_key', type=str, default='null', help='Name of aes key file')
-	parser.add_argument('--ta_aes_iv', type=str, default='null', help='Name of aes iv file')
-	parser.add_argument('--ta_aes_key_iv_enc', type=str, default='null', help='Name of encryped aes key iv file')
-	parser.add_argument('--ta_cvn', type=str, default='null', help='TA Current Version Number')
-	parser.add_argument('--in', required=True, dest='inf', help='Name of input file')
-	parser.add_argument('--out', type=str, default='null', help='Name of output file')
+	parser.add_argument('--ta_rsa_key', dest = 'ta_prv_key', required = True, \
+			help = 'ta rsa private key, input file')
+	parser.add_argument('--ta_rsa_key_sig', dest = 'cert_sig', \
+			required = True, \
+			help = 'sig of ta cert header and ta pub key, input file')
+	parser.add_argument('--ta_aes_key', type = str, default = 'null', \
+			help = 'ta aes key, input file')
+	parser.add_argument('--ta_aes_iv', type = str, default = 'null', \
+			help = 'ta aes iv, input file')
+	parser.add_argument('--ta_aes_key_iv_enc', dest = 'ta_aes_key_enc', \
+			type = str, default = 'null', \
+			help = 'encryped aes key and iv, input file')
+	parser.add_argument('--ta_cvn', dest = 'arb_cvn', type = int, default = 0, \
+			help = 'anti-rollback current version number')
+	parser.add_argument('--ta_marketid', dest = 'market_id', type = int, \
+			default = 0, help = 'market id')
+	parser.add_argument('--chipset_id', type = int, default = 0, \
+			help = 'chipset id')
+	parser.add_argument('--arb_type', type = int, default = 0, \
+			choices = [0, 1, 2], help = 'anti-rollback type, 0 = RPMB, \
+			1 = OTP, 2 = Fixed Table')
+	parser.add_argument('--in', dest = 'unsigned_ta', required = True, \
+			help = 'unsigned ta, input file')
+	parser.add_argument('--out', dest = 'signed_ta', type = str, \
+			default = 'null', help = 'signed ta, output file')
 
 	return parser.parse_args()
 
-def aes256_cbc_enc(key, iv, text):
-	import struct
+class ta_hdr():
+	def __init__(self, ta_hdr_info):
+		import struct
+
+		self.__magic, self.__version, self.__flags, self.__algo, \
+			self.__arb_cvn, self.__img_type, self.__img_size, self.__enc_type, \
+			self.__arb_type = struct.unpack('<9I', ta_hdr_info)
+
+		self.__version = 0x00000300
+		self.__algo = 0x70004830
+		self.__img_type = 2      # img type, 1:ta unsigned, 2:ta signed
+
+		self.__rsv = [0] * 7     # 28bytes reserved
+		self.__nonce = ''        # 16bytes nonce
+		self.__ta_aes_key = ''   # 32bytes aes key
+		self.__ta_aes_iv = ''    # 16bytes aes iv
+
+	def update_attrs(self, arb_cvn, arb_type, enc_type, nonce, ta_aes_key, \
+			ta_aes_iv):
+		self.__arb_cvn = arb_cvn
+		self.__arb_type = arb_type
+		self.__enc_type = enc_type
+		self.__nonce = nonce
+		self.__ta_aes_key = ta_aes_key
+		self.__ta_aes_iv = ta_aes_iv
+
+	def serialize(self):
+		import struct
+		return struct.pack('<16I', self.__magic, self.__version, self.__flags, \
+				self.__algo, self.__arb_cvn, self.__img_type, self.__img_size, \
+				self.__enc_type, self.__arb_type, *self.__rsv) + \
+				self.__nonce + self.__ta_aes_key + self.__ta_aes_iv
+
+class ta_cert_hdr():
+	def __init__(self, market_id, chipset_id):
+		self.__magic = 0x43455254        # header magic, value = "CERT"
+		self.__version = 0x00000100      # cert version, 1.0
+		self.__uuid = ''                 # 16bytes uuid
+		self.__market_id = market_id     # market id
+		self.__chipset_id = chipset_id   # chipset id
+		self.__rsv = [0] * 8             # 32bytes reserved
+
+	def update_attrs(self, in_uuid):
+		import uuid
+		uuid_str = "{" + in_uuid + "}"
+		tmp_id = uuid.UUID(uuid_str)
+		self.__uuid = tmp_id.bytes_le
+
+	def serialize(self):
+		import struct
+		return struct.pack('<2I', self.__magic, self.__version) + \
+			self.__uuid + struct.pack('<10I', self.__market_id, \
+					self.__chipset_id, *self.__rsv)
+
+class ta_cert():
+	def __init__(self, market_id, chipset_id):
+		self.__cert_hdr = ta_cert_hdr(market_id, chipset_id)
+		self.__ta_pub_key = ''  # 256bytes ta rsa pub key
+
+		# 256bytes sig of cert header and ta pub key by root prv key
+		self.__cert_sig = ''
+
+		self.__ta_sig = ''      # 256bytes sig of ta by ta prv key
+
+	def update_attrs(self, ta_pub_key, cert_sig, ta_sig, uuid):
+		import struct
+		import array
+		from Crypto.Util.number import long_to_bytes
+
+		for x in array.array("B", long_to_bytes(ta_pub_key.n)):
+			self.__ta_pub_key += struct.pack("B", x)
+		self.__cert_sig = cert_sig
+		self.__ta_sig = ta_sig
+		self.__cert_hdr.update_attrs(uuid)
+
+	def serialize(self):
+		import struct
+		return self.__cert_hdr.serialize() + self.__ta_pub_key + \
+			self.__cert_sig + self.__ta_sig
+
+class signed_ta_hdr():
+	def __init__(self, ta_hdr_info, market_id, chipset_id):
+		self.__ta_hdr = ta_hdr(ta_hdr_info)
+		self.__payload_digest = ''
+		self.__ta_cert = ta_cert(market_id, chipset_id)
+
+	def update_attrs(self, arb_cvn, arb_type, enc_type, market_id, chipset_id, \
+			nonce, ta_aes_key, ta_aes_iv, payload_digest, ta_pub_key, \
+			cert_sig, ta_sig, uuid):
+		self.__ta_hdr.update_attrs(arb_cvn, arb_type, enc_type, nonce, \
+				ta_aes_key, ta_aes_iv)
+		self.__payload_digest = payload_digest
+		self.__ta_cert.update_attrs(ta_pub_key, cert_sig, ta_sig, uuid)
+
+	def serialize(self):
+		import struct
+		return self.__ta_hdr.serialize() + self.__payload_digest + \
+			self.__ta_cert.serialize()
+
+def aes256_cbc_enc(key, iv, src_data):
 	from Crypto.Cipher import AES
 
-	cipher = AES.new(key, AES.MODE_CBC, iv)
+	to_enc_data = src_data
+	if (len(src_data) % 16) != 0:
+		to_enc_data = src_data + '0' * (16 - (len(src_data) % 16))
 
-	#if text is not a multiple of 16, padding
-	x = len(text) % 16
-	if x != 0:
-		text_pad = text + '0'*(16 - x)
+	return AES.new(key, AES.MODE_CBC, iv).encrypt(to_enc_data)
+
+def is_signed_ta(ta):
+	import struct
+
+	f = open(ta, 'rb')
+	f.seek(20)
+	img_type = struct.unpack('<I', f.read(4))[0]
+	f.close()
+	if img_type == 2:
+		print 'ta has been signed'
+		return True
 	else:
-		text_pad = text
-
-	msg = cipher.encrypt(text_pad)
-
-	return msg
+		return False
 
 def main():
 	import sys
-	import os
 	import struct
-	import array
-	import uuid
-	import md5
-	from Crypto.Hash import SHA256
 	from Crypto.Signature import PKCS1_v1_5
 	from Crypto.Hash import SHA256
 	from Crypto.PublicKey import RSA
-	from Crypto.Util.number import long_to_bytes
-	import binascii
 
-	# parse arguments
 	args = get_args()
-	if args.out == 'null':
-		args.out = args.inf
 
-	# TA version
-	if args.ta_cvn == 'null':
-		ta_cvn = 0
-	else:
-		try:
-			ta_cvn_str = args.ta_cvn.strip()
-			version = int(ta_cvn_str.split('.')[0])
-			assert version<256
-			patchlevel = int(ta_cvn_str.split('.')[1])
-			assert patchlevel<256
-			sublevel = int(ta_cvn_str.split('.')[2])
-			assert sublevel<256
-		except:
-			print "Bad format version!"
-			return 0
-		else:
-			ta_cvn = version<<16|patchlevel<<8|sublevel
-
-	# aes key
-	if args.ta_aes_key == 'null':
-		aes_key_type = 0
-		aes_key = struct.pack('<IIIIIIII', \
-			0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x0, 0x0)
-		aes_iv = struct.pack('<IIII', \
-			0x0, 0x0, 0x0, 0x0)
-		enc_aes_key = struct.pack('<IIIIIIIIIIIIIIII', \
-			0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x0, 0x0)
-		enc_aes_key_len = len(enc_aes_key)
-	else:
-		aes_key_type = 2
-		f = open(args.ta_aes_key, 'rb')
-		aes_key = f.read()
-		f.close()
-		f = open(args.ta_aes_iv, 'rb')
-		aes_iv = f.read()
-		f.close()
-		f = open(args.ta_aes_key_iv_enc, 'rb')
-		enc_aes_key = f.read()
-		f.close()
-		enc_aes_key_len = len(enc_aes_key)
-
-	# ta private key
-	f = open(args.ta_rsa_key, 'rb')
-	ta_key = RSA.importKey(f.read())
-	f.close()
-	key_len = (ta_key.size() + 1) / 8
-
-	# ta public key signature
-	f = open(args.ta_rsa_key_sig, 'rb')
-	ta_key_sig = f.read()
-	sig_key_len = len(ta_key_sig)
-	f.close()
-
-	h_hdr = SHA256.new()
-	digest_len = h_hdr.digest_size
-	signer_ta = PKCS1_v1_5.new(ta_key)
-	sig_len = len(signer_ta.sign(h_hdr))
-
-	f = open(args.inf, 'rb+')
-	shdr_len = struct.calcsize('<IIIIIIIIIIIIIIII')
-	shdr_check = f.read(shdr_len)
-	magic_check, version, flags, algo_check, arb_cvn, img_type_check,\
-	img_size_check,rsv0_check, rsv1_check, rsv2_check, rsv3_check, rsv4_check,\
-	rsv5_check, rsv6_check, rsv7_check, rsv8_check  = struct.unpack('<IIIIIIIIIIIIIIII', shdr_check)
-
-	if img_type_check == 1:
-		skip_len = shdr_len+digest_len+enc_aes_key_len
-	elif img_type_check == 2:
-		print 'TA has been signed, exit.'
+	if is_signed_ta(args.unsigned_ta) == True:
 		sys.exit(0)
-	else:
-		print 'ERROR: TA image type wrong!'
-		sys.exit(1)
 
-	f.seek(skip_len)
-	img = f.read()
+	enc_type = 0
+	if args.ta_aes_key != 'null' and args.ta_aes_iv != 'null' and \
+				args.ta_aes_key_enc != 'null':
+		enc_type = 2
+	elif args.ta_aes_key == 'null' and args.ta_aes_iv == 'null' and \
+				args.ta_aes_key_enc == 'null':
+		enc_type = 0
+	else:
+		print 'aes key file or iv file or enc aes key file is null, exit'
+		sys.exit(0)
+
+	f = open(args.unsigned_ta, 'rb')
+	ta_hdr_info = f.read(36)
+	f.seek(128)
+	payload_digest = f.read(32)
+	payload = f.read()
 	f.close()
 
-	img_size = len(img)
+	f = open(args.ta_prv_key, 'rb')
+	ta_prv_key = RSA.importKey(f.read())
+	ta_pub_key = ta_prv_key.publickey()
+	f.close()
 
-	magic = 0x4f545348	# SHDR_MAGIC
-	version = 0x02000204# VERSION
-	img_type = 2		# SHDR_TA_SIGNED
-	algo = 0x70004830	# TEE_ALG_RSASSA_PKCS1_V1_5_SHA256
-	arb_cvn = ta_cvn
+	f = open(args.cert_sig, 'rb')
+	cert_sig = f.read()
+	f.close()
 
-	h_key = SHA256.new()
-	shdr = struct.pack('<IIIIIIIIIIIIIIII', \
-		magic, version, 0, algo, arb_cvn, img_type, img_size, aes_key_type,\
-		0, 0, 0, 0, 0, 0, 0, 0)
+	enc_nonce = struct.pack('<4I', *([0] * 4))
+	enc_ta_aes_key = struct.pack('<8I', *([0] * 8))
+	enc_ta_aes_iv = struct.pack('<4I', *([0] * 4))
+	if enc_type == 2:
+		f = open(args.ta_aes_key_enc, 'rb')
+		enc_nonce = f.read(16)
+		enc_ta_aes_key = f.read(32)
+		enc_ta_aes_iv = f.read(16)
+		f.close()
 
-	h_elf = SHA256.new()
-	h_elf.update(img)
-	h_hdr.update(shdr)
-	h_hdr.update(enc_aes_key)
-	h_hdr.update(h_elf.digest())
-	sig_ta = signer_ta.sign(h_hdr)
-	shdr_len = struct.calcsize('<IIIIIIIIIIIIIIII')
+		f_ta_aes_key = open(args.ta_aes_key, 'rb')
+		f_ta_aes_iv = open(args.ta_aes_iv, 'rb')
+		payload = aes256_cbc_enc(f_ta_aes_key.read(), f_ta_aes_iv.read(), \
+				payload)
+		f_ta_aes_key.close()
+		f_ta_aes_iv.close()
+
+	uuid = "" + args.unsigned_ta.split('/')[-1]
+	uuid = uuid[:-3]
+
+	# gen ta sig
+	ta_hdr_obj = ta_hdr(ta_hdr_info);
+	ta_hdr_obj.update_attrs(args.arb_cvn, args.arb_type, enc_type, \
+			enc_nonce, enc_ta_aes_key, enc_ta_aes_iv)
+	sha256 = SHA256.new()
+	sha256.update(ta_hdr_obj.serialize())
+	sha256.update(payload_digest)
+	ta_sig = PKCS1_v1_5.new(ta_prv_key).sign(sha256)
+
+	signed_hdr_obj = signed_ta_hdr(ta_hdr_info, args.market_id, args.chipset_id)
+	signed_hdr_obj.update_attrs(args.arb_cvn, args.arb_type, enc_type, \
+			args.market_id, args.chipset_id, enc_nonce, enc_ta_aes_key, \
+			enc_ta_aes_iv, payload_digest, ta_pub_key, cert_sig, ta_sig, uuid)
+
+	if args.signed_ta == 'null':
+		args.signed_ta = args.unsigned_ta
+
+	f = open(args.signed_ta, 'wb')
+	f.write(signed_hdr_obj.serialize())
+	f.write(payload)
+	f.close()
 
 	print 'Signing TA ...'
-	print '    Input:    ta_rsa_key.name = ' + args.ta_rsa_key
-	print '              ta_rsa_key.size = {}'.format(ta_key.size() + 1)
-	print '              ta_rsa_key.sig  = ' + args.ta_rsa_key_sig
-	print '              ta_aes_key.name = ' + args.ta_aes_key
-	print '              ta_aes_iv.name  = ' + args.ta_aes_iv
-	print '       ta_aes_key_iv_enc.name = ' + args.ta_aes_key_iv_enc
-	print '                      ta.name = ' + args.inf
-	print '    Output:           ta.name = ' + args.out
-
-	f = open(args.out, 'wb')
-	f.write(shdr)
-	f.write(enc_aes_key)
-	f.write(h_elf.digest())
-	f.write(sig_ta)
-
-	skip_len = shdr_len + enc_aes_key_len + digest_len + sig_len
-	f.seek(skip_len)
-	for x in array.array("B", long_to_bytes(ta_key.publickey().n)):
-		pub_n_ta = struct.pack("B", x)
-		h_key.update(pub_n_ta)
-		f.write(pub_n_ta)
-
-	uuidStr = "{" + os.path.basename(args.inf).split(".")[0] + "}"
-	uuid = uuid.UUID(uuidStr)
-	h_key.update(uuid.bytes_le)
-
-	skip_len = shdr_len + enc_aes_key_len + digest_len + sig_len + key_len
-	f.seek(skip_len, 0)
-	f.write(ta_key_sig)
-
-	skip_len = shdr_len + enc_aes_key_len + digest_len + sig_len + key_len + sig_key_len
-	f.seek(skip_len, 0)
-	if aes_key_type == 2:
-		f.write(aes256_cbc_enc(aes_key, aes_iv, img))
-	else:
-		f.write(img)
-	f.close()
+	print '  Input:                  arb_cvn = ' + str(args.arb_cvn)
+	print '                        market_id = ' + str(args.market_id)
+	print '                       chipset_id = ' + str(args.chipset_id)
+	print '                         arb_type = ' + str(args.arb_type)
+	print '                  ta_prv_key.name = ' + args.ta_prv_key
+	print '                  ta_prv_key.size = {}'.format(ta_prv_key.size() + 1)
+	print '                    cert_sig.name = ' + args.cert_sig
+	print '                  ta_aes_key.name = ' + args.ta_aes_key
+	print '                   ta_aes_iv.name = ' + args.ta_aes_iv
+	print '              ta_aes_key_enc.name = ' + args.ta_aes_key_enc
+	print '                 unsigned_ta.name = ' + args.unsigned_ta
+	print '  Output:          signed_ta.name = ' + args.signed_ta
 
 if __name__ == "__main__":
 	main()

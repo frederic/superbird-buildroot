@@ -1,7 +1,7 @@
 /*
  * Include file private to the SOC Interconnect support files.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: siutils_priv.h 769534 2018-06-26 21:19:11Z $
+ * $Id: siutils_priv.h 795345 2018-12-18 16:52:03Z $
  */
 
 #ifndef	_siutils_priv_h_
@@ -33,7 +33,7 @@
 #if defined(SI_ERROR_ENFORCE)
 #define	SI_ERROR(args)	printf args
 #else
-#define	SI_ERROR(args) printf args
+#define	SI_ERROR(args)
 #endif // endif
 
 #if defined(ENABLE_CORECAPTURE)
@@ -157,6 +157,7 @@ typedef struct si_info {
 	void	*curwrap;		/**< current wrapper va */
 
 	uint32	oob_router;		/**< oob router registers for axi */
+	uint32	oob_router1;		/**< oob router registers for axi */
 
 	si_cores_info_t *cores_info;
 	gci_gpio_item_t	*gci_gpio_head;	/**< gci gpio interrupts head */

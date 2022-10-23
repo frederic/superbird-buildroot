@@ -220,6 +220,13 @@ meson_vpu_create_block(struct meson_vpu_block_para *para,
 
 		pipeline->postblend = to_postblend_block(mvb);
 		break;
+	case MESON_BLK_VIDEO:
+		blk_size = sizeof(struct meson_vpu_video);
+		mvb = create_block(blk_size, para, &video_ops, pipeline);
+
+		pipeline->video[mvb->index] = to_video_block(mvb);
+		pipeline->num_video++;
+		break;
 	default:
 		return NULL;
 	}
@@ -295,6 +302,7 @@ static void vpu_pipeline_planes_calc(struct meson_vpu_pipeline *pipeline,
 	u8 i;
 
 	mvps->num_plane = 0;
+	mvps->num_plane_video = 0;
 	mvps->enable_blocks = 0;
 	for (i = 0; i < pipeline->num_osds; i++) {
 		if (mvps->plane_info[i].enable) {
@@ -307,7 +315,17 @@ static void vpu_pipeline_planes_calc(struct meson_vpu_pipeline *pipeline,
 			mvps->num_plane++;
 		}
 	}
-	DRM_DEBUG("num_plane=%d.\n", mvps->num_plane);
+	for (i = 0; i < pipeline->num_video; i++) {
+		if (mvps->video_plane_info[i].enable) {
+			mvps->enable_blocks |=
+				BIT(pipeline->video[i]->base.id);
+			mvps->num_plane_video++;
+			DRM_DEBUG("video[%d]-id=%d\n", i,
+				  pipeline->video[i]->base.id);
+		}
+	}
+	DRM_DEBUG("num_plane=%d, video_plane_num=%d.\n",
+		  mvps->num_plane, mvps->num_plane_video);
 }
 
 int vpu_pipeline_check(struct meson_vpu_pipeline *pipeline,
@@ -321,6 +339,7 @@ int vpu_pipeline_check(struct meson_vpu_pipeline *pipeline,
 	vpu_pipeline_planes_calc(pipeline, mvps);
 
 	ret = vpu_pipeline_traverse(mvps, state);
+	vpu_video_pipeline_check_block(mvps, state);
 	DRM_DEBUG("check done--num_plane=%d.\n", mvps->num_plane);
 
 	return ret;
@@ -332,6 +351,9 @@ void vpu_pipeline_init(struct meson_vpu_pipeline *pipeline)
 
 	for (i = 0; i < pipeline->num_osds; i++)
 		VPU_PIPELINE_HW_INIT(&pipeline->osds[i]->base);
+
+	for (i = 0; i < pipeline->num_video; i++)
+		VPU_PIPELINE_HW_INIT(&pipeline->video[i]->base);
 
 	for (i = 0; i < pipeline->num_afbc_osds; i++)
 		VPU_PIPELINE_HW_INIT(&pipeline->afbc_osds[i]->base);

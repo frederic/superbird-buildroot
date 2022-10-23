@@ -22,6 +22,9 @@
 #define DDC_SEGMENT_ADDR   0x30
 #define VIC_MAX_NUM        512
 #define DRM_HDMITX_VER     "20180705"
+//Not sure the default value
+#define MESON_DEFAULT_COLOR_DEPTH COLORDEPTH_24B
+#define MESON_DEFAULT_COLOR_SPACE HDMI_COLORSPACE_RGB
 
 struct am_hdmi_data {
 	unsigned int vic;
@@ -58,7 +61,10 @@ struct am_hdmi_tx {
 	int irq;
 	unsigned int input_color_format;
 	unsigned int output_color_format;
-	unsigned int color_depth;
+	enum hdmi_color_depth color_depth;
+	enum hdmi_colorspace color_space;
+	struct drm_property *color_depth_property;
+	struct drm_property *color_space_property;
 	struct drm_display_mode previous_mode;
 	struct am_hdmi_data hdmi_info;
 	struct am_hdmi_i2c *i2c;
@@ -67,6 +73,7 @@ struct am_hdmi_tx {
 	const char *hpd_pin;
 	const char *ddc_pin;
 	unsigned int hpd_flag;/*0:none   1:up    2:down*/
+	unsigned int drm_mode_setting;
 	struct mutex hdcp_mutex;
 	unsigned int hdcp_feature;
 	unsigned int hdcp_tx_type;/*bit0:hdcp14 bit 1:hdcp22*/

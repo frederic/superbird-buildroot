@@ -228,6 +228,7 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 	u32 aligned_32, afbc_color_reorder;
 	unsigned int depth;
 	int bpp;
+	bool reverse_x, reverse_y;
 
 	struct meson_vpu_afbc *afbc;
 	struct meson_vpu_afbc_state *afbc_state;
@@ -264,6 +265,8 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 
 	header_addr = plane_info->phy_addr;
 	out_addr = ((u64)(vblk->index + 1)) << 24;
+	reverse_x = (plane_info->rotation & DRM_REFLECT_X) ? 1 : 0;
+	reverse_y = (plane_info->rotation & DRM_REFLECT_Y) ? 1 : 0;
 
 	/* set osd path misc ctrl */
 	VSYNCOSD_WR_MPEG_REG_BITS(OSD_PATH_MISC_CTRL, 0x1, (osd_index + 4), 1);
@@ -323,6 +326,11 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 	VSYNCOSD_WR_MPEG_REG(afbc_reg->vpu_mafbc_bounding_box_y_end_s,
 		(plane_info->src_y + plane_info->src_h - 1));
 
+	/*reverse config*/
+	VSYNCOSD_WR_MPEG_REG_BITS(afbc_reg->vpu_mafbc_prefetch_cfg_s,
+				  reverse_x, 0, 1);
+	VSYNCOSD_WR_MPEG_REG_BITS(afbc_reg->vpu_mafbc_prefetch_cfg_s,
+				  reverse_y, 1, 1);
 	VSYNCOSD_WR_MPEG_REG(VPU_MAFBC_COMMAND, 1);
 
 	DRM_DEBUG("%s set_state called.\n", afbc->base.name);

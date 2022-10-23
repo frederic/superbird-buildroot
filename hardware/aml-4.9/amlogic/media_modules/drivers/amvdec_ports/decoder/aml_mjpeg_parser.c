@@ -33,7 +33,7 @@ static int find_marker(const u8 **pbuf_ptr, const u8 *buf_end)
 	buf_ptr = buf_end;
 	val = -1;
 found:
-	pr_info("find_marker skipped %d bytes\n", skipped);
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "find_marker skipped %d bytes\n", skipped);
 	*pbuf_ptr = buf_ptr;
 
 	return val;
@@ -100,7 +100,7 @@ int ff_mjpeg_find_marker(struct MJpegDecodeContext *s,
 		memset(s->buffer + *unescaped_buf_size, 0,
 			AV_INPUT_BUFFER_PADDING_SIZE);
 
-		pr_info("escaping removed %d bytes\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "escaping removed %d bytes\n",
 			(int)((buf_end - *buf_ptr) - (dst - s->buffer)));
 	} else if (start_code == SOS && s->ls) {
 		const u8 *src = *buf_ptr;
@@ -131,7 +131,7 @@ int ff_mjpeg_find_marker(struct MJpegDecodeContext *s,
 			if (x == 0xFF && b < t) {
 				x = src[b++];
 				if (x & 0x80) {
-					pr_err("Invalid escape sequence\n");
+					v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid escape sequence\n");
 					x &= 0x7f;
 				}
 				put_bits(&pb, 7, x);
@@ -168,14 +168,14 @@ int ff_mjpeg_decode_sof(struct MJpegDecodeContext *s)
 	bits    = get_bits(&s->gb, 8);
 
 	if (bits > 16 || bits < 1) {
-		pr_err("bits %d is invalid\n", bits);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "bits %d is invalid\n", bits);
 		return -1;
 	}
 
 	height = get_bits(&s->gb, 16);
 	width  = get_bits(&s->gb, 16);
 
-	pr_info("sof0: picture: %dx%d\n", width, height);
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "sof0: picture: %dx%d\n", width, height);
 
 	nb_components = get_bits(&s->gb, 8);
 	if (nb_components <= 0 ||
@@ -197,16 +197,16 @@ int ff_mjpeg_decode_sof(struct MJpegDecodeContext *s)
 			s->v_max = v_count[i];
 		s->quant_index[i] = get_bits(&s->gb, 8);
 		if (s->quant_index[i] >= 4) {
-			pr_err("quant_index is invalid\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "quant_index is invalid\n");
 			return -1;
 		}
 		if (!h_count[i] || !v_count[i]) {
-			pr_err("Invalid sampling factor in component %d %d:%d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid sampling factor in component %d %d:%d\n",
 				i, h_count[i], v_count[i]);
 			return -1;
 		}
 
-		pr_info("component %d %d:%d id: %d quant:%d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "component %d %d:%d id: %d quant:%d\n",
 			i, h_count[i], v_count[i],
 		s->component_id[i], s->quant_index[i]);
 	}
@@ -256,21 +256,21 @@ static int ff_mjpeg_decode_frame(u8 *buf, int buf_size, struct MJpegDecodeContex
 		if (start_code < 0) {
 			break;
 		} else if (unescaped_buf_size > INT_MAX / 8) {
-			pr_err("MJPEG packet 0x%x too big (%d/%d), corrupt data?\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "MJPEG packet 0x%x too big (%d/%d), corrupt data?\n",
 				start_code, unescaped_buf_size, buf_size);
 			return -1;
 		}
-		pr_info("marker=%x avail_size_in_buf=%d\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "marker=%x avail_size_in_buf=%d\n",
 			start_code, (int)(buf_end - buf_ptr));
 
 		ret = init_get_bits8(&s->gb, unescaped_buf_ptr, unescaped_buf_size);
 		if (ret < 0) {
-			pr_err("invalid buffer\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "invalid buffer\n");
 			goto fail;
 		}
 
 		s->start_code = start_code;
-		pr_info("startcode: %X\n", start_code);
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "startcode: %X\n", start_code);
 
 		switch (start_code) {
 		case SOF0:
@@ -348,23 +348,23 @@ static int ff_mjpeg_decode_frame(u8 *buf, int buf_size, struct MJpegDecodeContex
 		case SOF14:
 		case SOF15:
 		case JPG:
-			pr_err("mjpeg: unsupported coding type (%x)\n", start_code);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "mjpeg: unsupported coding type (%x)\n", start_code);
 			break;
 		}
 skip:
 		/* eof process start code */
 		buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
-		pr_info("marker parser used %d bytes (%d bits)\n",
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "marker parser used %d bytes (%d bits)\n",
 			(get_bits_count(&s->gb) + 7) / 8, get_bits_count(&s->gb));
 	}
 
-	pr_err("No JPEG data found in image\n");
+	v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "No JPEG data found in image\n");
 	return -1;
 fail:
 	s->got_picture = 0;
 	return ret;
 the_end:
-	pr_info("decode frame unused %d bytes\n", (int)(buf_end - buf_ptr));
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "decode frame unused %d bytes\n", (int)(buf_end - buf_ptr));
 
 	return 0;
 }
@@ -382,7 +382,7 @@ int mjpeg_decode_extradata_ps(u8 *buf, int size, struct mjpeg_param_sets *ps)
 
 	ret = ff_mjpeg_decode_frame(buf, size, &ps->dec_ps);
 	if (ret) {
-		pr_err("parse extra data failed. err: %d\n", ret);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "parse extra data failed. err: %d\n", ret);
 		vfree(ps->dec_ps.buffer);
 		return ret;
 	}

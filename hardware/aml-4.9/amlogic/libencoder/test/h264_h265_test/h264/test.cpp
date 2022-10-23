@@ -15,7 +15,11 @@
 #include "test_dma_api.h"
 
 #define ENABLE_VFR 0
-
+//#define LOGAPI(x...) \
+//    do { \
+//        printf(x); \
+//        printf("\n"); \
+//    }while(0);
 //int main(int argc, const char *argv[]) {
 int avc_encode(avc_encoder_params_t * params) {
 
@@ -288,12 +292,12 @@ int avc_encode(avc_encoder_params_t * params) {
   param_runtime.frame_rate = framerate;
   fp = fopen(params->src_file, "rb");
   if (fp == NULL) {
-    LOGAPI("open src file error!\n");
+    LOGAPI("open src file error! %s\n", strerror(errno));
     goto exit;
   }
   outfd = open(params->es_file, O_CREAT | O_RDWR | O_TRUNC, 0644);
   if (outfd < 0) {
-    LOGAPI("open dest file error!\n");
+    LOGAPI("open dest file error! %s\n", strerror(errno));
     goto exit;
   }
   handle_enc =

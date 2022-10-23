@@ -12,7 +12,7 @@ BUILD_FOLDER="build/"
 FIP_FOLDER="fip/"
 MANIFEST=".repo/manifest.xml"
 FIP_BUILD_FOLDER="fip/_tmp/"
-declare -a BLX_NAME_GLB=("bl2" "bl30" "bl31" "bl32")
+declare -a BLX_NAME_GLB=("bl2" "bl30" "bl31" "bl32" "bl40")
 
 # include uboot pre-build defines
 #BL33_BUILD_FOLDER=("bl33/build/")
@@ -35,6 +35,7 @@ declare BL33_TOOLCHAIN2="/opt/gcc-linaro-7.3.1-2018.05-i686_aarch64-elf/bin/aarc
 declare BL33_DEFCFG1="${UBOOT_FOLDER}/${UBOOT_VERSION1}/${DEFCFG_FOLDER}"
 declare BL33_DEFCFG2="${UBOOT_FOLDER}/${UBOOT_VERSION2}/${DEFCFG_FOLDER}"
 
+declare FIP_DDR_PARSE="${FIP_FOLDER}/tools/ddr_parse/"
 # current branch/path/rev/name/remote in xml
 declare -a GIT_INFO=("branch", "path", "rev", "name", "remote")
 

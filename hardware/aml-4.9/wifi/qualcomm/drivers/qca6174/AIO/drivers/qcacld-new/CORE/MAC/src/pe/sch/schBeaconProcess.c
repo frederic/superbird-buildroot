@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -423,10 +423,7 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
         }
 
         if (pBeacon->cfPresent)
-        {
             cfgSetInt(pMac, WNI_CFG_CFP_PERIOD, pBeacon->cfParamSet.cfpPeriod);
-            limSendCFParams(pMac, bssIdx, pBeacon->cfParamSet.cfpCount, pBeacon->cfParamSet.cfpPeriod);
-        }
 
         if (pBeacon->timPresent)
         {
@@ -723,6 +720,14 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
         limReceivedHBHandler(pMac, (tANI_U8)pBeacon->HTInfo.primaryChannel, psessionEntry);
     else
         limReceivedHBHandler(pMac, (tANI_U8)pBeacon->channelNumber, psessionEntry);
+
+    if (pBeacon->countryInfoPresent && pMac->sta_change_cc_via_beacon) {
+        schLog(pMac, LOG1, "beacon country code %c%c ssid: %s",
+               pBeacon->countryInfoParam.countryString[0],
+               pBeacon->countryInfoParam.countryString[1],
+               pBeacon->ssId.ssId);
+        lim_check_and_change_cc(pMac, pBeacon, psessionEntry);
+    }
 
     // I don't know if any additional IE is required here. Currently, not include addIE.
     if(sendProbeReq)

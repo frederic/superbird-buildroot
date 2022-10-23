@@ -1,0 +1,159 @@
+From 827ddde92e51a4bf8e0f9f571a99efed0a1bb23f Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Thu, 26 Mar 2020 21:27:43 +0800
+Subject: [PATCH 8/8] Enable Connector by priority
+
+we just support only one pipline.
+---
+ Makefile.am       |  2 ++
+ compositor/main.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ configure.ac      |  6 ++++
+ 3 files changed, 92 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index da9253f..038fc76 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -216,6 +216,8 @@ weston_SOURCES += 					\
+ 	compositor/xwayland.c
+ endif
+ 
++weston_CFLAGS += -DAML_MAX_OUTPUT_PIPLINE=$(WESTON_MAX_OUTPUT_PIPLINE)
++
+ # Track this dependency explicitly instead of using BUILT_SOURCES.  We
+ # add BUILT_SOURCES to CLEANFILES, but we want to keep git-version.h
+ # in case we're building from tarballs.
+diff --git a/compositor/main.c b/compositor/main.c
+index 6d13ce2..144777d 100644
+--- a/compositor/main.c
++++ b/compositor/main.c
+@@ -2135,6 +2135,73 @@ drm_head_disable(struct weston_head *head)
+ 		wet_output_destroy(output);
+ }
+ 
++static int drm_get_head_priority(struct wet_compositor *wet,
++		struct weston_head* head)
++{
++	const char *name = weston_head_get_name(head);
++	struct weston_config_section *section;
++	int priority = 0;
++
++	section = drm_config_find_controlling_output_section(wet->config, name);
++	if (section) {
++		weston_config_section_get_int(section, "priority", &priority, 0);
++	}
++	return priority;
++}
++
++static void drm_get_should_enable_heads_by_priority(struct weston_compositor *compositor,
++		struct weston_head** out, int out_size)
++{
++
++	int i,j;
++	struct weston_head *head = NULL;
++	bool connected;
++	bool forced;
++	int priority = 0;
++	struct wet_compositor *wet = to_wet_compositor(compositor);
++	int *priority_array = (int *)zalloc(sizeof(int) * out_size);
++
++	if (!priority_array) {
++		perror("out of memory");
++		return;
++	}
++
++	memset(out, 0, sizeof(struct weston_head*) * out_size);
++
++	while ((head = weston_compositor_iterate_heads(compositor, head))) {
++		connected = weston_head_is_connected(head);
++		forced = drm_head_should_force_enable(wet, head);
++		priority = drm_get_head_priority(wet, head);
++
++		if (!(connected || forced)) {
++			continue;
++		}
++
++		for (i = 0; i < out_size; i++) {
++			if (priority > priority_array[i] || out[i] == NULL) {
++				for (j = out_size - 1; j > i; j--) {
++					out[j] = out[j-1];
++					priority_array[j] = priority_array[j-1];
++				}
++				out[i] = head;
++				priority_array[i] = priority;
++				break;
++			}
++		}
++	}
++	free(priority_array);
++
++	for (i = 0; i < out_size; i++) {
++		if (i == 0)
++			weston_log("Output pipline limited:%d, Enable connect by priority:", out_size);
++		if (out[i] != NULL) {
++			weston_log("[=>%s]", weston_head_get_name(out[i]));
++		}
++	}
++	weston_log("\n");
++}
++
++
+ static void
+ drm_heads_changed(struct wl_listener *listener, void *arg)
+ {
+@@ -2146,18 +2213,33 @@ drm_heads_changed(struct wl_listener *listener, void *arg)
+ 	bool changed;
+ 	bool forced;
+ 
++#if AML_MAX_OUTPUT_PIPLINE > 0
++	struct weston_head* head_should_enable[AML_MAX_OUTPUT_PIPLINE] = {NULL};
++	drm_get_should_enable_heads_by_priority(compositor, head_should_enable, AML_MAX_OUTPUT_PIPLINE);
++#endif
+ 	/* We need to collect all cloned heads into outputs before enabling the
+ 	 * output.
+ 	 */
+ 	while ((head = weston_compositor_iterate_heads(compositor, head))) {
++#if AML_MAX_OUTPUT_PIPLINE > 0
++		bool should_enable = false;
++		int i;
++		for (i = 0; i < AML_MAX_OUTPUT_PIPLINE; i++) {
++			if (head == head_should_enable[i]) {
++				should_enable = true;
++			}
++		}
++#else
++		bool should_enable = true;
++#endif
+ 		connected = weston_head_is_connected(head);
+ 		enabled = weston_head_is_enabled(head);
+ 		changed = weston_head_is_device_changed(head);
+ 		forced = drm_head_should_force_enable(wet, head);
+ 
+-		if ((connected || forced) && !enabled) {
++		if (((connected || forced) && should_enable) && !enabled) {
+ 			drm_head_prepare_enable(wet, head);
+-		} else if (!(connected || forced) && enabled) {
++		} else if (!((connected || forced) && should_enable) && enabled) {
+ 			drm_head_disable(head);
+ 		} else if (enabled && changed) {
+ 			weston_log("Detected a monitor change on head '%s', "
+diff --git a/configure.ac b/configure.ac
+index a6baa10..7056ad1 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -176,6 +176,12 @@ AC_ARG_ENABLE(setuid-install, [  --enable-setuid-install],,
+ 	      enable_setuid_install=yes)
+ AM_CONDITIONAL(ENABLE_SETUID_INSTALL, test x$enable_setuid_install = xyes)
+ 
++AC_ARG_VAR([WESTON_MAX_OUTPUT_PIPLINE],
++           [Set max output pipline supported, default is 0, unlimited])
++
++if test "x$WESTON_MAX_OUTPUT_PIPLINE" = "x"; then
++	WESTON_MAX_OUTPUT_PIPLINE=0
++fi
+ 
+ AC_ARG_ENABLE(xwayland, [  --enable-xwayland],,
+ 	      enable_xwayland=yes)
+-- 
+2.7.4
+

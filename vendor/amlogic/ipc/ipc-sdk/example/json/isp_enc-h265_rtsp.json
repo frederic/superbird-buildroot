@@ -1,0 +1,29 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h265
+    },
+    bind: {output:[rtspses.rtp_v]}
+  },
+  {
+    type: GstBridge,
+    load: "/usr/lib/ipc_gstbridge.so",
+    param: {
+      name: rtspses,
+      rtsp-port: 554,
+      rtsp-server: "rtspes"
+      rtsp-mount: "/live.sdp"
+      launch: "appsrc name=rtp_v max-bytes=256000 ! h265parse config-interval=1 ! rtph265pay pt=96 config-interval=1 name=pay0"
+    }
+  }
+]

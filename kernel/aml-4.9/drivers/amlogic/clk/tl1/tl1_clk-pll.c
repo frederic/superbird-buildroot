@@ -92,6 +92,19 @@
 #define TM2_PCIE_PLL_CNTL5	0x68000048
 #define TM2_PCIE_PLL_CNTL5_	0x68000068
 
+#define TM2_REVB_PCIE_PLL_CNTL0_0	0x200c04c8
+#define TM2_REVB_PCIE_PLL_CNTL0_1	0x300c04c8
+#define TM2_REVB_PCIE_PLL_CNTL0_2	0x340c04c8
+#define TM2_REVB_PCIE_PLL_CNTL0_3	0x140c04c8
+#define TM2_REVB_PCIE_PLL_CNTL1		0x30000000
+#define TM2_REVB_PCIE_PLL_CNTL2		0x00001100
+#define TM2_REVB_PCIE_PLL_CNTL2_	0x00001000
+#define TM2_REVB_PCIE_PLL_CNTL3		0x10058e00
+#define TM2_REVB_PCIE_PLL_CNTL4		0x000100c0
+#define TM2_REVB_PCIE_PLL_CNTL4_	0x008100c0
+#define TM2_REVB_PCIE_PLL_CNTL5		0x68000048
+#define TM2_REVB_PCIE_PLL_CNTL5_	0x68000068
+
 #define to_meson_clk_pll(_hw) container_of(_hw, struct meson_clk_pll, hw)
 
 static unsigned long meson_tl1_pll_recalc_rate(struct clk_hw *hw,
@@ -314,7 +327,8 @@ static int meson_tl1_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 			writel(TL1_PLL_CNTL6,
 			       cntlbase + (unsigned long)(6 * 4));
 			udelay(10);
-		} else if (!strcmp(clk_hw_get_name(hw), "pcie_pll")) {
+		} else if (!strcmp(clk_hw_get_name(hw), "pcie_pll")
+			   && (!tm2_revb_pcie)) {
 			writel(TM2_PCIE_PLL_CNTL0_0,
 			       cntlbase + (unsigned long)(0 * 4));
 			writel(TM2_PCIE_PLL_CNTL0_1,
@@ -344,6 +358,35 @@ static int meson_tl1_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 			writel(TM2_PCIE_PLL_CNTL0_4,
 			       cntlbase + (unsigned long)(0 * 4));
 			writel(TM2_PCIE_PLL_CNTL2_,
+			       cntlbase + (unsigned long)(7 * 4));
+		} else if (!strcmp(clk_hw_get_name(hw), "pcie_pll")
+			   && tm2_revb_pcie) {
+			writel(TM2_REVB_PCIE_PLL_CNTL0_0,
+			       cntlbase + (unsigned long)(0 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL0_1,
+			       cntlbase + (unsigned long)(0 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL1,
+			       cntlbase + (unsigned long)(1 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL2,
+			       cntlbase + (unsigned long)(7 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL3,
+			       cntlbase + (unsigned long)(8 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL4,
+			       cntlbase + (unsigned long)(53 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL5,
+			       cntlbase + (unsigned long)(54 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL5_,
+			       cntlbase + (unsigned long)(54 * 4));
+			udelay(20);
+			writel(TM2_REVB_PCIE_PLL_CNTL4_,
+			       cntlbase + (unsigned long)(53 * 4));
+			udelay(10);
+			writel(TM2_REVB_PCIE_PLL_CNTL0_2,
+			       cntlbase + (unsigned long)(0 * 4));
+			writel(TM2_REVB_PCIE_PLL_CNTL0_3,
+			       cntlbase + (unsigned long)(0 * 4));
+			udelay(20);
+			writel(TM2_REVB_PCIE_PLL_CNTL2_,
 			       cntlbase + (unsigned long)(7 * 4));
 		} else if (!strcmp(clk_hw_get_name(hw), "fixed_pll")) {
 			writel((readl(cntlbase) | MESON_PLL_RESET)

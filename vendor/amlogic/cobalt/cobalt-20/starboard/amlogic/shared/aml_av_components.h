@@ -91,7 +91,14 @@ public:
   const static int PREROLL_NUM_FRAMES = 50;
 
 #if defined(COBALT_WIDEVINE_OPTEE)
-  uint8_t * GetSecMem(int size) { has_fed_encrypt_data=true; return sec_drm_mem; }
+  uint8_t * GetSecMem(int size)
+  {
+    has_fed_encrypt_data=true;
+#if defined(SECMEM_V2)
+   return (uint8_t*)secmem_handle;
+#endif
+    return sec_drm_mem;
+  }
   bool IsTvpMode() { return (codec_param && codec_param->drmmode); }
   void CopyClearBufferToSecure(InputBuffer *input_buffer);
   bool IsSampleInSecureBuffer(InputBuffer *input_buffer);
@@ -126,6 +133,9 @@ protected:
   SbTime time_seek;
   bool isvideo;
   bool prerolled;
+  bool bsubdecoder_;
+  static int sub_eos_state;
+  static int sub_audio_retpts;
   FILE * dump_fp;
   SbPlayerOutputMode output_mode_;
 
@@ -137,13 +147,17 @@ protected:
   static int sec_mem_size;
   static int sec_mem_pos;
   bool has_fed_encrypt_data;
+#if defined(SECMEM_V2)
+  static void  * secmem_session;
+  static unsigned int  secmem_handle;
+#endif
 #endif
 };
 
 class AmlAudioRenderer : public AmlAVCodec {
 public:
-  AmlAudioRenderer(SbMediaAudioCodec audio_codec,
-                   SbMediaAudioSampleInfo audio_sample_info, SbDrmSystem drm_system);
+  AmlAudioRenderer(SbMediaAudioCodec audio_codec,SbMediaAudioSampleInfo audio_sample_info,
+                    SbDrmSystem drm_system,bool bsubdecoder);
   virtual ~AmlAudioRenderer() {}
   // AudioRenderer methods
   bool WriteSample(const scoped_refptr<InputBuffer> &input_buffer,
@@ -154,14 +168,15 @@ public:
   void SetVolume(double volume) { AVSetVolume(volume); }
   bool IsEndOfStreamWritten() const { return AVIsEndOfStreamWritten(); }
   bool WriteOpusSample(uint8_t * buf, int dsize, bool *written);
+
 };
 
 class AmlVideoRenderer: public AmlAVCodec {
 public:
   AmlVideoRenderer(SbMediaVideoCodec video_codec, SbDrmSystem drm_system,
                    SbPlayerOutputMode output_mode,
-                   SbDecodeTargetGraphicsContextProvider
-                       *decode_target_graphics_context_provider);
+                   SbDecodeTargetGraphicsContextProvider *decode_target_graphics_context_provider,
+                   bool bsubdecoder);
   virtual ~AmlVideoRenderer();
   void Initialize(const ErrorCB &error_cb, const PrerolledCB &prerolled_cb,
                   const EndedCB &ended_cb) {

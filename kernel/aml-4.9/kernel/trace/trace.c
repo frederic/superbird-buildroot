@@ -794,7 +794,7 @@ int __trace_puts(unsigned long ip, const char *str, int size)
 
 	local_save_flags(irq_flags);
 	buffer = global_trace.trace_buffer.buffer;
-	event = trace_buffer_lock_reserve(buffer, TRACE_PRINT, alloc, 
+	event = trace_buffer_lock_reserve(buffer, TRACE_PRINT, alloc,
 					  irq_flags, pc);
 	if (!event)
 		return 0;
@@ -1864,7 +1864,7 @@ static void __trace_find_cmdline(int pid, char comm[])
 
 	map = savedcmd->map_pid_to_cmdline[pid];
 	if (map != NO_CMDLINE_MAP)
-		strcpy(comm, get_saved_cmdlines(map));
+		strlcpy(comm, get_saved_cmdlines(map), TASK_COMM_LEN-1);
 	else
 		strcpy(comm, "<...>");
 }
@@ -4858,7 +4858,7 @@ static void tracing_set_nop(struct trace_array *tr)
 {
 	if (tr->current_trace == &nop_trace)
 		return;
-	
+
 	tr->current_trace->enabled--;
 
 	if (tr->current_trace->reset)
@@ -7534,6 +7534,7 @@ static struct notifier_block trace_panic_notifier = {
 	.priority       = 150   /* priority: INT_MAX >= x >= 0 */
 };
 
+#ifndef CONFIG_AMLOGIC_MODIFY
 static int trace_die_handler(struct notifier_block *self,
 			     unsigned long val,
 			     void *data)
@@ -7553,6 +7554,7 @@ static struct notifier_block trace_die_notifier = {
 	.notifier_call = trace_die_handler,
 	.priority = 200
 };
+#endif
 
 /*
  * printk is set to max of 1024, we really don't need it that big.
@@ -7609,6 +7611,278 @@ void trace_init_global_iter(struct trace_iterator *iter)
 		iter->iter_flags |= TRACE_FILE_TIME_IN_NS;
 }
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <linux/memblock.h>
+#include <linux/proc_fs.h>
+
+static aml_wdt_stop_func_t aml_wdt_stop_func;
+static void *aml_wdt_stop_data;
+
+static char *ftrace_dump_mem_base;
+static unsigned long ftrace_dump_mem_size;
+static unsigned long ftrace_dump_mem_idx;
+static int ftrace_dump_mem_overflowed;
+
+void set_aml_wdt_stop_func(aml_wdt_stop_func_t func, void *data)
+{
+	aml_wdt_stop_func = func;
+	aml_wdt_stop_data = data;
+}
+
+static int __init early_ftrace_dump_mem(char *buf)
+{
+	int ret;
+	unsigned long mem_base, mem_size;
+
+	if (!buf)
+		return -EINVAL;
+
+	pr_info("%s:%s\n", __func__, buf);
+
+	ret = sscanf(buf, "%lx,%lx", &mem_base, &mem_size);
+	if (ret != 2) {
+		pr_err("early_ftrace_dump_mem: invalid boot args:%s\n", buf);
+		return -EINVAL;
+	}
+
+	mem_size = PAGE_ALIGN(mem_size);
+
+	ret = memblock_reserve(mem_base, mem_size);
+	if (ret < 0) {
+		pr_err("reserve ftrace_dump_mem base=%lx size=%lx failed\n",
+		       mem_base, mem_size);
+		return -EINVAL;
+	}
+
+	ftrace_dump_mem_base = phys_to_virt(mem_base);
+	ftrace_dump_mem_size = mem_size;
+
+	pr_info("early_ftrace_dump_mem: base:%lx, size:%lx, virt=%lx\n",
+		mem_base,
+		mem_size,
+		(unsigned long)ftrace_dump_mem_base);
+
+	return 0;
+}
+
+early_param("ftrace_dump_mem", early_ftrace_dump_mem);
+
+static void trace_printk_seq_mem(struct trace_seq *s)
+{
+	/* Probably should print a warning here. */
+	if (s->seq.len >= 1024)
+		s->seq.len = 1024;
+
+	if (WARN_ON_ONCE(s->seq.len >= s->seq.size))
+		s->seq.len = s->seq.size - 1;
+
+	/* should be zero ended, but we are paranoid. */
+	s->buffer[s->seq.len] = 0;
+
+	memcpy((void *)(ftrace_dump_mem_base + ftrace_dump_mem_idx),
+	       s->buffer,
+	       s->seq.len);
+
+	ftrace_dump_mem_idx += s->seq.len;
+
+	if (ftrace_dump_mem_idx >= ftrace_dump_mem_size - 1024) {
+		pr_emerg("ftrace_dump_mem buffer overflow\n");
+
+		memset((void *)(ftrace_dump_mem_base + ftrace_dump_mem_idx),
+		       '+',
+		       ftrace_dump_mem_size - ftrace_dump_mem_idx);
+		ftrace_dump_mem_base[ftrace_dump_mem_size - 1] = '\n';
+
+		ftrace_dump_mem_idx = 0;
+		ftrace_dump_mem_overflowed = 1;
+	}
+
+	trace_seq_init(s);
+}
+
+#define TRACE_HEAD_STR "TRACE:\n" \
+	"# tracer: dump\n" \
+	"#\n" \
+	"# entries-in-buffer/entries-written: 0/0   #P:4\n" \
+	"#\n" \
+	"#                              _-----=> irqs-off\n" \
+	"#                             / _----=> need-resched\n" \
+	"#                            | / _---=> hardirq/softirq\n" \
+	"#                            || / _--=> preempt-depth\n" \
+	"#                            ||| /     delay\n" \
+	"#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION\n" \
+	"#              | |       |   ||||       |         |\n"
+
+static void trace_first_line_init(int idx)
+{
+	char *line = ftrace_dump_mem_base + idx;
+
+	memset(line, ' ', 1024);
+	strcpy(line, TRACE_HEAD_STR);
+	line[strlen(line)] = ' ';
+	line[1023] = '\n';
+}
+
+static void trace_second_line_init(int idx)
+{
+	int i;
+	char *line = ftrace_dump_mem_base + idx;
+
+	for (i = 0; i < 1024; i++) {
+		if (line[i] == '\n')
+			break;
+
+		line[i] = ' ';
+	}
+}
+
+static void trace_last_line_init(int idx)
+{
+	memset(ftrace_dump_mem_base + idx, ' ', 1024 - (idx & 1023));
+
+	ftrace_dump_mem_base[(idx & ~1023) + 1023] = '\n';
+}
+
+static void swap_lines(int src, int dest, int size)
+{
+	static char line[1024];
+	int i;
+
+	pr_debug("swap_lines: src=%0x, dest=%0x, size=%0x\n", src, dest, size);
+
+	for (i = 0; i < size; i += 1024) {
+		memcpy(line, ftrace_dump_mem_base + src + i, 1024);
+		memcpy(ftrace_dump_mem_base + src + i,
+		       ftrace_dump_mem_base + dest + i,
+		       1024);
+		memcpy(ftrace_dump_mem_base + dest + i, line, 1024);
+	}
+}
+
+static void ftrace_dump_mem_finish(void)
+{
+	int first_line_idx, second_line_idx;
+	int start, middle, end, cur, tmp;
+
+	if (!ftrace_dump_mem_base)
+		return;
+
+	if (!ftrace_dump_mem_overflowed) {
+		trace_first_line_init(0);
+		trace_second_line_init(1024);
+		return;
+	}
+
+	trace_last_line_init(ftrace_dump_mem_idx);
+
+	first_line_idx = (ftrace_dump_mem_idx & ~1023) + 1024;
+	if (first_line_idx == ftrace_dump_mem_size)
+		first_line_idx = 0;
+
+	second_line_idx = first_line_idx + 1024;
+	if (second_line_idx == ftrace_dump_mem_size)
+		second_line_idx = 0;
+
+	trace_first_line_init(first_line_idx);
+	trace_second_line_init(second_line_idx);
+
+	/* sort lines */
+	start = 0;
+	middle = ftrace_dump_mem_size / 2;
+	end = ftrace_dump_mem_size;
+	cur = first_line_idx;
+
+	pr_debug("= start=%0x, middle=%0x, end=%0x, cur=%0x\n",
+		 start, middle, end, cur);
+
+	while (end - start > 1024) {
+		if (cur <= middle) {
+			swap_lines(cur, start, cur - start);
+
+			tmp = start + (cur - start) * 2;
+			start = cur;
+			cur = tmp;
+			middle = start + (end - start) / 2;
+			pr_debug("< start=%0x, middle=%0x, end=%0x, cur=%0x\n",
+				 start, middle, end, cur);
+		} else {
+			swap_lines(cur, cur - (end - cur), end - cur);
+
+			tmp = end - (end - cur) * 2;
+			end = cur;
+			cur = tmp;
+			middle = start + (end - start) / 2;
+
+			pr_debug("> start=%0x, middle=%0x, end=%0x, cur=%0x\n",
+				 start, middle, end, cur);
+		}
+
+		if (cur >= end)
+			break;
+	}
+}
+
+static void *s_dump_start(struct seq_file *m, loff_t *pos)
+{
+	loff_t n = *pos;
+
+	if (n * 1024 >= ftrace_dump_mem_size)
+		return NULL;
+
+	if (*(char *)(ftrace_dump_mem_base + n * 1024) == 0)
+		return NULL;
+
+	return ftrace_dump_mem_base + n * 1024;
+}
+
+static void *s_dump_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	loff_t n = *pos;
+
+	if (n * 1024 >= ftrace_dump_mem_size)
+		return NULL;
+
+	(*pos)++;
+	n = *pos;
+
+	if (*(char *)(ftrace_dump_mem_base + n * 1024) == 0)
+		return NULL;
+
+	return ftrace_dump_mem_base + n * 1024;
+}
+
+static int s_dump_show(struct seq_file *m, void *p)
+{
+	seq_write(m, p, 1024);
+
+	return 0;
+}
+
+static void s_dump_stop(struct seq_file *m, void *p)
+{
+}
+
+static const struct seq_operations ftrace_dump_data_sops = {
+	.start = s_dump_start,
+	.next = s_dump_next,
+	.show = s_dump_show,
+	.stop = s_dump_stop,
+};
+
+static int ftrace_dump_data_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ftrace_dump_data_sops);
+}
+
+static const struct file_operations ftrace_dump_data_fops = {
+	.owner = THIS_MODULE,
+	.open = ftrace_dump_data_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif
+
 void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 {
 	/* use static because iter can be a bit big for the stack */
@@ -7624,6 +7898,14 @@ void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 		atomic_dec(&dump_running);
 		return;
 	}
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+	if (aml_wdt_stop_func)
+		(*aml_wdt_stop_func)(aml_wdt_stop_data);
+
+	if (ftrace_dump_mem_base)
+		memset(ftrace_dump_mem_base, 0, ftrace_dump_mem_size);
+#endif
 
 	/*
 	 * Always turn off tracing when we dump.
@@ -7689,7 +7971,9 @@ void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 		memset(&iter.seq, 0,
 		       sizeof(struct trace_iterator) -
 		       offsetof(struct trace_iterator, seq));
+#ifndef CONFIG_AMLOGIC_MODIFY
 		iter.iter_flags |= TRACE_FILE_LAT_FMT;
+#endif
 		iter.pos = -1;
 
 		if (trace_find_next_entry_inc(&iter) != NULL) {
@@ -7701,8 +7985,17 @@ void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 		}
 		touch_nmi_watchdog();
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+		if (ftrace_dump_mem_base)
+			trace_printk_seq_mem(&iter.seq);
+		else
+#endif
 		trace_printk_seq(&iter.seq);
 	}
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+	ftrace_dump_mem_finish();
+#endif
 
 	if (!cnt)
 		printk(KERN_TRACE "   (ftrace buffer empty)\n");
@@ -7799,7 +8092,9 @@ __init static int tracer_alloc_buffers(void)
 	atomic_notifier_chain_register(&panic_notifier_list,
 				       &trace_panic_notifier);
 
+#ifndef CONFIG_AMLOGIC_MODIFY
 	register_die_notifier(&trace_die_notifier);
+#endif
 
 	global_trace.flags = TRACE_ARRAY_FL_GLOBAL;
 
@@ -7839,6 +8134,15 @@ void __init trace_init(void)
 
 __init static int clear_boot_tracer(void)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	if (ftrace_dump_on_oops && ftrace_dump_mem_base) {
+		if (!proc_create("ftrace_dump_data", 0644, NULL,
+				 &ftrace_dump_data_fops))
+			pr_err("create proc ftrace_dump_data failed\n");
+		else
+			pr_info("create proc ftrace_dump_data success\n");
+	}
+#endif
 	/*
 	 * The default tracer at boot buffer is an init section.
 	 * This function is called in lateinit. If we did not

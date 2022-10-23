@@ -11,18 +11,24 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#ifdef __ANDROID__
+#include <media/stagefright/foundation/ALooper.h>
+using namespace android;
+#endif
 
-int main(int argc, const char *argv[]){
+int main(int argc, const char *argv[]) {
     int width, height, gop, framerate, bitrate, num, in_size = 0;
     int outfd = -1;
     FILE *fp = NULL;
     int datalen = 0;
     int fmt = 0;
     vl_codec_handle_t handle_enc;
+	int64_t total_encode_time=0, t1,t2;
+	int num_actually_encoded=0;
     if (argc < 9)
     {
         printf("Amlogic AVC Encode API \n");
-        printf(" usage: output [srcfile][outfile][width][height][gop][framerate][bitrate][num]\n");
+        printf(" usage: output [srcfile][outfile][width][height][gop][framerate][bitrate][num][fmt]\n");
         printf("  options  :\n");
         printf("  srcfile  : yuv data url in your root fs\n");
         printf("  outfile  : stream url in your root fs\n");
@@ -32,7 +38,7 @@ int main(int argc, const char *argv[]){
         printf("  framerate: framerate \n ");
         printf("  bitrate  : bit rate \n ");
         printf("  num      : encode frame count \n ");
-        printf("  fmt      : encode input fmt 0:nv12,nv21 1:yv12 2:rgb888 3:bgr888\n ");
+        printf("  fmt      : encode input fmt 0:nv12 1:nv21 2:yv12 3:rgb888 4:bgr888\n ");
         return -1;
     }
     else
@@ -108,9 +114,21 @@ int main(int argc, const char *argv[]){
             goto exit;
         }
         memset(output_buffer, 0, output_size);
+#ifdef __ANDROID__
+		t1=ALooper::GetNowUs();
+#endif
+
         datalen = vl_video_encoder_encode(handle_enc, FRAME_TYPE_AUTO, input_buffer, in_size, output_buffer, fmt);
-        if (datalen >= 0)
+
+#ifdef __ANDROID__
+		t2=ALooper::GetNowUs();
+        total_encode_time+=t2-t1;
+#endif
+
+        if (datalen >= 0) {
+			num_actually_encoded++;
             write(outfd, (unsigned char *)output_buffer, datalen);
+		}
         num--;
     }
     vl_video_encoder_destory(handle_enc);
@@ -118,6 +136,11 @@ int main(int argc, const char *argv[]){
     fclose(fp);
     free(output_buffer);
     free(input_buffer);
+
+#ifdef __ANDROID__
+	printf("total_encode_time: %lld, num_actually_encoded: %d, fps=%3.3f\n", total_encode_time, num_actually_encoded, num_actually_encoded*1.0*1000000/total_encode_time);
+#endif
+
     return 0;
 exit:
     if (input_buffer)

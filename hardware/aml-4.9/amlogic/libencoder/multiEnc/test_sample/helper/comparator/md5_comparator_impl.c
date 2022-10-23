@@ -39,6 +39,7 @@ typedef struct {
     Uint32          md5Size;
     Uint32          prevMd5[12];
     Uint32          loopCount;
+    BOOL            isMonochrome;
 } md5CompContext;
 
 BOOL MD5Comparator_Create(
@@ -59,6 +60,7 @@ BOOL MD5Comparator_Create(
         osal_fclose(fp);
         return FALSE;
     }
+    osal_memset((void*)ctx, 0x00, sizeof(md5CompContext));
 
     while (!osal_feof(fp)) {
         if (osal_fscanf((FILE*)fp, "%08x", &temp) < 1) break;
@@ -96,10 +98,13 @@ BOOL MD5Comparator_Compare(
 {
     md5CompContext*    ctx = (md5CompContext*)impl->context;
     BOOL        match = TRUE;
-    BOOL        lineMatch[12]={0,};
+    BOOL        lineMatch[12]   = {0,};
     Uint32      md5[12];
     Uint32      idx;
-    Uint32*     decodedMD5 = (Uint32*)data;
+    Uint32*     decodedMD5      = NULL;
+    Uint32      nullData[12]    = {0,};
+
+    decodedMD5 = (NULL == data) ? nullData : (Uint32*)data;
 
     if ( data == (void *)COMPARATOR_SKIP ) {
         for (idx=0; idx<ctx->md5Size; idx++) {
@@ -132,11 +137,14 @@ BOOL MD5Comparator_Compare(
             }
         }
 
-        if (data == NULL)
-            return FALSE;
-
         match = TRUE;
         for (idx=0; idx<ctx->md5Size; idx++) {
+
+            if (TRUE == ctx->isMonochrome && 3 < idx) {
+                //for monochrome
+                osal_memset(decodedMD5+idx, 0x00, sizeof(decodedMD5[0]));
+            }
+
             if (md5[idx] != decodedMD5[idx]) {
                 match = FALSE;
                 lineMatch[idx]=FALSE;
@@ -173,6 +181,12 @@ BOOL MD5Comparator_Configure(
     case COMPARATOR_CONF_SET_GOLDEN_DATA_SIZE:
         ctx->md5Size = *(Uint32*)val;
         impl->numOfFrames /= ctx->md5Size;
+        break;
+    case COMPARATOR_CONF_SET_MONOCHROME:
+        ctx->isMonochrome = TRUE;
+        break;
+    case COMPARATOR_CONF_SET_NOT_MONOCHROME:
+        ctx->isMonochrome = FALSE;
         break;
     default:
         ret = FALSE;

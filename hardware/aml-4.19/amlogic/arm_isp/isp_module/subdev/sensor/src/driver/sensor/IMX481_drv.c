@@ -96,7 +96,7 @@ static sensor_mode_t supported_modes[] = {
         .num = 3,
         .bayer = BAYER_RGGB,
         .dol_type = DOL_NON,
-     },
+    },
     {
         .wdr_mode = WDR_MODE_LINEAR,
         .fps = 30 * 256,
@@ -325,7 +325,7 @@ static uint16_t sensor_get_id( void *ctx )
 
     if (sensor_id != SENSOR_CHIP_ID) {
         LOG(LOG_ERR, "%s: Failed to read sensor id\n", __func__);
-        return 0xFF;
+        return 0xFFFF;
     }
     return 0;
 }
@@ -564,6 +564,43 @@ void sensor_init_imx481( void **ctx, sensor_control_t *ctrl, void* sbp)
     system_timer_usleep( 1000 );
 
     LOG(LOG_ERR, "%s: Success subdev init\n", __func__);
+}
+
+int sensor_detect_imx481( void* sbp)
+{
+    static sensor_context_t s_ctx;
+    int ret = 0;
+    sensor_bringup_t* sensor_bp = (sensor_bringup_t*) sbp;
+    s_ctx.sbp = sbp;
+
+#if NEED_CONFIG_BSP
+    ret = clk_am_enable(sensor_bp, "g12a_24m");
+    if (ret < 0 )
+        pr_err("set mclk fail\n");
+    udelay(30);
+#endif
+
+#if NEED_CONFIG_BSP
+    ret = reset_am_enable(sensor_bp,"reset", 1);
+    if (ret < 0 )
+        pr_info("set reset fail\n");
+#endif
+
+    s_ctx.sbus.mask = SBUS_MASK_SAMPLE_8BITS | SBUS_MASK_ADDR_16BITS | SBUS_MASK_ADDR_SWAP_BYTES;
+    s_ctx.sbus.control = 0;
+    s_ctx.sbus.bus = 0;
+    s_ctx.sbus.device = SENSOR_DEV_ADDRESS;
+    acamera_sbus_init( &s_ctx.sbus, sbus_i2c );
+
+    ret = 0;
+    if (sensor_get_id(&s_ctx) == 0xFFFF)
+        ret = -1;
+    else
+        pr_info("sensor_detect_imx481:%d\n", ret);
+
+    acamera_sbus_deinit(&s_ctx.sbus,  sbus_i2c);
+    reset_am_disable(sensor_bp);
+    return ret;
 }
 
 //*************************************************************************************

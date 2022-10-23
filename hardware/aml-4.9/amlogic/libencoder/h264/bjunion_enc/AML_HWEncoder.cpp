@@ -14,9 +14,9 @@
 #include "AML_HWEncoder.h"
 #include "enc_api.h"
 
-AMVEnc_Status DetermineFrameNum(AMVEncHandle *Handle, amvenc_info_t* info, uint64_t modTime, uint32 new_frame_rate, bool force_IDR) {
-    uint64 modTimeRef = info->modTimeRef;
-    int64 currFrameNum;
+AMVEnc_Status DetermineFrameNum(AMVEncHandle *Handle, amvenc_info_t* info, uint32 modTime, uint32 new_frame_rate, bool force_IDR) {
+    uint32 modTimeRef = info->modTimeRef;
+    int32 currFrameNum;
     int frameInc;
     int border = 200;
     bool no_skip = false;
@@ -54,17 +54,16 @@ AMVEnc_Status DetermineFrameNum(AMVEncHandle *Handle, amvenc_info_t* info, uint6
 
         if (modTime < modTimeRef) {
             /* modTime wrapped around */
-            info->wrapModTime += ((uint64) 0xFFFFFFFFFFFFFFFF - modTimeRef) + 1;
+            info->wrapModTime += ((uint32) 0xFFFFFFFF - modTimeRef) + 1;
             info->modTimeRef = modTimeRef = 0;
-            LOGAPI("update info->wrapModTime %lld\n",info->wrapModTime);
+            LOGAPI("update info->wrapModTime %u\n",info->wrapModTime);
         }
         modTime += info->wrapModTime; /* wrapModTime is non zero after wrap-around */
 
-        currFrameNum = (int64) (((modTime - modTimeRef) * (double) info->frame_rate + border) / 1000); /* add small roundings */
+        currFrameNum = (int32) (((modTime - modTimeRef) * (float) info->frame_rate + border) / 1000); /* add small roundings */
         //LOGAPI("modTime %lld, currFrameNum %lld, prevProcFrameNum %lld, late_frame_count %d\n",modTime,currFrameNum,info->prevProcFrameNum,info->late_frame_count);
 
-        if ((currFrameNum <= (int64) (info->prevProcFrameNum - info->late_frame_count)) && (no_skip == false)) {
-            LOGAPI("skip currFrameNum %lld, prevProcFrameNum %lld\n",currFrameNum, info->prevProcFrameNum);
+        if ((currFrameNum <= (int32) (info->prevProcFrameNum - info->late_frame_count)) && (no_skip == false)) {
             return AMVENC_FAIL; /* this is a late frame do not encode it */
         }
 
@@ -88,7 +87,7 @@ AMVEnc_Status DetermineFrameNum(AMVEncHandle *Handle, amvenc_info_t* info, uint6
 
         //LOGAPI("currFrameNum %lld, lastTimeRef %lld\n",currFrameNum,info->lastTimeRef);
 
-        if (currFrameNum >= (int64) info->frame_rate) { /* first frame or IDR*/
+        if (currFrameNum >= (int32) info->frame_rate) { /* first frame or IDR*/
             //info->modTimeRef += (uint32)(info->idrPeriod * 1000 / info->frame_rate);
             info->modTimeRef = modTime; //add this to avoid next modTime too small
             currFrameNum -= info->frame_rate;

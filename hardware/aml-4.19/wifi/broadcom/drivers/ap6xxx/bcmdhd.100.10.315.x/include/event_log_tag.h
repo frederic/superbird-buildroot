@@ -1,7 +1,7 @@
 /*
  * EVENT_LOG system definitions
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: event_log_tag.h 771154 2018-07-09 05:46:33Z $
+ * $Id: event_log_tag.h 820429 2019-05-17 22:30:04Z $
  */
 
 #ifndef _EVENT_LOG_TAG_H_
@@ -85,10 +85,6 @@
 #define EVENT_LOG_TAG_PCI_DBG	52
 #define EVENT_LOG_TAG_PCI_DATA  53
 #define EVENT_LOG_TAG_PCI_RING	54
-/* EVENT_LOG_TAG_AWDL_TRACE_RANGING will be removed after wlc_ranging merge from IGUANA
- * keeping it here to avoid compilation error on trunk
- */
-#define EVENT_LOG_TAG_AWDL_TRACE_RANGING	55
 #define EVENT_LOG_TAG_RANGING_TRACE	55
 #define EVENT_LOG_TAG_WL_ERROR		56
 #define EVENT_LOG_TAG_PHY_ERROR		57
@@ -131,11 +127,9 @@
 #define EVENT_LOG_TAG_MIMO_PS_INFO	94
 #define EVENT_LOG_TAG_BTCX_STATS	95
 #define EVENT_LOG_TAG_LEAKY_AP_STATS	96
-#define EVENT_LOG_TAG_AWDL_TRACE_ELECTION	97
 #define EVENT_LOG_TAG_MIMO_PS_STATS	98
 #define EVENT_LOG_TAG_PWRSTATS_PHY	99
 #define EVENT_LOG_TAG_PWRSTATS_SCAN	100
-#define EVENT_LOG_TAG_PWRSTATS_AWDL	101
 #define EVENT_LOG_TAG_PWRSTATS_WAKE_V2	102
 #define EVENT_LOG_TAG_LQM		103
 #define EVENT_LOG_TAG_TRACE_WL_INFO	104
@@ -190,13 +184,9 @@
 #define EVENT_LOG_TAG_STATS			153
 #define EVENT_LOG_TAG_BAM			154
 #define EVENT_LOG_TAG_TXFAIL			155
-#define EVENT_LOG_TAG_AWDL_CONFIG_DBG		156
-#define EVENT_LOG_TAG_AWDL_SYNC_DBG		157
-#define EVENT_LOG_TAG_AWDL_PEER_DBG		158
 #define EVENT_LOG_TAG_RANDMAC_INFO		159
 #define EVENT_LOG_TAG_RANDMAC_DBG		160
 #define EVENT_LOG_TAG_RANDMAC_ERR		161
-#define EVENT_LOG_TAG_AWDL_DFSP_DBG		162
 #define EVENT_LOG_TAG_MSCH_CAL			163
 #define EVENT_LOG_TAG_MSCH_OPP_CAL		164
 #define EVENT_LOG_TAG_MSCH			165
@@ -231,7 +221,6 @@
 #define EVENT_LOG_TAG_PHY_ACI_INFO		208
 #define EVENT_LOG_TAG_WL_COUNTERS_AUX		209
 #define EVENT_LOG_TAG_AMPDU_DUMP_AUX		210
-#define EVENT_LOG_TAG_PWRSTATS_AWDL_AUX		211
 #define EVENT_LOG_TAG_PWRSTATS_PHY_AUX		212
 #define EVENT_LOG_TAG_PWRSTATS_SCAN_AUX		213
 #define EVENT_LOG_TAG_PWRSTATS_WAKE_V2_AUX	214
@@ -244,10 +233,27 @@
 #define EVENT_LOG_TAG_FILS_ERROR		221
 #define EVENT_LOG_TAG_HWA_TXPOST		222
 #define EVENT_LOG_TAG_HWA_TXDMA			223
+#define EVENT_LOG_TAG_PPR_ERROR			224
+
 /* Arbitrator callback log tags */
 #define EVENT_LOG_TAG_STF_ARB_CB_TRACE		224
 #define EVENT_LOG_TAG_STF_ARB_CB_ERROR		225
 #define EVENT_LOG_TAG_PHY_PERIODIC_SEC		226
+#define EVENT_LOG_TAG_RTE_ERROR			227
+#define EVENT_LOG_TAG_CPLT_ERROR		228
+#define EVENT_LOG_TAG_DNGL_ERROR		229
+#define EVENT_LOG_TAG_NVRAM_ERROR		230
+#define EVENT_LOG_TAG_NAC			231
+#define EVENT_LOG_TAG_HP2P_ERR			232
+#define EVENT_LOG_TAG_SB_SCHED_DBG_SYNC		233
+#define EVENT_LOG_TAG_ENHANCED_TS		234
+
+/* Available space for new tags for Dingo, Iguana and branches
+ * prior to Koala only. From Koala onwards, new tags must be greater
+ * than 255. If a tag is required for Koala and legacy productization branches,
+ * add that tag here. Tags > 255 will generate extended header. Legacy code
+ * does not understand extended header.
+ */
 
 /* Debug tags for making debug builds */
 #define EVENT_LOG_TAG_DBG1			251
@@ -333,8 +339,65 @@
 /* RTE */
 #define EVENT_LOG_TAG_RTE_ERR			312
 
+/* TX FIFO */
+#define EVENT_LOG_TAG_FIFO_INFO			313
+
+/* PKTTS */
+#define EVENT_LOG_TAG_LATENCY_INFO		314
+
+/* TDLS */
+#define EVENT_LOG_TAG_WL_TDLS_INFO              315
+#define EVENT_LOG_TAG_WL_TDLS_DBG               316
+#define EVENT_LOG_TAG_WL_TDLS_ERR               317
+
+/* MSCH messages */
+#define EVENT_LOG_TAG_MSCH_DATASTRUCT		319
+#define EVENT_LOG_TAG_MSCH_REGISTER		320
+#define EVENT_LOG_TAG_MSCH_CALLBACK		321
+#define EVENT_LOG_TAG_MSCH_ERROR		322
+#define EVENT_LOG_TAG_MSCH_DEBUG		323
+#define EVENT_LOG_TAG_MSCH_INFORM		324
+#define EVENT_LOG_TAG_MSCH_TRACE		325
+
+/* bus low power related info messages */
+#define EVENT_LOG_TAG_WL_BUS_LP_INFO		326
+#define EVENT_LOG_TAG_PCI_LP_INFO		327
+
+/* SBSS BT-Coex */
+#define EVENT_LOG_TAG_SB_BTCX_INFO		328
+
+/* wbus */
+#define EVENT_LOG_TAG_WBUS_ERR			329
+#define EVENT_LOG_TAG_WBUS_INFO			330
+#define EVENT_LOG_TAG_WBUS_SCHED		331
+
+/* MODESW */
+#define EVENT_LOG_TAG_MODESW_ERR		332
+
+/* LPHS */
+#define EVENT_LOG_TAG_LPHS_ERR			333
+
+/* CPU statistics */
+#define EVENT_LOG_TAG_ARM_STAT			334
+
+/* Event log tags for SOE */
+#define EVENT_LOG_TAG_SOE_ERROR			335
+#define EVENT_LOG_TAG_SOE_INFO			336
+
+/* Event log tags for GCI Shared Memory */
+#define EVENT_LOG_TAG_GCISHM_ERR		337
+#define EVENT_LOG_TAG_GCISHM_INFO		338
+
+/* Eevent log tags for Enhanced Roam Log */
+#define EVENT_LOG_TAG_ROAM_ENHANCED_LOG		339
+
+/* WL BTCEC */
+#define EVENT_LOG_TAG_BTCEC_ERR			340
+#define EVENT_LOG_TAG_BTCEC_INFO		341
+#define EVENT_LOG_TAG_BTCEC_SCHED		342
+
 /* EVENT_LOG_TAG_MAX	= Set to the same value of last tag, not last tag + 1 */
-#define EVENT_LOG_TAG_MAX			312
+#define EVENT_LOG_TAG_MAX			342
 
 typedef enum wl_el_set_type_def {
 	EVENT_LOG_SET_TYPE_DEFAULT = 0, /* flush the log buffer when it is full - Default option */

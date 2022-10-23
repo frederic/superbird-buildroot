@@ -223,10 +223,17 @@
 		reg = <0xff63c400 0x4c>,   /* MHU registers */
 		      <0xfffe7000 0x800>;   /* Payload area */
 		interrupts = <0 209 1>,   /* low priority interrupt */
-			     <0 210 1>;   /* high priority interrupt */
+			     <0 210 1>,   /* bl4 receive interrupt */
+			     <0 213 1>;   /* bl4 send interrupt */
+
 		#mbox-cells = <1>;
 		mbox-names = "cpu_to_scp_low", "cpu_to_scp_high";
 		mboxes = <&mailbox 0 &mailbox 1>;
+		num-chans-to-scp = <1>;  /*number of chans to send m3*/
+		send-isr-bits = <5>;     /*BIT(idx) of isr listen when ap send*/
+		ack-isr-bits = <4>;      /*BIT(idx) of ack isr*/
+		m4-isr-bits = <6>;       /*BIT(idx) of m4 isr*/
+		mbox-chans = <3>;        /*chan number*/
 	};
 
 	cpu_iomap {
@@ -276,6 +283,12 @@
 		compatible = "aml, reboot";
 		sys_reset = <0x84000009>;
 		sys_poweroff = <0x84000008>;
+	};
+
+	dolby_fw: dolby_fw {
+		compatible = "amlogic, dolby_fw";
+		mem_size = <0x100000>;
+		status = "okay";
 	};
 
 	vpu {
@@ -1041,12 +1054,12 @@
 		bus-range = <0x0 0xff>;
 		#address-cells = <3>;
 		#size-cells = <2>;
+		device_type = "pci";
 		interrupt-map-mask = <0 0 0 0>;
 		interrupt-map = <0 0 0 0 &gic GIC_SPI 223 IRQ_TYPE_EDGE_RISING>;
-		device_type = "pci";
 		ranges = <0x81000000 0 0 0xfc600000 0x0 0x100000
 			/* downstream I/O */
-			0x82000000 0xfc700000 0x0 0xfc700000 0 0x1900000>;
+			0x82000000 0x0 0xfc700000 0xfc700000 0 0x1900000>;
 			/* non-prefetchable memory */
 		num-lanes = <1>;
 		pcie-num = <1>;
@@ -1120,7 +1133,8 @@
 		cec_osd_string = "AML_MBOX"; /* Max Chars: 14    */
 		cec_version = <5>;/*5:1.4;6:2.0*/
 		port_num = <1>;
-		ee_cec;
+		output = <1>;
+		/*ee_cec;*/
 		arc_port_mask = <0x2>;
 		interrupts = <0 203 1
 					0 199 1>;	/*0:snps 1:ts*/
@@ -1187,6 +1201,27 @@
 			<&clkc CLKID_VPU_CLKC_MUX>;
 		clock-names = "vpu_clkc0",
 			"vpu_clkc";
+	};
+
+	dummy_venc: dummy_venc {
+		compatible = "amlogic, dummy_venc";
+		status = "okay";
+		clocks = <&clkc CLKID_VCLK2_ENCP
+			&clkc CLKID_VCLK2_VENCP0
+			&clkc CLKID_VCLK2_VENCP1
+			&clkc CLKID_VCLK2_ENCI
+			&clkc CLKID_VCLK2_VENCI0
+			&clkc CLKID_VCLK2_VENCI1
+			&clkc CLKID_VCLK2_ENCL
+			&clkc CLKID_VCLK2_VENCL>;
+		clock-names = "encp_top_gate",
+			"encp_int_gate0",
+			"encp_int_gate1",
+			"venci_top_gate",
+			"enci_int_gate0",
+			"enci_int_gate1",
+			"encl_top_gate",
+			"encl_int_gate";
 	};
 
 	vdac {
@@ -1799,6 +1834,7 @@
 		status = "okay";
 		reg = <0xff638000 0x100
 		       0xff638c00 0x100>;
+		sec_base = <0xff639000>;
 		interrupts = <0 52 1>;
 		interrupt-names = "ddr_bandwidth";
 	};

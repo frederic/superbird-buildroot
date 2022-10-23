@@ -336,7 +336,10 @@ struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
 		heap = ion_cma_heap_create(heap_data);
 		break;
 	case ION_HEAP_TYPE_CUSTOM:
-		heap = ion_codec_mm_heap_create(heap_data);
+		if (heap_data->id == ION_HEAP_ID_SECURE)
+			heap = ion_secure_heap_create(heap_data);
+		else
+			heap = ion_codec_mm_heap_create(heap_data);
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,
@@ -379,7 +382,10 @@ void ion_heap_destroy(struct ion_heap *heap)
 		ion_cma_heap_destroy(heap);
 		break;
 	case ION_HEAP_TYPE_CUSTOM:
-		ion_codec_mm_heap_destroy(heap);
+		if (heap->id == ION_HEAP_ID_SECURE)
+			ion_secure_heap_destroy(heap);
+		else
+			ion_codec_mm_heap_destroy(heap);
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,

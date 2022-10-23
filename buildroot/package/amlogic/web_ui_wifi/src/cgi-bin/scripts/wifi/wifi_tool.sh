@@ -175,8 +175,8 @@ ping_test()
         if [ $1 -eq 0 ];then
                 lightTest --num=12 --times=0 --speed=300 --time=0 --style=0 --mute_led=1 --listen_led=1
                 echo "ping fail!! ip is NULL"
-                if [ -f "/etc/bsa/config/wifi_status" ]; then
-                        echo 0 > /etc/bsa/config/wifi_status
+                if [ -f "/etc/bluetooth/wifi_status" ]; then
+                        echo 0 > /etc/bluetooth/wifi_status
                 fi
 		return 0
         fi
@@ -185,8 +185,8 @@ ping_test()
 	if [ $? -eq 1 ];then
 		lightTest --num=12 --times=0 --speed=300 --time=0 --style=0 --mute_led=1 --listen_led=1
 		echo "ping fail!! please check"
-		if [ -f "/etc/bsa/config/wifi_status" ]; then
-			echo 0 > /etc/bsa/config/wifi_status
+		if [ -f "/etc/bluetooth/wifi_status" ]; then
+			echo 0 > /etc/bluetooth/wifi_status
 		fi
 	else
 		echo "------------------------------------------------1"
@@ -198,8 +198,8 @@ ping_test()
 		wpa_cli save_config
 		sync
 		lightTest --num=12 --times=0 --speed=150 --time=3 --style=30 --mute_led=1 --listen_led=1
-		if [ -f "/etc/bsa/config/wifi_status" ] ;then
-			echo 1 > /etc/bsa/config/wifi_status
+		if [ -f "/etc/bluetooth/wifi_status" ] ;then
+			echo 1 > /etc/bluetooth/wifi_status
 		fi
 		sleep 2
 		lightTest --num=12 --times=0 --speed=300 --time=0 --style=0 --mute_led=1 --listen_led=1

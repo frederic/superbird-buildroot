@@ -1,75 +1,46 @@
 <?php
-require "../../common.php";
+require '../../common.php';
 
-function video_set($part, $part_id, $bit_id, $gop_id)
-{
-    $bitrate = $_COOKIE[$bit_id];
-    $codec = $_POST[$part_id . "_codec"];
-    $device = $_POST[$part_id . "_device"];
-    $framerate = $_POST[$part_id . "_framerate"];
-    $gop = $_COOKIE[$gop_id];
-    $reso = $_POST[$part_id . "_reso"];
-    $kvs = array('bitrate' => $bitrate, 'codec' => $codec, 'device' => $device, 'framerate' => $framerate, 'gop' => $gop, 'resolution' => $reso);
-    if ($part == "ts/sub") {
-        $enabled = $_COOKIE["v_ts_s_en"];
-        if ($enabled == "false") {
-            $kvs = array('enabled' => $enabled) + $kvs;
-        } else {
-            $kvs['enabled'] = $enabled;
-        }
-    }
-    $vkey = '/ipc/video/' . $part . '/';
-    foreach ($kvs as $k => $v) {
-        ipc_property('set', $vkey . $k, $v);
-    }
+function list_video_devices() {
+    $ret = [];
+    exec("ls /dev/video*", $ret, $rc);
+    echo json_encode($ret);
 }
 
-function gdc_set($part, $part_id)
-{
-    $config_file = $_POST[$part_id . "_config_file"];
-    $enabled = $_COOKIE[$part_id . "_en"];
-    $in_reso = $_POST[$part_id . "_in_reso"];
-    $out_reso = $_POST[$part_id . "_out_reso"];
-    $kvs = array();
-    if ($enabled == "false") {
-        $kvs['enabled'] = $enabled;
-    } else {
-        $kvs['config-file'] = '/etc/gdc_config/' . $config_file;
-        $kvs['input-resolution'] = $in_reso;
-        $kvs['output-resolution'] = $out_reso;
-        $kvs['enabled'] = $enabled;
-    }
-    $vkey = '/ipc/video/' . $part . '/gdc/';
-    foreach ($kvs as $k => $v) {
-        ipc_property('set', $vkey . $k, $v);
-    }
+function list_gdc_config_files() {
+    $ret = [];
+    exec("ls /etc/gdc_config/", $ret, $rc);
+    echo json_encode($ret);
 }
 
-$p_id = $_REQUEST["p_id"];
-
-if ($p_id == "mu_en") {
-    $mu_en = $_COOKIE["v_mu_en"];
-    ipc_property('set', '/ipc/video/multi-channel', $mu_en);
-} elseif ($p_id == "sub") {
-    video_set("ts/sub", "v_ts_s", "ts_sb", "ts_sg");
-} elseif ($p_id == "ts_gdc") {
-    gdc_set("ts", "v_ts_g");
-} elseif ($p_id == "vr") {
-    video_set("vr", "v_vr", "vr_b", "vr_g");
-    gdc_set("vr", "v_vr_g");
-}
-
-$id = $_POST["id"];
-if ($id == "main") {
-    if ($_POST["v_ts_m_reso"] == "3840x2160") {
-        ipc_property('set', '/ipc/video/multi-channel', 'false');
+function list_video_framerates() {
+    $ret = [24, 25];
+    $vsys = ipc_property('get', '/ipc/isp/anti-banding');
+    if ($vsys == '60') {
+        array_push($ret, '30');
     }
-    video_set("ts/main", "v_ts_m", "ts_mb", "ts_mg");
+    echo json_encode($ret);
 }
 
-$main_reso = ipc_property('get', '/ipc/video/ts/main/resolution');
-$multi_en = ipc_property('get', '/ipc/video/multi-channel');
-$val = array($main_reso, $multi_en);
-echo json_encode($val);
+function get_isp_resolution() {
+    $ret['ret'] = ipc_property('get', '/ipc/isp/sensor/resolution/list');
+    echo json_encode($ret);
+}
 
-?>
+function get_ts_main_video_framerate() {
+    $ret['ret'] = ipc_property('get', '/ipc/video/ts/main/framerate');
+    echo json_encode($ret);
+}
+
+function get_ts_main_video_resolution() {
+    $val = ipc_property('get', '/ipc/video/ts/main/resolution');
+    $resolution = explode('x', $val);
+    $ret['width'] = $resolution[0];
+    $ret['height'] = $resolution[1];
+    echo json_encode($ret);
+}
+
+if (isset($_GET['function'])) {
+    $func = $_GET['function'];
+    $func();
+}

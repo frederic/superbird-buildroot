@@ -63,7 +63,7 @@ static int ctrl_channel_fops_open( struct inode *inode, struct file *f )
     struct ctrl_channel_dev_context *p_ctx = &ctrl_channel_ctx;
     int minor = iminor( inode );
 
-    LOG( LOG_INFO, "client is opening..., minor: %d.", minor );
+    LOG( LOG_DEBUG, "client is opening..., minor: %d.", minor );
 
     if ( minor != p_ctx->dev_minor_id ) {
         LOG( LOG_CRIT, "Not matched ID, minor_id: %d, exptect: %d(dev name: %s)", minor, p_ctx->dev_minor_id, p_ctx->dev_name );
@@ -82,11 +82,7 @@ static int ctrl_channel_fops_open( struct inode *inode, struct file *f )
     } else {
         p_ctx->dev_opened = 1;
         rc = 0;
-        LOG( LOG_INFO, "open(%s) succeed.", p_ctx->dev_name );
-
-        LOG( LOG_INFO, "Bf set, private_data: %p.", f->private_data );
         f->private_data = p_ctx;
-        LOG( LOG_INFO, "Af set, private_data: %p.", f->private_data );
     }
 
     mutex_unlock( &p_ctx->fops_lock );
@@ -116,7 +112,7 @@ static int ctrl_channel_fops_release( struct inode *inode, struct file *f )
         f->private_data = NULL;
         kfifo_reset( &p_ctx->ctrl_kfifo_in );
         kfifo_reset( &p_ctx->ctrl_kfifo_out );
-        LOG( LOG_INFO, "close(%s) succeed, private_data: %p.", p_ctx->dev_name, p_ctx );
+        LOG( LOG_DEBUG, "close(%s) succeed, private_data: %p.", p_ctx->dev_name, p_ctx );
     } else {
         LOG( LOG_CRIT, "Fatal error: wrong state of dev: %s, dev_opened: %d.", p_ctx->dev_name, p_ctx->dev_opened );
         rc = -EINVAL;
@@ -357,8 +353,6 @@ int ctrl_channel_init( void )
 
     ctrl_channel_ctx.dev_inited = 1;
 
-    LOG( LOG_INFO, "ctrl_channel_dev_context(%s) init OK.", ctrl_channel_ctx.dev_name );
-
     return 0;
 
 failed_kfifo_out_alloc:
@@ -378,10 +372,8 @@ void ctrl_channel_deinit( void )
         kfifo_free( &ctrl_channel_ctx.ctrl_kfifo_out );
 
         misc_deregister( &ctrl_channel_ctx.ctrl_dev );
-
-        LOG( LOG_INFO, "misc_deregister dev: %s.", ctrl_channel_ctx.ctrl_dev.name );
     } else {
-        LOG( LOG_INFO, "dev not inited, do nothing." );
+        LOG( LOG_DEBUG, "dev not inited, do nothing." );
     }
 }
 
@@ -396,7 +388,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
     switch ( command_type ) {
 #ifdef TALGORITHMS
     case TALGORITHMS:
-        LOG( LOG_INFO, "TALGORITHMS is supported, cmd_type: %u, cmd: %u, direction: %u",
+        LOG( LOG_DEBUG, "TALGORITHMS is supported, cmd_type: %u, cmd: %u, direction: %u",
              command_type, command, direction );
         rc = 1;
         break;
@@ -406,7 +398,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
     case TGENERAL:
         switch ( command ) {
         case ACTIVE_CONTEXT:
-            LOG( LOG_INFO, "TGENERAL is supported, cmd_type: %u, cmd: %u, direction: %u",
+            LOG( LOG_DEBUG, "TGENERAL is supported, cmd_type: %u, cmd: %u, direction: %u",
                  command_type, command, direction );
             rc = 1;
             break;
@@ -417,7 +409,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
 
 #ifdef TSENSOR
     case TSENSOR:
-        LOG( LOG_INFO, "TSENSOR is supported, cmd_type: %u, cmd: %u, direction: %u",
+        LOG( LOG_DEBUG, "TSENSOR is supported, cmd_type: %u, cmd: %u, direction: %u",
              command_type, command, direction );
         rc = 1;
         break;
@@ -428,7 +420,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
 
         if ( command != SYSTEM_FREEZE_FIRMWARE ) {
             rc = 1;
-            LOG( LOG_INFO, "TSYSTEM is supported, cmd_type: %u, cmd: %u, direction: %u",
+            LOG( LOG_DEBUG, "TSYSTEM is supported, cmd_type: %u, cmd: %u, direction: %u",
                  command_type, command, direction );
         } else {
             LOG( LOG_INFO, "SYSTEM_FREEZE_FIRMWARE is not needed" );
@@ -439,7 +431,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
 
 #ifdef TSCENE_MODES
     case TSCENE_MODES:
-        LOG( LOG_INFO, "TSCENE_MODES is supported, cmd_type: %u, cmd: %u, direction: %u",
+        LOG( LOG_DEBUG, "TSCENE_MODES is supported, cmd_type: %u, cmd: %u, direction: %u",
              command_type, command, direction );
         rc = 1;
         break;
@@ -447,7 +439,7 @@ static uint8_t is_uf_needed_command( uint8_t command_type, uint8_t command, uint
 
 #ifdef TISP_MODULES
     case TISP_MODULES:
-        LOG( LOG_INFO, "TISP_MODULES is supported, cmd_type: %u, cmd: %u, direction: %u",
+        LOG( LOG_DEBUG, "TISP_MODULES is supported, cmd_type: %u, cmd: %u, direction: %u",
              command_type, command, direction );
         rc = 1;
         break;
@@ -501,7 +493,6 @@ void ctrl_channel_handle_api_calibration( uint32_t cmd_ctx_id, uint8_t type, uin
     }
 
     if ( !ctrl_channel_ctx.dev_opened ) {
-        LOG( LOG_INFO, "FW ctrl channel is not opened, skip." );
         return;
     }
 

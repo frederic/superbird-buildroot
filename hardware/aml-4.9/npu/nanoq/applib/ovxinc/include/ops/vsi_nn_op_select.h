@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -30,16 +30,9 @@
 extern "C" {
 #endif
 
-#define _VSI_NN_SELECT_LOCAL_TENSOR_NUM 4
-
-typedef struct _vsi_nn_select_lcl_data
-{
-    vx_tensor   local_tensor[_VSI_NN_SELECT_LOCAL_TENSOR_NUM];
-} vsi_nn_select_lcl_data;
-
 typedef struct _vsi_nn_select_param
 {
-    vsi_nn_select_lcl_data     local;
+    void *reserve;
 } vsi_nn_select_param;
 
 #ifdef __cplusplus

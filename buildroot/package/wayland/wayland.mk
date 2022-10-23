@@ -4,7 +4,11 @@
 #
 ################################################################################
 
-WAYLAND_VERSION = 1.17.0
+ifneq ($(BR2_PACKAGE_WAYLAND_VERSION),"")
+  WAYLAND_VERSION = $(call qstrip,$(BR2_PACKAGE_WAYLAND_VERSION))
+else
+  WAYLAND_VERSION = 1.17.0
+endif
 WAYLAND_SITE = http://wayland.freedesktop.org/releases
 WAYLAND_SOURCE = wayland-$(WAYLAND_VERSION).tar.xz
 WAYLAND_LICENSE = MIT

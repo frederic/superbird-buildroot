@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -85,7 +85,7 @@ void hdd_softap_tkip_mic_fail_counter_measure(hdd_adapter_t*,v_BOOL_t);
 int hdd_softap_unpackIE( tHalHandle halHandle,
                 eCsrEncryptionType *pEncryptType,
                 eCsrEncryptionType *mcEncryptType,
-                eCsrAuthType *pAuthType,
+                tCsrAuthList *akm_list,
                 v_BOOL_t *pMFPCapable,
                 v_BOOL_t *pMFPRequired,
                 u_int16_t gen_ie_len,
@@ -123,7 +123,20 @@ hdd_set_sap_auth_offload(hdd_adapter_t *pHostapdAdapter, bool enabled)
 {
 }
 #endif /* SAP_AUTH_OFFLOAD */
+
 int hdd_softap_set_channel_change(struct net_device *dev, int target_channel);
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+VOS_STATUS hdd_sta_state_sap_notify(hdd_context_t *hdd_context,
+                                sta_sap_notifications event,
+                                struct wlan_sap_csa_info csa_info);
+VOS_STATUS hdd_send_sap_event(struct net_device *dev,
+                sta_sap_notifications event,
+                struct wlan_sap_csa_info csa_info,
+                struct wireless_dev *wdev);
+void hdd_hostapd_chan_switch_cb(v_PVOID_t usrDataForCallback);
+
+int hdd_softap_set_channel_change(struct net_device *dev, int target_channel);
+#endif //WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
 
 /**
  * hdd_is_sta_connection_pending() - This function will check if sta connection
@@ -138,9 +151,9 @@ static inline bool
 hdd_is_sta_connection_pending(hdd_context_t *hdd_ctx)
 {
     bool status;
-    spin_lock(&hdd_ctx->sta_update_info_lock);
+    adf_os_spin_lock(&hdd_ctx->sta_update_info_lock);
     status = hdd_ctx->is_sta_connection_pending;
-    spin_unlock(&hdd_ctx->sta_update_info_lock);
+    adf_os_spin_unlock(&hdd_ctx->sta_update_info_lock);
     return status;
 }
 
@@ -158,9 +171,9 @@ static inline void
 hdd_change_sta_conn_pending_status(hdd_context_t *hdd_ctx,
                                    bool value)
 {
-    spin_lock(&hdd_ctx->sta_update_info_lock);
+    adf_os_spin_lock(&hdd_ctx->sta_update_info_lock);
     hdd_ctx->is_sta_connection_pending = value;
-    spin_unlock(&hdd_ctx->sta_update_info_lock);
+    adf_os_spin_unlock(&hdd_ctx->sta_update_info_lock);
 }
 
 /**
@@ -176,10 +189,10 @@ static inline bool
 hdd_is_sap_restart_required(hdd_context_t *hdd_ctx)
 {
     bool status = false;
-    spin_lock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_lock(&hdd_ctx->sap_update_info_lock);
     if (!hdd_ctx->is_ch_avoid_in_progress)
         status = hdd_ctx->is_sap_restart_required;
-    spin_unlock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_unlock(&hdd_ctx->sap_update_info_lock);
     return status;
 }
 
@@ -198,9 +211,9 @@ static inline void
 hdd_change_sap_restart_required_status(hdd_context_t *hdd_ctx,
                                        bool value)
 {
-    spin_lock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_lock(&hdd_ctx->sap_update_info_lock);
     hdd_ctx->is_sap_restart_required = value;
-    spin_unlock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_unlock(&hdd_ctx->sap_update_info_lock);
 }
 
 /**
@@ -217,9 +230,9 @@ static inline void
 hdd_change_ch_avoidance_status(hdd_context_t *hdd_ctx,
                                bool value)
 {
-    spin_lock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_lock(&hdd_ctx->sap_update_info_lock);
     hdd_ctx->is_ch_avoid_in_progress = value;
-    spin_unlock(&hdd_ctx->sap_update_info_lock);
+    adf_os_spin_unlock(&hdd_ctx->sap_update_info_lock);
     hddLog(LOG1, FL("is_ch_avoid_in_progress %d"), value);
 }
 

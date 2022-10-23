@@ -392,46 +392,15 @@ static int __init ramdump_probe(struct platform_device *pdev)
 {
 	void __iomem *p = NULL;
 	struct device_node *np;
-	unsigned long dts_memory[2] = {0}, total_mem;
+	unsigned long total_mem;
 	struct resource *res;
 	unsigned int dump_set;
 	int ret;
 	void __iomem *base;
 	const char *dev_name = NULL;
 
-	np = of_find_node_by_name(NULL, "memory");
-	if (!np)
-		return -EINVAL;
-
-#ifdef CONFIG_64BIT
-	ret = of_property_read_u64_array(np, "linux,usable-memory",
-					 (u64 *)&dts_memory, 2);
-	if (ret)
-		ret = of_property_read_u64_array(np, "reg",
-						 (u64 *)&dts_memory, 2);
-#else
-	ret = of_property_read_u32_array(np, "linux,usable-memory",
-					 (u32 *)&dts_memory, 2);
-	if (ret)
-		ret = of_property_read_u32_array(np, "reg",
-						 (u32 *)&dts_memory, 2);
-#endif
-	if (ret)
-		pr_info("can't get dts memory\n");
-	else
-		pr_info("MEMORY:[%lx+%lx]\n", dts_memory[0], dts_memory[1]);
-	of_node_put(np);
-
-	/*
-	 * memory in dts is [start_addr size] patten. For amlogic soc,
-	 * ddr address range is started from 0x0, usually start_addr in
-	 * dts should be started with 0x0, but some soc must reserve a
-	 * small framgment of memory at 0x0 for start up code. So start_addr
-	 * can be 0x100000/0x1000000. But we always using 0x0 to get real
-	 * DDR size for ramdump. So we using following formula to get total
-	 * DDR size.
-	 */
-	total_mem = dts_memory[0] + dts_memory[1];
+	total_mem = get_num_physpages() << PAGE_SHIFT;
+	pr_info("Total Memory:[%lx]\n", total_mem);
 
 	ram = kzalloc(sizeof(struct ramdump), GFP_KERNEL);
 	if (!ram)

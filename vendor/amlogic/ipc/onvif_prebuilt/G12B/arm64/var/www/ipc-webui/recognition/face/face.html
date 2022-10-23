@@ -1,0 +1,77 @@
+<?php
+include "../../common.php";
+check_session("/login/login.html");
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="/scripts/jquery.min.js"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <title>faceinfo</title>
+    <style type="text/css">
+        .layui-table-cell {
+            height: auto !important;
+            white-space: normal;
+        }
+    </style>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+</head>
+<body>
+<div style="margin-left: 25px; margin-top: 25px; height:auto">
+<table class="layui-hide" id="face" lay-filter="facetable" lay-data="{id:'idFace'}"></table>
+    <iframe name="temp" style="display:none"></iframe>
+</div>
+<script type="text/html" id="toolbarFace">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm" lay-event="refresh">[Refresh]</button>
+        <button class="layui-btn layui-btn-sm" lay-event="camera_face_capture">[Capture Face]</button>
+        <button class="layui-btn layui-btn-sm" lay-event="upload" id="up_img">[Capture From Image]</button>
+        <button class="layui-btn layui-btn-sm" lay-event="upload" id="up">[Import Database]</button>
+        <button class="layui-btn layui-btn-sm" lay-event="download" id="dl_db">
+            <a href="download_database.php" style="color:white;">[Export Database]</a>
+        </button>
+        <ul class="layui-layout-right" style="margin-top:10px">
+            <button class="layui-btn layui-btn-sm layui-btn-danger locale" lay-event="batch_delete">
+                <i class="layui-icon">&#xe640</i>[Delete]
+            </button>
+        </ul>
+    </div>
+</script>
+<script type="text/html" id="barFace">
+    <a class="layui-btn layui-btn-primary layui-btn-xs locale" lay-event="detail" style="display:none">[Check]</a>
+    <a class="layui-btn layui-btn-xs locale" lay-event="edit">[Edit]</a>
+    <a class="layui-btn layui-btn-danger layui-btn-xs locale" lay-event="del">[Delete]</a>
+</script>
+
+<div class="layui-row" id="layer_modify" style="display:none;">
+    <div class="layui-col-md10" style="margin-top:25px">
+        <form class="layui-form" id="modify">
+            <div class="layui-form-item">
+                <label class="layui-form-label locale">Index</label>
+                <div class="layui-input-block">
+                    <input type="text" id="input_index" name="index" class="layui-input" placeholder="0" readonly="true">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label locale">Name</label>
+                <div class="layui-input-block">
+                    <select class="layui-input" name="name" id="name" lay-filter="nameTest" lay-search="">
+                        <option value="0"></option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/layui/layui.js" type="text/javascript"></script>
+<script src="face.js" type="text/javascript"></script>
+<script>
+    translate_inner_html('toolbarFace');
+    translate_inner_html('barFace');
+    translate_html();
+</script>
+</body>
+</html>
+

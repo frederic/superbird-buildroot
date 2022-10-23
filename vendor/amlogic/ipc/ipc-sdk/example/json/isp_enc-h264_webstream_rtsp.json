@@ -1,0 +1,37 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264
+    },
+    bind: {output:[webstream.ws,rtspses.rtp_v]}
+  },
+  {
+    type: GstBridge,
+    load: "/usr/lib/ipc_gstbridge.so",
+    param: {
+      name: webstream,
+      launch: "appsrc name=ws ! h264parse ! video/x-h264,stream-format=avc ! amlwsssink port=8082 async=false"
+    },
+    bind: {}
+  },
+  {
+    type: GstBridge,
+    param: {
+      name: rtspses,
+      rtsp-port: 554,
+      rtsp-server: "rtspes"
+      rtsp-mount: "/live.sdp"
+      launch: "appsrc name=rtp_v ! h264parse config-interval=1 ! rtph264pay pt=96 config-interval=1 name=pay0"
+    }
+  }
+]

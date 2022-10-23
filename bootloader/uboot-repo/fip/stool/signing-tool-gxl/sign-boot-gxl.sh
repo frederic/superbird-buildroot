@@ -769,7 +769,7 @@ is_android9_img() {
 
     if [ "$inmagic" == "414e44524f494421" ]; then
       inmagic=$(xxd -p -seek 40 -l 4 $input)
-      if [ "$inmagic" == "01000000" ]; then
+      if [ "$inmagic" == "01000000" ] || [ "$inmagic" == "02000000" ]; then
         echo True
       else
         echo False

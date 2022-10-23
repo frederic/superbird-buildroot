@@ -1,0 +1,12 @@
+config BR2_PACKAGE_AML_AUDIO_HAL
+        bool "aml_audio_hal"
+	select BR2_PACKAGE_HAL_AUDIO_SERVICE
+	select BR2_PACKAGE_AML_AMAUDIOUTILS
+	select BR2_PACKAGE_LIBLOG
+	select BR2_PACKAGE_TINYALSA
+	select BR2_PACKAGE_ANDROID_TOOLS
+	select BR2_PACKAGE_AML_DVB
+	select BR2_PACKAGE_LIBPLAYER
+	select BR2_PACKAGE_EXPAT
+        help
+          Audio HAL ported from Android audio HAL stack

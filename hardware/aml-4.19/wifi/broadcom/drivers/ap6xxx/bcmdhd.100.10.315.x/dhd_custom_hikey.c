@@ -1,7 +1,7 @@
 /*
  * Platform Dependent file for Hikey
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -83,16 +83,16 @@ dhd_wifi_init_gpio(void)
 	 */
 	if (gpio_request_one(wlan_reg_on, GPIOF_OUT_INIT_HIGH, "WL_REG_ON")) {
 		printk(KERN_ERR "%s: Failed to request gpio %d for WL_REG_ON, "
-			   "might have configured in the dts\n",
-			   __FUNCTION__, wlan_reg_on);
+			"might have configured in the dts\n",
+			__FUNCTION__, wlan_reg_on);
 	} else {
 		printk(KERN_ERR "%s: gpio_request WL_REG_ON done - WLAN_EN: GPIO %d\n",
-			   __FUNCTION__, wlan_reg_on);
+			__FUNCTION__, wlan_reg_on);
 	}
 
 	gpio_reg_on_val = gpio_get_value(wlan_reg_on);
 	printk(KERN_INFO "%s: Initial WL_REG_ON: [%d]\n",
-		   __FUNCTION__, gpio_get_value(wlan_reg_on));
+		__FUNCTION__, gpio_get_value(wlan_reg_on));
 
 	if (gpio_reg_on_val == 0) {
 		printk(KERN_INFO "%s: WL_REG_ON is LOW, drive it HIGH\n", __FUNCTION__);
@@ -112,12 +112,12 @@ dhd_wifi_init_gpio(void)
 
 	if (gpio_request_one(wlan_host_wake_up, GPIOF_IN, "WLAN_HOST_WAKE")) {
 		printk(KERN_ERR "%s: Failed to request gpio %d for WLAN_HOST_WAKE\n",
-			   __FUNCTION__, wlan_host_wake_up);
-		return -ENODEV;
+			__FUNCTION__, wlan_host_wake_up);
+			return -ENODEV;
 	} else {
 		printk(KERN_ERR "%s: gpio_request WLAN_HOST_WAKE done"
-			   " - WLAN_HOST_WAKE: GPIO %d\n",
-			   __FUNCTION__, wlan_host_wake_up);
+			" - WLAN_HOST_WAKE: GPIO %d\n",
+			__FUNCTION__, wlan_host_wake_up);
 	}
 
 	if (gpio_direction_input(wlan_host_wake_up)) {
@@ -147,12 +147,12 @@ dhd_wlan_power(int onoff)
 		}
 		if (gpio_get_value(wlan_reg_on)) {
 			printk(KERN_INFO"WL_REG_ON on-step-2 : [%d]\n",
-				   gpio_get_value(wlan_reg_on));
+				gpio_get_value(wlan_reg_on));
 		} else {
 			printk("[%s] gpio value is 0. We need reinit.\n", __func__);
 			if (gpio_direction_output(wlan_reg_on, 1)) {
 				printk(KERN_ERR "%s: WL_REG_ON is "
-					   "failed to pull up\n", __func__);
+					"failed to pull up\n", __func__);
 			}
 		}
 
@@ -167,14 +167,14 @@ dhd_wlan_power(int onoff)
 			kirin_pcie_power_on_atu_fixup();
 		} else {
 			printk(KERN_ERR "[%s] kirin_pcie_power_on_atu_fixup is NULL. "
-				   "REG_ON may not work\n", __func__);
+				"REG_ON may not work\n", __func__);
 		}
 		/* Enable ASPM after powering ON */
 		if (kirin_pcie_lp_ctrl) {
 			kirin_pcie_lp_ctrl(onoff);
 		} else {
 			printk(KERN_ERR "[%s] kirin_pcie_lp_ctrl is NULL. "
-				   "ASPM may not work\n", __func__);
+				"ASPM may not work\n", __func__);
 		}
 	} else {
 		/* Disable ASPM before powering off */
@@ -182,7 +182,7 @@ dhd_wlan_power(int onoff)
 			kirin_pcie_lp_ctrl(onoff);
 		} else {
 			printk(KERN_ERR "[%s] kirin_pcie_lp_ctrl is NULL. "
-				   "ASPM may not work\n", __func__);
+				"ASPM may not work\n", __func__);
 		}
 		if (gpio_direction_output(wlan_reg_on, 0)) {
 			printk(KERN_ERR "%s: WL_REG_ON is failed to pull up\n", __FUNCTION__);
@@ -190,7 +190,7 @@ dhd_wlan_power(int onoff)
 		}
 		if (gpio_get_value(wlan_reg_on)) {
 			printk(KERN_INFO"WL_REG_ON on-step-2 : [%d]\n",
-				   gpio_get_value(wlan_reg_on));
+				gpio_get_value(wlan_reg_on));
 		}
 	}
 	return 0;
@@ -216,6 +216,16 @@ static int dhd_wlan_get_wake_irq(void)
 	return gpio_to_irq(wlan_host_wake_up);
 }
 #endif /* BCMSDIO */
+
+#if defined(CONFIG_BCMDHD_OOB_HOST_WAKE) && defined(CONFIG_BCMDHD_GET_OOB_STATE)
+int
+dhd_get_wlan_oob_gpio(void)
+{
+	return gpio_is_valid(wlan_host_wake_up) ?
+		gpio_get_value(wlan_host_wake_up) : -1;
+}
+EXPORT_SYMBOL(dhd_get_wlan_oob_gpio);
+#endif /* CONFIG_BCMDHD_OOB_HOST_WAKE && CONFIG_BCMDHD_GET_OOB_STATE */
 
 struct resource dhd_wlan_resources = {
 	.name	= "bcmdhd_wlan_irq",
@@ -250,7 +260,7 @@ dhd_wlan_init(void)
 	ret = dhd_wifi_init_gpio();
 	if (ret < 0) {
 		printk(KERN_ERR "%s: failed to initiate GPIO, ret=%d\n",
-			   __FUNCTION__, ret);
+			__FUNCTION__, ret);
 		goto fail;
 	}
 
@@ -258,11 +268,11 @@ dhd_wlan_init(void)
 	dhd_wlan_resources.end = wlan_host_wake_irq;
 
 #ifdef CONFIG_BROADCOM_WIFI_RESERVED_MEM
-	ret = dhd_init_wlan_mem();
-	if (ret < 0) {
-		printk(KERN_ERR "%s: failed to alloc reserved memory,"
-			   " ret=%d\n", __FUNCTION__, ret);
-	}
+	  ret = dhd_init_wlan_mem();
+	  if (ret < 0) {
+		  printk(KERN_ERR "%s: failed to alloc reserved memory,"
+			  " ret=%d\n", __FUNCTION__, ret);
+	  }
 #endif /* CONFIG_BROADCOM_WIFI_RESERVED_MEM */
 
 fail:

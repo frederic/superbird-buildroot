@@ -33,6 +33,9 @@
 #include "sensor_bsp_common.h"
 
 static int isp_seq_num;
+static int sensor_idx;
+static int cur_idx;
+static int info_idx;
 module_param(isp_seq_num, int, 0664);
 
 #define ARGS_TO_PTR( arg ) ( (struct soc_sensor_ioctl_args *)arg )
@@ -42,21 +45,29 @@ module_param(isp_seq_num, int, 0664);
 struct SensorConversion {
     void (*sensor_init)(void **ctx, sensor_control_t *ctrl, void* sbp);
     void (*sensor_deinit)(void *ctx);
+    int (*sensor_detect)(void* sbp);
     const char *sensor_name;
+    int w;// max width
+    int h;// max height
+    char *res;
 };
-
 
 struct SensorConversion ConversionTable[] = {
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_OS08A10, SENSOR_DEINIT_SUBDEV_FUNCTIONS_OS08A10, "os08a10"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX290, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX290, "imx290"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX227, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX227, "imx227"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX481, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX481, "imx481"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX307, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX307, "imx307"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX224, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX224, "imx224"},
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_OV13858, SENSOR_DEINIT_SUBDEV_FUNCTIONS_OV13858, "ov13858"},    
-    {SENSOR_INIT_SUBDEV_FUNCTIONS_SC2232H, SENSOR_DEINIT_SUBDEV_FUNCTIONS_SC2232H, "sc2232h"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_OS08A10, SENSOR_DEINIT_SUBDEV_FUNCTIONS_OS08A10, SENSOR_DETECT_FUNCTIONS_OS08A10, "os08a10", 3840,2160, "8MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX290, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX290, SENSOR_DETECT_FUNCTIONS_IMX290, "imx290", 1920,1080, "2MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX335, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX335, SENSOR_DETECT_FUNCTIONS_IMX335, "imx335", 2592,1944, "5MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX415, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX415, SENSOR_DETECT_FUNCTIONS_IMX415, "imx415", 3840,2160, "8MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX227, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX227, SENSOR_DETECT_FUNCTIONS_IMX227, "imx227", 2200,2720, "6MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX481, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX481, SENSOR_DETECT_FUNCTIONS_IMX481, "imx481", 2328,1748, "4MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX307, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX307, SENSOR_DETECT_FUNCTIONS_IMX307, "imx307", 1920,1080, "2MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX224, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX224, SENSOR_DETECT_FUNCTIONS_IMX224, "imx224", 1280,960, "1.2MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_OV13858, SENSOR_DEINIT_SUBDEV_FUNCTIONS_OV13858, SENSOR_DETECT_FUNCTIONS_OV13858, "ov13858", 4096,3136, "13MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_SC2232H, SENSOR_DEINIT_SUBDEV_FUNCTIONS_SC2232H, SENSOR_DETECT_FUNCTIONS_SC2232H, "sc2232h", 1920,1080, "2MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_SC4238, SENSOR_DEINIT_SUBDEV_FUNCTIONS_SC4238, SENSOR_DETECT_FUNCTIONS_SC4238, "sc4238", 2688,1520, "4MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_SC2335, SENSOR_DEINIT_SUBDEV_FUNCTIONS_SC2335, SENSOR_DETECT_FUNCTIONS_SC2335, "sc2335", 1920,1080, "2MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_IMX334, SENSOR_DEINIT_SUBDEV_FUNCTIONS_IMX334, SENSOR_DETECT_FUNCTIONS_IMX334, "imx334", 3840,2160, "8MP"},
+    {SENSOR_INIT_SUBDEV_FUNCTIONS_SC8238CS, SENSOR_DEINIT_SUBDEV_FUNCTIONS_SC8238CS, SENSOR_DETECT_FUNCTIONS_SC8238CS, "sc8238cs", 3840,2160, "8MP"},
 };
-
 
 void ( *SOC_SENSOR_SENSOR_ENTRY_ARR[FIRMWARE_CONTEXT_NUMBER] )( void **ctx, sensor_control_t *ctrl, void* sbp ) =
 {
@@ -84,7 +95,6 @@ typedef struct _subdev_camera_ctx {
 } subdev_camera_ctx;
 
 static subdev_camera_ctx s_ctx[FIRMWARE_CONTEXT_NUMBER];
-
 
 static int camera_log_status( struct v4l2_subdev *sd )
 {
@@ -211,6 +221,67 @@ Err:
     return ret;
 }
 static DEVICE_ATTR(sreg, S_IRUGO | S_IWUSR, sreg_read, sreg_write);
+
+
+static ssize_t info_read(
+    struct device *dev,
+    struct device_attribute *attr,
+    char *buf)
+{
+    switch (info_idx) {
+        case SEN_RESOLUTION:
+            return sprintf(buf, "%s/%dx%d\n", ConversionTable[cur_idx].res, ConversionTable[cur_idx].w, ConversionTable[cur_idx].h);
+        case SEN_NAME:
+            return sprintf(buf, "%s\n", ConversionTable[cur_idx].sensor_name);
+        default:
+            return sprintf(buf, "%s/%dx%d\n", ConversionTable[cur_idx].res, ConversionTable[cur_idx].w, ConversionTable[cur_idx].h);
+    }
+}
+
+static ssize_t info_write(
+    struct device *dev, struct device_attribute *attr,
+    char const *buf, size_t size)
+{
+    char *buf_orig = NULL;
+    char *parm[8] = {NULL};
+    ssize_t ret = size;
+
+    subdev_camera_ctx *ctx = &s_ctx[0];
+
+    if ( ctx->camera_context == NULL ) {
+        LOG( LOG_ERR, "Failed to process reg write.camera_init must be called before\n");
+        ret = -EINVAL;
+        goto Err;
+    }
+
+    if (!buf)
+        return ret;
+
+    buf_orig = kstrdup(buf, GFP_KERNEL);
+    if (!buf_orig)
+        return ret;
+
+    parse_param(buf_orig, (char **)&parm);
+
+    if (!parm[0]) {
+        ret = -EINVAL;
+        goto Err;
+    }
+
+    if (!strcmp(parm[0], "resolution")) {
+        info_idx = SEN_RESOLUTION;
+        //pr_info("%s/%dx%d\n", ConversionTable[cur_idx].res, ConversionTable[cur_idx].w, ConversionTable[cur_idx].h);
+    } else if (!strcmp(parm[0], "name")) {
+        info_idx = SEN_NAME;
+        //pr_info("%s\n", ConversionTable[cur_idx].sensor_name);
+    } else
+        pr_info("unsupprt cmd!\n");
+Err:
+    kfree(buf_orig);
+    return ret;
+}
+
+static DEVICE_ATTR(info, S_IRUGO | S_IWUSR, info_read, info_write);
 
 static int camera_init( struct v4l2_subdev *sd, u32 val )
 {
@@ -511,8 +582,14 @@ static int32_t soc_sensor_probe( struct platform_device *pdev )
     int32_t rc = 0;
     int rtn = 0;
     int i;
+    int prst_res = 0;
     struct device *dev = &pdev->dev;
     struct device_node *dev_np = dev->of_node;
+
+#if PLATFORM_C308X
+    write_reg(0xdfff,0xfe000608);		// set GPIOA_13 output
+    write_reg(0xdfff,0xfe000604);		// pull down GPIOA_13
+#endif
 
     sensor_bp = kzalloc( sizeof( *sensor_bp ), GFP_KERNEL );
     if (sensor_bp == NULL) {
@@ -528,16 +605,41 @@ static int32_t soc_sensor_probe( struct platform_device *pdev )
     pr_err("config sensor %s driver.\n", sensor_name);
 
     ir_cut_get_named_gpio(dev_np);
+    sensor_bp_init(sensor_bp, dev);
 
     for (i = 0; i < NELEM(ConversionTable); ++i) {
         if (strcmp(ConversionTable[i].sensor_name, sensor_name) == 0) {
             SOC_SENSOR_SENSOR_ENTRY_ARR[FIRMWARE_CONTEXT_NUMBER-1] = ConversionTable[i].sensor_init;
             SOC_SENSOR_SENSOR_RESET_ARR[FIRMWARE_CONTEXT_NUMBER-1] = ConversionTable[i].sensor_deinit;
+            prst_res = ConversionTable[i].w * ConversionTable[i].h;
+            sensor_idx = i;
+            break;
         }
     }
+    if (i == NELEM(ConversionTable)) {
+        pr_err("Fatal error:cant find %s driver with dts config!\n", sensor_name);
+        return -1;
+    }
 
-    sensor_bp_init(sensor_bp, dev);
-
+    if (ConversionTable[i].sensor_detect(sensor_bp) != 0) {
+        for (i = 0; i < NELEM(ConversionTable); ++i) {
+            if (prst_res < ConversionTable[i].w * ConversionTable[i].h)
+                continue;
+            if (ConversionTable[i].sensor_detect(sensor_bp) == 0) {
+                SOC_SENSOR_SENSOR_ENTRY_ARR[FIRMWARE_CONTEXT_NUMBER-1] = ConversionTable[i].sensor_init;
+                SOC_SENSOR_SENSOR_RESET_ARR[FIRMWARE_CONTEXT_NUMBER-1] = ConversionTable[i].sensor_deinit;
+                sensor_name = ConversionTable[i].sensor_name;
+                cur_idx = i;
+                break;
+            }
+        }
+        if ( i == NELEM(ConversionTable)) {
+            LOG(LOG_CRIT, "find no matching sensor.");
+            return -1;
+        }
+    } else {
+        cur_idx = sensor_idx;
+    }
     v4l2_subdev_init( &soc_sensor, &camera_ops );
 
     soc_sensor.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
@@ -547,6 +649,7 @@ static int32_t soc_sensor_probe( struct platform_device *pdev )
     soc_sensor.dev = &pdev->dev;
     rc = v4l2_async_register_subdev( &soc_sensor );
 
+    device_create_file(dev, &dev_attr_info);
     device_create_file(dev, &dev_attr_sreg);
 
     LOG( LOG_ERR, "register v4l2 sensor device. result %d, sd 0x%x sd->dev 0x%x", rc, &soc_sensor, soc_sensor.dev );
@@ -557,6 +660,7 @@ static int32_t soc_sensor_probe( struct platform_device *pdev )
 static int soc_sensor_remove( struct platform_device *pdev )
 {
     device_remove_file(&pdev->dev, &dev_attr_sreg);
+    device_remove_file(&pdev->dev, &dev_attr_info);
 
     v4l2_async_unregister_subdev( &soc_sensor );
 

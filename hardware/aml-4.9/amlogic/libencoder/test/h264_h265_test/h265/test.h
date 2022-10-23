@@ -2,8 +2,8 @@
 #define __INCLUDE_TEST_H_
 
 typedef struct hevc_encoder_params {
-    char src_file[100];
-    char es_file[100];
+    char src_file[256];
+    char es_file[256];
     int width;
     int height;
     int gop;

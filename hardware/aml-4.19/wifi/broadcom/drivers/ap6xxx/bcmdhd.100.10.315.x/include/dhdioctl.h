@@ -5,7 +5,7 @@
  *
  * Definitions subject to change without notice.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -28,7 +28,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhdioctl.h 765806 2018-06-05 13:56:08Z $
+ * $Id: dhdioctl.h 800512 2019-01-22 09:31:01Z $
  */
 
 #ifndef _dhdioctl_h_
@@ -59,6 +59,33 @@ typedef enum {
 	DMA_XFER_IN_PROGRESS,
 	DMA_XFER_FAILED
 } dma_xfer_status_t;
+
+typedef enum d11_lpbk_type {
+	M2M_DMA_LPBK = 0,
+	D11_LPBK = 1,
+	BMC_LPBK = 2,
+	M2M_NON_DMA_LPBK = 3,
+	D11_HOST_MEM_LPBK = 4,
+	BMC_HOST_MEM_LPBK = 5,
+	MAX_LPBK = 6
+} dma_xfer_type_t;
+
+typedef struct dmaxfer_info {
+	uint16 version;
+	uint16 length;
+	dma_xfer_status_t status;
+	dma_xfer_type_t type;
+	uint src_delay;
+	uint dest_delay;
+	uint should_wait;
+	uint core_num;
+	int error_code;
+	uint32 num_bytes;
+	uint64 time_taken;
+	uint64 tput;
+} dma_xfer_info_t;
+
+#define DHD_DMAXFER_VERSION 0x1
 
 typedef struct tput_test {
 	uint16 version;
@@ -152,6 +179,12 @@ typedef enum {
 #define DHD_IW_VAL	0x20000
 #define DHD_CFG_VAL	0x40000
 #define DHD_CONFIG_VAL	0x80000
+#define DUMP_EAPOL_VAL	0x0001
+#define DUMP_ARP_VAL	0x0002
+#define DUMP_DHCP_VAL	0x0004
+#define DUMP_ICMP_VAL	0x0008
+#define DUMP_DNS_VAL	0x0010
+#define DUMP_TRX_VAL	0x0080
 
 #ifdef SDTEST
 /* For pktgen iovar */
@@ -239,4 +272,5 @@ typedef struct bt_mem_req {
 typedef struct debug_buf_dest_stat {
 	uint32 stat[DEBUG_BUF_DEST_MAX];
 } debug_buf_dest_stat_t;
+
 #endif /* _dhdioctl_h_ */

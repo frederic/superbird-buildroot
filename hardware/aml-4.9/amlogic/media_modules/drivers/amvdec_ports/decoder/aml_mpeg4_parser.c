@@ -149,7 +149,7 @@ static int decode_studio_vol_header(struct mpeg4_dec_param *ctx, struct get_bits
 		ctx->rgb = get_bits1(gb); /* rgb_components */
 		s->chroma_format = get_bits(gb, 2); /* chroma_format */
 		if (!s->chroma_format) {
-			pr_err("illegal chroma format\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "illegal chroma format\n");
 			return -1;
 		}
 
@@ -162,7 +162,7 @@ static int decode_studio_vol_header(struct mpeg4_dec_param *ctx, struct get_bits
 			}
 		}
 		else {
-			pr_err("MPEG-4 Studio profile bit-depth %u", bits_per_raw_sample);
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "MPEG-4 Studio profile bit-depth %u", bits_per_raw_sample);
 			return -1;
 		}
 		ctx->bits_per_raw_sample = bits_per_raw_sample;
@@ -253,7 +253,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 	if ((ctx->vol_control_parameters = get_bits1(gb))) { /* vol control parameter */
 		int chroma_format = get_bits(gb, 2);
 		if (chroma_format != CHROMA_420)
-			pr_err("illegal chroma format\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "illegal chroma format\n");
 
 		s->low_delay = get_bits1(gb);
 		if (get_bits1(gb)) {    /* vbv parameters */
@@ -286,9 +286,9 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 
 	ctx->shape = get_bits(gb, 2); /* vol shape */
 	if (ctx->shape != RECT_SHAPE)
-		pr_err("only rectangular vol supported\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "only rectangular vol supported\n");
 	if (ctx->shape == GRAY_SHAPE && vo_ver_id != 1) {
-		pr_err("Gray shape not supported\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Gray shape not supported\n");
 		skip_bits(gb, 4);  /* video_object_layer_shape_extension */
 	}
 
@@ -296,7 +296,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 
 	ctx->framerate.num = get_bits(gb, 16);
 	if (!ctx->framerate.num) {
-		pr_err("framerate==0\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "framerate==0\n");
 		return -1;
 	}
 
@@ -336,14 +336,14 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 		s->progressive_frame     = get_bits1(gb) ^ 1;
 		s->interlaced_dct        = 0;
 		if (!get_bits1(gb)) /* OBMC Disable */
-			pr_info("MPEG-4 OBMC not supported (very likely buggy encoder)\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "MPEG-4 OBMC not supported (very likely buggy encoder)\n");
 		if (vo_ver_id == 1)
 			ctx->vol_sprite_usage = get_bits1(gb);    /* vol_sprite_usage */
 		else
 			ctx->vol_sprite_usage = get_bits(gb, 2);  /* vol_sprite_usage */
 
 		if (ctx->vol_sprite_usage == STATIC_SPRITE)
-			pr_err("Static Sprites not supported\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Static Sprites not supported\n");
 		if (ctx->vol_sprite_usage == STATIC_SPRITE ||
 			ctx->vol_sprite_usage == GMC_SPRITE) {
 		if (ctx->vol_sprite_usage == STATIC_SPRITE) {
@@ -358,7 +358,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 		}
 		ctx->num_sprite_warping_points = get_bits(gb, 6);
 		if (ctx->num_sprite_warping_points > 3) {
-			pr_err("%d sprite_warping_points\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "%d sprite_warping_points\n",
 				ctx->num_sprite_warping_points);
 			ctx->num_sprite_warping_points = 0;
 			return -1;
@@ -373,9 +373,9 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 		if (get_bits1(gb) == 1) {                   /* not_8_bit */
 				s->quant_precision = get_bits(gb, 4);   /* quant_precision */
 			if (get_bits(gb, 4) != 8)               /* bits_per_pixel */
-				pr_err("N-bit not supported\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "N-bit not supported\n");
 			if (s->quant_precision != 5)
-				pr_err("quant precision %d\n", s->quant_precision);
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "quant precision %d\n", s->quant_precision);
 			if (s->quant_precision<3 || s->quant_precision>9) {
 				s->quant_precision = 5;
 			}
@@ -396,7 +396,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			for (i = 0; i < 64; i++) {
 				//int j;
 				if (get_bits_left(gb) < 8) {
-					pr_err("insufficient data for custom matrix\n");
+					v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "insufficient data for custom matrix\n");
 					return -1;
 				}
 				v = get_bits(gb, 8);
@@ -423,7 +423,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 				for (i = 0; i < 64; i++) {
 					//int j;
 					if (get_bits_left(gb) < 8) {
-						pr_err("insufficient data for custom matrix\n");
+						v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "insufficient data for custom matrix\n");
 						return -1;
 					}
 					v = get_bits(gb, 8);
@@ -453,7 +453,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			s->quarter_sample = 0;
 
 		if (get_bits_left(gb) < 4) {
-			pr_err("VOL Header truncated\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "VOL Header truncated\n");
 			return -1;
 		}
 
@@ -502,7 +502,7 @@ static int decode_vol_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 					ctx->cplx_estimation_trash_p += 8 * get_bits1(gb);  /* qpel */
 				}
 			} else
-			pr_err("Invalid Complexity estimation method %d\n",
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Invalid Complexity estimation method %d\n",
 				estimation_method);
 		} else {
 
@@ -521,12 +521,12 @@ no_cplx_est:
 		if (vo_ver_id != 1) {
 			ctx->new_pred = get_bits1(gb);
 		if (ctx->new_pred) {
-			pr_err("new pred not supported\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "new pred not supported\n");
 			skip_bits(gb, 2); /* requested upstream message type */
 			skip_bits1(gb);   /* newpred segment type */
 		}
 		if (get_bits1(gb)) // reduced_res_vop
-			pr_err("reduced resolution VOP not supported\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "reduced resolution VOP not supported\n");
 		} else {
 			ctx->new_pred = 0;
 		}
@@ -556,22 +556,21 @@ no_cplx_est:
 				ctx->scalability = 0;
 				*gb            = bak;
 			} else
-				pr_err("scalability not supported\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "scalability not supported\n");
 
 			// bin shape stuff FIXME
 		}
 	}
 
 	if (1) {
-		pr_info("tb %d/%d, tincrbits:%d, qp_prec:%d, ps:%d, low_delay:%d  %s%s%s%s\n",
-		ctx->framerate.den, ctx->framerate.num,
-		ctx->time_increment_bits,
-		s->quant_precision,
-		s->progressive_sequence,
-		s->low_delay,
-		ctx->scalability ? "scalability " :"" , s->quarter_sample ? "qpel " : "",
-		s->data_partitioning ? "partition " : "", ctx->rvlc ? "rvlc " : ""
-		);
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "tb %d/%d, tincrbits:%d, qp_prec:%d, ps:%d, low_delay:%d  %s%s%s%s\n",
+			ctx->framerate.den, ctx->framerate.num,
+			ctx->time_increment_bits,
+			s->quant_precision,
+			s->progressive_sequence,
+			s->low_delay,
+			ctx->scalability ? "scalability " :"" , s->quarter_sample ? "qpel " : "",
+			s->data_partitioning ? "partition " : "", ctx->rvlc ? "rvlc " : "");
 	}
 
 	return 0;
@@ -616,7 +615,7 @@ static int decode_user_data(struct mpeg4_dec_param *ctx, struct get_bits_context
 		e = sscanf(buf, "Lavc%d.%d.%d", &ver, &ver2, &ver3) + 1;
 		if (e > 1) {
 			if (ver > 0xFFU || ver2 > 0xFFU || ver3 > 0xFFU) {
-				pr_info("Unknown Lavc version string encountered, %d.%d.%d; "
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Unknown Lavc version string encountered, %d.%d.%d; "
 					"clamping sub-version values to 8-bits.\n",
 					ver, ver2, ver3);
 			}
@@ -644,7 +643,7 @@ static int mpeg4_decode_gop_header(struct MpegEncContext *s, struct get_bits_con
 	int hours, minutes, seconds;
 
 	if (!show_bits(gb, 23)) {
-		pr_err("GOP header invalid\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "GOP header invalid\n");
 		return -1;
 	}
 
@@ -685,7 +684,7 @@ static int decode_studiovisualobject(struct mpeg4_dec_param *ctx, struct get_bit
 	skip_bits(gb, 4); /* visual_object_verid */
 	visual_object_type = get_bits(gb, 4);
 	if (visual_object_type != VOT_VIDEO_ID) {
-		pr_err("VO type %u", visual_object_type);
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "VO type %u", visual_object_type);
 		return -1;
 	}
 
@@ -818,7 +817,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 	s->pict_type = get_bits(gb, 2) + AV_PICTURE_TYPE_I;        /* pict type: I = 0 , P = 1 */
 	if (s->pict_type == AV_PICTURE_TYPE_B && s->low_delay &&
 		ctx->vol_control_parameters == 0) {
-		pr_err("low_delay flag set incorrectly, clearing it\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "low_delay flag set incorrectly, clearing it\n");
 		s->low_delay = 0;
 	}
 
@@ -836,7 +835,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 
 	if (ctx->time_increment_bits == 0 ||
 		!(show_bits(gb, ctx->time_increment_bits + 1) & 1)) {
-		pr_info("time_increment_bits %d is invalid in relation to the current bitstream, this is likely caused by a missing VOL header\n", ctx->time_increment_bits);
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "time_increment_bits %d is invalid in relation to the current bitstream, this is likely caused by a missing VOL header\n", ctx->time_increment_bits);
 
 		for (ctx->time_increment_bits = 1;
 			ctx->time_increment_bits < 16;
@@ -850,7 +849,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 				break;
 		}
 
-		pr_info("time_increment_bits set to %d bits, based on bitstream analysis\n", ctx->time_increment_bits);
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "time_increment_bits set to %d bits, based on bitstream analysis\n", ctx->time_increment_bits);
 		if (ctx->framerate.num && 4*ctx->framerate.num < 1<<ctx->time_increment_bits) {
 			ctx->framerate.num = 1<<ctx->time_increment_bits;
 			//ctx->time_base = av_inv_q(av_mul_q(ctx->framerate, (AVRational){ctx->ticks_per_frame, 1}));
@@ -900,14 +899,14 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 		pts = ROUNDED_DIV(s->time, ctx->framerate.den);
 	else
 		pts = AV_NOPTS_VALUE;
-	pr_info("MPEG4 PTS: %lld\n", pts);
+	v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "MPEG4 PTS: %lld\n", pts);
 
 	check_marker(gb, "before vop_coded");
 
 	/* vop coded */
 	if (get_bits1(gb) != 1) {
 		if (1)
-			pr_err("vop not coded\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "vop not coded\n");
 		return FRAME_SKIPPED;
 	}
 	if (ctx->new_pred)
@@ -950,7 +949,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			skip_bits_long(gb, ctx->cplx_estimation_trash_b);
 
 		if (get_bits_left(gb) < 3) {
-			pr_err("Header truncated\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Header truncated\n");
 			return -1;
 		}
 		ctx->intra_dc_threshold = ff_mpeg4_dc_threshold[get_bits(gb, 3)];
@@ -969,9 +968,9 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			//if (mpeg4_decode_sprite_trajectory(ctx, gb) < 0)
 				//return -1;
 			if (ctx->sprite_brightness_change)
-				pr_err("sprite_brightness_change not supported\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "sprite_brightness_change not supported\n");
 			if (ctx->vol_sprite_usage == STATIC_SPRITE)
-				pr_err("static sprite not supported\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "static sprite not supported\n");
 		} else {
 			memset(s->sprite_offset, 0, sizeof(s->sprite_offset));
 			memset(s->sprite_delta, 0, sizeof(s->sprite_delta));
@@ -981,14 +980,14 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 	if (ctx->shape != BIN_ONLY_SHAPE) {
 		s->chroma_qscale = s->qscale = get_bits(gb, s->quant_precision);
 		if (s->qscale == 0) {
-			pr_err("Error, header damaged or not MPEG-4 header (qscale=0)\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Error, header damaged or not MPEG-4 header (qscale=0)\n");
 			return -1;  // makes no sense to continue, as there is nothing left from the image then
 		}
 
 		if (s->pict_type != AV_PICTURE_TYPE_I) {
 			s->f_code = get_bits(gb, 3);        /* fcode_for */
 			if (s->f_code == 0) {
-				pr_err("Error, header damaged or not MPEG-4 header (f_code=0)\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Error, header damaged or not MPEG-4 header (f_code=0)\n");
 					s->f_code = 1;
 				return -1;  // makes no sense to continue, as there is nothing left from the image then
 			}
@@ -998,7 +997,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 		if (s->pict_type == AV_PICTURE_TYPE_B) {
 			s->b_code = get_bits(gb, 3);
 			if (s->b_code == 0) {
-				pr_err("Error, header damaged or not MPEG4 header (b_code=0)\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Error, header damaged or not MPEG4 header (b_code=0)\n");
 					s->b_code=1;
 				return -1; // makes no sense to continue, as the MV decoding will break very quickly
 			}
@@ -1006,20 +1005,19 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			s->b_code = 1;
 
 		if (1) {
-			pr_info("qp:%d fc:%d,%d %s size:%d pro:%d alt:%d top:%d %spel part:%d resync:%d w:%d a:%d rnd:%d vot:%d%s dc:%d ce:%d/%d/%d time:%ld tincr:%d\n",
-			s->qscale, s->f_code, s->b_code,
-			s->pict_type == AV_PICTURE_TYPE_I ? "I" : (s->pict_type == AV_PICTURE_TYPE_P ? "P" : (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")),
-			gb->size_in_bits,s->progressive_sequence, s->alternate_scan,
-			s->top_field_first, s->quarter_sample ? "q" : "h",
-			s->data_partitioning, ctx->resync_marker,
-			ctx->num_sprite_warping_points, s->sprite_warping_accuracy,
-			1 - s->no_rounding, s->vo_type,
-			ctx->vol_control_parameters ? " VOLC" : " ", ctx->intra_dc_threshold,
-			ctx->cplx_estimation_trash_i, ctx->cplx_estimation_trash_p,
-			ctx->cplx_estimation_trash_b,
-			s->time,
-			time_increment
-			);
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "qp:%d fc:%d,%d %s size:%d pro:%d alt:%d top:%d %spel part:%d resync:%d w:%d a:%d rnd:%d vot:%d%s dc:%d ce:%d/%d/%d time:%ld tincr:%d\n",
+				s->qscale, s->f_code, s->b_code,
+				s->pict_type == AV_PICTURE_TYPE_I ? "I" : (s->pict_type == AV_PICTURE_TYPE_P ? "P" : (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")),
+				gb->size_in_bits,s->progressive_sequence, s->alternate_scan,
+				s->top_field_first, s->quarter_sample ? "q" : "h",
+				s->data_partitioning, ctx->resync_marker,
+				ctx->num_sprite_warping_points, s->sprite_warping_accuracy,
+				1 - s->no_rounding, s->vo_type,
+				ctx->vol_control_parameters ? " VOLC" : " ", ctx->intra_dc_threshold,
+				ctx->cplx_estimation_trash_i, ctx->cplx_estimation_trash_p,
+				ctx->cplx_estimation_trash_b,
+				s->time,
+				time_increment);
 		}
 
 		if (!ctx->scalability) {
@@ -1029,7 +1027,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 			if (ctx->enhancement_type) {
 				int load_backward_shape = get_bits1(gb);
 				if (load_backward_shape)
-					pr_err("load backward shape isn't supported\n");
+					v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "load backward shape isn't supported\n");
 			}
 			skip_bits(gb, 2);  // ref_select_code
 		}
@@ -1039,7 +1037,7 @@ static int decode_vop_header(struct mpeg4_dec_param *ctx, struct get_bits_contex
 	* easily (although it's buggy too) */
 	if (s->vo_type == 0 && ctx->vol_control_parameters == 0 &&
 		ctx->divx_version == -1 && s->picture_number == 0) {
-		pr_info("looks like this file was encoded with (divx4/(old)xvid/opendivx) -> forcing low_delay flag\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "looks like this file was encoded with (divx4/(old)xvid/opendivx) -> forcing low_delay flag\n");
 			s->low_delay = 1;
 	}
 
@@ -1088,7 +1086,7 @@ int ff_mpeg4_decode_picture_header(struct mpeg4_dec_param *ctx, struct get_bits_
 	for (;;) {
 		if (get_bits_count(gb) >= gb->size_in_bits) {
 			if (gb->size_in_bits == 8) {
-				pr_info("frame skip %d\n", gb->size_in_bits);
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "frame skip %d\n", gb->size_in_bits);
 				return FRAME_SKIPPED;  // divx bug
 			} else
 				return -1;  // end of stream
@@ -1102,66 +1100,66 @@ int ff_mpeg4_decode_picture_header(struct mpeg4_dec_param *ctx, struct get_bits_
 			continue;  // no startcode
 
 		if (1) { //debug
-			pr_info("startcode: %3X \n", startcode);
+			v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "startcode: %3X \n", startcode);
 			if (startcode <= 0x11F)
-				pr_info("Video Object Start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Video Object Start\n");
 			else if (startcode <= 0x12F)
-				pr_info("Video Object Layer Start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Video Object Layer Start\n");
 			else if (startcode <= 0x13F)
-				pr_info("Reserved\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Reserved\n");
 			else if (startcode <= 0x15F)
-				pr_info("FGS bp start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "FGS bp start\n");
 			else if (startcode <= 0x1AF)
-				pr_info("Reserved\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Reserved\n");
 			else if (startcode == 0x1B0)
-				pr_info("Visual Object Seq Start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Visual Object Seq Start\n");
 			else if (startcode == 0x1B1)
-				pr_info("Visual Object Seq End\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Visual Object Seq End\n");
 			else if (startcode == 0x1B2)
-				pr_info("User Data\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "User Data\n");
 			else if (startcode == 0x1B3)
-				pr_info("Group of VOP start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Group of VOP start\n");
 			else if (startcode == 0x1B4)
-				pr_info("Video Session Error\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Video Session Error\n");
 			else if (startcode == 0x1B5)
-				pr_info("Visual Object Start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Visual Object Start\n");
 			else if (startcode == 0x1B6)
-				pr_info("Video Object Plane start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Video Object Plane start\n");
 			else if (startcode == 0x1B7)
-				pr_info("slice start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "slice start\n");
 			else if (startcode == 0x1B8)
-				pr_info("extension start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "extension start\n");
 			else if (startcode == 0x1B9)
-				pr_info("fgs start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "fgs start\n");
 			else if (startcode == 0x1BA)
-				pr_info("FBA Object start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "FBA Object start\n");
 			else if (startcode == 0x1BB)
-				pr_info("FBA Object Plane start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "FBA Object Plane start\n");
 			else if (startcode == 0x1BC)
-				pr_info("Mesh Object start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Mesh Object start\n");
 			else if (startcode == 0x1BD)
-				pr_info("Mesh Object Plane start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Mesh Object Plane start\n");
 			else if (startcode == 0x1BE)
-				pr_info("Still Texture Object start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Still Texture Object start\n");
 			else if (startcode == 0x1BF)
-				pr_info("Texture Spatial Layer start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Texture Spatial Layer start\n");
 			else if (startcode == 0x1C0)
-				pr_info("Texture SNR Layer start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Texture SNR Layer start\n");
 			else if (startcode == 0x1C1)
-				pr_info("Texture Tile start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Texture Tile start\n");
 			else if (startcode == 0x1C2)
-				pr_info("Texture Shape Layer start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "Texture Shape Layer start\n");
 			else if (startcode == 0x1C3)
-				pr_info("stuffing start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "stuffing start\n");
 			else if (startcode <= 0x1C5)
-				pr_info("reserved\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "reserved\n");
 			else if (startcode <= 0x1FF)
-				pr_info("System start\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_PARSER, "System start\n");
 		}
 
 		if (startcode >= 0x120 && startcode <= 0x12F) {
 			if (vol) {
-				pr_err("Ignoring multiple VOL headers\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Ignoring multiple VOL headers\n");
 				continue;
 			}
 			vol++;
@@ -1180,7 +1178,7 @@ int ff_mpeg4_decode_picture_header(struct mpeg4_dec_param *ctx, struct get_bits_
 				next_start_code_studio(gb);
 				extension_and_user_data(s, gb, 0);
 			} else if (s->studio_profile) {
-				pr_err("Mixes studio and non studio profile\n");
+				v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Mixes studio and non studio profile\n");
 				return -1;
 			}
 			ctx->profile = profile;
@@ -1202,7 +1200,7 @@ int ff_mpeg4_decode_picture_header(struct mpeg4_dec_param *ctx, struct get_bits_
 end:
 	if (s->studio_profile) {
 		if (!bits_per_raw_sample) {
-			pr_err("Missing VOL header\n");
+			v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Missing VOL header\n");
 			return -1;
 		}
 		return decode_studio_vop_header(ctx, gb);
@@ -1221,7 +1219,7 @@ int mpeg4_decode_extradata_ps(u8 *buf, int size, struct mpeg4_param_sets *ps)
 
 	ret = ff_mpeg4_decode_picture_header(&ps->dec_ps, &gb);
 	if (ret < -1) {
-		pr_err("Failed to parse extradata\n");
+		v4l_dbg(0, V4L_DEBUG_CODEC_ERROR, "Failed to parse extradata\n");
 		return ret;
 	}
 

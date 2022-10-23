@@ -1,0 +1,80 @@
+diff -Nur fb-test-app-rosetta-1.1.0-Orig/fb-string.c fb-test-app-rosetta-1.1.0/fb-string.c
+--- fb-test-app-rosetta-1.1.0-Orig/fb-string.c	2014-09-26 00:52:11.000000000 +0800
++++ fb-test-app-rosetta-1.1.0/fb-string.c	2020-04-24 14:53:22.000000000 +0800
+@@ -88,6 +88,8 @@
+ 		unsigned int *p;
+ 
+ 		fbmem += fb_info->fix.line_length * y;
++        if (!(color & 0xff000000))
++          color |= 0xff000000;
+ 
+ 		p = fbmem;
+ 
+diff -Nur fb-test-app-rosetta-1.1.0-Orig/fb-test.c fb-test-app-rosetta-1.1.0/fb-test.c
+--- fb-test-app-rosetta-1.1.0-Orig/fb-test.c	2014-09-26 00:52:11.000000000 +0800
++++ fb-test-app-rosetta-1.1.0/fb-test.c	2020-04-24 14:53:47.000000000 +0800
+@@ -80,6 +80,8 @@
+ 		*p = color >> 16;
+ 	} else {
+ 		unsigned int *p;
++        if(!(color & 0xff000000))
++            color |= 0xff000000;
+ 
+ 		fbmem += fb_info->fix.line_length * y;
+ 
+@@ -156,6 +158,11 @@
+ 	unsigned h = fb_info->var.yres;
+ 	unsigned w = fb_info->var.xres;
+ 
++    printf("--%s color: %#08x\n", __func__, color);
++    if(!(color & 0xff000000))
++        color |= 0xff000000;
++    printf("--%s final color: %#08x\n", __func__, color);
++
+ 	for (y = 0; y < h; y++) {
+ 		for (x = 0; x < w; x++)
+ 			draw_pixel(fb_info, x, y, color);
+@@ -178,9 +185,11 @@
+ 	case 4:
+ 		fill_screen_solid(fb_info, 0xffffff);
+ 		break;
+-	case 0:
+-	default:
++	case 0xdeadbeef:
+ 		fill_screen(fb_info);
++        break;
++	default:
++		fill_screen_solid(fb_info, pattern);
+ 		break;
+ 	}
+ }
+@@ -200,7 +209,7 @@
+ {
+ 	int opt;
+ 	int req_fb = 0;
+-	int req_pattern = 0;
++	int req_pattern = 0xdeadbeef;
+ 
+ 	printf("fb-test %d.%d.%d (%s)\n", VERSION, PATCHLEVEL, SUBLEVEL,
+ 		VERSION_NAME);
+@@ -211,7 +220,7 @@
+ 			req_fb = atoi(optarg);
+ 			break;
+ 		case 'p':
+-			req_pattern = atoi(optarg);
++			req_pattern = strtoul(optarg, NULL, 16);
+ 			break;
+ 		case 'r':
+ 			req_pattern = 1;
+diff -Nur fb-test-app-rosetta-1.1.0-Orig/rect.c fb-test-app-rosetta-1.1.0/rect.c
+--- fb-test-app-rosetta-1.1.0-Orig/rect.c	2014-09-26 00:52:11.000000000 +0800
++++ fb-test-app-rosetta-1.1.0/rect.c	2020-04-24 14:54:04.000000000 +0800
+@@ -147,6 +147,8 @@
+ 		unsigned int *p;
+ 
+ 		fbmem += fix.line_length * y;
++        if(!(color & 0xff000000))
++          color |= 0xff000000;
+ 
+ 		p = fbmem;
+ 

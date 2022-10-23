@@ -1,0 +1,43 @@
+[
+  {
+    type:VBPool,
+    param:{
+      nbuf:3
+    },
+    bind:{
+      output:gdc.ch1
+    }
+  },
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type:gdc,
+    param:
+    {
+      name:gdc,
+      config-file:"/etc/gdc_config/affine-1920_1080_180_1080_0_0-0_0_1920_1080-0_0_1.0-0-nv12.bin"
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264,
+      width: 1920,
+      height: 1080
+    }
+  },
+  {
+    type: GstBridge,
+    load: "/usr/lib/ipc_gstbridge.so",
+    param: {
+      launch: "appsrc ! h264parse ! video/x-h264,stream-format=avc !amlwsssink port=8082 async=false"
+    }
+  }
+]

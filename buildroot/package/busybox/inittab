@@ -38,7 +38,7 @@ null::sysinit:/bin/touch /var/log/messages
 null::respawn:/sbin/syslogd -n
 null::respawn:/sbin/klogd -n
 tty3::once:/usr/bin/tail -f /var/log/messages
-null::respawn:/usr/sbin/telnetd -l /bin/sh
+#null::respawn:/usr/sbin/telnetd -l /bin/sh
 
 # Stuff to do for the 3-finger salute
 #::ctrlaltdel:/sbin/reboot
@@ -50,6 +50,6 @@ null::respawn:/usr/sbin/telnetd -l /bin/sh
 ::shutdown:/sbin/swapoff -a
 ::shutdown:/bin/umount -a -r
 #null::sysinit:/usr/sbin/fbset -fb /dev/fb0 -g 1024 600 1024 1200 32
-null::sysinit:echo 1 >  /sys/class/graphics/fb1/blank 
+null::sysinit:echo 1 >  /sys/class/graphics/fb1/blank
 #null::sysinit:/usr/sbin/gui &
 

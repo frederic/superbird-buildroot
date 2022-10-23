@@ -152,7 +152,6 @@
 			SYSTEM_SLEEP_0: system-sleep-0 {
 				compatible = "arm,idle-state";
 				arm,psci-suspend-param = <0x0020000>;
-				local-timer-stop;
 				entry-latency-us = <0x3fffffff>;
 				exit-latency-us = <0x40000000>;
 				min-residency-us = <0xffffffff>;
@@ -1431,9 +1430,45 @@
 		status = "okay";
 	};
 
+	vout: vout {
+		compatible = "amlogic, vout";
+		status = "okay";
+		fr_auto_policy = <0>;
+	};
+
+	vout2: vout2 {
+		compatible = "amlogic, vout2";
+		status = "disabled";
+		clocks = <&clkc CLKID_VPU_CLKC_P0_COMP>,
+			<&clkc CLKID_VPU_CLKC_MUX>;
+		clock-names = "vpu_clkc0",
+			"vpu_clkc";
+	};
+
 	vdac {
 		compatible = "amlogic, vdac-tl1";
 		status = "okay";
+	};
+
+	dummy_venc: dummy_venc {
+		compatible = "amlogic, dummy_venc";
+		status = "disabled";
+		clocks = <&clkc CLKID_VCLK2_ENCP
+			&clkc CLKID_VCLK2_VENCP0
+			&clkc CLKID_VCLK2_VENCP1
+			&clkc CLKID_VCLK2_ENCI
+			&clkc CLKID_VCLK2_VENCI0
+			&clkc CLKID_VCLK2_VENCI1
+			&clkc CLKID_VCLK2_ENCL
+			&clkc CLKID_VCLK2_VENCL>;
+		clock-names = "encp_top_gate",
+			"encp_int_gate0",
+			"encp_int_gate1",
+			"venci_top_gate",
+			"enci_int_gate0",
+			"enci_int_gate1",
+			"encl_top_gate",
+			"encl_int_gate";
 	};
 
 	ddr_bandwidth {
@@ -1442,6 +1477,7 @@
 		reg = <0xff638000 0x100
 		       0xff638c00 0x100>;
 		interrupts = <0 52 1>;
+		sec_base = <0xff639000>;
 		interrupt-names = "ddr_bandwidth";
 	};
 
@@ -1502,6 +1538,212 @@
 		mem_size = <0 0x100000>;
 		status = "okay";
 	};
+
+	p_tsensor: p_tsensor@ff634800 {
+		compatible = "amlogic, r1p1-tsensor";
+		status = "okay";
+		reg = <0xff634800 0x50>,
+			<0xff800268 0x4>;
+		cal_type = <0x1>;
+		cal_a = <324>;
+		cal_b = <424>;
+		cal_c = <3159>;
+		cal_d = <9411>;
+		rtemp = <115000>;
+		interrupts = <0 35 0>;
+		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
+		clock-names = "ts_comp";
+		#thermal-sensor-cells = <1>;
+	};
+
+	d_tsensor: d_tsensor@ff634c00 {
+		compatible = "amlogic, r1p1-tsensor";
+		status = "okay";
+		reg = <0xff634c00 0x50>,
+			<0xff800230 0x4>;
+		cal_type = <0x1>;
+		cal_a = <324>;
+		cal_b = <424>;
+		cal_c = <3159>;
+		cal_d = <9411>;
+		rtemp = <115000>;
+		interrupts = <0 36 0>;
+		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
+		clock-names = "ts_comp";
+		#thermal-sensor-cells = <1>;
+	};
+
+	s_tsensor: s_tsensor@ff635000 {
+		compatible = "amlogic, r1p1-tsensor";
+		status = "okay";
+		reg = <0xff635000 0x50>,
+			<0xff80026c 0x4>;
+		cal_type = <0x1>;
+		cal_a = <324>;
+		cal_b = <424>;
+		cal_c = <3159>;
+		cal_d = <9411>;
+		rtemp = <115000>;
+		interrupts = <0 38 0>;
+		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
+		clock-names = "ts_comp";
+		#thermal-sensor-cells = <1>;
+	};
+
+	meson_cooldev: meson-cooldev@0 {
+		status = "okay";
+		compatible = "amlogic, meson-cooldev";
+		cooling_devices {
+			cpufreq_cool_cluster0 {
+				min_state = <1000000>;
+				dyn_coeff = <140>;
+				gpu_pp = <2>;
+				cluster_id = <0>;
+				node_name = "cpufreq_cool0";
+				device_type = "cpufreq";
+			};
+			cpucore_cool_cluster0 {
+				min_state = <1>;
+				dyn_coeff = <0>;
+				gpu_pp = <2>;
+				cluster_id = <0>;
+				node_name = "cpucore_cool0";
+				device_type = "cpucore";
+			};
+			gpufreq_cool {
+				min_state = <400>;
+				dyn_coeff = <140>;
+				gpu_pp = <2>;
+				cluster_id = <0>;
+				node_name = "gpufreq_cool0";
+				device_type = "gpufreq";
+			};
+			gpucore_cool {
+				min_state = <1>;
+				dyn_coeff = <0>;
+				gpu_pp = <2>;
+				cluster_id = <0>;
+				node_name = "gpucore_cool0";
+				device_type = "gpucore";
+			};
+		};
+		cpufreq_cool0:cpufreq_cool0 {
+			#cooling-cells = <2>; /* min followed by max */
+		};
+		cpucore_cool0:cpucore_cool0 {
+			#cooling-cells = <2>; /* min followed by max */
+		};
+		gpufreq_cool0:gpufreq_cool0 {
+			#cooling-cells = <2>; /* min followed by max */
+		};
+		gpucore_cool0:gpucore_cool0 {
+			#cooling-cells = <2>; /* min followed by max */
+		};
+	};/*meson cooling devices end*/
+
+	thermal-zones {
+		soc_thermal: soc_thermal {
+			polling-delay = <1000>;
+			polling-delay-passive = <100>;
+			sustainable-power = <1322>;
+			thermal-sensors = <&p_tsensor 0>;
+			trips {
+				pswitch_on: trip-point@0 {
+					temperature = <60000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				pcontrol: trip-point@1 {
+					temperature = <75000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				phot: trip-point@2 {
+					temperature = <85000>;
+					hysteresis = <5000>;
+					type = "hot";
+				};
+				pcritical: trip-point@3 {
+					temperature = <110000>;
+					hysteresis = <1000>;
+					type = "critical";
+				};
+			};
+			cooling-maps {
+				cpufreq_cooling_map {
+					trip = <&pcontrol>;
+					cooling-device = <&cpufreq_cool0 0 11>;
+					contribution = <1024>;
+				};
+				cpucore_cooling_map {
+					trip = <&pcontrol>;
+					cooling-device = <&cpucore_cool0 0 4>;
+					contribution = <1024>;
+				};
+				gpufreq_cooling_map {
+					trip = <&pcontrol>;
+					cooling-device = <&gpufreq_cool0 0 4>;
+					contribution = <1024>;
+				};
+			};
+		};
+		ddr_thermal: ddr_thermal {
+			polling-delay = <2000>;
+			polling-delay-passive = <1000>;
+			sustainable-power = <1322>;
+			thermal-sensors = <&d_tsensor 1>;
+			trips {
+				dswitch_on: trip-point@0 {
+					temperature = <60000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				dcontrol: trip-point@1 {
+					temperature = <75000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				dhot: trip-point@2 {
+					temperature = <85000>;
+					hysteresis = <5000>;
+					type = "hot";
+				};
+				dcritical: trip-point@3 {
+					temperature = <110000>;
+					hysteresis = <1000>;
+					type = "critical";
+				};
+			};
+		};
+		sar_thermal: sar_thermal {
+			polling-delay = <2000>;
+			polling-delay-passive = <1000>;
+			sustainable-power = <1322>;
+			thermal-sensors = <&s_tsensor 2>;
+			trips {
+				sswitch_on: trip-point@0 {
+					temperature = <60000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				scontrol: trip-point@1 {
+					temperature = <75000>;
+					hysteresis = <5000>;
+					type = "passive";
+				};
+				shot: trip-point@2 {
+					temperature = <85000>;
+					hysteresis = <5000>;
+					type = "hot";
+				};
+				scritical: trip-point@3 {
+					temperature = <110000>;
+					hysteresis = <1000>;
+					type = "critical";
+				};
+			};
+		};
+	};/*thermal zone end*/
 }; /* end of / */
 
 &pinctrl_aobus {
@@ -1633,6 +1875,23 @@
 		};
 	};
 
+	i2c_ao_2_pins_slp_input:i2c_ao_2_slp_input {
+		mux {
+			groups = "GPIOAO_2", "GPIOAO_3";
+			function = "gpio_aobus";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c_ao_2_pins_slp_low:i2c_ao_2_slp_low {
+		mux {
+			groups = "GPIOAO_2", "GPIOAO_3";
+			function = "gpio_aobus";
+			output-low;
+		};
+	};
+
 	i2c_ao_e_pins:i2c_ao_e {
 		mux {
 			groups = "i2c_ao_sck_e",
@@ -1640,6 +1899,23 @@
 			function = "i2c_ao";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c_ao_e_pins_slp_input:i2c_ao_e_slp_input {
+		mux {
+			groups = "GPIOE_0", "GPIOE_1";
+			function = "gpio_aobus";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c_ao_e_pins_slp_low:i2c_ao_e_slp_low {
+		mux {
+			groups = "GPIOE_0", "GPIOE_1";
+			function = "gpio_aobus";
+			output-low;
 		};
 	};
 
@@ -1984,6 +2260,23 @@
 		};
 	};
 
+	i2c0_c_pins_slp_input:i2c0_c_slp_input {
+		mux {
+			groups = "GPIOC_8", "GPIOC_9";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c0_c_pins_slp_low:i2c0_c_slp_low {
+		mux {
+			groups = "GPIOC_8", "GPIOC_9";
+			function = "gpio_periphs";
+			output-low;
+		};
+	};
+
 	i2c0_dv_pins:i2c0_dv {
 		mux {
 			groups = "i2c0_sda_dv",
@@ -1991,6 +2284,23 @@
 			function = "i2c0";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c0_dv_pins_slp_input:i2c0_dv_slp_input {
+		mux {
+			groups = "GPIODV_0", "GPIODV_1";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c0_dv_pins_slp_low:i2c0_dv_slp_low {
+		mux {
+			groups = "GPIODV_0", "GPIODV_1";
+			function = "gpio_periphs";
+			output-low;
 		};
 	};
 
@@ -2004,6 +2314,31 @@
 		};
 	};
 
+	/*
+	 * i2c sleep mode1: set the gpio the input
+	 * in this scene, pull up power is off
+	 */
+	i2c1_z_pins_slp_input:i2c1_z_slp_input {
+		mux {
+			groups = "GPIOZ_1", "GPIOZ_2";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	/*
+	 * i2c sleep mode2: set the gpio low
+	 * in this scene, pull up power is on
+	 */
+	i2c1_z_pins_slp_low:i2c1_z_slp_low {
+		mux {
+			groups = "GPIOZ_1", "GPIOZ_2";
+			function = "gpio_periphs";
+			output-low;
+		};
+	};
+
 	i2c1_h_pins:i2c1_h {
 		mux {
 			groups = "i2c1_sda_h",
@@ -2011,6 +2346,23 @@
 			function = "i2c1";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c1_h_pins_slp_input:i2c1_h_slp_input {
+		mux {
+			groups = "GPIOH_21", "GPIOH_22";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c1_h_pins_slp_low:i2c1_h_slp_low {
+		mux {
+			groups = "GPIOH_21", "GPIOH_22";
+			function = "gpio_periphs";
+			output-low;
 		};
 	};
 
@@ -2024,6 +2376,23 @@
 		};
 	};
 
+	i2c2_h_pins_slp_input:i2c2_h_slp_input {
+		mux {
+			groups = "GPIOH_19", "GPIOH_20";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c2_h_pins_slp_low:i2c2_h_slp_low {
+		mux {
+			groups = "GPIOH_19", "GPIOH_20";
+			function = "gpio_periphs";
+			output-low;
+		};
+	};
+
 	i2c2_z_pins:i2c2_z {
 		mux {
 			groups = "i2c2_sda_z",
@@ -2031,6 +2400,23 @@
 			function = "i2c2";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c2_z_pins_slp_input:i2c2_z_slp_input {
+		mux {
+			groups = "GPIOZ_9", "GPIOZ_10";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c2_z_pins_slp_low:i2c2_z_slp_low {
+		mux {
+			groups = "GPIOZ_9", "GPIOZ_10";
+			function = "gpio_periphs";
+			output-low;
 		};
 	};
 
@@ -2044,6 +2430,23 @@
 		};
 	};
 
+	i2c3_h1_pins_slp_input:i2c3_h1_slp_input {
+		mux {
+			groups = "GPIOH_0", "GPIOH_1";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c3_h1_pins_slp_low:i2c3_h1_slp_low {
+		mux {
+			groups = "GPIOH_0", "GPIOH_1";
+			function = "gpio_periphs";
+			output-low;
+		};
+	};
+
 	i2c3_h20_pins:i2c3_h3 {
 		mux {
 			groups = "i2c3_sda_h20",
@@ -2051,6 +2454,23 @@
 			function = "i2c3";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c3_h20_pins_slp_input:i2c3_h20_slp_input {
+		mux {
+			groups = "GPIOH_19", "GPIOH_20";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c3_h20_pins_slp_low:i2c3_h20_slp_low {
+		mux {
+			groups = "GPIOH_19", "GPIOH_20";
+			function = "gpio_periphs";
+			output-low;
 		};
 	};
 
@@ -2064,6 +2484,23 @@
 		};
 	};
 
+	i2c3_dv_pins_slp_input:i2c3_dv_slp_input {
+		mux {
+			groups = "GPIODV_9", "GPIODV_10";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c3_dv_pins_slp_low:i2c3_dv_slp_low {
+		mux {
+			groups = "GPIODV_9", "GPIODV_10";
+			function = "gpio_periphs";
+			output-low;
+		};
+	};
+
 	i2c3_c_pins:i2c3_c {
 		mux {
 			groups = "i2c3_sda_c",
@@ -2071,6 +2508,23 @@
 			function = "i2c3";
 			bias-pull-up;
 			drive-strength = <3>;
+		};
+	};
+
+	i2c3_c_pins_slp_input:i2c3_c_slp_input {
+		mux {
+			groups = "GPIOC_13", "GPIOC_14";
+			function = "gpio_periphs";
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	i2c3_c_pins_slp_low:i2c3_c_slp_low {
+		mux {
+			groups = "GPIOC_13", "GPIOC_14";
+			function = "gpio_periphs";
+			output-low;
 		};
 	};
 
@@ -2179,7 +2633,6 @@
 			function = "vx1";
 		};
 	};
-
 	lcd_vbyone_off_pins: lcd_vbyone_off_pin {
 		mux {
 			groups = "GPIOH_15","GPIOH_16";
@@ -2188,25 +2641,52 @@
 		};
 	};
 
-	lcd_tcon_pins: lcd_tcon_pin {
+	lcd_tcon_p2p_pins: lcd_tcon_p2p_pin {
 		mux {
 			groups = "tcon_0","tcon_1","tcon_2","tcon_3",
 				"tcon_4","tcon_5","tcon_6","tcon_7",
 				"tcon_8","tcon_9","tcon_10","tcon_11",
 				"tcon_12","tcon_13","tcon_14","tcon_15",
-				"tcon_lock","tcon_spi_mo","tcon_spi_mi",
-				"tcon_spi_clk","tcon_spi_ss";
+				"tcon_lock";
 			function = "tcon";
 		};
 	};
-	lcd_tcon_off_pins: lcd_tcon_off_pin {
+	lcd_tcon_p2p_usit_pins: lcd_tcon_p2p_usit_pin {
+		mux {
+			groups = "tcon_0","tcon_1","tcon_2","tcon_3",
+				"tcon_4","tcon_5","tcon_6","tcon_7",
+				"tcon_8","tcon_9","tcon_10","tcon_11",
+				"tcon_12","tcon_13","tcon_14","tcon_15",
+				"tcon_sfc_h16";
+			function = "tcon";
+		};
+	};
+	lcd_tcon_p2p_off_pins: lcd_tcon_p2p_off_pin {
 		mux {
 			groups = "GPIOH_0","GPIOH_1","GPIOH_2","GPIOH_3",
 				"GPIOH_4","GPIOH_5","GPIOH_6","GPIOH_7",
 				"GPIOH_8","GPIOH_9","GPIOH_10","GPIOH_11",
 				"GPIOH_12","GPIOH_13","GPIOH_14","GPIOH_15",
-				"GPIOH_16","GPIOH_17","GPIOH_18","GPIOH_19",
-				"GPIOH_20";
+				"GPIOH_16";
+			function = "gpio_periphs";
+			input-enable;
+		};
+	};
+	lcd_tcon_mlvds_pins: lcd_tcon_mlvds_pin {
+		mux {
+			groups = "tcon_0","tcon_1","tcon_2","tcon_3",
+				"tcon_4","tcon_5","tcon_6","tcon_7",
+				"tcon_8","tcon_9","tcon_10","tcon_11",
+				"tcon_12","tcon_13","tcon_14","tcon_15";
+			function = "tcon";
+		};
+	};
+	lcd_tcon_mlvds_off_pins: lcd_tcon_mlvds_off_pin {
+		mux {
+			groups = "GPIOH_0","GPIOH_1","GPIOH_2","GPIOH_3",
+				"GPIOH_4","GPIOH_5","GPIOH_6","GPIOH_7",
+				"GPIOH_8","GPIOH_9","GPIOH_10","GPIOH_11",
+				"GPIOH_12","GPIOH_13","GPIOH_14","GPIOH_15";
 			function = "gpio_periphs";
 			input-enable;
 		};

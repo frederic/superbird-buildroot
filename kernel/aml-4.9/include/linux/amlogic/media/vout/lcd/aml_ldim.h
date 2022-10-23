@@ -70,6 +70,7 @@ struct ldim_dev_config_s {
 	int lamp_err_gpio;
 	unsigned char fault_check;
 	unsigned char write_check;
+	unsigned char device_count;
 
 	unsigned int dim_min;
 	unsigned int dim_max;
@@ -88,8 +89,23 @@ struct ldim_dev_config_s {
 	unsigned short bl_mapping[LD_BLKREGNUM];
 
 	void (*dim_range_update)(void);
-	int (*dev_reg_write)(unsigned char *buf, unsigned int len);
-	int (*dev_reg_read)(unsigned char *buf, unsigned int len);
+	int (*dev_reg_write)(unsigned int dev_id, unsigned char *buf,
+			     unsigned int len);
+	int (*dev_reg_read)(unsigned int dev_id, unsigned char *buf,
+			    unsigned int len);
+};
+
+struct ldim_rmem_s {
+	void *wr_mem_vaddr1;
+	phys_addr_t wr_mem_paddr1;
+	void *wr_mem_vaddr2;
+	phys_addr_t wr_mem_paddr2;
+	void *rd_mem_vaddr1;
+	phys_addr_t rd_mem_paddr1;
+	void *rd_mem_vaddr2;
+	phys_addr_t rd_mem_paddr2;
+	unsigned int wr_mem_size;
+	unsigned int rd_mem_size;
 };
 
 /*******global API******/
@@ -102,6 +118,7 @@ struct aml_ldim_driver_s {
 
 	struct ldim_config_s *ldim_conf;
 	struct ldim_dev_config_s *ldev_conf;
+	struct ldim_rmem_s *rmem;
 	unsigned int *hist_matrix;
 	unsigned int *max_rgb;
 	unsigned short *ldim_test_matrix;

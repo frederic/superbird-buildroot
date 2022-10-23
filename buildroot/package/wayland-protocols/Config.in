@@ -7,3 +7,6 @@ config BR2_PACKAGE_WAYLAND_PROTOCOLS
 	  the Wayland core protocol.
 
 	  http://wayland.freedesktop.org/
+
+config BR2_PACKAGE_WAYLAND_PROTOCOLS_VERSION
+    string ""

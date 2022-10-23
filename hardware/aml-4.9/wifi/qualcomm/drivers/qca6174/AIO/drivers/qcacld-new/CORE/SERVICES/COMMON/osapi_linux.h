@@ -149,8 +149,8 @@ extern int logger_write(const enum logidx idx,
 /* Mutual Exclusion */
 typedef spinlock_t                      A_MUTEX_T;
 #define A_MUTEX_INIT(mutex)             spin_lock_init(mutex)
-#define A_MUTEX_LOCK(mutex)             SPIN_LOCK_BH(mutex)
-#define A_MUTEX_UNLOCK(mutex)           SPIN_UNLOCK_BH(mutex)
+#define A_MUTEX_LOCK(mutex)             spin_lock_bh(mutex)
+#define A_MUTEX_UNLOCK(mutex)           spin_unlock_bh(mutex)
 #define A_IS_MUTEX_VALID(mutex)         TRUE  /* okay to return true, since A_MUTEX_DELETE does nothing */
 #define A_MUTEX_DELETE(mutex)           /* spin locks are not kernel resources so nothing to free.. */
 

@@ -52,6 +52,8 @@ Description:
 #define     PARTITION_RESERVED              (8*SZ_1M)  // 8MB
 #define     MMC_BOOT_PARTITION_RESERVED     (32*SZ_1M) // 32MB
 
+#define     MMC_PARTITION_PROTECT_MASK      0x10      //low 4bit is for nand
+
 #define     MMC_BOOT_NAME                   "bootloader"
 #define     MMC_BOOT_NAME0                   "bootloader-boot0"
 #define     MMC_BOOT_NAME1                   "bootloader-boot1"
@@ -238,9 +240,10 @@ struct _mmc_device{
 typedef struct LockData {
 	uint8_t version_major;
 	uint8_t version_minor;
+	uint8_t unlock_ability;
 
 	/* Padding to eight bytes. */
-	uint8_t reserved1[2];
+	uint8_t reserved1;
 
 	/* 0: unlock    1: lock*/
 	uint8_t lock_state;

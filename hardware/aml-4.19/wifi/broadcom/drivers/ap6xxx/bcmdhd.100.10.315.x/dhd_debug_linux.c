@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -39,9 +39,9 @@
 #include <wl_cfgvendor.h>
 
 typedef void (*dbg_ring_send_sub_t)(void *ctx, const int ring_id, const void *data,
-									const uint32 len, const dhd_dbg_ring_status_t ring_status);
+	const uint32 len, const dhd_dbg_ring_status_t ring_status);
 typedef void (*dbg_urgent_noti_sub_t)(void *ctx, const void *data,
-									  const uint32 len, const uint32 fw_len);
+	const uint32 len, const uint32 fw_len);
 
 static dbg_ring_send_sub_t ring_send_sub_cb[DEBUG_RING_ID_MAX];
 static dbg_urgent_noti_sub_t urgent_noti_sub_cb;
@@ -70,7 +70,7 @@ struct log_level_table dhd_event_map[] = {
 
 static void
 debug_data_send(dhd_pub_t *dhdp, int ring_id, const void *data, const uint32 len,
-				const dhd_dbg_ring_status_t ring_status)
+	const dhd_dbg_ring_status_t ring_status)
 {
 	struct net_device *ndev;
 	dbg_ring_send_sub_t ring_sub_send;
@@ -143,7 +143,9 @@ dbg_ring_poll_worker(struct work_struct *work)
 		goto exit;
 	}
 
+	DHD_DBG_RING_UNLOCK(ring->lock, flags);
 	rlen = dhd_dbg_pull_from_ring(dhdp, ringid, buf, buflen);
+	DHD_DBG_RING_LOCK(ring->lock, flags);
 
 	if (!ring->sched_pull) {
 		ring->sched_pull = TRUE;
@@ -155,7 +157,7 @@ dbg_ring_poll_worker(struct work_struct *work)
 		/* offset fw ts to host ts */
 		hdr->timestamp += ring_info->tsoffset;
 		debug_data_send(dhdp, ringid, hdr, ENTRY_LENGTH(hdr),
-						ring_status);
+			ring_status);
 		rlen -= ENTRY_LENGTH(hdr);
 		hdr = (dhd_dbg_ring_entry_t *)((char *)hdr + ENTRY_LENGTH(hdr));
 	}
@@ -197,7 +199,7 @@ dhd_os_dbg_register_urgent_notifier(dhd_pub_t *dhdp, dbg_urgent_noti_sub_t urgen
 
 int
 dhd_os_start_logging(dhd_pub_t *dhdp, char *ring_name, int log_level,
-					 int flags, int time_intval, int threshold)
+	int flags, int time_intval, int threshold)
 {
 	int ret = BCME_OK;
 	int ring_id;
@@ -208,7 +210,7 @@ dhd_os_start_logging(dhd_pub_t *dhdp, char *ring_name, int log_level,
 		return BCME_UNSUPPORTED;
 
 	DHD_DBGIF(("%s , log_level : %d, time_intval : %d, threshod %d Bytes\n",
-			   __FUNCTION__, log_level, time_intval, threshold));
+		__FUNCTION__, log_level, time_intval, threshold));
 
 	/* change the configuration */
 	ret = dhd_dbg_set_configuration(dhdp, ring_id, log_level, flags, threshold);
@@ -284,7 +286,7 @@ dhd_os_suppress_logging(dhd_pub_t *dhdp, bool suppress)
 	if (max_log_level == SUPPRESS_LOG_LEVEL) {
 		/* suppress the logging in FW not to wake up host while device in suspend mode */
 		ret = dhd_iovar(dhdp, 0, "logtrace", (char *)&enable, sizeof(enable), NULL, 0,
-						TRUE);
+				TRUE);
 		if (ret < 0 && (ret != BCME_UNSUPPORTED)) {
 			DHD_ERROR(("logtrace is failed : %d\n", ret));
 		}
@@ -352,7 +354,7 @@ dhd_os_push_push_ring_data(dhd_pub_t *dhdp, int ring_id, void *data, int32 data_
 		/* filter the event for higher log level with current log level */
 		for (i = 0; i < ARRAYSIZE(dhd_event_map); i++) {
 			if ((dhd_event_map[i].tag == event_data->event) &&
-					dhd_event_map[i].log_level > ring_info->log_level) {
+				dhd_event_map[i].log_level > ring_info->log_level) {
 				return ret;
 			}
 		}
@@ -360,7 +362,7 @@ dhd_os_push_push_ring_data(dhd_pub_t *dhdp, int ring_id, void *data, int32 data_
 	ret = dhd_dbg_push_to_ring(dhdp, ring_id, &msg_hdr, event_data);
 	if (ret) {
 		DHD_ERROR(("%s : failed to push data into the ring (%d) with ret(%d)\n",
-				   __FUNCTION__, ring_id, ret));
+			__FUNCTION__, ring_id, ret));
 	}
 
 	return ret;
@@ -371,7 +373,7 @@ int
 dhd_os_dbg_attach_pkt_monitor(dhd_pub_t *dhdp)
 {
 	return dhd_dbg_attach_pkt_monitor(dhdp, dhd_os_dbg_monitor_tx_pkts,
-									  dhd_os_dbg_monitor_tx_status, dhd_os_dbg_monitor_rx_pkts);
+		dhd_os_dbg_monitor_tx_status, dhd_os_dbg_monitor_rx_pkts);
 }
 
 int
@@ -388,7 +390,7 @@ dhd_os_dbg_monitor_tx_pkts(dhd_pub_t *dhdp, void *pkt, uint32 pktid)
 
 int
 dhd_os_dbg_monitor_tx_status(dhd_pub_t *dhdp, void *pkt, uint32 pktid,
-							 uint16 status)
+	uint16 status)
 {
 	return dhd_dbg_monitor_tx_status(dhdp, pkt, pktid, status);
 }
@@ -407,14 +409,14 @@ dhd_os_dbg_stop_pkt_monitor(dhd_pub_t *dhdp)
 
 int
 dhd_os_dbg_monitor_get_tx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
-							   uint16 req_count, uint16 *resp_count)
+	uint16 req_count, uint16 *resp_count)
 {
 	return dhd_dbg_monitor_get_tx_pkts(dhdp, user_buf, req_count, resp_count);
 }
 
 int
 dhd_os_dbg_monitor_get_rx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
-							   uint16 req_count, uint16 *resp_count)
+	uint16 req_count, uint16 *resp_count)
 {
 	return dhd_dbg_monitor_get_rx_pkts(dhdp, user_buf, req_count, resp_count);
 }
@@ -472,7 +474,7 @@ dhd_os_dbg_attach(dhd_pub_t *dhdp)
 		return BCME_NOMEM;
 
 	for (ring_id = DEBUG_RING_ID_INVALID + 1; ring_id < DEBUG_RING_ID_MAX;
-			ring_id++) {
+	     ring_id++) {
 		ring_info = &os_priv[ring_id];
 		INIT_DELAYED_WORK(&ring_info->work, dbg_ring_poll_worker);
 		ring_info->dhdp = dhdp;

@@ -2,7 +2,7 @@
  * IE/TLV fragmentation/defragmentation support for
  * Broadcom 802.11bang Networking Device Driver
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -36,7 +36,7 @@
  */
 int
 bcm_tlv_dot11_defrag(const void *buf, uint buf_len, uint8 id, bool id_ext,
-					 uint8 *out, uint *out_len)
+	uint8 *out, uint *out_len)
 {
 	int err = BCME_OK;
 	const bcm_tlv_t *ie;
@@ -73,7 +73,7 @@ bcm_tlv_dot11_defrag(const void *buf, uint buf_len, uint8 id, bool id_ext,
 	}
 
 	/* adjust buf_len to length after ie including it */
-	buf_len -= ((const uint8 *)ie - (const uint8 *)buf);
+	buf_len -= (uint)(((const uint8 *)ie - (const uint8 *)buf));
 
 	/* update length from fragments, okay if no next ie */
 	while ((ie = bcm_next_tlv(ie, &buf_len)) &&
@@ -106,7 +106,7 @@ done:
 
 int
 bcm_tlv_dot11_frag_tot_len(const void *buf, uint buf_len,
-						   uint8 id, bool id_ext, uint *ie_len)
+	uint8 id, bool id_ext, uint *ie_len)
 {
 	return  bcm_tlv_dot11_defrag(buf, buf_len, id, id_ext, NULL, ie_len);
 }

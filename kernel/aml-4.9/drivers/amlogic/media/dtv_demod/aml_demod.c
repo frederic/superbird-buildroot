@@ -273,6 +273,7 @@ static long aml_demod_ioctl(struct file *file,
 	struct aml_tuner_sys *tuner;
 	struct aml_tuner_sys  tuner_para = {0};
 	struct aml_demod_reg  arg_t;
+	unsigned int val;
 
 	switch (cmd) {
 	case AML_DEMOD_GET_RSSI:
@@ -451,6 +452,14 @@ static long aml_demod_ioctl(struct file *file,
 
 	case AML_DEMOD_ATSC_IRQ:
 		atsc_read_iqr_reg();
+		break;
+	case AML_DEMOD_GET_PLL_INIT:
+		val = get_dtvpll_init_flag();
+
+		if (copy_to_user((void __user *)arg, &val,
+			sizeof(unsigned int))) {
+			pr_dbg("copy_to_user error AML_DEMOD_GET_PLL_INIT\n");
+		}
 		break;
 
 	default:

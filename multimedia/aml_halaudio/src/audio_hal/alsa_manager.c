@@ -127,6 +127,19 @@ static alsa_pair_t alsapairs[] = {
     }
 };
 
+#define HW_AUDIO_TYPE_CONFIG "hw_audio_type"
+bool aml_audio_hw_type_parser_init(cJSON * config)
+{
+    cJSON *type_config = cJSON_GetObjectItem(config, HW_AUDIO_TYPE_CONFIG);
+    bool enable = false;
+
+    if (type_config) {
+        enable = type_config->valueint;
+    }
+
+    return enable;
+}
+
 void aml_alsa_init(cJSON * config)
 {
     cJSON *temp;

@@ -53,16 +53,6 @@
 */
 #define IGNORE_PARAM_FROM_CONFIG      0x8000000
 
-
-#define PIC_SINGLE_FRAME			0
-#define PIC_TOP_BOT_TOP				1
-#define PIC_BOT_TOP_BOT				2
-#define PIC_DOUBLE_FRAME			3
-#define PIC_TRIPLE_FRAME			4
-#define PIC_TOP_BOT					5
-#define PIC_BOT_TOP					6
-#define PIC_INVALID					7
-
 #define MVC_EXTENSION_ENABLE 0
 #define PRINTREFLIST  0
 
@@ -430,6 +420,19 @@ enum PictureStructure {
 	BOTTOM_FIELD
 };
 
+typedef enum {
+	PIC_SINGLE_FRAME = 0,
+	PIC_TOP,
+	PIC_BOT,
+	PIC_TOP_BOT,
+	PIC_BOT_TOP,
+	PIC_TOP_BOT_TOP = 5,
+	PIC_BOT_TOP_BOT,
+	PIC_DOUBLE_FRAME,
+	PIC_TRIPLE_FRAME,
+	PIC_INVALID,
+} PicStruct_E;
+
 #define I_Slice                               2
 #define P_Slice                               5
 #define B_Slice                               6
@@ -462,7 +465,8 @@ enum ProfileIDC {
 enum FirstInsertFrm_State {
 	FirstInsertFrm_IDLE = 0,
 	FirstInsertFrm_OUT = 1,
-	FirstInsertFrm_SKIPDONE = 2,
+	FirstInsertFrm_RESET = 2,
+	FirstInsertFrm_SKIPDONE = 3,
 };
 
 
@@ -804,6 +808,9 @@ struct FrameStore {
 	int max_mv;
 	int min_mv;
 	int avg_mv;
+	int dpb_frame_count;
+	u32 hw_decode_time;
+	u32 frame_size2; // For recording the chunk->size in frame mode
 };
 
 
@@ -896,6 +903,7 @@ struct h264_dpb_stru {
 	unsigned int origin_max_reference;
 	unsigned int first_insert_frame;
 	int first_output_poc;
+	int dpb_frame_count;
 };
 
 
@@ -916,7 +924,7 @@ void set_frame_output_flag(struct h264_dpb_stru *p_H264_Dpb, int index);
 
 int is_there_unused_frame_from_dpb(struct DecodedPictureBuffer *p_Dpb);
 
-int h264_slice_header_process(struct h264_dpb_stru *p_H264_Dpb);
+int h264_slice_header_process(struct h264_dpb_stru *p_H264_Dpb, int *frame_num_gap);
 
 void dpb_init_global(struct h264_dpb_stru *p_H264_Dpb,
 	int id, int actual_dpb_size, int max_reference_size);
@@ -959,4 +967,8 @@ enum PictureStructure get_cur_slice_picture_struct(
 
 int dpb_check_ref_list_error(
 	struct h264_dpb_stru *p_H264_Dpb);
+
+void unmark_for_reference(struct DecodedPictureBuffer *p_Dpb,
+	struct FrameStore *fs);
+
 #endif

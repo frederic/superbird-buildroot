@@ -89,7 +89,7 @@
 	#endif
 
 	#ifdef CONFIG_LPS_LCLK
-	#define CONFIG_XMIT_THREAD_MODE
+	/* #define CONFIG_XMIT_THREAD_MODE */
 	#endif
 #endif /* CONFIG_POWER_SAVING */
 
@@ -191,9 +191,6 @@
 #endif
 #define RTW_NOTCH_FILTER 0 /* 0:Disable, 1:Enable, */
 
-#define CONFIG_TX_MCAST2UNI		/* Support IP multicast->unicast */
-/* #define CONFIG_CHECK_AC_LIFETIME */	/* Check packet lifetime of 4 ACs. */
-
 /*
  * Interface  Related Config
  */
@@ -294,8 +291,6 @@
 		#define WAKEUP_GPIO_IDX 7
 	#endif
 #endif
-
-#define CONFIG_ATTEMPT_TO_FIX_AP_BEACON_ERROR
 
 /*
  * Debug Related Config

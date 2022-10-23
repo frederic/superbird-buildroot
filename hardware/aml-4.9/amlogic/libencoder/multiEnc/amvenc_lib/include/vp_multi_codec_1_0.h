@@ -56,6 +56,7 @@ typedef struct encoding_metadata_e {
   int timestamp_us;  /* timestamp in usec of the encode frame */
   bool is_valid;     /* if true, the encoding was successful */
   enc_frame_extra_info_t extra; /* extra info of encoded frame if is_valid true */
+  int err_cod; /* error code if is_valid is false: >0 normal, others error */
 } encoding_metadata_t;
 
 typedef enum vl_codec_id_e {
@@ -96,6 +97,16 @@ typedef enum {
   DMA_TYPE = 3,
 } vl_buffer_type_t;
 
+/* encoder features configure flags bit masks for enc_feature_opts */
+/* Enable RIO feature.
+        bit field value 1: enable, 0: diablae (default) */
+#define ENABLE_ROI_FEATURE      0x1
+/* Encode parameter update on the fly.
+        bit field value: 1: enable, 0: disable (default) */
+#define ENABLE_PARA_UPDATE      0x2
+/* Encode long term references feauture.
+        bit field value: 1 enable, 0: disable (default)*/
+#define ENABLE_LONG_TERM_REF    0x80
 /* encoder info config */
 typedef struct vl_encode_info {
   int width;
@@ -106,8 +117,15 @@ typedef struct vl_encode_info {
   bool prepend_spspps_to_idr_frames;
   vl_img_format_t img_format;
   int qp_mode; /* 1: use customer QP range, 0:use default QP range */
-  int enc_feature_opts; /*option features flag settings */
+  int enc_feature_opts; /* option features flag settings.*/
+                        /* See above for fields definition in detail */
                        /* bit 0: qp hint(roi) 0:disable (default) 1: enable */
+                       /* bit 1: param_change 0:disable (default) 1: enable */
+                       /* bit 2 to 6: gop_opt:0 (default), 1:I only 2:IP, */
+                       /*                     3: IBBBP, 4: IP_SVC1, 5:IP_SVC2 */
+                       /*                     6: IP_SVC3, 7: IP_SVC4 */
+                       /*                     see define of AMVGOPModeOPT */
+                       /* bit 7:LTR control   0:disable (default) 1: enable*/
 } vl_encode_info_t;
 
 /* dma buffer info*/
@@ -298,7 +316,19 @@ int vl_video_encoder_change_qp(vl_codec_handle_t handle,
  */
 int vl_video_encoder_change_gop(vl_codec_handle_t handle,
                                 int intraQP, int GOPPeriod);
-
+/*
+ * vl_video_encoder_longterm_ref
+ * set up long term reference flags
+ *
+ *@param : handle
+ *@param : LongtermRefFlags:
+ *         bit 0: current frame use as long term reference
+ *         bit 1: current frame use LTF as reference to encode.
+ *
+ *@return : if success return 0 ,else return <= 0
+ */
+int vl_video_encoder_longterm_ref(vl_codec_handle_t codec_handle,
+                                  int LongtermRefFlags);
 /**
  * destroy encoder
  *

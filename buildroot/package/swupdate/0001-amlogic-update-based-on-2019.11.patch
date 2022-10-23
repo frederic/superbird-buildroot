@@ -1,0 +1,4298 @@
+From 67b514d0a2b776ab4c5f6f9c8fc008d155a2d8e8 Mon Sep 17 00:00:00 2001
+From: Blance Tang <guofeng.tang@amlogic.com>
+Date: Sun, 19 Apr 2020 22:26:47 +0800
+Subject: [PATCH] amlogic update based on 2019.11
+
+1, Support AML Uboot env
+2, Support ab update
+3, Support EXT4
+4, Support Recovery download
+5, Support bootloader offset
+---
+ Makefile                   |   2 +-
+ bootloader/none.c          |  82 +++++
+ core/cpio_utils.c          |   2 +-
+ core/pctl.c                |  12 +-
+ core/swupdate.c            |  45 ++-
+ corelib/mtd-interface.c    | 105 ++++++
+ corelib/stream_interface.c |  66 ++++
+ handlers/Config.in         |  10 +-
+ handlers/Makefile          |   1 +
+ handlers/ext4_handler.c    | 318 +++++++++++++++++++
+ handlers/flash_handler.c   |  74 ++++-
+ handlers/raw_handler.c     | 199 +++++++++++-
+ handlers/ubivol_handler.c  |  14 +-
+ include/bootloader.h       |   2 +
+ include/flash.h            |   1 +
+ include/swupdate.h         |   1 +
+ libsparse/Config.in        |  18 ++
+ libsparse/Makefile         |  10 +
+ libsparse/backed_block.c   | 404 +++++++++++++++++++++++
+ libsparse/backed_block.h   |  64 ++++
+ libsparse/defs.h           |  23 ++
+ libsparse/output_file.c    | 775 +++++++++++++++++++++++++++++++++++++++++++++
+ libsparse/output_file.h    |  42 +++
+ libsparse/sparse.c         | 396 +++++++++++++++++++++++
+ libsparse/sparse.h         | 310 ++++++++++++++++++
+ libsparse/sparse_crc32.c   | 111 +++++++
+ libsparse/sparse_crc32.h   |  32 ++
+ libsparse/sparse_defs.h    |  49 +++
+ libsparse/sparse_err.c     |  33 ++
+ libsparse/sparse_file.h    |  32 ++
+ libsparse/sparse_format.h  |  55 ++++
+ libsparse/sparse_read.c    | 510 +++++++++++++++++++++++++++++
+ 32 files changed, 3781 insertions(+), 17 deletions(-)
+ create mode 100644 handlers/ext4_handler.c
+ create mode 100644 libsparse/Config.in
+ create mode 100644 libsparse/Makefile
+ create mode 100644 libsparse/backed_block.c
+ create mode 100644 libsparse/backed_block.h
+ create mode 100644 libsparse/defs.h
+ create mode 100644 libsparse/output_file.c
+ create mode 100644 libsparse/output_file.h
+ create mode 100644 libsparse/sparse.c
+ create mode 100644 libsparse/sparse.h
+ create mode 100644 libsparse/sparse_crc32.c
+ create mode 100644 libsparse/sparse_crc32.h
+ create mode 100644 libsparse/sparse_defs.h
+ create mode 100644 libsparse/sparse_err.c
+ create mode 100644 libsparse/sparse_file.h
+ create mode 100644 libsparse/sparse_format.h
+ create mode 100644 libsparse/sparse_read.c
+
+diff --git a/Makefile b/Makefile
+index 943e013..1a14293 100644
+--- a/Makefile
++++ b/Makefile
+@@ -354,7 +354,7 @@ include $(srctree)/Makefile.flags
+ # Defaults to vmlinux, but the arch makefile usually adds further targets
+ 
+ objs-y		:= core handlers
+-libs-y		:= corelib ipc mongoose parser suricatta bootloader
++libs-y		:= corelib ipc mongoose parser suricatta bootloader libsparse
+ shareds-y	:= bindings
+ tools-y		:= tools
+ 
+diff --git a/bootloader/none.c b/bootloader/none.c
+index 57ff121..626d81a 100644
+--- a/bootloader/none.c
++++ b/bootloader/none.c
+@@ -5,6 +5,8 @@
+  * SPDX-License-Identifier:     GPL-2.0-or-later
+  */
+ 
++#if 0
++
+ #include <unistd.h>
+ #include <string.h>
+ #include "bootloader.h"
+@@ -43,3 +45,83 @@ int bootloader_apply_list(const char *filename)
+ {
+ 	return dict_parse_script(&environment, filename);
+ }
++
++#else
++
++#include <unistd.h>
++#include <stdio.h>
++#include <string.h>
++#include "bootloader.h"
++
++static int env_init = 0;
++
++int bootloader_env_init()
++{
++	if (env_init == 0) {
++		bootenv_init();
++		env_init = 1;
++	}
++	return 0;
++}
++
++int bootloader_env_set(const char __attribute__ ((__unused__)) *name,
++			const char __attribute__ ((__unused__)) *value)
++{
++	bootenv_update(name, value);
++	return 0;
++}
++
++int bootloader_env_unset(const char __attribute__ ((__unused__)) *name)
++{
++	bootenv_update(name, "");
++	return 0;
++}
++
++char *bootloader_env_get(const char __attribute__ ((__unused__)) *name)
++{
++    return bootenv_get(name);
++}
++
++int bootloader_apply_list(const char __attribute__ ((__unused__)) *filename)
++{
++	FILE *fp = NULL;
++	int ret = 0;
++	char *line = NULL, *key = NULL, *value = NULL;
++	size_t len = 0;
++	/* open script generated during sw-description parsing */
++	fp = fopen(filename, "rb");
++	if (!fp) {
++		printf("Failed to open filename: %s\n", filename);
++		ret = -1;
++		goto cleanup;
++	}
++
++	/* load  varname-value pairs from script into grubenv dictlist */
++	/* Note that variables with no value assigned are skipped now.
++	 * We should consider whether we want to replicate U-Boot behavior
++	 * (unset if no value given). GRUB env tool distinguishes unsetting
++	 * (removing) variable from environment and setting variable to an
++	 * empty string (NULL) as two actions. We should think about if if it
++	 * turns oout to be desired
++	 */
++	while ((getline(&line, &len, fp)) != -1) {
++		key = strtok(line, " \t\n");
++		value = strtok(NULL, " \t\n");
++		if (value != NULL && key != NULL) {
++			ret = bootloader_env_set( key, value);
++			if (ret) {
++				printf("Adding pair [%s] = %s into dictionary"
++					"list failed\n", key, value);
++				goto cleanup;
++			}
++		}
++	}
++
++cleanup:
++	if (fp) fclose(fp);
++	/* free(null) should not harm anything */
++	free(line);
++
++	return ret;
++}
++#endif
+diff --git a/core/cpio_utils.c b/core/cpio_utils.c
+index 03776e2..ad27b75 100644
+--- a/core/cpio_utils.c
++++ b/core/cpio_utils.c
+@@ -25,7 +25,7 @@
+ 
+ #define MODULE_NAME "cpio"
+ 
+-#define BUFF_SIZE	 16384
++#define BUFF_SIZE	 262144
+ 
+ #define NPAD_BYTES(o) ((4 - (o % 4)) % 4)
+ 
+diff --git a/core/pctl.c b/core/pctl.c
+index d8b2c76..b3eed7d 100644
+--- a/core/pctl.c
++++ b/core/pctl.c
+@@ -27,6 +27,8 @@
+ #define WAIT_ANY (-1)
+ #endif
+ 
++#define EXIT_RECOVERY   (10)
++
+ /* the array contains the pid of the subprocesses */
+ #define MAX_PROCESSES	10
+ static struct swupdate_task procs[MAX_PROCESSES];
+@@ -260,7 +262,15 @@ void sigchld_handler (int __attribute__ ((__unused__)) signum)
+ 				kill(procs[i].pid, SIGTERM);
+ 			}
+ 		}
+-
++        
++		char *recovery_status = bootloader_env_get("recovery_status");
++		printf("recovery_status:%s\n", recovery_status);
++		if (recovery_status) {
++			if ((!strcmp(recovery_status, "failed")) || (!strcmp(recovery_status, "in_progress"))) {
++				printf("swupdate upgrade failed, wait for continue again!\n");
++				exitstatus = EXIT_RECOVERY;
++			}
++		}
+ 		exit(exitstatus);
+ 	}
+ 
+diff --git a/core/swupdate.c b/core/swupdate.c
+index 38e5a56..af3f193 100644
+--- a/core/swupdate.c
++++ b/core/swupdate.c
+@@ -54,6 +54,8 @@
+ 
+ #define MODULE_NAME	"swupdate"
+ 
++#define EXIT_RECOVERY   (10)
++
+ static pthread_t network_daemon;
+ 
+ /* Tree derived from the configuration file */
+@@ -99,6 +101,7 @@ static struct option long_options[] = {
+ #endif
+ #ifdef CONFIG_DOWNLOAD
+ 	{"download", required_argument, NULL, 'd'},
++	{"Download", required_argument, NULL, 'D'},
+ #endif
+ #ifdef CONFIG_SURICATTA
+ 	{"suricatta", required_argument, NULL, 'u'},
+@@ -107,6 +110,7 @@ static struct option long_options[] = {
+ 	{"webserver", required_argument, NULL, 'w'},
+ #endif
+ 	{"check", no_argument, NULL, 'c'},
++    {"recovery", no_argument, NULL, 'r'},
+ 	{"postupdate", required_argument, NULL, 'p'},
+ 	{"preupdate", required_argument, NULL, 'P'},
+ 	{NULL, 0, NULL, 0}
+@@ -621,11 +625,13 @@ int main(int argc, char **argv)
+ 	memset(main_options, 0, sizeof(main_options));
+ 	memset(image_url, 0, sizeof(image_url));
+ 	strcpy(main_options, "vhni:e:l:Lcf:p:P:o:N:R:M");
++    strcat(main_options, "r:");
+ #ifdef CONFIG_MTD
+ 	strcat(main_options, "b:");
+ #endif
+ #ifdef CONFIG_DOWNLOAD
+ 	strcat(main_options, "d:");
++	strcat(main_options, "D:");
+ #endif
+ #ifdef CONFIG_SURICATTA
+ 	strcat(main_options, "u:");
+@@ -649,6 +655,7 @@ int main(int argc, char **argv)
+ 	/* Initialize internal database */
+ 	swupdate_init(&swcfg);
+ 
++    mtd_scan_partitions();
+ 	/*
+ 	 * Initialize notifier to enable at least output
+ 	 * on the console
+@@ -710,7 +717,7 @@ int main(int argc, char **argv)
+ 	/* Process options with getopt */
+ 	while ((c = getopt_long(argc, argv, main_options,
+ 				long_options, NULL)) != EOF) {
+-		if (optarg && *optarg == '-' && (c != 'd' && c != 'u' && c != 'w')) {
++		if (optarg && *optarg == '-' && (c != 'd' && c != 'D' && c != 'u' && c != 'w')) {
+ 			/* An option's value starting with '-' is not allowed except
+ 			 * for downloader, webserver, and suricatta doing their own
+ 			 * argv parsing.
+@@ -797,6 +804,20 @@ int main(int argc, char **argv)
+ 			opt_d = 1;
+ 			free(dwloptions);
+ 			break;
++        case 'D':
++            if (get_recovery_otapath(image_url) != 0) {
++                exit(EXIT_FAILURE);
++                break;
++            }
++            if (asprintf(&dwloptions, "%s -u %s %s", argv[0], image_url, optarg)
++                == ENOMEM_ASPRINTF) {
++				ERROR("Cannot allocate memory for downloader options.");
++				exit(EXIT_FAILURE);
++			}
++            dwlav = splitargs(dwloptions, &dwlac);
++			free(dwloptions);
++            opt_d = 1;
++            break;
+ #endif
+ 		case 'H':
+ 			if (opt_to_hwrev(optarg, &swcfg.hw) < 0)
+@@ -829,6 +850,9 @@ int main(int argc, char **argv)
+ 		case 'c':
+ 			opt_c = 1;
+ 			break;
++        case 'r':
++            swcfg.recovery_flag = 1;
++            break;
+ 		case 'p':
+ 			strncpy(swcfg.globals.postupdatecmd, optarg,
+ 				sizeof(swcfg.globals.postupdatecmd));
+@@ -967,13 +991,22 @@ int main(int argc, char **argv)
+ 				"Key file does not contain a valid AES key\n");
+ 			exit(EXIT_FAILURE);
+ 		}
+-	}
++
++        if (get_system_type() == 0) {
++            int slot = 0;
++            get_active_slot(&slot);
++            slot = slot ? 0 : 1;
++            set_active_slot(slot);
++        }
++    }
+ 
+ 	lua_handlers_init();
+ 
+ 	if(!get_hw_revision(&swcfg.hw))
+ 		printf("Running on %s Revision %s\n", swcfg.hw.boardname, swcfg.hw.revision);
+ 
++    bootloader_env_init();
++
+ 	print_registered_handlers();
+ 	if (swcfg.globals.syslog_enabled) {
+ 		if (syslog_init()) {
+@@ -1011,12 +1044,20 @@ int main(int argc, char **argv)
+ 			if (swcfg.bootloader_transaction_marker) {
+ 				save_state_string((char*)BOOTVAR_TRANSACTION, STATE_FAILED);
+ 			}
++            result = EXIT_RECOVERY;
+ 			break;
+ 		case EXIT_SUCCESS:
+ 			notify(SUCCESS, 0, INFOLEVEL, NULL);
+ 			if (postupdate(&swcfg, NULL) != 0) {
+ 				ERROR("Post-update command execution failed.");
+ 			}
++
++            if (get_system_type() == 0) {
++                int slot = 0;
++                get_active_slot(&slot);
++                slot = slot ? 0 : 1;
++                set_active_slot(slot);
++            }
+ 			break;
+ 		}
+ 		cleanup_files(&swcfg);
+diff --git a/corelib/mtd-interface.c b/corelib/mtd-interface.c
+index ccbe178..458303c 100644
+--- a/corelib/mtd-interface.c
++++ b/corelib/mtd-interface.c
+@@ -135,6 +135,111 @@ erase_out:
+ }
+ 
+ 
++int flash_erase_offset_size(int mtdnum, int offset, int size)
++{
++	int fd;
++	char mtd_device[80];
++	struct mtd_dev_info *mtd;
++	int noskipbad = 0;
++	int unlock = 0;
++	int ret = 0;
++	unsigned int eb, eb_start, eb_cnt, i;
++	uint8_t *buf;
++	struct flash_description *flash = get_flash_info();
++
++	if  (!mtd_dev_present(flash->libmtd, mtdnum)) {
++			ERROR("MTD %d does not exist\n", mtdnum);
++			return -ENODEV;
++	}
++	mtd = &flash->mtd_info[mtdnum].mtd;
++	snprintf(mtd_device, sizeof(mtd_device), "/dev/mtd%d", mtdnum);
++
++	if ((fd = open(mtd_device, O_RDWR)) < 0) {
++		ERROR( "%s: %s: %s", __func__, mtd_device, strerror(errno));
++		return -ENODEV;
++	}
++
++	/*
++	 * prepare to erase all of the MTD partition,
++	 */
++	buf = (uint8_t *)malloc(mtd->eb_size);
++	if (!buf) {
++		ERROR("No memory for temporary buffer of %d bytes",
++			mtd->eb_size);
++		close(fd);
++		return -ENOMEM;
++	}
++
++	eb_start = offset /mtd->eb_size ;
++	eb_cnt = size / mtd->eb_size;
++	for (eb = eb_start; eb < eb_start + eb_cnt; eb++) {
++
++		/* Always skip bad sectors */
++		if (!noskipbad) {
++			int isbad = mtd_is_bad(mtd, fd, eb);
++			if (isbad > 0) {
++				continue;
++			} else if (isbad < 0) {
++				if (errno == EOPNOTSUPP) {
++					noskipbad = 1;
++				} else {
++					ERROR("%s: MTD get bad block failed", mtd_device);
++					ret  = -EFAULT;
++					goto erase_out;
++				}
++			}
++		}
++
++		/*
++		 * In case of NOR flash, check if the flash
++		 * is already empty. This can save
++		 * an amount of time because erasing
++		 * a NOR flash is very time expensive.
++		 * NAND flash is always erased.
++		 */
++		if (!isNand(flash, mtdnum)) {
++			if (mtd_read(mtd, fd, eb, 0, buf, mtd->eb_size) != 0) {
++				ERROR("%s: MTD Read failure", mtd_device);
++				ret  = -EIO;
++				goto erase_out;
++			}
++
++			/* check if already empty */
++			for (i = 0; i < mtd->eb_size; i++) {
++				if (buf[i] != EMPTY_BYTE)
++					break;
++			}
++
++			/* skip erase if empty */
++			if (i == mtd->eb_size)
++				continue;
++
++		}
++
++		/* The sector contains data and it must be erased */
++		if (unlock) {
++			if (mtd_unlock(mtd, fd, eb) != 0) {
++				TRACE("%s: MTD unlock failure", mtd_device);
++				continue;
++			}
++		}
++
++		if (mtd_erase(flash->libmtd, mtd, fd, eb) != 0) {
++			ERROR("%s: MTD Erase failure", mtd_device);
++			ret  = -EIO;
++			goto erase_out;
++		}
++	}
++
++erase_out:
++	free(buf);
++
++	close(fd);
++
++	return ret;
++}
++
++
+ void mtd_init(void)
+ {
+ 	struct flash_description *flash = get_flash_info();
+diff --git a/corelib/stream_interface.c b/corelib/stream_interface.c
+index b65627a..20d3622 100644
+--- a/corelib/stream_interface.c
++++ b/corelib/stream_interface.c
+@@ -71,6 +71,50 @@ pthread_cond_t stream_wkup = PTHREAD_COND_INITIALIZER;
+ 
+ static struct installer inst;
+ 
++
++static int extract_file_to_data(int fd, const char *fname, unsigned long *poffs)
++{
++	char output_file[MAX_IMAGE_FNAME];
++	struct filehdr fdh;
++	int fdout;
++	uint32_t checksum;
++
++	if (extract_cpio_header(fd, &fdh, poffs)) {
++		return -1;
++	}
++	if (strcmp(fdh.filename, fname)) {
++		TRACE("description file name not the first of the list: %s instead of %s",
++			fdh.filename,
++			fname);
++		return -1;
++	}
++	if (snprintf(output_file, sizeof(output_file), "%s%s", "/data/",
++		     fdh.filename) >= (int)sizeof(output_file)) {
++		ERROR("Path too long: %s%s", "/data/", fdh.filename);
++		return -1;
++	}
++	TRACE("Found file:\n\tfilename %s\n\tsize %u", fdh.filename, (unsigned int)fdh.size);
++
++	fdout = openfileoutput(output_file);
++	if (fdout < 0)
++		return -1;
++
++	if (copyfile(fd, &fdout, fdh.size, poffs, 0, 0, 0, &checksum, NULL, 0, NULL) < 0) {
++		close(fdout);
++		return -1;
++	}
++	if (checksum != (uint32_t)fdh.chksum) {
++		close(fdout);
++		ERROR("Checksum WRONG ! Computed 0x%ux, it should be 0x%ux\n",
++			(unsigned int)checksum, (unsigned int)fdh.chksum);
++			return -1;
++	}
++	close(fdout);
++
++	return 0;
++}
++
++
+ static int extract_file_to_tmp(int fd, const char *fname, unsigned long *poffs)
+ {
+ 	char output_file[MAX_IMAGE_FNAME];
+@@ -229,6 +273,8 @@ static int extract_files(int fd, struct swupdate_cfg *software)
+ 				}
+ 				break;
+ 			case INSTALL_FROM_STREAM:
++                bootloader_env_init();
++                bootloader_env_set("recovery_status", "in_progress");
+ 				TRACE("Installing STREAM %s, %lld bytes", img->fname, img->size);
+ 
+ 				/*
+@@ -515,6 +561,25 @@ void *network_initializer(void *data)
+ 			mtd_cleanup();
+ 			scan_mtd_devices();
+ #endif
++			if (software->recovery_flag == 1) {
++				unsigned long offset = 0;
++				ret = extract_file_to_data(inst.fd, "software.swu", &offset);
++				if (ret == 0) {
++					close(inst.fd);
++					inst.last_install = SUCCESS;
++					//             bootloader_env_set("upgrade_step", "3");
++					notify(SUCCESS, RECOVERY_NO_ERROR, INFOLEVEL, "SWUPDATE download successful !, reboot...");
++					umount("/data");
++					set_recovery();
++					system("reboot");
++					sleep(5);
++				} else {
++					close(inst.fd);
++					inst.last_install = FAILURE;
++					notify(FAILURE, RECOVERY_ERROR, ERRORLEVEL, "Image download error. Not installing ...");
++				}
++                goto aml_exit;
++			}
+ 			/*
+ 		 	 * extract the meta data and relevant parts
+ 		 	 * (flash images) from the install image
+@@ -565,6 +630,7 @@ void *network_initializer(void *data)
+ 			notify(FAILURE, RECOVERY_ERROR, ERRORLEVEL, "Image invalid or corrupted. Not installing ...");
+ 		}
+ 
++aml_exit:
+ 		swupdate_progress_end(inst.last_install);
+ 
+ 		pthread_mutex_lock(&stream_mutex);
+diff --git a/handlers/Config.in b/handlers/Config.in
+index 41eac1c..dd18eaa 100644
+--- a/handlers/Config.in
++++ b/handlers/Config.in
+@@ -48,7 +48,7 @@ config UBIWHITELIST
+ 	help
+ 	  Define a list of MTD devices that are planned to have
+ 	  always UBI. If first attach fails, the device is erased
+-	  and tried again. 
++	  and tried again.
+ 	  The list can be set as a string with the mtd numbers.
+ 	  Examples: "0 1 2"
+ 	  This sets mtd0-mtd1-mtd2 to be used as UBI volumes.
+@@ -106,6 +106,14 @@ config RDIFFHANDLER
+ 	  Add support for applying librsync's rdiff patches,
+ 	  see http://librsync.sourcefrog.net/
+ 
++config EXT4
++    bool "ext4"
++    depends on !UBIVOL
++    default n
++    help
++        This is a ext4 handler that to write sparse
++        ext4 image into the destination.
++
+ config LUASCRIPTHANDLER
+ 	bool "Lua Script"
+ 	depends on LUA
+diff --git a/handlers/Makefile b/handlers/Makefile
+index 61e4f76..12ad2e6 100644
+--- a/handlers/Makefile
++++ b/handlers/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_CFI)	+= flash_handler.o
+ obj-$(CONFIG_CFIHAMMING1)+= flash_hamming1_handler.o
+ obj-$(CONFIG_LUASCRIPTHANDLER) += lua_scripthandler.o
+ obj-$(CONFIG_RAW)	+= raw_handler.o
++obj-$(CONFIG_EXT4) += ext4_handler.o
+ obj-$(CONFIG_RDIFFHANDLER) += rdiff_handler.o
+ obj-$(CONFIG_REMOTE_HANDLER) += remote_handler.o
+ obj-$(CONFIG_SHELLSCRIPTHANDLER) += shell_scripthandler.o
+diff --git a/handlers/ext4_handler.c b/handlers/ext4_handler.c
+new file mode 100644
+index 0000000..de5f544
+--- /dev/null
++++ b/handlers/ext4_handler.c
+@@ -0,0 +1,318 @@
++/*
++ * (C) Copyright 2013
++ * Stefano Babic, DENX Software Engineering, sbabic@denx.de.
++ * 	on behalf of ifm electronic GmbH
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ *
++ *  add by zhigang.yu@amlogic.com
++ *  2017.11.2
++ */
++
++
++
++#include <fcntl.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include <errno.h>
++
++//#include "sparse.h" 
++ #include "handler.h"
++ #include "swupdate.h"
++ #include "util.h"
++ #include "sslapi.h"
++
++#define __le64 u64
++#define __le32 u32
++#define __le16 u16
++
++#define __be64 u64
++#define __be32 u32
++#define __be16 u16
++
++#define __u64 u64
++#define __u32 u32
++#define __u16 u16
++#define __u8 u8
++
++typedef unsigned long long u64;
++typedef signed long long s64;
++typedef unsigned int u32;
++typedef unsigned short int u16;
++typedef unsigned char u8;
++
++#define BUFF_SIZE	 16384
++#define SPARSE_HEADER_MAGIC	0xed26ff3a
++#define SPARSE_HEADER_MAJOR_VER 1
++
++#define CHUNK_TYPE_RAW		 0xCAC1
++#define CHUNK_TYPE_FILL		 0xCAC2
++#define CHUNK_TYPE_DONT_CARE  0xCAC3
++#define CHUNK_TYPE_CRC32           0xCAC4
++
++static uint32_t crc32_tab[] = {
++        0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
++        0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
++        0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
++        0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
++        0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec, 0x14015c4f, 0x63066cd9,
++        0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
++        0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
++        0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
++        0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
++        0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
++        0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d, 0x76dc4190, 0x01db7106,
++        0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
++        0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d,
++        0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
++        0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950,
++        0x8bbeb8ea, 0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65,
++        0x4db26158, 0x3ab551ce, 0xa3bc0074, 0xd4bb30e2, 0x4adfa541, 0x3dd895d7,
++        0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
++        0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9, 0x5005713c, 0x270241aa,
++        0xbe0b1010, 0xc90c2086, 0x5768b525, 0x206f85b3, 0xb966d409, 0xce61e49f,
++        0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
++        0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a,
++        0xead54739, 0x9dd277af, 0x04db2615, 0x73dc1683, 0xe3630b12, 0x94643b84,
++        0x0d6d6a3e, 0x7a6a5aa8, 0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
++        0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe, 0xf762575d, 0x806567cb,
++        0x196c3671, 0x6e6b06e7, 0xfed41b76, 0x89d32be0, 0x10da7a5a, 0x67dd4acc,
++        0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8, 0xa1d1937e,
++        0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
++        0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60, 0xdf60efc3, 0xa867df55,
++        0x316e8eef, 0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
++        0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28,
++        0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7, 0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d,
++        0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a, 0x9c0906a9, 0xeb0e363f,
++        0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38,
++        0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242,
++        0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
++        0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69,
++        0x616bffd3, 0x166ccf45, 0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2,
++        0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db, 0xaed16a4a, 0xd9d65adc,
++        0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9,
++        0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6, 0xbad03605, 0xcdd70693,
++        0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
++        0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
++};
++
++typedef struct sparse_header {
++  __le32	magic;		/* 0xed26ff3a */
++  __le16	major_version;	/* (0x1) - reject images with higher major versions */
++  __le16	minor_version;	/* (0x0) - allow images with higer minor versions */
++  __le16	file_hdr_sz;	/* 28 bytes for first revision of the file format */
++  __le16	chunk_hdr_sz;	/* 12 bytes for first revision of the file format */
++  __le32	blk_sz;		/* block size in bytes, must be a multiple of 4 (4096) */
++  __le32	total_blks;	/* total blocks in the non-sparse output image */
++  __le32	total_chunks;	/* total chunks in the sparse input image */
++  __le32	image_checksum; /* CRC32 checksum of the original data, counting "don't care" */
++				/* as 0. Standard 802.3 polynomial, use a Public Domain */
++				/* table implementation */
++} sparse_header_t;
++
++typedef struct chunk_header {
++  __le16	chunk_type;	/* 0xCAC1 -> raw; 0xCAC2 -> fill; 0xCAC3 -> don't care */
++  __le16	reserved1;
++  __le32	chunk_sz;	/* in blocks in output image */
++  __le32	total_sz;	/* in bytes of chunk input file including chunk header and data */
++} chunk_header_t;
++
++static char *copyBuf = NULL;
++static char *sparseMergeBuf = NULL;
++static int curValidSparseMergeDataLen = 0;
++
++#define sparseErr(fmt ...) printf("Err:%s,line:%d. ", __FUNCTION__, __LINE__); printf(fmt);
++#define sparseMsg(fmt ...) printf(fmt);
++#ifdef SIMG2IMG_DEBUG
++#define sparseDbg(fmt ...) printf(fmt);
++#else
++#define sparseDbg(fmt ...)
++#endif
++
++enum ext4DataMsg {
++    HEAD = 0,
++    CHUNK,
++};
++
++enum stateReturnMsg {
++    FAIL = -1,
++    SUCC = 0,
++    CONTINUE_UNZIP,
++};
++
++#define SIZE_1M (1024*1024)
++#define SIZE_150M (150 * SIZE_1M)
++#define COPY_BUF_SIZE SIZE_1M
++#define SPARSE_MERGE_BUF_SIZE SIZE_150M
++
++#define SPARSE_HEADER_LEN (sizeof(sparse_header_t))
++#define CHUNK_HEADER_LEN (sizeof(chunk_header_t))
++
++void ext4_handler(void);
++
++/*
++ * A function that calculates the CRC-32 based on the table above is
++ * given below for documentation purposes. An equivalent implementation
++ * of this function that's actually used in the kernel can be found
++ * in sys/libkern.h, where it can be inlined.
++ */
++uint32_t sparse_crc32(uint32_t crc_in, const void *buf, int size)
++{
++        const uint8_t *p = buf;
++        uint32_t crc;
++
++        crc = crc_in ^ ~0U;
++        while (size--)
++                crc = crc32_tab[(crc ^ *p++) & 0xFF] ^ (crc >> 8);
++        return crc ^ ~0U;
++}
++
++static int hash_check(int fdin, unsigned int nbytes, unsigned char *hash)
++{
++    int ret = -1;
++    ssize_t len = 0;
++    unsigned long size;
++    unsigned char *in = NULL;
++    void *dgst = NULL;	/* use a private context for HASH */
++    unsigned char md_value[64]; //Maximum hash is 64 bytes for SHA512 and we use sha256 in swupdate
++    unsigned int md_len = 0;
++
++    if (!IsValidHash(hash)) {
++        return 0;
++    }
++
++    dgst = swupdate_HASH_init(SHA_DEFAULT);
++    if (!dgst) {
++        return -1;
++    }
++
++    in = (unsigned char *)malloc(BUFF_SIZE);
++    if (!in) {
++        goto exit;
++    }
++
++    while (nbytes > 0) {
++        memset(in, 0, BUFF_SIZE);
++        size = (nbytes < BUFF_SIZE ? nbytes : BUFF_SIZE);
++        len = read(fdin, in, size);
++        if (len < 0) {
++            ERROR("read error: I cannot go on\n");
++            goto exit;
++        }
++        nbytes -= len;
++        swupdate_HASH_update(dgst, in, len);
++    }
++
++    swupdate_HASH_final(dgst, md_value, &md_len);
++
++    if (md_len != SHA256_HASH_LENGTH || swupdate_HASH_compare(hash, md_value)) {
++        char hashstring[2 * SHA256_HASH_LENGTH + 1];
++        char newhashstring[2 * SHA256_HASH_LENGTH + 1];
++
++        hash_to_ascii(hash, hashstring);
++        hash_to_ascii(md_value, newhashstring);
++
++        ERROR("HASH mismatch : %s <--> %s", hashstring, newhashstring);
++        goto exit;
++    }
++    ret = 0;
++
++exit:
++    if (in) {
++        free(in);
++        in = NULL;
++    }
++
++    if (dgst) {
++        swupdate_HASH_cleanup(dgst);
++    }
++
++    return ret;
++}
++
++static int install_ext4_image(struct img_type *img,
++	void __attribute__ ((__unused__)) *data)
++{
++    int ret;
++    int fdout;
++    int slot = 0;
++    char device_name[128];
++    int readl = 0;
++    int len = img->size;
++    struct sparse_file *s;
++
++    ret = hash_check(img->fdin, img->size, img->sha256);
++    if (ret != 0) {
++        return -1;
++    }
++
++    fdout = open(img->device, O_RDWR);
++    if (fdout < 0) {
++        //try a/b  system
++        ret = get_active_slot(&slot);
++        if (ret != 0) {
++            TRACE("get active slot failed!\n");
++            return -1;
++        }
++
++        if (slot == 0) {
++            sprintf(device_name, "%s%s", img->device, "_b");
++        } else {
++            sprintf(device_name, "%s%s", img->device, "_a");
++        }
++		fdout = open(device_name, O_RDWR);
++		if (fdout < 0) {
++			TRACE("Device %s cannot be opened: %s", img->device, strerror(errno));
++			return -1;
++		}
++	}
++
++	ret = lseek(img->fdin, len*(-1), SEEK_CUR);
++	if (ret < 0) {
++		TRACE("lseek failed!\n");
++		close(fdout);
++		return -1;
++	}
++
++	s = sparse_file_import(img->fdin, true, false);
++	if (!s) {
++		fprintf(stderr, "Failed to read sparse file\n");
++		close(fdout);
++		return -1;
++	}
++
++	if (sparse_file_write(s, fdout, false, false, false) < 0) {
++		fprintf(stderr, "Cannot write output file\n");
++		close(fdout);
++		return -1;
++	}
++	sparse_file_destroy(s);
++
++	close(fdout);
++	return 0;
++}
++
++__attribute__((constructor))
++void ext4_handler(void)
++{
++    register_handler("ext4", install_ext4_image, IMAGE_HANDLER, NULL);
++}
+diff --git a/handlers/flash_handler.c b/handlers/flash_handler.c
+index b112365..014d7ed 100644
+--- a/handlers/flash_handler.c
++++ b/handlers/flash_handler.c
+@@ -34,6 +34,9 @@
+ #define PROCMTD	"/proc/mtd"
+ #define LINESIZE	80
+ 
++#define BL2_SIZE    (256*1024)
++#define TPL_SIZE    (2*1024*1024)
++
+ void flash_handler(void);
+ 
+ /* Check whether buffer is filled with character 'pattern' */
+@@ -91,7 +94,7 @@ static int flash_write_nand(int mtdnum, struct img_type *img)
+ 	unsigned char *filebuf = NULL;
+ 	size_t filebuf_max = 0;
+ 	size_t filebuf_len = 0;
+-	long long mtdoffset = 0;
++	long long mtdoffset = img->seek;
+ 	int ifd = img->fdin;
+ 	int fd = -1;
+ 	bool failed = true;
+@@ -322,11 +325,55 @@ static int flash_write_image(int mtdnum, struct img_type *img)
+ 		return flash_write_nand(mtdnum, img);
+ }
+ 
++static int flash_write_boot(struct img_type *img) {
++    int ret = 0;
++    int slot = 0;
++    int mtd_bootab = 0;
++
++    ret = get_active_slot(&slot);
++    if (ret != 0) {
++        ERROR("get active slot failed!\n");
++        return -1;
++    }
++
++    //get boot_a/b mtdnum
++    if (slot == 0) {
++        ret = get_mtd_by_name("boot_b");
++    } else {
++        ret = get_mtd_by_name("boot_a");
++    }
++
++    if (ret < 0) {
++        ERROR("get boot_a/b mtdnum failed!\n");
++        return -1;
++    }
++    mtd_bootab = ret;
++
++    //write boot_a/b partition
++    if(flash_erase(mtd_bootab)) {
++        ERROR("I cannot erasing /dev/mtd%d",mtd_bootab);
++        return -1;
++    }
++
++    TRACE("Copying %s into /dev/mtd%d", img->fname, mtd_bootab);
++    if (flash_write_image(mtd_bootab, img)) {
++        ERROR("I cannot copy %s into /dev/mtd%d", img->fname, mtd_bootab);
++        return -1;
++    }
++
++    return 0;
++}
++
+ static int install_flash_image(struct img_type *img,
+ 	void __attribute__ ((__unused__)) *data)
+ {
+ 	int mtdnum;
+ 
++	//if a/b boot, need to write boot_a or boot_b
++	if ((strcmp(img->fname, "boot.img")==0) && (get_system_type()==0)) {
++		return flash_write_boot(img);
++	}
++
+ 	if (strlen(img->path))
+ 		mtdnum = get_mtd_from_name(img->path);
+ 	else
+@@ -337,11 +384,26 @@ static int install_flash_image(struct img_type *img,
+ 		return -1;
+ 	}
+ 
+-	if(flash_erase(mtdnum)) {
+-		ERROR("I cannot erasing %s",
+-			img->device);
+-		return -1;
+-	}
++    if (strcmp(img->fname, "u-boot.bin.usb.bl2")==0) {
++       if(flash_erase_offset_size(mtdnum, img->seek, BL2_SIZE)) {
++           ERROR("I cannot erasing %s",
++               img->device);
++           return -1;
++       }
++    } else if (strcmp(img->fname, "u-boot.bin.usb.tpl")==0) {
++       if(flash_erase_offset_size(mtdnum, img->seek, TPL_SIZE)) {
++           ERROR("I cannot erasing %s",
++               img->device);
++           return -1;
++       }
++    } else {
++       if(flash_erase(mtdnum)) {
++           ERROR("I cannot erasing %s",
++               img->device);
++           return -1;
++       }
++    }
++
+ 	TRACE("Copying %s into /dev/mtd%d", img->fname, mtdnum);
+ 	if (flash_write_image(mtdnum, img)) {
+ 		ERROR("I cannot copy %s into %s partition",
+diff --git a/handlers/raw_handler.c b/handlers/raw_handler.c
+index fb48170..491d7f1 100644
+--- a/handlers/raw_handler.c
++++ b/handlers/raw_handler.c
+@@ -23,10 +23,175 @@
+ #include "handler.h"
+ #include "util.h"
+ 
++#define ARRAY_SIZE(x)  sizeof(x)/sizeof(x[0])
++#define EMMC_USER_PARTITION        "bootloader"
++#define EMMC_BLK0BOOT0_PARTITION   "mmcblk0boot0"
++#define EMMC_BLK0BOOT1_PARTITION   "mmcblk0boot1"
++#define EMMC_BLK1BOOT0_PARTITION   "mmcblk1boot0"
++#define EMMC_BLK1BOOT1_PARTITION   "mmcblk1boot1"
++#define EMMC_BLK2BOOT0_PARTITION   "mmcblk2boot0"
++#define EMMC_BLK2BOOT1_PARTITION   "mmcblk2boot1"
++
++enum emmcPartition {
++  USER = 0,
++  BLK0BOOT0,
++  BLK0BOOT1,
++  BLK1BOOT0,
++  BLK1BOOT1,
++  BLK2BOOT0,
++  BLK2BOOT1,
++};
++
++static int sEmmcPartionIndex = -1;
++static const char *sEmmcPartionName[] = {
++  EMMC_USER_PARTITION,
++  EMMC_BLK0BOOT0_PARTITION,
++  EMMC_BLK0BOOT1_PARTITION,
++  EMMC_BLK1BOOT0_PARTITION,
++  EMMC_BLK1BOOT1_PARTITION,
++  EMMC_BLK2BOOT0_PARTITION,
++  EMMC_BLK2BOOT1_PARTITION,
++};
++
++
+ void raw_image_handler(void);
+ void raw_file_handler(void);
+ void raw_copyimage_handler(void);
+ 
++
++static int install_boot_ab(struct img_type *img) {
++  int ret = 0;
++  int slot = 0;
++  int fdout = 0;
++  char devicename[128] = {0};
++
++  ret = get_active_slot(&slot);
++  if (ret != 0) {
++	TRACE("get active slot failed!\n");
++	return -1;
++  }
++
++  ret = get_inactive_devicename("boot", slot, devicename);
++  if (ret != 0) {
++	TRACE("get inactive devicename failed!\n");
++	return -1;
++  }
++
++  //write boot_a/b
++  printf("write boot.img to %s.\n", devicename);
++  fdout = open(devicename, O_RDWR);
++  if (fdout < 0) {
++	TRACE("open %s failed!\n", devicename);
++	return -1;
++  }
++
++  ret = copyimage(&fdout, img, NULL);
++  close(fdout);
++  if (ret != 0) {
++	TRACE("install %s failed!\n", devicename);
++	return -1;
++  }
++
++  return ret;
++}
++
++static int read_sysfs_val(const char* path, char* rBuf, const unsigned bufSz, int * readCnt)
++{
++  int fd  = -1;
++  int count = 0;
++
++  if (access(path, F_OK)) {
++	printf("path[%s] not existed\n", path);
++	return -1;
++  }
++  if (access(path, R_OK)) {
++	printf("path[%s] cannot read\n", path);
++	return -1;
++  }
++
++  fd = open(path, O_RDONLY);
++  if (fd < 0) {
++	printf("fail in open[%s] in O_RDONLY\n", path);
++	return -1;
++  }
++
++  count = read(fd, rBuf, bufSz);
++  close(fd);
++  if (count <= 0) {
++	printf("read %s failed (count:%d)\n", path, count);
++	return -1;
++  }
++  *readCnt = count;
++  return 0;
++}
++
++static int getBootloaderOffset(int* bootloaderOffset)
++{
++  const char* PathBlOff = "/sys/class/aml_store/bl_off_bytes" ;
++  int             iret  = 0;
++  char  buf[16]         = { 0 };
++  int           readCnt = 0;
++
++  iret = read_sysfs_val(PathBlOff, buf, 15, &readCnt);
++  if (iret < 0) {
++	printf("fail when read path[%s]\n", PathBlOff);
++	return -1;
++  }
++  buf[readCnt] = 0;
++  *bootloaderOffset = atoi(buf);
++  printf("bootloaderOffset is %s\n", buf);
++
++  return 0;
++}
++
++static int install_bootloader(struct img_type *img) {
++  int ret = 0;
++  int fdout = 0;
++  int offset = 0;
++
++  getBootloaderOffset(&offset);
++
++  unsigned int i = 0;
++  char emmcPartitionPath[128];
++  for (i = USER; i < ARRAY_SIZE(sEmmcPartionName); i ++) {
++	memset(emmcPartitionPath, 0, sizeof(emmcPartitionPath));
++	sprintf(emmcPartitionPath, "/dev/%s", sEmmcPartionName[i]);
++
++	if (!access(emmcPartitionPath, F_OK)) {
++	  printf("write %s to %s.\n", img->fname, emmcPartitionPath);
++	  //open
++	  fdout = open(emmcPartitionPath, O_RDWR);
++	  if (fdout < 0) {
++		TRACE("open %s failed!\n", emmcPartitionPath);
++		return -1;
++	  }
++
++	  ret = lseek(fdout, offset, SEEK_SET);
++	  if (ret < 0) {
++		TRACE("lseek %s failed!\n", emmcPartitionPath);
++		close(fdout);
++		return -1;
++	  }
++
++	  ret = copyimage(&fdout, img, NULL);
++	  close(fdout);
++	  if (ret != 0) {
++		TRACE("install %s failed!\n", "/dev/bootloader");
++		return -1;
++	  }
++
++	  ret = lseek64(img->fdin, (img->size)*(-1), SEEK_CUR);
++	  if (ret < 0) {
++		TRACE("install %s failed!\n", "/dev/bootloader");
++		return -1;
++	  }
++	}
++  }
++
++  return 0;
++}
++
++
+ /**
+  * Handle write protection for block devices
+  *
+@@ -115,11 +280,39 @@ static int install_raw_image(struct img_type *img,
+ 	if (prot_stat < 0)
+ 		return prot_stat;
+ 
++	int slot = 0;
++	char device_name[128];
++	// bootloader maybe need to seek 512 byte
++	if ((strcmp(img->fname, "u-boot.bin")==0) ||(strcmp(img->fname, "u-boot.bin.encrypt")==0)) {
++		return install_bootloader(img);
++	}
++
++	//if a/b system and write boot partition
++	if ((strcmp(img->fname, "boot.img")==0) && (get_system_type()==0)) {
++		return install_boot_ab(img);
++	}
++
+ 	fdout = open(img->device, O_RDWR);
+ 	if (fdout < 0) {
+-		TRACE("Device %s cannot be opened: %s",
+-			img->device, strerror(errno));
+-		return -ENODEV;
++		//try a/b  system
++		ret = get_active_slot(&slot);
++		if (ret != 0) {
++			TRACE("get active slot failed!\n");
++			return -1;
++		}
++
++		if (slot == 0) {
++			sprintf(device_name, "%s%s", img->device, "_b");
++		} else {
++			sprintf(device_name, "%s%s", img->device, "_a");
++		}
++
++		fdout = open(device_name, O_RDWR);
++		if (fdout < 0) {
++			TRACE("Device %s cannot be opened: %s",
++				img->device, strerror(errno));
++			return -ENODEV;
++		}
+ 	}
+ #if defined(__FreeBSD__)
+ 	ret = copyimage(&fdout, img, copy_write_padded);
+diff --git a/handlers/ubivol_handler.c b/handlers/ubivol_handler.c
+index 0f53a0a..b6337f2 100644
+--- a/handlers/ubivol_handler.c
++++ b/handlers/ubivol_handler.c
+@@ -41,12 +41,18 @@ static struct ubi_part *search_volume_global(const char *str)
+ 	struct mtd_ubi_info *mtd_ubi_info;
+ 	struct ubi_part *ubivol;
+ 	int i;
++	int flag = 0;
+ 
+ 	for (i = mtd_info->lowest_mtd_num; i <= mtd_info->highest_mtd_num; i++) {
+ 		mtd_ubi_info = &flash->mtd_info[i];
+ 		ubivol = search_volume(str, &mtd_ubi_info->ubi_partitions);
+-		if (ubivol)
++		if (ubivol) {
++			if ((get_ubi_skip()==1) && (flag == 0)) {
++				flag = 1;
++				continue;
++			}
+ 			return ubivol;
++		}
+ 	}
+ 	return NULL;
+ }
+@@ -250,7 +256,11 @@ static int resize_volume(struct img_type *cfg, long long size)
+ 	 * Partition are adjusted only in one MTD device
+ 	 * Other MTD are not touched
+ 	 */
+-	mtdnum = get_mtd_from_device(cfg->device);
++    if (get_system_type() == 0) {
++        mtdnum = get_inactive_mtd("system");
++    } else {
++        mtdnum = get_mtd_from_device(cfg->device);
++    }
+ 	if (mtdnum < 0) {
+ 		/* Allow device to be specified by name OR number */
+ 		mtdnum = get_mtd_from_name(cfg->device);
+diff --git a/include/bootloader.h b/include/bootloader.h
+index 3981bd1..c2eef6e 100644
+--- a/include/bootloader.h
++++ b/include/bootloader.h
+@@ -53,4 +53,6 @@ char *bootloader_env_get(const char *name);
+  */
+ int bootloader_apply_list(const char *script);
+ 
++int bootloader_env_init(void) ;
++
+ #endif
+diff --git a/include/flash.h b/include/flash.h
+index e180e79..42d8dd7 100644
+--- a/include/flash.h
++++ b/include/flash.h
+@@ -55,6 +55,7 @@ void mtd_cleanup (void);
+ int get_mtd_from_device(char *s);
+ int get_mtd_from_name(const char *s);
+ int flash_erase(int mtdnum);
++int flash_erase_offset_size(int mtdnum, int offset, int size);
+ 
+ struct flash_description *get_flash_info(void);
+ #define isNand(flash, index) \
+diff --git a/include/swupdate.h b/include/swupdate.h
+index 8cd1574..390e3e2 100644
+--- a/include/swupdate.h
++++ b/include/swupdate.h
+@@ -150,6 +150,7 @@ struct swupdate_cfg {
+ 	struct proclist extprocs;
+ 	void *dgst;	/* Structure for signed images */
+ 	struct swupdate_global_cfg globals;
++	int recovery_flag;
+ 	const char *embscript;
+ };
+ 
+diff --git a/libsparse/Config.in b/libsparse/Config.in
+new file mode 100644
+index 0000000..0c5d266
+--- /dev/null
++++ b/libsparse/Config.in
+@@ -0,0 +1,18 @@
++#
++# For a description of the syntax of this configuration file,
++# see scripts/kbuild/config-language.txt.
++#
++
++menu "Sparse"
++
++config SPARSE
++	bool "sparse"
++	default y
++	depends on HAVE_ZLIB
++	help
++	  support for sparse ext format system.
++
++comment "sparse support needs libz"
++	depends on !HAVE_ZLIB
++
++endmenu
+diff --git a/libsparse/Makefile b/libsparse/Makefile
+new file mode 100644
+index 0000000..bdd8047
+--- /dev/null
++++ b/libsparse/Makefile
+@@ -0,0 +1,10 @@
++# Note: the handlers are inserted automatically
++# via a GCC constructor. To work, the linker should
++# not drop the handler if it is not called.
++# Handler can be called dynamically based
++# on the received image type.
++lib-$(CONFIG_EXT4)	+= backed_block.o
++lib-$(CONFIG_EXT4)	+= output_file.o
++lib-$(CONFIG_EXT4)	+= sparse.o
++lib-$(CONFIG_EXT4)	+= sparse_crc32.o
++lib-$(CONFIG_EXT4)	+= sparse_read.o
+diff --git a/libsparse/backed_block.c b/libsparse/backed_block.c
+new file mode 100644
+index 0000000..794cd6b
+--- /dev/null
++++ b/libsparse/backed_block.c
+@@ -0,0 +1,404 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <assert.h>
++#include <errno.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "backed_block.h"
++#include "sparse_defs.h"
++
++struct backed_block {
++	unsigned int block;
++	unsigned int len;
++	enum backed_block_type type;
++	union {
++		struct {
++			void *data;
++		} data;
++		struct {
++			char *filename;
++			int64_t offset;
++		} file;
++		struct {
++			int fd;
++			int64_t offset;
++		} fd;
++		struct {
++			uint32_t val;
++		} fill;
++	};
++	struct backed_block *next;
++};
++
++struct backed_block_list {
++	struct backed_block *data_blocks;
++	struct backed_block *last_used;
++	unsigned int block_size;
++};
++
++struct backed_block *backed_block_iter_new(struct backed_block_list *bbl)
++{
++	return bbl->data_blocks;
++}
++
++struct backed_block *backed_block_iter_next(struct backed_block *bb)
++{
++	return bb->next;
++}
++
++unsigned int backed_block_len(struct backed_block *bb)
++{
++	return bb->len;
++}
++
++unsigned int backed_block_block(struct backed_block *bb)
++{
++	return bb->block;
++}
++
++void *backed_block_data(struct backed_block *bb)
++{
++	assert(bb->type == BACKED_BLOCK_DATA);
++	return bb->data.data;
++}
++
++const char *backed_block_filename(struct backed_block *bb)
++{
++	assert(bb->type == BACKED_BLOCK_FILE);
++	return bb->file.filename;
++}
++
++int backed_block_fd(struct backed_block *bb)
++{
++	assert(bb->type == BACKED_BLOCK_FD);
++	return bb->fd.fd;
++}
++
++int64_t backed_block_file_offset(struct backed_block *bb)
++{
++	assert(bb->type == BACKED_BLOCK_FILE || bb->type == BACKED_BLOCK_FD);
++	if (bb->type == BACKED_BLOCK_FILE) {
++		return bb->file.offset;
++	} else { /* bb->type == BACKED_BLOCK_FD */
++		return bb->fd.offset;
++	}
++}
++
++uint32_t backed_block_fill_val(struct backed_block *bb)
++{
++	assert(bb->type == BACKED_BLOCK_FILL);
++	return bb->fill.val;
++}
++
++enum backed_block_type backed_block_type(struct backed_block *bb)
++{
++	return bb->type;
++}
++
++void backed_block_destroy(struct backed_block *bb)
++{
++	if (bb->type == BACKED_BLOCK_FILE) {
++		free(bb->file.filename);
++	}
++
++	free(bb);
++}
++
++struct backed_block_list *backed_block_list_new(unsigned int block_size)
++{
++	struct backed_block_list *b = calloc(sizeof(struct backed_block_list), 1);
++	b->block_size = block_size;
++	return b;
++}
++
++void backed_block_list_destroy(struct backed_block_list *bbl)
++{
++	if (bbl->data_blocks) {
++		struct backed_block *bb = bbl->data_blocks;
++		while (bb) {
++			struct backed_block *next = bb->next;
++			backed_block_destroy(bb);
++			bb = next;
++		}
++	}
++
++	free(bbl);
++}
++
++void backed_block_list_move(struct backed_block_list *from,
++		struct backed_block_list *to, struct backed_block *start,
++		struct backed_block *end)
++{
++	struct backed_block *bb;
++
++	if (start == NULL) {
++		start = from->data_blocks;
++	}
++
++	if (!end) {
++		for (end = start; end && end->next; end = end->next)
++			;
++	}
++
++	if (start == NULL || end == NULL) {
++		return;
++	}
++
++	from->last_used = NULL;
++	to->last_used = NULL;
++	if (from->data_blocks == start) {
++		from->data_blocks = end->next;
++	} else {
++		for (bb = from->data_blocks; bb; bb = bb->next) {
++			if (bb->next == start) {
++				bb->next = end->next;
++				break;
++			}
++		}
++	}
++
++	if (!to->data_blocks) {
++		to->data_blocks = start;
++		end->next = NULL;
++	} else {
++		for (bb = to->data_blocks; bb; bb = bb->next) {
++			if (!bb->next || bb->next->block > start->block) {
++				end->next = bb->next;
++				bb->next = start;
++				break;
++			}
++		}
++	}
++}
++
++/* may free b */
++static int merge_bb(struct backed_block_list *bbl,
++		struct backed_block *a, struct backed_block *b)
++{
++	unsigned int block_len;
++
++	/* Block doesn't exist (possible if one block is the last block) */
++	if (!a || !b) {
++		return -EINVAL;
++	}
++
++	assert(a->block < b->block);
++
++	/* Blocks are of different types */
++	if (a->type != b->type) {
++		return -EINVAL;
++	}
++
++	/* Blocks are not adjacent */
++	block_len = a->len / bbl->block_size; /* rounds down */
++	if (a->block + block_len != b->block) {
++		return -EINVAL;
++	}
++
++	switch (a->type) {
++	case BACKED_BLOCK_DATA:
++		/* Don't support merging data for now */
++		return -EINVAL;
++	case BACKED_BLOCK_FILL:
++		if (a->fill.val != b->fill.val) {
++			return -EINVAL;
++		}
++		break;
++	case BACKED_BLOCK_FILE:
++		/* Already make sure b->type is BACKED_BLOCK_FILE */
++		if (strcmp(a->file.filename, b->file.filename) ||
++				a->file.offset + a->len != b->file.offset) {
++			return -EINVAL;
++		}
++		break;
++	case BACKED_BLOCK_FD:
++		if (a->fd.fd != b->fd.fd ||
++				a->fd.offset + a->len != b->fd.offset) {
++			return -EINVAL;
++		}
++		break;
++	}
++
++	/* Blocks are compatible and adjacent, with a before b.  Merge b into a,
++	 * and free b */
++	a->len += b->len;
++	a->next = b->next;
++
++	backed_block_destroy(b);
++
++	return 0;
++}
++
++static int queue_bb(struct backed_block_list *bbl, struct backed_block *new_bb)
++{
++	struct backed_block *bb;
++
++	if (bbl->data_blocks == NULL) {
++		bbl->data_blocks = new_bb;
++		return 0;
++	}
++
++	if (bbl->data_blocks->block > new_bb->block) {
++		new_bb->next = bbl->data_blocks;
++		bbl->data_blocks = new_bb;
++		return 0;
++	}
++
++	/* Optimization: blocks are mostly queued in sequence, so save the
++	   pointer to the last bb that was added, and start searching from
++	   there if the next block number is higher */
++	if (bbl->last_used && new_bb->block > bbl->last_used->block)
++		bb = bbl->last_used;
++	else
++		bb = bbl->data_blocks;
++	bbl->last_used = new_bb;
++
++	for (; bb->next && bb->next->block < new_bb->block; bb = bb->next)
++		;
++
++	if (bb->next == NULL) {
++		bb->next = new_bb;
++	} else {
++		new_bb->next = bb->next;
++		bb->next = new_bb;
++	}
++
++	merge_bb(bbl, new_bb, new_bb->next);
++	if (!merge_bb(bbl, bb, new_bb)) {
++		/* new_bb destroyed, point to retained as last_used */
++		bbl->last_used = bb;
++	}
++
++	return 0;
++}
++
++/* Queues a fill block of memory to be written to the specified data blocks */
++int backed_block_add_fill(struct backed_block_list *bbl, unsigned int fill_val,
++		unsigned int len, unsigned int block)
++{
++	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
++	if (bb == NULL) {
++		return -ENOMEM;
++	}
++
++	bb->block = block;
++	bb->len = len;
++	bb->type = BACKED_BLOCK_FILL;
++	bb->fill.val = fill_val;
++	bb->next = NULL;
++
++	return queue_bb(bbl, bb);
++}
++
++/* Queues a block of memory to be written to the specified data blocks */
++int backed_block_add_data(struct backed_block_list *bbl, void *data,
++		unsigned int len, unsigned int block)
++{
++	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
++	if (bb == NULL) {
++		return -ENOMEM;
++	}
++
++	bb->block = block;
++	bb->len = len;
++	bb->type = BACKED_BLOCK_DATA;
++	bb->data.data = data;
++	bb->next = NULL;
++
++	return queue_bb(bbl, bb);
++}
++
++/* Queues a chunk of a file on disk to be written to the specified data blocks */
++int backed_block_add_file(struct backed_block_list *bbl, const char *filename,
++		int64_t offset, unsigned int len, unsigned int block)
++{
++	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
++	if (bb == NULL) {
++		return -ENOMEM;
++	}
++
++	bb->block = block;
++	bb->len = len;
++	bb->type = BACKED_BLOCK_FILE;
++	bb->file.filename = strdup(filename);
++	bb->file.offset = offset;
++	bb->next = NULL;
++
++	return queue_bb(bbl, bb);
++}
++
++/* Queues a chunk of a fd to be written to the specified data blocks */
++int backed_block_add_fd(struct backed_block_list *bbl, int fd, int64_t offset,
++		unsigned int len, unsigned int block)
++{
++	struct backed_block *bb = calloc(1, sizeof(struct backed_block));
++	if (bb == NULL) {
++		return -ENOMEM;
++	}
++
++	bb->block = block;
++	bb->len = len;
++	bb->type = BACKED_BLOCK_FD;
++	bb->fd.fd = fd;
++	bb->fd.offset = offset;
++	bb->next = NULL;
++
++	return queue_bb(bbl, bb);
++}
++
++int backed_block_split(struct backed_block_list *bbl, struct backed_block *bb,
++		unsigned int max_len)
++{
++	struct backed_block *new_bb;
++
++	max_len = ALIGN_DOWN(max_len, bbl->block_size);
++
++	if (bb->len <= max_len) {
++		return 0;
++	}
++
++	new_bb = malloc(sizeof(struct backed_block));
++	if (new_bb == NULL) {
++		return -ENOMEM;
++	}
++
++	*new_bb = *bb;
++
++	new_bb->len = bb->len - max_len;
++	new_bb->block = bb->block + max_len / bbl->block_size;
++	new_bb->next = bb->next;
++	bb->next = new_bb;
++	bb->len = max_len;
++
++	switch (bb->type) {
++	case BACKED_BLOCK_DATA:
++		new_bb->data.data = (char *)bb->data.data + max_len;
++		break;
++	case BACKED_BLOCK_FILE:
++		new_bb->file.offset += max_len;
++		break;
++	case BACKED_BLOCK_FD:
++		new_bb->fd.offset += max_len;
++		break;
++	case BACKED_BLOCK_FILL:
++		break;
++	}
++
++	return 0;
++}
+diff --git a/libsparse/backed_block.h b/libsparse/backed_block.h
+new file mode 100644
+index 0000000..1a159be
+--- /dev/null
++++ b/libsparse/backed_block.h
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _BACKED_BLOCK_H_
++#define _BACKED_BLOCK_H_
++
++#include <stdint.h>
++
++struct backed_block_list;
++struct backed_block;
++
++enum backed_block_type {
++	BACKED_BLOCK_DATA,
++	BACKED_BLOCK_FILE,
++	BACKED_BLOCK_FD,
++	BACKED_BLOCK_FILL,
++};
++
++int backed_block_add_data(struct backed_block_list *bbl, void *data,
++		unsigned int len, unsigned int block);
++int backed_block_add_fill(struct backed_block_list *bbl, unsigned int fill_val,
++		unsigned int len, unsigned int block);
++int backed_block_add_file(struct backed_block_list *bbl, const char *filename,
++		int64_t offset, unsigned int len, unsigned int block);
++int backed_block_add_fd(struct backed_block_list *bbl, int fd,
++		int64_t offset, unsigned int len, unsigned int block);
++
++struct backed_block *backed_block_iter_new(struct backed_block_list *bbl);
++struct backed_block *backed_block_iter_next(struct backed_block *bb);
++unsigned int backed_block_len(struct backed_block *bb);
++unsigned int backed_block_block(struct backed_block *bb);
++void *backed_block_data(struct backed_block *bb);
++const char *backed_block_filename(struct backed_block *bb);
++int backed_block_fd(struct backed_block *bb);
++int64_t backed_block_file_offset(struct backed_block *bb);
++uint32_t backed_block_fill_val(struct backed_block *bb);
++enum backed_block_type backed_block_type(struct backed_block *bb);
++int backed_block_split(struct backed_block_list *bbl, struct backed_block *bb,
++		unsigned int max_len);
++
++struct backed_block *backed_block_iter_new(struct backed_block_list *bbl);
++struct backed_block *backed_block_iter_next(struct backed_block *bb);
++
++struct backed_block_list *backed_block_list_new(unsigned int block_size);
++void backed_block_list_destroy(struct backed_block_list *bbl);
++
++void backed_block_list_move(struct backed_block_list *from,
++		struct backed_block_list *to, struct backed_block *start,
++		struct backed_block *end);
++
++#endif
+diff --git a/libsparse/defs.h b/libsparse/defs.h
+new file mode 100644
+index 0000000..34e63c5
+--- /dev/null
++++ b/libsparse/defs.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_DEFS_H_
++
++#ifndef __unused
++#define __unused        __attribute__((__unused__))
++#endif
++
++#endif /* _LIBSPARSE_DEFS_H_ */
+diff --git a/libsparse/output_file.c b/libsparse/output_file.c
+new file mode 100644
+index 0000000..2115998
+--- /dev/null
++++ b/libsparse/output_file.c
+@@ -0,0 +1,775 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define _FILE_OFFSET_BITS 64
++#define _LARGEFILE64_SOURCE 1
++
++#include <fcntl.h>
++#include <inttypes.h>
++#include <limits.h>
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include <zlib.h>
++
++#include "defs.h"
++#include "output_file.h"
++#include "sparse_crc32.h"
++#include "sparse_format.h"
++
++#ifndef _WIN32
++#include <sys/mman.h>
++#define O_BINARY 0
++#else
++#define ftruncate64 ftruncate
++#endif
++
++#if defined(__APPLE__) && defined(__MACH__)
++#define lseek64 lseek
++#define ftruncate64 ftruncate
++#define mmap64 mmap
++#define off64_t off_t
++#endif
++
++#define min(a, b) \
++	({ typeof(a) _a = (a); typeof(b) _b = (b); (_a < _b) ? _a : _b; })
++
++#define SPARSE_HEADER_MAJOR_VER 1
++#define SPARSE_HEADER_MINOR_VER 0
++#define SPARSE_HEADER_LEN       (sizeof(sparse_header_t))
++#define CHUNK_HEADER_LEN (sizeof(chunk_header_t))
++
++#define container_of(inner, outer_t, elem) \
++	((outer_t *)((char *)(inner) - offsetof(outer_t, elem)))
++
++struct output_file_ops {
++	int (*open)(struct output_file *, int fd);
++	int (*skip)(struct output_file *, int64_t);
++	int (*pad)(struct output_file *, int64_t);
++	int (*write)(struct output_file *, void *, size_t);
++	void (*close)(struct output_file *);
++};
++
++struct sparse_file_ops {
++	int (*write_data_chunk)(struct output_file *out, unsigned int len,
++			void *data);
++	int (*write_fill_chunk)(struct output_file *out, unsigned int len,
++			uint32_t fill_val);
++	int (*write_skip_chunk)(struct output_file *out, int64_t len);
++	int (*write_end_chunk)(struct output_file *out);
++};
++
++struct output_file {
++	int64_t cur_out_ptr;
++	unsigned int chunk_cnt;
++	uint32_t crc32;
++	struct output_file_ops *ops;
++	struct sparse_file_ops *sparse_ops;
++	int use_crc;
++	unsigned int block_size;
++	int64_t len;
++	char *zero_buf;
++	uint32_t *fill_buf;
++	char *buf;
++};
++
++struct output_file_gz {
++	struct output_file out;
++	gzFile gz_fd;
++};
++
++#define to_output_file_gz(_o) \
++	container_of((_o), struct output_file_gz, out)
++
++struct output_file_normal {
++	struct output_file out;
++	int fd;
++};
++
++#define to_output_file_normal(_o) \
++	container_of((_o), struct output_file_normal, out)
++
++struct output_file_callback {
++	struct output_file out;
++	void *priv;
++	int (*write)(void *priv, const void *buf, int len);
++};
++
++#define to_output_file_callback(_o) \
++	container_of((_o), struct output_file_callback, out)
++
++static int file_open(struct output_file *out, int fd)
++{
++	struct output_file_normal *outn = to_output_file_normal(out);
++
++	outn->fd = fd;
++	return 0;
++}
++
++static int file_skip(struct output_file *out, int64_t cnt)
++{
++	off64_t ret;
++	struct output_file_normal *outn = to_output_file_normal(out);
++
++	ret = lseek64(outn->fd, cnt, SEEK_CUR);
++	if (ret < 0) {
++		error_errno("lseek64");
++		return -1;
++	}
++	return 0;
++}
++
++static int file_pad(struct output_file *out, int64_t len)
++{
++	int ret;
++	struct output_file_normal *outn = to_output_file_normal(out);
++
++	ret = ftruncate64(outn->fd, len);
++	if (ret < 0) {
++		return -errno;
++	}
++
++	return 0;
++}
++
++static int file_write(struct output_file *out, void *data, size_t len)
++{
++	ssize_t ret;
++	struct output_file_normal *outn = to_output_file_normal(out);
++
++	while (len > 0) {
++		ret = write(outn->fd, data, len);
++		if (ret < 0) {
++			if (errno == EINTR) {
++				continue;
++			}
++			error_errno("write");
++			return -1;
++		}
++
++		data = (char *)data + ret;
++		len -= ret;
++	}
++
++	return 0;
++}
++
++static void file_close(struct output_file *out)
++{
++	struct output_file_normal *outn = to_output_file_normal(out);
++
++	free(outn);
++}
++
++static struct output_file_ops file_ops = {
++	.open = file_open,
++	.skip = file_skip,
++	.pad = file_pad,
++	.write = file_write,
++	.close = file_close,
++};
++
++static int gz_file_open(struct output_file *out, int fd)
++{
++	struct output_file_gz *outgz = to_output_file_gz(out);
++
++	outgz->gz_fd = gzdopen(fd, "wb9");
++	if (!outgz->gz_fd) {
++		error_errno("gzopen");
++		return -errno;
++	}
++
++	return 0;
++}
++
++
++static int gz_file_skip(struct output_file *out, int64_t cnt)
++{
++	off64_t ret;
++	struct output_file_gz *outgz = to_output_file_gz(out);
++
++	ret = gzseek(outgz->gz_fd, cnt, SEEK_CUR);
++	if (ret < 0) {
++		error_errno("gzseek");
++		return -1;
++	}
++	return 0;
++}
++
++static int gz_file_pad(struct output_file *out, int64_t len)
++{
++	off64_t ret;
++	struct output_file_gz *outgz = to_output_file_gz(out);
++
++	ret = gztell(outgz->gz_fd);
++	if (ret < 0) {
++		return -1;
++	}
++
++	if (ret >= len) {
++		return 0;
++	}
++
++	ret = gzseek(outgz->gz_fd, len - 1, SEEK_SET);
++	if (ret < 0) {
++		return -1;
++	}
++
++	gzwrite(outgz->gz_fd, "", 1);
++
++	return 0;
++}
++
++static int gz_file_write(struct output_file *out, void *data, size_t len)
++{
++	int ret;
++	struct output_file_gz *outgz = to_output_file_gz(out);
++
++	while (len > 0) {
++		ret = gzwrite(outgz->gz_fd, data,
++			      min(len, (unsigned int)INT_MAX));
++		if (ret == 0) {
++			error("gzwrite %s", gzerror(outgz->gz_fd, NULL));
++			return -1;
++		}
++		len -= ret;
++		data = (char *)data + ret;
++	}
++
++	return 0;
++}
++
++static void gz_file_close(struct output_file *out)
++{
++	struct output_file_gz *outgz = to_output_file_gz(out);
++
++	gzclose(outgz->gz_fd);
++	free(outgz);
++}
++
++static struct output_file_ops gz_file_ops = {
++	.open = gz_file_open,
++	.skip = gz_file_skip,
++	.pad = gz_file_pad,
++	.write = gz_file_write,
++	.close = gz_file_close,
++};
++
++static int callback_file_open(struct output_file *out __unused, int fd __unused)
++{
++	return 0;
++}
++
++static int callback_file_skip(struct output_file *out, int64_t off)
++{
++	struct output_file_callback *outc = to_output_file_callback(out);
++	int to_write;
++	int ret;
++
++	while (off > 0) {
++		to_write = min(off, (int64_t)INT_MAX);
++		ret = outc->write(outc->priv, NULL, to_write);
++		if (ret < 0) {
++			return ret;
++		}
++		off -= to_write;
++	}
++
++	return 0;
++}
++
++static int callback_file_pad(struct output_file *out __unused, int64_t len __unused)
++{
++	return -1;
++}
++
++static int callback_file_write(struct output_file *out, void *data, size_t len)
++{
++	struct output_file_callback *outc = to_output_file_callback(out);
++
++	return outc->write(outc->priv, data, len);
++}
++
++static void callback_file_close(struct output_file *out)
++{
++	struct output_file_callback *outc = to_output_file_callback(out);
++
++	free(outc);
++}
++
++static struct output_file_ops callback_file_ops = {
++	.open = callback_file_open,
++	.skip = callback_file_skip,
++	.pad = callback_file_pad,
++	.write = callback_file_write,
++	.close = callback_file_close,
++};
++
++int read_all(int fd, void *buf, size_t len)
++{
++	size_t total = 0;
++	int ret;
++	char *ptr = buf;
++
++	while (total < len) {
++		ret = read(fd, ptr, len - total);
++
++		if (ret < 0)
++			return -errno;
++
++		if (ret == 0)
++			return -EINVAL;
++
++		ptr += ret;
++		total += ret;
++	}
++
++	return 0;
++}
++
++static int write_sparse_skip_chunk(struct output_file *out, int64_t skip_len)
++{
++	chunk_header_t chunk_header;
++	int ret;
++
++	if (skip_len % out->block_size) {
++		error("don't care size %"PRIi64" is not a multiple of the block size %u",
++				skip_len, out->block_size);
++		return -1;
++	}
++
++	/* We are skipping data, so emit a don't care chunk. */
++	chunk_header.chunk_type = CHUNK_TYPE_DONT_CARE;
++	chunk_header.reserved1 = 0;
++	chunk_header.chunk_sz = skip_len / out->block_size;
++	chunk_header.total_sz = CHUNK_HEADER_LEN;
++	ret = out->ops->write(out, &chunk_header, sizeof(chunk_header));
++	if (ret < 0)
++		return -1;
++
++	out->cur_out_ptr += skip_len;
++	out->chunk_cnt++;
++
++	return 0;
++}
++
++static int write_sparse_fill_chunk(struct output_file *out, unsigned int len,
++		uint32_t fill_val)
++{
++	chunk_header_t chunk_header;
++	int rnd_up_len, count;
++	int ret;
++
++	/* Round up the fill length to a multiple of the block size */
++	rnd_up_len = ALIGN(len, out->block_size);
++
++	/* Finally we can safely emit a chunk of data */
++	chunk_header.chunk_type = CHUNK_TYPE_FILL;
++	chunk_header.reserved1 = 0;
++	chunk_header.chunk_sz = rnd_up_len / out->block_size;
++	chunk_header.total_sz = CHUNK_HEADER_LEN + sizeof(fill_val);
++	ret = out->ops->write(out, &chunk_header, sizeof(chunk_header));
++
++	if (ret < 0)
++		return -1;
++	ret = out->ops->write(out, &fill_val, sizeof(fill_val));
++	if (ret < 0)
++		return -1;
++
++	if (out->use_crc) {
++		count = out->block_size / sizeof(uint32_t);
++		while (count--)
++			out->crc32 = sparse_crc32(out->crc32, &fill_val, sizeof(uint32_t));
++	}
++
++	out->cur_out_ptr += rnd_up_len;
++	out->chunk_cnt++;
++
++	return 0;
++}
++
++static int write_sparse_data_chunk(struct output_file *out, unsigned int len,
++		void *data)
++{
++	chunk_header_t chunk_header;
++	int rnd_up_len, zero_len;
++	int ret;
++
++	/* Round up the data length to a multiple of the block size */
++	rnd_up_len = ALIGN(len, out->block_size);
++	zero_len = rnd_up_len - len;
++
++	/* Finally we can safely emit a chunk of data */
++	chunk_header.chunk_type = CHUNK_TYPE_RAW;
++	chunk_header.reserved1 = 0;
++	chunk_header.chunk_sz = rnd_up_len / out->block_size;
++	chunk_header.total_sz = CHUNK_HEADER_LEN + rnd_up_len;
++	ret = out->ops->write(out, &chunk_header, sizeof(chunk_header));
++
++	if (ret < 0)
++		return -1;
++	ret = out->ops->write(out, data, len);
++	if (ret < 0)
++		return -1;
++	if (zero_len) {
++		ret = out->ops->write(out, out->zero_buf, zero_len);
++		if (ret < 0)
++			return -1;
++	}
++
++	if (out->use_crc) {
++		out->crc32 = sparse_crc32(out->crc32, data, len);
++		if (zero_len)
++			out->crc32 = sparse_crc32(out->crc32, out->zero_buf, zero_len);
++	}
++
++	out->cur_out_ptr += rnd_up_len;
++	out->chunk_cnt++;
++
++	return 0;
++}
++
++int write_sparse_end_chunk(struct output_file *out)
++{
++	chunk_header_t chunk_header;
++	int ret;
++
++	if (out->use_crc) {
++		chunk_header.chunk_type = CHUNK_TYPE_CRC32;
++		chunk_header.reserved1 = 0;
++		chunk_header.chunk_sz = 0;
++		chunk_header.total_sz = CHUNK_HEADER_LEN + 4;
++
++		ret = out->ops->write(out, &chunk_header, sizeof(chunk_header));
++		if (ret < 0) {
++			return ret;
++		}
++		out->ops->write(out, &out->crc32, 4);
++		if (ret < 0) {
++			return ret;
++		}
++
++		out->chunk_cnt++;
++	}
++
++	return 0;
++}
++
++static struct sparse_file_ops sparse_file_ops = {
++		.write_data_chunk = write_sparse_data_chunk,
++		.write_fill_chunk = write_sparse_fill_chunk,
++		.write_skip_chunk = write_sparse_skip_chunk,
++		.write_end_chunk = write_sparse_end_chunk,
++};
++
++static int write_normal_data_chunk(struct output_file *out, unsigned int len,
++		void *data)
++{
++	int ret;
++	unsigned int rnd_up_len = ALIGN(len, out->block_size);
++
++	ret = out->ops->write(out, data, len);
++	if (ret < 0) {
++		return ret;
++	}
++
++	if (rnd_up_len > len) {
++		ret = out->ops->skip(out, rnd_up_len - len);
++	}
++
++	return ret;
++}
++
++static int write_normal_fill_chunk(struct output_file *out, unsigned int len,
++		uint32_t fill_val)
++{
++	int ret;
++	unsigned int i;
++	unsigned int write_len;
++
++	/* Initialize fill_buf with the fill_val */
++	for (i = 0; i < out->block_size / sizeof(uint32_t); i++) {
++		out->fill_buf[i] = fill_val;
++	}
++
++	while (len) {
++		write_len = min(len, out->block_size);
++		ret = out->ops->write(out, out->fill_buf, write_len);
++		if (ret < 0) {
++			return ret;
++		}
++
++		len -= write_len;
++	}
++
++	return 0;
++}
++
++static int write_normal_skip_chunk(struct output_file *out, int64_t len)
++{
++	return out->ops->skip(out, len);
++}
++
++int write_normal_end_chunk(struct output_file *out)
++{
++	return out->ops->pad(out, out->len);
++}
++
++static struct sparse_file_ops normal_file_ops = {
++		.write_data_chunk = write_normal_data_chunk,
++		.write_fill_chunk = write_normal_fill_chunk,
++		.write_skip_chunk = write_normal_skip_chunk,
++		.write_end_chunk = write_normal_end_chunk,
++};
++
++void output_file_close(struct output_file *out)
++{
++	out->sparse_ops->write_end_chunk(out);
++	out->ops->close(out);
++}
++
++static int output_file_init(struct output_file *out, int block_size,
++		int64_t len, bool sparse, int chunks, bool crc)
++{
++	int ret;
++
++	out->len = len;
++	out->block_size = block_size;
++	out->cur_out_ptr = 0ll;
++	out->chunk_cnt = 0;
++	out->crc32 = 0;
++	out->use_crc = crc;
++
++	out->zero_buf = calloc(block_size, 1);
++	if (!out->zero_buf) {
++		error_errno("malloc zero_buf");
++		return -ENOMEM;
++	}
++
++	out->fill_buf = calloc(block_size, 1);
++	if (!out->fill_buf) {
++		error_errno("malloc fill_buf");
++		ret = -ENOMEM;
++		goto err_fill_buf;
++	}
++
++	if (sparse) {
++		out->sparse_ops = &sparse_file_ops;
++	} else {
++		out->sparse_ops = &normal_file_ops;
++	}
++
++	if (sparse) {
++		sparse_header_t sparse_header = {
++				.magic = SPARSE_HEADER_MAGIC,
++				.major_version = SPARSE_HEADER_MAJOR_VER,
++				.minor_version = SPARSE_HEADER_MINOR_VER,
++				.file_hdr_sz = SPARSE_HEADER_LEN,
++				.chunk_hdr_sz = CHUNK_HEADER_LEN,
++				.blk_sz = out->block_size,
++				.total_blks = out->len / out->block_size,
++				.total_chunks = chunks,
++				.image_checksum = 0
++		};
++
++		if (out->use_crc) {
++			sparse_header.total_chunks++;
++		}
++
++		ret = out->ops->write(out, &sparse_header, sizeof(sparse_header));
++		if (ret < 0) {
++			goto err_write;
++		}
++	}
++
++	return 0;
++
++err_write:
++	free(out->fill_buf);
++err_fill_buf:
++	free(out->zero_buf);
++	return ret;
++}
++
++static struct output_file *output_file_new_gz(void)
++{
++	struct output_file_gz *outgz = calloc(1, sizeof(struct output_file_gz));
++	if (!outgz) {
++		error_errno("malloc struct outgz");
++		return NULL;
++	}
++
++	outgz->out.ops = &gz_file_ops;
++
++	return &outgz->out;
++}
++
++static struct output_file *output_file_new_normal(void)
++{
++	struct output_file_normal *outn = calloc(1, sizeof(struct output_file_normal));
++	if (!outn) {
++		error_errno("malloc struct outn");
++		return NULL;
++	}
++
++	outn->out.ops = &file_ops;
++
++	return &outn->out;
++}
++
++struct output_file *output_file_open_callback(int (*write)(void *, const void *, int),
++		void *priv, unsigned int block_size, int64_t len,
++		int gz __unused, int sparse, int chunks, int crc)
++{
++	int ret;
++	struct output_file_callback *outc;
++
++	outc = calloc(1, sizeof(struct output_file_callback));
++	if (!outc) {
++		error_errno("malloc struct outc");
++		return NULL;
++	}
++
++	outc->out.ops = &callback_file_ops;
++	outc->priv = priv;
++	outc->write = write;
++
++	ret = output_file_init(&outc->out, block_size, len, sparse, chunks, crc);
++	if (ret < 0) {
++		free(outc);
++		return NULL;
++	}
++
++	return &outc->out;
++}
++
++struct output_file *output_file_open_fd(int fd, unsigned int block_size, int64_t len,
++		int gz, int sparse, int chunks, int crc)
++{
++	int ret;
++	struct output_file *out;
++
++	if (gz) {
++		out = output_file_new_gz();
++	} else {
++		out = output_file_new_normal();
++	}
++	if (!out) {
++		return NULL;
++	}
++
++	out->ops->open(out, fd);
++
++	ret = output_file_init(out, block_size, len, sparse, chunks, crc);
++	if (ret < 0) {
++		free(out);
++		return NULL;
++	}
++
++	return out;
++}
++
++/* Write a contiguous region of data blocks from a memory buffer */
++int write_data_chunk(struct output_file *out, unsigned int len, void *data)
++{
++	return out->sparse_ops->write_data_chunk(out, len, data);
++}
++
++/* Write a contiguous region of data blocks with a fill value */
++int write_fill_chunk(struct output_file *out, unsigned int len,
++		uint32_t fill_val)
++{
++	return out->sparse_ops->write_fill_chunk(out, len, fill_val);
++}
++
++int write_fd_chunk(struct output_file *out, unsigned int len,
++		int fd, int64_t offset)
++{
++	int ret;
++	int64_t aligned_offset;
++	int aligned_diff;
++	uint64_t buffer_size;
++	char *ptr;
++
++	aligned_offset = offset & ~(4096 - 1);
++	aligned_diff = offset - aligned_offset;
++	buffer_size = (uint64_t)len + (uint64_t)aligned_diff;
++
++#ifndef _WIN32
++	if (buffer_size > SIZE_MAX)
++		return -E2BIG;
++	char *data = mmap64(NULL, buffer_size, PROT_READ, MAP_SHARED, fd,
++			aligned_offset);
++	if (data == MAP_FAILED) {
++		return -errno;
++	}
++	ptr = data + aligned_diff;
++#else
++	off64_t pos;
++	char *data = malloc(len);
++	if (!data) {
++		return -errno;
++	}
++	pos = lseek64(fd, offset, SEEK_SET);
++	if (pos < 0) {
++                free(data);
++		return -errno;
++	}
++	ret = read_all(fd, data, len);
++	if (ret < 0) {
++                free(data);
++		return ret;
++	}
++	ptr = data;
++#endif
++
++	ret = out->sparse_ops->write_data_chunk(out, len, ptr);
++
++#ifndef _WIN32
++	munmap(data, buffer_size);
++#else
++	free(data);
++#endif
++
++	return ret;
++}
++
++/* Write a contiguous region of data blocks from a file */
++int write_file_chunk(struct output_file *out, unsigned int len,
++		const char *file, int64_t offset)
++{
++	int ret;
++
++	int file_fd = open(file, O_RDONLY | O_BINARY);
++	if (file_fd < 0) {
++		return -errno;
++	}
++
++	ret = write_fd_chunk(out, len, file_fd, offset);
++
++	close(file_fd);
++
++	return ret;
++}
++
++int write_skip_chunk(struct output_file *out, int64_t len)
++{
++	return out->sparse_ops->write_skip_chunk(out, len);
++}
+diff --git a/libsparse/output_file.h b/libsparse/output_file.h
+new file mode 100644
+index 0000000..67d48cc
+--- /dev/null
++++ b/libsparse/output_file.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _OUTPUT_FILE_H_
++#define _OUTPUT_FILE_H_
++
++//#include <sparse/sparse.h>
++#include "sparse.h"
++
++struct output_file;
++
++struct output_file *output_file_open_fd(int fd, unsigned int block_size, int64_t len,
++		int gz, int sparse, int chunks, int crc);
++struct output_file *output_file_open_callback(int (*write)(void *, const void *, int),
++		void *priv, unsigned int block_size, int64_t len, int gz, int sparse,
++		int chunks, int crc);
++int write_data_chunk(struct output_file *out, unsigned int len, void *data);
++int write_fill_chunk(struct output_file *out, unsigned int len,
++		uint32_t fill_val);
++int write_file_chunk(struct output_file *out, unsigned int len,
++		const char *file, int64_t offset);
++int write_fd_chunk(struct output_file *out, unsigned int len,
++		int fd, int64_t offset);
++int write_skip_chunk(struct output_file *out, int64_t len);
++void output_file_close(struct output_file *out);
++
++int read_all(int fd, void *buf, size_t len);
++
++#endif
+diff --git a/libsparse/sparse.c b/libsparse/sparse.c
+new file mode 100644
+index 0000000..d60c14b
+--- /dev/null
++++ b/libsparse/sparse.c
+@@ -0,0 +1,396 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <assert.h>
++#include <stdlib.h>
++
++//#include <sparse/sparse.h>
++
++#include "defs.h"
++#include "sparse.h"
++#include "sparse_file.h"
++
++#include "output_file.h"
++#include "backed_block.h"
++#include "sparse_defs.h"
++#include "sparse_format.h"
++
++struct sparse_file *sparse_file_new(unsigned int block_size, int64_t len)
++{
++	struct sparse_file *s = calloc(sizeof(struct sparse_file), 1);
++	if (!s) {
++		return NULL;
++	}
++
++	s->backed_block_list = backed_block_list_new(block_size);
++	if (!s->backed_block_list) {
++		free(s);
++		return NULL;
++	}
++
++	s->block_size = block_size;
++	s->len = len;
++
++	return s;
++}
++
++void sparse_file_destroy(struct sparse_file *s)
++{
++	backed_block_list_destroy(s->backed_block_list);
++	free(s);
++}
++
++int sparse_file_add_data(struct sparse_file *s,
++		void *data, unsigned int len, unsigned int block)
++{
++	return backed_block_add_data(s->backed_block_list, data, len, block);
++}
++
++int sparse_file_add_fill(struct sparse_file *s,
++		uint32_t fill_val, unsigned int len, unsigned int block)
++{
++	return backed_block_add_fill(s->backed_block_list, fill_val, len, block);
++}
++
++int sparse_file_add_file(struct sparse_file *s,
++		const char *filename, int64_t file_offset, unsigned int len,
++		unsigned int block)
++{
++	return backed_block_add_file(s->backed_block_list, filename, file_offset,
++			len, block);
++}
++
++int sparse_file_add_fd(struct sparse_file *s,
++		int fd, int64_t file_offset, unsigned int len, unsigned int block)
++{
++	return backed_block_add_fd(s->backed_block_list, fd, file_offset,
++			len, block);
++}
++unsigned int sparse_count_chunks(struct sparse_file *s)
++{
++	struct backed_block *bb;
++	unsigned int last_block = 0;
++	unsigned int chunks = 0;
++
++	for (bb = backed_block_iter_new(s->backed_block_list); bb;
++			bb = backed_block_iter_next(bb)) {
++		if (backed_block_block(bb) > last_block) {
++			/* If there is a gap between chunks, add a skip chunk */
++			chunks++;
++		}
++		chunks++;
++		last_block = backed_block_block(bb) +
++				DIV_ROUND_UP(backed_block_len(bb), s->block_size);
++	}
++	if (last_block < DIV_ROUND_UP(s->len, s->block_size)) {
++		chunks++;
++	}
++
++	return chunks;
++}
++
++static int sparse_file_write_block(struct output_file *out,
++		struct backed_block *bb)
++{
++	int ret = -EINVAL;
++
++	switch (backed_block_type(bb)) {
++	case BACKED_BLOCK_DATA:
++		ret = write_data_chunk(out, backed_block_len(bb), backed_block_data(bb));
++		break;
++	case BACKED_BLOCK_FILE:
++		ret = write_file_chunk(out, backed_block_len(bb),
++				       backed_block_filename(bb),
++				       backed_block_file_offset(bb));
++		break;
++	case BACKED_BLOCK_FD:
++		ret = write_fd_chunk(out, backed_block_len(bb),
++				     backed_block_fd(bb),
++				     backed_block_file_offset(bb));
++		break;
++	case BACKED_BLOCK_FILL:
++		ret = write_fill_chunk(out, backed_block_len(bb),
++				       backed_block_fill_val(bb));
++		break;
++	}
++
++	return ret;
++}
++
++static int write_all_blocks(struct sparse_file *s, struct output_file *out)
++{
++	struct backed_block *bb;
++	unsigned int last_block = 0;
++	int64_t pad;
++	int ret = 0;
++
++	for (bb = backed_block_iter_new(s->backed_block_list); bb;
++			bb = backed_block_iter_next(bb)) {
++		if (backed_block_block(bb) > last_block) {
++			unsigned int blocks = backed_block_block(bb) - last_block;
++			write_skip_chunk(out, (int64_t)blocks * s->block_size);
++		}
++		ret = sparse_file_write_block(out, bb);
++		if (ret)
++			return ret;
++		last_block = backed_block_block(bb) +
++				DIV_ROUND_UP(backed_block_len(bb), s->block_size);
++	}
++
++	pad = s->len - (int64_t)last_block * s->block_size;
++	assert(pad >= 0);
++	if (pad > 0) {
++		write_skip_chunk(out, pad);
++	}
++
++	return 0;
++}
++
++int sparse_file_write(struct sparse_file *s, int fd, bool gz, bool sparse,
++		bool crc)
++{
++	int ret;
++	int chunks;
++	struct output_file *out;
++
++	chunks = sparse_count_chunks(s);
++	out = output_file_open_fd(fd, s->block_size, s->len, gz, sparse, chunks, crc);
++
++	if (!out)
++		return -ENOMEM;
++
++	ret = write_all_blocks(s, out);
++
++	output_file_close(out);
++
++	return ret;
++}
++
++int sparse_file_callback(struct sparse_file *s, bool sparse, bool crc,
++		int (*write)(void *priv, const void *data, int len), void *priv)
++{
++	int ret;
++	int chunks;
++	struct output_file *out;
++
++	chunks = sparse_count_chunks(s);
++	out = output_file_open_callback(write, priv, s->block_size, s->len, false,
++			sparse, chunks, crc);
++
++	if (!out)
++		return -ENOMEM;
++
++	ret = write_all_blocks(s, out);
++
++	output_file_close(out);
++
++	return ret;
++}
++
++struct chunk_data {
++	void		*priv;
++	unsigned int	block;
++	unsigned int	nr_blocks;
++	int (*write)(void *priv, const void *data, int len, unsigned int block,
++		     unsigned int nr_blocks);
++};
++
++static int foreach_chunk_write(void *priv, const void *data, int len)
++{
++	struct chunk_data *chk = priv;
++
++	return chk->write(chk->priv, data, len, chk->block, chk->nr_blocks);
++}
++
++int sparse_file_foreach_chunk(struct sparse_file *s, bool sparse, bool crc,
++	int (*write)(void *priv, const void *data, int len, unsigned int block,
++		     unsigned int nr_blocks),
++	void *priv)
++{
++	int ret;
++	int chunks;
++	struct chunk_data chk;
++	struct output_file *out;
++	struct backed_block *bb;
++
++	chk.priv = priv;
++	chk.write = write;
++	chk.block = chk.nr_blocks = 0;
++	chunks = sparse_count_chunks(s);
++	out = output_file_open_callback(foreach_chunk_write, &chk,
++					s->block_size, s->len, false, sparse,
++					chunks, crc);
++
++	if (!out)
++		return -ENOMEM;
++
++	for (bb = backed_block_iter_new(s->backed_block_list); bb;
++			bb = backed_block_iter_next(bb)) {
++		chk.block = backed_block_block(bb);
++		chk.nr_blocks = (backed_block_len(bb) - 1) / s->block_size + 1;
++		ret = sparse_file_write_block(out, bb);
++		if (ret)
++			return ret;
++	}
++
++	output_file_close(out);
++
++	return ret;
++}
++
++static int out_counter_write(void *priv, const void *data __unused, int len)
++{
++	int64_t *count = priv;
++	*count += len;
++	return 0;
++}
++
++int64_t sparse_file_len(struct sparse_file *s, bool sparse, bool crc)
++{
++	int ret;
++	int chunks = sparse_count_chunks(s);
++	int64_t count = 0;
++	struct output_file *out;
++
++	out = output_file_open_callback(out_counter_write, &count,
++			s->block_size, s->len, false, sparse, chunks, crc);
++	if (!out) {
++		return -1;
++	}
++
++	ret = write_all_blocks(s, out);
++
++	output_file_close(out);
++
++	if (ret < 0) {
++		return -1;
++	}
++
++	return count;
++}
++
++unsigned int sparse_file_block_size(struct sparse_file *s)
++{
++	return s->block_size;
++}
++
++static struct backed_block *move_chunks_up_to_len(struct sparse_file *from,
++		struct sparse_file *to, unsigned int len)
++{
++	int64_t count = 0;
++	struct output_file *out_counter;
++	struct backed_block *last_bb = NULL;
++	struct backed_block *bb;
++	struct backed_block *start;
++	unsigned int last_block = 0;
++	int64_t file_len = 0;
++	int ret;
++
++	/*
++	 * overhead is sparse file header, the potential end skip
++	 * chunk and crc chunk.
++	 */
++	int overhead = sizeof(sparse_header_t) + 2 * sizeof(chunk_header_t) +
++			sizeof(uint32_t);
++	len -= overhead;
++
++	start = backed_block_iter_new(from->backed_block_list);
++	out_counter = output_file_open_callback(out_counter_write, &count,
++			to->block_size, to->len, false, true, 0, false);
++	if (!out_counter) {
++		return NULL;
++	}
++
++	for (bb = start; bb; bb = backed_block_iter_next(bb)) {
++		count = 0;
++		if (backed_block_block(bb) > last_block)
++			count += sizeof(chunk_header_t);
++		last_block = backed_block_block(bb) +
++				DIV_ROUND_UP(backed_block_len(bb), to->block_size);
++
++		/* will call out_counter_write to update count */
++		ret = sparse_file_write_block(out_counter, bb);
++		if (ret) {
++			bb = NULL;
++			goto out;
++		}
++		if (file_len + count > len) {
++			/*
++			 * If the remaining available size is more than 1/8th of the
++			 * requested size, split the chunk.  Results in sparse files that
++			 * are at least 7/8ths of the requested size
++			 */
++			file_len += sizeof(chunk_header_t);
++			if (!last_bb || (len - file_len > (len / 8))) {
++				backed_block_split(from->backed_block_list, bb, len - file_len);
++				last_bb = bb;
++			}
++			goto move;
++		}
++		file_len += count;
++		last_bb = bb;
++	}
++
++move:
++	backed_block_list_move(from->backed_block_list,
++		to->backed_block_list, start, last_bb);
++
++out:
++	output_file_close(out_counter);
++
++	return bb;
++}
++
++int sparse_file_resparse(struct sparse_file *in_s, unsigned int max_len,
++		struct sparse_file **out_s, int out_s_count)
++{
++	struct backed_block *bb;
++	struct sparse_file *s;
++	struct sparse_file *tmp;
++	int c = 0;
++
++	tmp = sparse_file_new(in_s->block_size, in_s->len);
++	if (!tmp) {
++		return -ENOMEM;
++	}
++
++	do {
++		s = sparse_file_new(in_s->block_size, in_s->len);
++
++		bb = move_chunks_up_to_len(in_s, s, max_len);
++
++		if (c < out_s_count) {
++			out_s[c] = s;
++		} else {
++			backed_block_list_move(s->backed_block_list, tmp->backed_block_list,
++					NULL, NULL);
++			sparse_file_destroy(s);
++		}
++		c++;
++	} while (bb);
++
++	backed_block_list_move(tmp->backed_block_list, in_s->backed_block_list,
++			NULL, NULL);
++
++	sparse_file_destroy(tmp);
++
++	return c;
++}
++
++void sparse_file_verbose(struct sparse_file *s)
++{
++	s->verbose = true;
++}
+diff --git a/libsparse/sparse.h b/libsparse/sparse.h
+new file mode 100644
+index 0000000..356f65f
+--- /dev/null
++++ b/libsparse/sparse.h
+@@ -0,0 +1,310 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_SPARSE_H_
++#define _LIBSPARSE_SPARSE_H_
++
++#include <stdbool.h>
++#include <stdint.h>
++
++#ifdef	__cplusplus
++extern "C" {
++#endif
++
++struct sparse_file;
++
++/**
++ * sparse_file_new - create a new sparse file cookie
++ *
++ * @block_size - minimum size of a chunk
++ * @len - size of the expanded sparse file.
++ *
++ * Creates a new sparse_file cookie that can be used to associate data
++ * blocks.  Can later be written to a file with a variety of options.
++ * block_size specifies the minimum size of a chunk in the file.  The maximum
++ * size of the file is 2**32 * block_size (16TB for 4k block size).
++ *
++ * Returns the sparse file cookie, or NULL on error.
++ */
++struct sparse_file *sparse_file_new(unsigned int block_size, int64_t len);
++
++/**
++ * sparse_file_destroy - destroy a sparse file cookie
++ *
++ * @s - sparse file cookie
++ *
++ * Destroys a sparse file cookie.  After destroy, all memory passed in to
++ * sparse_file_add_data can be freed by the caller
++ */
++void sparse_file_destroy(struct sparse_file *s);
++
++/**
++ * sparse_file_add_data - associate a data chunk with a sparse file
++ *
++ * @s - sparse file cookie
++ * @data - pointer to data block
++ * @len - length of the data block
++ * @block - offset in blocks into the sparse file to place the data chunk
++ *
++ * Associates a data chunk with a sparse file cookie.  The region
++ * [block * block_size : block * block_size + len) must not already be used in
++ * the sparse file. If len is not a multiple of the block size the data
++ * will be padded with zeros.
++ *
++ * The data pointer must remain valid until the sparse file is closed or the
++ * data block is removed from the sparse file.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_add_data(struct sparse_file *s,
++		void *data, unsigned int len, unsigned int block);
++
++/**
++ * sparse_file_add_fill - associate a fill chunk with a sparse file
++ *
++ * @s - sparse file cookie
++ * @fill_val - 32 bit fill data
++ * @len - length of the fill block
++ * @block - offset in blocks into the sparse file to place the fill chunk
++ *
++ * Associates a chunk filled with fill_val with a sparse file cookie.
++ * The region [block * block_size : block * block_size + len) must not already
++ * be used in the sparse file. If len is not a multiple of the block size the
++ * data will be padded with zeros.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_add_fill(struct sparse_file *s,
++		uint32_t fill_val, unsigned int len, unsigned int block);
++
++/**
++ * sparse_file_add_file - associate a chunk of a file with a sparse file
++ *
++ * @s - sparse file cookie
++ * @filename - filename of the file to be copied
++ * @file_offset - offset into the copied file
++ * @len - length of the copied block
++ * @block - offset in blocks into the sparse file to place the file chunk
++ *
++ * Associates a chunk of an existing file with a sparse file cookie.
++ * The region [block * block_size : block * block_size + len) must not already
++ * be used in the sparse file. If len is not a multiple of the block size the
++ * data will be padded with zeros.
++ *
++ * Allows adding large amounts of data to a sparse file without needing to keep
++ * it all mapped.  File size is limited by available virtual address space,
++ * exceptionally large files may need to be added in multiple chunks.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_add_file(struct sparse_file *s,
++		const char *filename, int64_t file_offset, unsigned int len,
++		unsigned int block);
++
++/**
++ * sparse_file_add_file - associate a chunk of a file with a sparse file
++ *
++ * @s - sparse file cookie
++ * @filename - filename of the file to be copied
++ * @file_offset - offset into the copied file
++ * @len - length of the copied block
++ * @block - offset in blocks into the sparse file to place the file chunk
++ *
++ * Associates a chunk of an existing fd with a sparse file cookie.
++ * The region [block * block_size : block * block_size + len) must not already
++ * be used in the sparse file. If len is not a multiple of the block size the
++ * data will be padded with zeros.
++ *
++ * Allows adding large amounts of data to a sparse file without needing to keep
++ * it all mapped.  File size is limited by available virtual address space,
++ * exceptionally large files may need to be added in multiple chunks.
++ *
++ * The fd must remain open until the sparse file is closed or the fd block is
++ * removed from the sparse file.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_add_fd(struct sparse_file *s,
++		int fd, int64_t file_offset, unsigned int len, unsigned int block);
++
++/**
++ * sparse_file_write - write a sparse file to a file
++ *
++ * @s - sparse file cookie
++ * @fd - file descriptor to write to
++ * @gz - write a gzipped file
++ * @sparse - write in the Android sparse file format
++ * @crc - append a crc chunk
++ *
++ * Writes a sparse file to a file.  If gz is true, the data will be passed
++ * through zlib.  If sparse is true, the file will be written in the Android
++ * sparse file format.  If sparse is false, the file will be written by seeking
++ * over unused chunks, producing a smaller file if the filesystem supports
++ * sparse files.  If crc is true, the crc of the expanded data will be
++ * calculated and appended in a crc chunk.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_write(struct sparse_file *s, int fd, bool gz, bool sparse,
++		bool crc);
++
++/**
++ * sparse_file_len - return the length of a sparse file if written to disk
++ *
++ * @s - sparse file cookie
++ * @sparse - write in the Android sparse file format
++ * @crc - append a crc chunk
++ *
++ * Returns the size a sparse file would be on disk if it were written in the
++ * specified format.  If sparse is true, this is the size of the data in the
++ * sparse format.  If sparse is false, this is the size of the normal
++ * non-sparse file.
++ */
++int64_t sparse_file_len(struct sparse_file *s, bool sparse, bool crc);
++
++/**
++ * sparse_file_block_size
++ *
++ * @s - sparse file cookie
++ */
++unsigned int sparse_file_block_size(struct sparse_file *s);
++
++/**
++ * sparse_file_callback - call a callback for blocks in sparse file
++ *
++ * @s - sparse file cookie
++ * @sparse - write in the Android sparse file format
++ * @crc - append a crc chunk
++ * @write - function to call for each block
++ * @priv - value that will be passed as the first argument to write
++ *
++ * Writes a sparse file by calling a callback function.  If sparse is true, the
++ * file will be written in the Android sparse file format.  If crc is true, the
++ * crc of the expanded data will be calculated and appended in a crc chunk.
++ * The callback 'write' will be called with data and length for each data,
++ * and with data==NULL to skip over a region (only used for non-sparse format).
++ * The callback should return negative on error, 0 on success.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_callback(struct sparse_file *s, bool sparse, bool crc,
++		int (*write)(void *priv, const void *data, int len), void *priv);
++
++/**
++ * sparse_file_foreach_chunk - call a callback for data blocks in sparse file
++ *
++ * @s - sparse file cookie
++ * @sparse - write in the Android sparse file format
++ * @crc - append a crc chunk
++ * @write - function to call for each block
++ * @priv - value that will be passed as the first argument to write
++ *
++ * The function has the same behavior as 'sparse_file_callback', except it only
++ * iterates on blocks that contain data.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_foreach_chunk(struct sparse_file *s, bool sparse, bool crc,
++	int (*write)(void *priv, const void *data, int len, unsigned int block,
++		     unsigned int nr_blocks),
++	void *priv);
++/**
++ * sparse_file_read - read a file into a sparse file cookie
++ *
++ * @s - sparse file cookie
++ * @fd - file descriptor to read from
++ * @sparse - read a file in the Android sparse file format
++ * @crc - verify the crc of a file in the Android sparse file format
++ *
++ * Reads a file into a sparse file cookie.  If sparse is true, the file is
++ * assumed to be in the Android sparse file format.  If sparse is false, the
++ * file will be sparsed by looking for block aligned chunks of all zeros or
++ * another 32 bit value.  If crc is true, the crc of the sparse file will be
++ * verified.
++ *
++ * Returns 0 on success, negative errno on error.
++ */
++int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc);
++
++/**
++ * sparse_file_import - import an existing sparse file
++ *
++ * @s - sparse file cookie
++ * @verbose - print verbose errors while reading the sparse file
++ * @crc - verify the crc of a file in the Android sparse file format
++ *
++ * Reads an existing sparse file into a sparse file cookie, recreating the same
++ * sparse cookie that was used to write it.  If verbose is true, prints verbose
++ * errors when the sparse file is formatted incorrectly.
++ *
++ * Returns a new sparse file cookie on success, NULL on error.
++ */
++struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc);
++
++/**
++ * sparse_file_import_auto - import an existing sparse or normal file
++ *
++ * @fd - file descriptor to read from
++ * @crc - verify the crc of a file in the Android sparse file format
++ * @verbose - whether to use verbose logging
++ *
++ * Reads an existing sparse or normal file into a sparse file cookie.
++ * Attempts to determine if the file is sparse or not by looking for the sparse
++ * file magic number in the first 4 bytes.  If the file is not sparse, the file
++ * will be sparsed by looking for block aligned chunks of all zeros or another
++ * 32 bit value.  If crc is true, the crc of the sparse file will be verified.
++ *
++ * Returns a new sparse file cookie on success, NULL on error.
++ */
++struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose);
++
++/** sparse_file_resparse - rechunk an existing sparse file into smaller files
++ *
++ * @in_s - sparse file cookie of the existing sparse file
++ * @max_len - maximum file size
++ * @out_s - array of sparse file cookies
++ * @out_s_count - size of out_s array
++ *
++ * Splits chunks of an existing sparse file into smaller sparse files such that
++ * each sparse file is less than max_len.  Returns the number of sparse_files
++ * that would have been written to out_s if out_s were big enough.
++ */
++int sparse_file_resparse(struct sparse_file *in_s, unsigned int max_len,
++		struct sparse_file **out_s, int out_s_count);
++
++/**
++ * sparse_file_verbose - set a sparse file cookie to print verbose errors
++ *
++ * @s - sparse file cookie
++ *
++ * Print verbose sparse file errors whenever using the sparse file cookie.
++ */
++void sparse_file_verbose(struct sparse_file *s);
++
++/**
++ * sparse_print_verbose - function called to print verbose errors
++ *
++ * By default, verbose errors will print to standard error.
++ * sparse_print_verbose may be overridden to log verbose errors somewhere else.
++ *
++ */
++extern void (*sparse_print_verbose)(const char *fmt, ...);
++
++#ifdef	__cplusplus
++}
++#endif
++
++#endif
+diff --git a/libsparse/sparse_crc32.c b/libsparse/sparse_crc32.c
+new file mode 100644
+index 0000000..38bfe4a
+--- /dev/null
++++ b/libsparse/sparse_crc32.c
+@@ -0,0 +1,111 @@
++/*-
++ *  COPYRIGHT (C) 1986 Gary S. Brown.  You may use this program, or
++ *  code or tables extracted from it, as desired without restriction.
++ */
++
++/*
++ *  First, the polynomial itself and its table of feedback terms.  The
++ *  polynomial is
++ *  X^32+X^26+X^23+X^22+X^16+X^12+X^11+X^10+X^8+X^7+X^5+X^4+X^2+X^1+X^0
++ *
++ *  Note that we take it "backwards" and put the highest-order term in
++ *  the lowest-order bit.  The X^32 term is "implied"; the LSB is the
++ *  X^31 term, etc.  The X^0 term (usually shown as "+1") results in
++ *  the MSB being 1
++ *
++ *  Note that the usual hardware shift register implementation, which
++ *  is what we're using (we're merely optimizing it by doing eight-bit
++ *  chunks at a time) shifts bits into the lowest-order term.  In our
++ *  implementation, that means shifting towards the right.  Why do we
++ *  do it this way?  Because the calculated CRC must be transmitted in
++ *  order from highest-order term to lowest-order term.  UARTs transmit
++ *  characters in order from LSB to MSB.  By storing the CRC this way
++ *  we hand it to the UART in the order low-byte to high-byte; the UART
++ *  sends each low-bit to hight-bit; and the result is transmission bit
++ *  by bit from highest- to lowest-order term without requiring any bit
++ *  shuffling on our part.  Reception works similarly
++ *
++ *  The feedback terms table consists of 256, 32-bit entries.  Notes
++ *
++ *      The table can be generated at runtime if desired; code to do so
++ *      is shown later.  It might not be obvious, but the feedback
++ *      terms simply represent the results of eight shift/xor opera
++ *      tions for all combinations of data and CRC register values
++ *
++ *      The values must be right-shifted by eight bits by the "updcrc
++ *      logic; the shift must be unsigned (bring in zeroes).  On some
++ *      hardware you could probably optimize the shift in assembler by
++ *      using byte-swap instructions
++ *      polynomial $edb88320
++ *
++ *
++ * CRC32 code derived from work by Gary S. Brown.
++ */
++
++/* Code taken from FreeBSD 8 */
++#include <stdint.h>
++
++static uint32_t crc32_tab[] = {
++        0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
++        0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
++        0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
++        0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
++        0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec, 0x14015c4f, 0x63066cd9,
++        0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
++        0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
++        0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
++        0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
++        0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
++        0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d, 0x76dc4190, 0x01db7106,
++        0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
++        0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d,
++        0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
++        0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950,
++        0x8bbeb8ea, 0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65,
++        0x4db26158, 0x3ab551ce, 0xa3bc0074, 0xd4bb30e2, 0x4adfa541, 0x3dd895d7,
++        0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
++        0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9, 0x5005713c, 0x270241aa,
++        0xbe0b1010, 0xc90c2086, 0x5768b525, 0x206f85b3, 0xb966d409, 0xce61e49f,
++        0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
++        0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a,
++        0xead54739, 0x9dd277af, 0x04db2615, 0x73dc1683, 0xe3630b12, 0x94643b84,
++        0x0d6d6a3e, 0x7a6a5aa8, 0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
++        0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe, 0xf762575d, 0x806567cb,
++        0x196c3671, 0x6e6b06e7, 0xfed41b76, 0x89d32be0, 0x10da7a5a, 0x67dd4acc,
++        0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8, 0xa1d1937e,
++        0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
++        0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60, 0xdf60efc3, 0xa867df55,
++        0x316e8eef, 0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
++        0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28,
++        0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7, 0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d,
++        0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a, 0x9c0906a9, 0xeb0e363f,
++        0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38,
++        0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242,
++        0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
++        0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69,
++        0x616bffd3, 0x166ccf45, 0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2,
++        0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db, 0xaed16a4a, 0xd9d65adc,
++        0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9,
++        0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6, 0xbad03605, 0xcdd70693,
++        0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
++        0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
++};
++
++/*
++ * A function that calculates the CRC-32 based on the table above is
++ * given below for documentation purposes. An equivalent implementation
++ * of this function that's actually used in the kernel can be found
++ * in sys/libkern.h, where it can be inlined.
++ */
++
++uint32_t sparse_crc32(uint32_t crc_in, const void *buf, int size)
++{
++        const uint8_t *p = buf;
++        uint32_t crc;
++
++        crc = crc_in ^ ~0U;
++        while (size--)
++                crc = crc32_tab[(crc ^ *p++) & 0xFF] ^ (crc >> 8);
++        return crc ^ ~0U;
++}
++
+diff --git a/libsparse/sparse_crc32.h b/libsparse/sparse_crc32.h
+new file mode 100644
+index 0000000..50cd9e9
+--- /dev/null
++++ b/libsparse/sparse_crc32.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_SPARSE_CRC32_H_
++#define _LIBSPARSE_SPARSE_CRC32_H_
++
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++uint32_t sparse_crc32(uint32_t crc, const void *buf, size_t size);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/libsparse/sparse_defs.h b/libsparse/sparse_defs.h
+new file mode 100644
+index 0000000..b99cfd5
+--- /dev/null
++++ b/libsparse/sparse_defs.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_SPARSE_DEFS_
++#define _LIBSPARSE_SPARSE_DEFS_
++
++#include <errno.h>
++#include <stdio.h>
++
++#define __le64 u64
++#define __le32 u32
++#define __le16 u16
++
++#define __be64 u64
++#define __be32 u32
++#define __be16 u16
++
++#define __u64 u64
++#define __u32 u32
++#define __u16 u16
++#define __u8 u8
++
++typedef unsigned long long u64;
++typedef signed long long s64;
++typedef unsigned int u32;
++typedef unsigned short int u16;
++typedef unsigned char u8;
++
++#define DIV_ROUND_UP(x, y) (((x) + (y) - 1)/(y))
++#define ALIGN(x, y) ((y) * DIV_ROUND_UP((x), (y)))
++#define ALIGN_DOWN(x, y) ((y) * ((x) / (y)))
++
++#define error(fmt, args...) do { fprintf(stderr, "error: %s: " fmt "\n", __func__, ## args); } while (0)
++#define error_errno(s, args...) error(s ": %s", ##args, strerror(errno))
++
++#endif
+diff --git a/libsparse/sparse_err.c b/libsparse/sparse_err.c
+new file mode 100644
+index 0000000..d9f8c24
+--- /dev/null
++++ b/libsparse/sparse_err.c
+@@ -0,0 +1,33 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++//#include <sparse/sparse.h>
++#include "sparse.h"
++#include <stdarg.h>
++#include <stdio.h>
++#include <unistd.h>
++
++void sparse_default_print(const char *fmt, ...)
++{
++	va_list argp;
++
++	va_start(argp, fmt);
++	vfprintf(stderr, fmt, argp);
++	va_end(argp);
++}
++
++void (*sparse_print_error)(const char *fmt, ...) = sparse_default_print;
++void (*sparse_print_verbose)(const char *fmt, ...) = sparse_default_print;
+diff --git a/libsparse/sparse_file.h b/libsparse/sparse_file.h
+new file mode 100644
+index 0000000..72a1530
+--- /dev/null
++++ b/libsparse/sparse_file.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_SPARSE_FILE_H_
++#define _LIBSPARSE_SPARSE_FILE_H_
++
++//#include <sparse/sparse.h>
++#include "sparse.h"
++struct sparse_file {
++	unsigned int block_size;
++	int64_t len;
++	bool verbose;
++
++	struct backed_block_list *backed_block_list;
++	struct output_file *out;
++};
++
++
++#endif /* _LIBSPARSE_SPARSE_FILE_H_ */
+diff --git a/libsparse/sparse_format.h b/libsparse/sparse_format.h
+new file mode 100644
+index 0000000..c41f12a
+--- /dev/null
++++ b/libsparse/sparse_format.h
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2010 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _LIBSPARSE_SPARSE_FORMAT_H_
++#define _LIBSPARSE_SPARSE_FORMAT_H_
++#include "sparse_defs.h"
++
++typedef struct sparse_header {
++  __le32	magic;		/* 0xed26ff3a */
++  __le16	major_version;	/* (0x1) - reject images with higher major versions */
++  __le16	minor_version;	/* (0x0) - allow images with higer minor versions */
++  __le16	file_hdr_sz;	/* 28 bytes for first revision of the file format */
++  __le16	chunk_hdr_sz;	/* 12 bytes for first revision of the file format */
++  __le32	blk_sz;		/* block size in bytes, must be a multiple of 4 (4096) */
++  __le32	total_blks;	/* total blocks in the non-sparse output image */
++  __le32	total_chunks;	/* total chunks in the sparse input image */
++  __le32	image_checksum; /* CRC32 checksum of the original data, counting "don't care" */
++				/* as 0. Standard 802.3 polynomial, use a Public Domain */
++				/* table implementation */
++} sparse_header_t;
++
++#define SPARSE_HEADER_MAGIC	0xed26ff3a
++
++#define CHUNK_TYPE_RAW		0xCAC1
++#define CHUNK_TYPE_FILL		0xCAC2
++#define CHUNK_TYPE_DONT_CARE	0xCAC3
++#define CHUNK_TYPE_CRC32    0xCAC4
++
++typedef struct chunk_header {
++  __le16	chunk_type;	/* 0xCAC1 -> raw; 0xCAC2 -> fill; 0xCAC3 -> don't care */
++  __le16	reserved1;
++  __le32	chunk_sz;	/* in blocks in output image */
++  __le32	total_sz;	/* in bytes of chunk input file including chunk header and data */
++} chunk_header_t;
++
++/* Following a Raw or Fill or CRC32 chunk is data.
++ *  For a Raw chunk, it's the data in chunk_sz * blk_sz.
++ *  For a Fill chunk, it's 4 bytes of the fill data.
++ *  For a CRC32 chunk, it's 4 bytes of CRC32
++ */
++
++#endif
+diff --git a/libsparse/sparse_read.c b/libsparse/sparse_read.c
+new file mode 100644
+index 0000000..7d5cbbf
+--- /dev/null
++++ b/libsparse/sparse_read.c
+@@ -0,0 +1,510 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define _GNU_SOURCE
++#define _FILE_OFFSET_BITS 64
++#define _LARGEFILE64_SOURCE 1
++
++#include <inttypes.h>
++#include <fcntl.h>
++#include <stdarg.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++//#include <sparse/sparse.h>
++#include "sparse.h"
++
++#include "defs.h"
++#include "output_file.h"
++#include "sparse_crc32.h"
++#include "sparse_file.h"
++#include "sparse_format.h"
++
++#if defined(__APPLE__) && defined(__MACH__)
++#define lseek64 lseek
++#define off64_t off_t
++#endif
++
++#define SPARSE_HEADER_MAJOR_VER 1
++#define SPARSE_HEADER_LEN       (sizeof(sparse_header_t))
++#define CHUNK_HEADER_LEN (sizeof(chunk_header_t))
++
++#define COPY_BUF_SIZE (1024U*1024U)
++static char *copybuf;
++
++#define min(a, b) \
++	({ typeof(a) _a = (a); typeof(b) _b = (b); (_a < _b) ? _a : _b; })
++
++static void verbose_error(bool verbose, int err, const char *fmt, ...)
++{
++	char *s = "";
++	char *at = "";
++	if (fmt) {
++		va_list argp;
++		int size;
++
++		va_start(argp, fmt);
++		size = vsnprintf(NULL, 0, fmt, argp);
++		va_end(argp);
++
++		if (size < 0) {
++			return;
++		}
++
++		at = malloc(size + 1);
++		if (at == NULL) {
++			return;
++		}
++
++		va_start(argp, fmt);
++		vsnprintf(at, size, fmt, argp);
++		va_end(argp);
++		at[size] = 0;
++		s = " at ";
++	}
++	if (verbose) {
++#ifndef _WIN32
++		if (err == -EOVERFLOW) {
++			printf("EOF while reading file%s%s\n", s, at);
++		} else
++#endif
++		if (err == -EINVAL) {
++			printf("Invalid sparse file format%s%s\n", s, at);
++		} else if (err == -ENOMEM) {
++			printf("Failed allocation while reading file%s%s\n",
++					s, at);
++		} else {
++			printf("Unknown error %d%s%s\n", err, s, at);
++		}
++	}
++	if (fmt) {
++		free(at);
++	}
++}
++
++static int process_raw_chunk(struct sparse_file *s, unsigned int chunk_size,
++		int fd, int64_t offset, unsigned int blocks, unsigned int block,
++		uint32_t *crc32)
++{
++	int ret;
++	int chunk;
++	unsigned int len = blocks * s->block_size;
++
++	if (chunk_size % s->block_size != 0) {
++		return -EINVAL;
++	}
++
++	if (chunk_size / s->block_size != blocks) {
++		return -EINVAL;
++	}
++
++	ret = sparse_file_add_fd(s, fd, offset, len, block);
++	if (ret < 0) {
++		return ret;
++	}
++
++	if (crc32) {
++		while (len) {
++			chunk = min(len, COPY_BUF_SIZE);
++			ret = read_all(fd, copybuf, chunk);
++			if (ret < 0) {
++				return ret;
++			}
++			*crc32 = sparse_crc32(*crc32, copybuf, chunk);
++			len -= chunk;
++		}
++	} else {
++		lseek64(fd, len, SEEK_CUR);
++	}
++
++	return 0;
++}
++
++static int process_fill_chunk(struct sparse_file *s, unsigned int chunk_size,
++		int fd, unsigned int blocks, unsigned int block, uint32_t *crc32)
++{
++	int ret;
++	int chunk;
++	int64_t len = (int64_t)blocks * s->block_size;
++	uint32_t fill_val;
++	uint32_t *fillbuf;
++	unsigned int i;
++
++	if (chunk_size != sizeof(fill_val)) {
++		return -EINVAL;
++	}
++
++	ret = read_all(fd, &fill_val, sizeof(fill_val));
++	if (ret < 0) {
++		return ret;
++	}
++
++	ret = sparse_file_add_fill(s, fill_val, len, block);
++	if (ret < 0) {
++		return ret;
++	}
++
++	if (crc32) {
++		/* Fill copy_buf with the fill value */
++		fillbuf = (uint32_t *)copybuf;
++		for (i = 0; i < (COPY_BUF_SIZE / sizeof(fill_val)); i++) {
++			fillbuf[i] = fill_val;
++		}
++
++		while (len) {
++			chunk = min(len, COPY_BUF_SIZE);
++			*crc32 = sparse_crc32(*crc32, copybuf, chunk);
++			len -= chunk;
++		}
++	}
++
++	return 0;
++}
++
++static int process_skip_chunk(struct sparse_file *s, unsigned int chunk_size,
++		int fd __unused, unsigned int blocks,
++		unsigned int block __unused, uint32_t *crc32)
++{
++	if (chunk_size != 0) {
++		return -EINVAL;
++	}
++
++	if (crc32) {
++	        int64_t len = (int64_t)blocks * s->block_size;
++		memset(copybuf, 0, COPY_BUF_SIZE);
++
++		while (len) {
++			int chunk = min(len, COPY_BUF_SIZE);
++			*crc32 = sparse_crc32(*crc32, copybuf, chunk);
++			len -= chunk;
++		}
++	}
++
++	return 0;
++}
++
++static int process_crc32_chunk(int fd, unsigned int chunk_size, uint32_t *crc32)
++{
++	uint32_t file_crc32;
++	int ret;
++
++	if (chunk_size != sizeof(file_crc32)) {
++		return -EINVAL;
++	}
++
++	ret = read_all(fd, &file_crc32, sizeof(file_crc32));
++	if (ret < 0) {
++		return ret;
++	}
++
++	if (crc32 != NULL && file_crc32 != *crc32) {
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int process_chunk(struct sparse_file *s, int fd, off64_t offset,
++		unsigned int chunk_hdr_sz, chunk_header_t *chunk_header,
++		unsigned int cur_block, uint32_t *crc_ptr)
++{
++	int ret;
++	unsigned int chunk_data_size;
++
++	chunk_data_size = chunk_header->total_sz - chunk_hdr_sz;
++
++	switch (chunk_header->chunk_type) {
++		case CHUNK_TYPE_RAW:
++			ret = process_raw_chunk(s, chunk_data_size, fd, offset,
++					chunk_header->chunk_sz, cur_block, crc_ptr);
++			if (ret < 0) {
++				verbose_error(s->verbose, ret, "data block at %" PRId64, offset);
++				return ret;
++			}
++			return chunk_header->chunk_sz;
++		case CHUNK_TYPE_FILL:
++			ret = process_fill_chunk(s, chunk_data_size, fd,
++					chunk_header->chunk_sz, cur_block, crc_ptr);
++			if (ret < 0) {
++				verbose_error(s->verbose, ret, "fill block at %" PRId64, offset);
++				return ret;
++			}
++			return chunk_header->chunk_sz;
++		case CHUNK_TYPE_DONT_CARE:
++			ret = process_skip_chunk(s, chunk_data_size, fd,
++					chunk_header->chunk_sz, cur_block, crc_ptr);
++			if (chunk_data_size != 0) {
++				if (ret < 0) {
++					verbose_error(s->verbose, ret, "skip block at %" PRId64, offset);
++					return ret;
++				}
++			}
++			return chunk_header->chunk_sz;
++		case CHUNK_TYPE_CRC32:
++			ret = process_crc32_chunk(fd, chunk_data_size, crc_ptr);
++			if (ret < 0) {
++				verbose_error(s->verbose, -EINVAL, "crc block at %" PRId64,
++						offset);
++				return ret;
++			}
++			return 0;
++		default:
++			verbose_error(s->verbose, -EINVAL, "unknown block %04X at %" PRId64,
++					chunk_header->chunk_type, offset);
++	}
++
++	return 0;
++}
++
++static int sparse_file_read_sparse(struct sparse_file *s, int fd, bool crc)
++{
++	int ret;
++	unsigned int i;
++	sparse_header_t sparse_header;
++	chunk_header_t chunk_header;
++	uint32_t crc32 = 0;
++	uint32_t *crc_ptr = 0;
++	unsigned int cur_block = 0;
++	off64_t offset;
++
++	if (!copybuf) {
++		copybuf = malloc(COPY_BUF_SIZE);
++	}
++
++	if (!copybuf) {
++		return -ENOMEM;
++	}
++
++	if (crc) {
++		crc_ptr = &crc32;
++	}
++
++	ret = read_all(fd, &sparse_header, sizeof(sparse_header));
++	if (ret < 0) {
++		return ret;
++	}
++
++	if (sparse_header.magic != SPARSE_HEADER_MAGIC) {
++		return -EINVAL;
++	}
++
++	if (sparse_header.major_version != SPARSE_HEADER_MAJOR_VER) {
++		return -EINVAL;
++	}
++
++	if (sparse_header.file_hdr_sz < SPARSE_HEADER_LEN) {
++		return -EINVAL;
++	}
++
++	if (sparse_header.chunk_hdr_sz < sizeof(chunk_header)) {
++		return -EINVAL;
++	}
++
++	if (sparse_header.file_hdr_sz > SPARSE_HEADER_LEN) {
++		/* Skip the remaining bytes in a header that is longer than
++		 * we expected.
++		 */
++		lseek64(fd, sparse_header.file_hdr_sz - SPARSE_HEADER_LEN, SEEK_CUR);
++	}
++
++	for (i = 0; i < sparse_header.total_chunks; i++) {
++		ret = read_all(fd, &chunk_header, sizeof(chunk_header));
++		if (ret < 0) {
++			return ret;
++		}
++
++		if (sparse_header.chunk_hdr_sz > CHUNK_HEADER_LEN) {
++			/* Skip the remaining bytes in a header that is longer than
++			 * we expected.
++			 */
++			lseek64(fd, sparse_header.chunk_hdr_sz - CHUNK_HEADER_LEN, SEEK_CUR);
++		}
++
++		offset = lseek64(fd, 0, SEEK_CUR);
++
++		ret = process_chunk(s, fd, offset, sparse_header.chunk_hdr_sz, &chunk_header,
++				cur_block, crc_ptr);
++		if (ret < 0) {
++			return ret;
++		}
++
++		cur_block += ret;
++	}
++
++	if (sparse_header.total_blks != cur_block) {
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int sparse_file_read_normal(struct sparse_file *s, int fd)
++{
++	int ret;
++	uint32_t *buf = malloc(s->block_size);
++	unsigned int block = 0;
++	int64_t remain = s->len;
++	int64_t offset = 0;
++	unsigned int to_read;
++	unsigned int i;
++	bool sparse_block;
++
++	if (!buf) {
++		return -ENOMEM;
++	}
++
++	while (remain > 0) {
++		to_read = min(remain, s->block_size);
++		ret = read_all(fd, buf, to_read);
++		if (ret < 0) {
++			error("failed to read sparse file");
++			free(buf);
++			return ret;
++		}
++
++		if (to_read == s->block_size) {
++			sparse_block = true;
++			for (i = 1; i < s->block_size / sizeof(uint32_t); i++) {
++				if (buf[0] != buf[i]) {
++					sparse_block = false;
++					break;
++				}
++			}
++		} else {
++			sparse_block = false;
++		}
++
++		if (sparse_block) {
++			/* TODO: add flag to use skip instead of fill for buf[0] == 0 */
++			sparse_file_add_fill(s, buf[0], to_read, block);
++		} else {
++			sparse_file_add_fd(s, fd, offset, to_read, block);
++		}
++
++		remain -= to_read;
++		offset += to_read;
++		block++;
++	}
++
++	free(buf);
++	return 0;
++}
++
++int sparse_file_read(struct sparse_file *s, int fd, bool sparse, bool crc)
++{
++	if (crc && !sparse) {
++		return -EINVAL;
++	}
++
++	if (sparse) {
++		return sparse_file_read_sparse(s, fd, crc);
++	} else {
++		return sparse_file_read_normal(s, fd);
++	}
++}
++
++struct sparse_file *sparse_file_import(int fd, bool verbose, bool crc)
++{
++	int ret;
++	sparse_header_t sparse_header;
++	int64_t len;
++       int head_len = sizeof(sparse_header);
++	struct sparse_file *s;
++
++	ret = read_all(fd, &sparse_header, sizeof(sparse_header));
++	if (ret < 0) {
++		verbose_error(verbose, ret, "header");
++		return NULL;
++	}
++
++	if (sparse_header.magic != SPARSE_HEADER_MAGIC) {
++		verbose_error(verbose, -EINVAL, "header magic");
++		return NULL;
++	}
++
++	if (sparse_header.major_version != SPARSE_HEADER_MAJOR_VER) {
++		verbose_error(verbose, -EINVAL, "header major version");
++		return NULL;
++	}
++
++	if (sparse_header.file_hdr_sz < SPARSE_HEADER_LEN) {
++		return NULL;
++	}
++
++	if (sparse_header.chunk_hdr_sz < sizeof(chunk_header_t)) {
++		return NULL;
++	}
++
++	len = (int64_t)sparse_header.total_blks * sparse_header.blk_sz;
++	s = sparse_file_new(sparse_header.blk_sz, len);
++	if (!s) {
++		verbose_error(verbose, -EINVAL, NULL);
++		return NULL;
++	}
++
++	ret = lseek64(fd, head_len*(-1), SEEK_CUR);
++	if (ret < 0) {
++		verbose_error(verbose, ret, "seeking");
++		sparse_file_destroy(s);
++		return NULL;
++	}
++
++	s->verbose = verbose;
++
++	ret = sparse_file_read(s, fd, true, crc);
++	if (ret < 0) {
++		sparse_file_destroy(s);
++		return NULL;
++	}
++
++	return s;
++}
++
++struct sparse_file *sparse_file_import_auto(int fd, bool crc, bool verbose)
++{
++	struct sparse_file *s;
++	int64_t len;
++	int ret;
++
++	s = sparse_file_import(fd, verbose, crc);
++	if (s) {
++		return s;
++	}
++
++	len = lseek64(fd, 0, SEEK_END);
++	if (len < 0) {
++		return NULL;
++	}
++
++	lseek64(fd, 0, SEEK_SET);
++
++	s = sparse_file_new(4096, len);
++	if (!s) {
++		return NULL;
++	}
++
++	ret = sparse_file_read_normal(s, fd);
++	if (ret < 0) {
++		sparse_file_destroy(s);
++		return NULL;
++	}
++
++	return s;
++}
+-- 
+2.7.4
+

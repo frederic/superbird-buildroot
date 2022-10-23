@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,15 @@
 extern "C" {
 #endif
 
+#define _VSI_NN_SPATIAL_TRANSFORMER_LOCAL_TENSOR_NUM 2
+
+typedef struct _vsi_nn_spatial_transformer_lcl_data
+{
+    vsi_nn_tensor_t  *local_tensor;
+    vx_scalar scl;
+} vsi_nn_spatial_transformer_lcl_data;
+
+
 typedef struct _vsi_nn_spatial_transformer_param
 {
     int32_t       output_H;
@@ -46,6 +55,8 @@ typedef struct _vsi_nn_spatial_transformer_param
     float         theta_2_1;
     float         theta_2_2;
     float         theta_2_3;
+
+    vsi_nn_spatial_transformer_lcl_data lcl;
 } vsi_nn_spatial_transformer_param;
 
 #ifdef __cplusplus

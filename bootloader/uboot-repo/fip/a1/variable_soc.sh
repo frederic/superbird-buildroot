@@ -23,7 +23,6 @@ declare -a BLX_READY=("false", "false", "false") # blx build/get flag
 declare BL33_COMPRESS_FLAG=""
 declare BL3X_SUFFIX="bin"
 declare V3_PROCESS_FLAG=""
-declare FIP_ARGS=""
 declare AML_BL2_NAME=""
 declare AML_KEY_BLOB_NANE=""
 declare FIP_BL32_PROCESS=""
@@ -33,3 +32,5 @@ BUILD_PATH=${FIP_BUILD_FOLDER}
 
 CONFIG_DDR_FW=0
 DDR_FW_NAME="aml_ddr.fw"
+
+CONFIG_DDR_PARSE=1

@@ -10,8 +10,9 @@ encryption_option=
 kernel_encryption=
 uimage_encryption=
 postfix="signed"
+bl40_option=
 
-while getopts "s:h:z:p:r:a:uno:" opt; do
+while getopts "s:h:z:p:r:a:um:no:" opt; do
   case $opt in
     s) readonly soc="$OPTARG" ;;
     z) readonly user_package="$OPTARG" ;;
@@ -19,6 +20,7 @@ while getopts "s:h:z:p:r:a:uno:" opt; do
     r) readonly user_rsa="$OPTARG" ;;
     a) readonly user_aes="$OPTARG" ;;
     o) readonly user_out="$OPTARG" ;;
+    m) readonly bl40_option="$OPTARG" ;;
     n) readonly encryption_option="-n" ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -98,7 +100,7 @@ mkdir -p ${OUTPUTDIR}
 if [ -e ${INPUTDIR}/bl2_new.bin ]; then
   echo
   echo "$user_package signing process ..."
-  "$uboot_encrypt_signed" -p ${INPUTDIR} -r ${RSAKEYDIR} -a ${AESKEYDIR} -o ${OUTPUTDIR} -h ${hash_ver} -s ${tool_type} -b ${ARBCONFIG} $encryption_option
+  "$uboot_encrypt_signed" -p ${INPUTDIR} -r ${RSAKEYDIR} -a ${AESKEYDIR} -o ${OUTPUTDIR} -h ${hash_ver} -s ${tool_type} -b ${ARBCONFIG} $encryption_option $bl40_option
 fi
 
 if [ -z $encryption_option ]; then

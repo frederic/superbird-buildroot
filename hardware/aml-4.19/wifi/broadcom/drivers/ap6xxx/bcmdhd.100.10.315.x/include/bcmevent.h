@@ -3,7 +3,7 @@
  *
  * Dependencies: bcmeth.h
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -26,7 +26,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmevent.h 768756 2018-06-21 05:44:28Z $
+ * $Id: bcmevent.h 822151 2019-05-28 18:37:23Z $
  *
  */
 
@@ -276,27 +276,33 @@ typedef union bcm_event_msg_u {
 #define WLC_E_INVALID_IE		162	/* Received invalid IE */
 #define WLC_E_MODE_SWITCH		163	/* Mode switch event */
 #define WLC_E_PKT_FILTER		164	/* Packet filter event */
-#define WLC_E_DMA_TXFLUSH_COMPLETE		165	/* TxFlush done before changing
-											* tx/rxchain
-											*/
+#define WLC_E_DMA_TXFLUSH_COMPLETE	165	/* TxFlush done before changing tx/rxchain */
 #define WLC_E_FBT			166	/* FBT event */
-#define WLC_E_PFN_SCAN_BACKOFF	167	/* PFN SCAN Backoff event */
+#define WLC_E_PFN_SCAN_BACKOFF		167	/* PFN SCAN Backoff event */
 #define WLC_E_PFN_BSSID_SCAN_BACKOFF	168	/* PFN BSSID SCAN BAckoff event */
 #define WLC_E_AGGR_EVENT		169	/* Aggregated event */
 #define WLC_E_TVPM_MITIGATION		171	/* Change in mitigation applied by TVPM */
-#define WLC_E_SCAN_START         172  /* Deprecated */
-#define WLC_E_SCAN                172 /* Scan event */
-#define WLC_E_MBO                173	/* MBO event */
-#define WLC_E_PHY_CAL		174	/* Phy calibration start indication to host */
-#define WLC_E_RPSNOA		175	/* Radio power save start/end indication to host */
-#define WLC_E_ADPS		176	/* ADPS event */
+#define WLC_E_SCAN_START		172	/* Deprecated */
+#define WLC_E_SCAN			172	/* Scan event */
+#define WLC_E_MBO			173	/* MBO event */
+#define WLC_E_PHY_CAL			174	/* Phy calibration start indication to host */
+#define WLC_E_RPSNOA			175	/* Radio power save start/end indication to host */
+#define WLC_E_ADPS			176	/* ADPS event */
 #define WLC_E_SLOTTED_BSS_PEER_OP	177	/* Per peer SCB delete */
-#define WLC_E_HWA                178	/* HWA events */
-#define WLC_E_GTK_KEYROT_NO_CHANSW      179     /* Avoid Chanswitch while GTK key rotation */
+#define WLC_E_HWA			178	/* HWA events */
+#define WLC_E_GTK_KEYROT_NO_CHANSW	179	/* Avoid Chanswitch while GTK key rotation */
 #define WLC_E_ONBODY_STATUS_CHANGE	180	/* Indication of onbody status change */
-#define WLC_E_LAST			181	/* highest val + 1 for range checking */
-#if (WLC_E_LAST > 181)
-#error "WLC_E_LAST: Invalid value for last event; must be <= 181."
+#define WLC_E_BCNRECV_ABORTED		181	/* Fake AP bcnrecv aborted roam event */
+#define WLC_E_PMK_INFO			182	/* PMK,PMKID information event */
+#define WLC_E_BSSTRANS			183	/* BSS Transition request / Response */
+#define WLC_E_WA_LQM			184	/* link quality monitoring */
+#define WLC_E_ACTION_FRAME_OFF_CHAN_DWELL_COMPLETE  185 /* action frame off channel
+						 *  dwell time complete
+						 */
+#define WLC_E_WSEC			186	/* wsec keymgmt event */
+#define WLC_E_LAST			187	/* highest val + 1 for range checking */
+#if (WLC_E_LAST > 187)
+#error "WLC_E_LAST: Invalid value for last event; must be <= 187."
 #endif /* WLC_E_LAST */
 
 /* define an API for getting the string name of an event */
@@ -335,6 +341,8 @@ void wl_event_to_network_order(wl_event_msg_t * evt);
 #define WLC_E_STATUS_SLOTTED_PEER_ADD	17	/* Slotted scb for peer addition status */
 #define WLC_E_STATUS_SLOTTED_PEER_DEL	18	/* Slotted scb for peer deletion status */
 #define WLC_E_STATUS_RXBCN		19	/* Rx Beacon event for FAKEAP feature	*/
+#define WLC_E_STATUS_RXBCN_ABORT	20	/* Rx Beacon abort event for FAKEAP feature */
+#define WLC_E_STATUS_LOWPOWER_ON_LOWSPAN	21	/* LOWPOWER scan request during LOWSPAN */
 #define WLC_E_STATUS_INVALID 0xff  /* Invalid status code to init variables. */
 
 /* 4-way handshake event type */
@@ -364,8 +372,6 @@ void wl_event_to_network_order(wl_event_msg_t * evt);
 #define WLC_E_REASON_INFRA_ROAM		2
 #define WLC_E_REASON_INFRA_DISASSOC	3
 #define WLC_E_REASON_NO_MODE_CHANGE_NEEDED	4
-#define WLC_E_REASON_AWDL_ENABLE	5
-#define WLC_E_REASON_AWDL_DISABLE	6
 
 /* WLC_E_SDB_TRANSITION event data */
 #define WL_MAX_BSSCFG     4
@@ -387,7 +393,6 @@ typedef struct wl_event_sdb_trans {
 
 /* reason codes for WLC_E_GTK_KEYROT_NO_CHANSW event */
 #define WLC_E_GTKKEYROT_SCANDELAY       0       /* Delay scan while gtk in progress */
-#define WLC_E_GTKKEYROT_SKIPCHANSW_AWDL 1       /* Avoid chansw by awdl while gtk in progress */
 #define WLC_E_GTKKEYROT_SKIPCHANSW_P2P  2       /* Avoid chansw by p2p while gtk in progress */
 
 /* roam reason codes */
@@ -408,9 +413,12 @@ typedef struct wl_event_sdb_trans {
 #define WLC_E_REASON_BSSTRANS_REQ	11	/* roamed due to BSS Transition request by AP */
 #define WLC_E_REASON_LOW_RSSI_CU	12	/* roamed due to low RSSI and Channel Usage */
 #define WLC_E_REASON_RADAR_DETECTED	13	/* roamed due to radar detection by STA */
-#define WLC_E_REASON_CSA	        14	/* roamed due to CSA from AP */
-#define WLC_E_REASON_ESTM_LOW      15  /* roamed due to ESTM low tput */
-#define WLC_E_REASON_LAST		16	/* NOTE: increment this as you add reasons above */
+#define WLC_E_REASON_CSA		14	/* roamed due to CSA from AP */
+#define WLC_E_REASON_ESTM_LOW		15	/* roamed due to ESTM low tput */
+#define WLC_E_REASON_SILENT_ROAM	16	/* roamed due to Silent roam */
+#define WLC_E_REASON_INACTIVITY		17	/* full roam scan due to inactivity */
+#define WLC_E_REASON_ROAM_SCAN_TIMEOUT		18	/* roam scan timer timeout */
+#define WLC_E_REASON_LAST		19	/* NOTE: increment this as you add reasons above */
 
 /* prune reason codes */
 #define WLC_E_PRUNE_ENCR_MISMATCH	1	/* encryption mismatch */
@@ -439,6 +447,8 @@ typedef struct wl_event_sdb_trans {
 #define WLC_E_PRUNE_NO_DIAG_SUPPORT	19	/* prune due to diagnostic mode not supported */
 #endif /* BCMCCX */
 #define WLC_E_PRUNE_AUTH_RESP_MAC	20	/* suppress auth resp by MAC filter */
+#define WLC_E_PRUNE_ASSOC_RETRY_DELAY	21	/* MBO assoc retry delay */
+#define WLC_E_PRUNE_RSSI_ASSOC_REJ	22	/* OCE RSSI-based assoc rejection */
 
 /* WPA failure reason codes carried in the WLC_E_PSK_SUP event */
 #define WLC_E_SUP_OTHER			0	/* Other reason */
@@ -462,6 +472,55 @@ typedef struct wl_event_sdb_trans {
 #define WLC_E_SUP_GTK_UPDATE_FAIL	18  /* GTK update failure */
 #define WLC_E_SUP_TK_UPDATE_FAIL	19  /* TK update failure */
 #define WLC_E_SUP_KEY_INSTALL_FAIL	20  /* Buffered key install failure */
+#define WLC_E_SUP_PTK_UPDATE		21	/* PTK update */
+#define WLC_E_SUP_MSG1_PMKID_MISMATCH	22	/* MSG1 PMKID not matched to PMKSA cache list */
+
+/* event msg for WLC_E_SUP_PTK_UPDATE */
+typedef struct wlc_sup_ptk_update {
+	uint16 version;		/* 0x0001 */
+	uint16 length;		/* length of data that follows */
+	uint32 tsf_low;		/* tsf at which ptk updated by internal supplicant */
+	uint32 tsf_high;
+	uint8 key_id;		/* always 0 for PTK update */
+	uint8 tid;		/* tid for the PN below - PTK refresh is per key */
+	uint16 pn_low;
+	uint32 pn_high;		/* local highest PN of any tid of the key when M4 was sent */
+} wlc_sup_ptk_update_t;
+
+/* sub event of WLC_E_WSEC */
+typedef enum {
+	WLC_WSEC_EVENT_PTK_PN_SYNC_ERROR = 0x01
+} wl_wsec_event_type_t;
+
+/* sub event msg - WLC_WSEC_EVENT_PTK_PN_SYNC_ERROR */
+struct wlc_wsec_ptk_pn_sync_error_v1 {
+	uint32 tsf_low;		/* tsf at which PN sync error happened */
+	uint32 tsf_high;
+	uint8 key_id;		/* always 0 for PTK update */
+	uint8 tid;		/* tid for the PN below - PTK refresh is per key */
+	uint16 PAD1;
+	uint16 rx_seqn;		/* d11 seq number */
+	uint16 pn_low;
+	uint32 pn_high;		/* local PN window start for the tid */
+	uint16 key_idx;		/* key idx in the keymgmt */
+	uint16 rx_pn_low;
+	uint32 rx_pn_high;	/* Rx PN window start for the tid */
+	uint32 span_time;	/* time elapsed since replay */
+	uint32 span_pkts;	/* pkt count since replay */
+};
+
+typedef struct wlc_wsec_ptk_pn_sync_error_v1 wlc_wsec_ptk_pn_sync_error_t;
+
+/* WLC_E_WSEC event msg */
+typedef struct wlc_wsec_event {
+	uint16 version;		/* 0x0001 */
+	uint16 length;		/* length of data that follows */
+	uint16 type;		/* wsec_event_type_t */
+	uint16 PAD1;
+	union {
+		wlc_wsec_ptk_pn_sync_error_t pn_sync_err;
+	} data;
+} wlc_wsec_event_t;
 
 /* Ucode reason codes carried in the WLC_E_MACDBG event */
 #define WLC_E_MACDBG_LIST_PSM		0	/* Dump list update for PSM registers */
@@ -532,8 +591,11 @@ typedef struct wl_event_data_natoe {
 #define WLC_E_IF_ROLE_WDS		2	/* WDS link */
 #define WLC_E_IF_ROLE_P2P_GO		3	/* P2P Group Owner */
 #define WLC_E_IF_ROLE_P2P_CLIENT	4	/* P2P Client */
-#define WLC_E_IF_ROLE_IBSS              8       /* IBSS */
-#define WLC_E_IF_ROLE_NAN              9       /* NAN */
+#ifdef WLMESH_CFG80211
+#define WLC_E_IF_ROLE_MESH		5	/* MESH */
+#endif /* WLMESH_CFG80211 */
+#define WLC_E_IF_ROLE_IBSS		8	/* IBSS */
+#define WLC_E_IF_ROLE_NAN		9	/* NAN */
 
 /* WLC_E_RSSI event data */
 typedef struct wl_event_data_rssi {
@@ -541,6 +603,22 @@ typedef struct wl_event_data_rssi {
 	int32 snr;
 	int32 noise;
 } wl_event_data_rssi_t;
+
+#define WL_EVENT_WA_LQM_VER	0	/* initial version */
+
+#define WL_EVENT_WA_LQM_BASIC	0	/* event sub-types */
+typedef struct {			/* payload of subevent in xtlv */
+	int32 rssi;
+	int32 snr;
+	uint32 tx_rate;
+	uint32 rx_rate;
+} wl_event_wa_lqm_basic_t;
+
+typedef struct wl_event_wa_lqm {
+	uint16 ver;			/* version */
+	uint16 len;			/* total length structure */
+	uint8 subevent[];		/* sub-event data in bcm_xtlv_t format */
+} wl_event_wa_lqm_t;
 
 /* WLC_E_IF flag */
 #define WLC_E_IF_FLAGS_BSSCFG_NOIF	0x1	/* no host I/F creation needed */
@@ -550,6 +628,7 @@ typedef struct wl_event_data_rssi {
 #define WLC_E_LINK_DISASSOC     2   /* Link down because of disassoc */
 #define WLC_E_LINK_ASSOC_REC    3   /* Link down because assoc recreate failed */
 #define WLC_E_LINK_BSSCFG_DIS   4   /* Link down due to bsscfg down */
+#define WLC_E_LINK_ASSOC_FAIL   5   /* Link down because assoc to new AP during roaming failed */
 
 /* WLC_E_NDIS_LINK event data */
 typedef BWL_PRE_PACKED_STRUCT struct ndis_link_parms {
@@ -794,6 +873,7 @@ typedef enum wl_nan_events {
 	WL_NAN_EVENT_SLOT_END			= 43,	/* SLOT_END event */
 	WL_NAN_EVENT_HOST_ASSIST_REQ		= 44,	/* Requesting host assist */
 	WL_NAN_EVENT_RX_MGMT_FRM		= 45,	/* NAN management frame received */
+	WL_NAN_EVENT_DISC_CACHE_TIMEOUT		= 46,	/* Disc cache timeout */
 
 	WL_NAN_EVENT_INVALID				/* delimiter for max value */
 } nan_app_events_e;
@@ -988,11 +1068,6 @@ typedef enum {
 	CHANSW_NAN = 18,	/* channel switch due to NAN */
 	CHANSW_NAN_DISC = 19,	/* channel switch due to NAN Disc */
 	CHANSW_NAN_SCHED = 20,	/* channel switch due to NAN Sched */
-	CHANSW_AWDL_AW = 21,	/* channel switch due to AWDL aw */
-	CHANSW_AWDL_SYNC = 22,	/* channel switch due to AWDL sync */
-	CHANSW_AWDL_CAL = 23,	/* channel switch due to AWDL Cal */
-	CHANSW_AWDL_PSF = 24,	/* channel switch due to AWDL PSF */
-	CHANSW_AWDL_OOB_AF = 25, /* channel switch due to AWDL OOB action frame */
 	CHANSW_TDLS = 26,	/* channel switch due to TDLS */
 	CHANSW_PROXD = 27,	/* channel switch due to PROXD */
 	CHANSW_SLOTTED_BSS = 28, /* channel switch due to slotted bss */
@@ -1111,8 +1186,9 @@ typedef struct {
 
 typedef enum wl_mbo_event_type {
 	WL_MBO_E_CELLULAR_NW_SWITCH = 1,
+	WL_MBO_E_BTM_RCVD = 2,
 	/* ADD before this */
-	WL_MBO_E_LAST = 2,  /* highest val + 1 for range checking */
+	WL_MBO_E_LAST = 3  /* highest val + 1 for range checking */
 } wl_mbo_event_type_t;
 
 /* WLC_E_MBO event structure version */
@@ -1142,6 +1218,31 @@ struct wl_event_mbo_cell_nw_switch {
 	* This is zero if not known or value is overflowing.
 	*/
 	uint32 assoc_time_remain;
+};
+
+/* WLC_E_MBO_BTM_RCVD event structure version */
+#define WL_BTM_EVENT_DATA_VER_1       1
+/* Specific btm event type data */
+struct wl_btm_event_type_data {
+	uint16	version;
+	uint16	len;
+	uint8	transition_reason;	/* transition reason code */
+	uint8	pad[3];			/* pad */
+};
+
+/* WLC_E_PRUNE event structure version */
+#define WL_BSSID_PRUNE_EVT_VER_1	1
+/* MBO-OCE params */
+struct wl_bssid_prune_evt_info {
+	uint16 version;
+	uint16 len;
+	uint8	SSID[32];
+	uint32	time_remaining;		/* Time remaining */
+	struct ether_addr BSSID;
+	uint8	SSID_len;
+	uint8	reason;			/* Reason code */
+	int8	rssi_threshold;		/* RSSI threshold */
+	uint8	pad[3];			/* pad */
 };
 
 /* WLC_E_HWA Event structure */
@@ -1185,4 +1286,7 @@ typedef struct wl_event_adps {
 } wl_event_adps_v1_t;
 
 typedef wl_event_adps_v1_t wl_event_adps_t;
+
+#define WLC_USER_E_KEY_UPDATE	1 /* Key add/remove */
+
 #endif /* _BCMEVENT_H_ */

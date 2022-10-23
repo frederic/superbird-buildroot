@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-APACHE_VERSION = 2.4.38
+APACHE_VERSION = 2.4.41
 APACHE_SOURCE = httpd-$(APACHE_VERSION).tar.bz2
 APACHE_SITE = http://archive.apache.org/dist/httpd
 APACHE_LICENSE = Apache-2.0
@@ -15,6 +15,14 @@ APACHE_INSTALL_STAGING = YES
 # so we need to autoreconf:
 APACHE_AUTORECONF = YES
 APACHE_DEPENDENCIES = apr apr-util pcre
+
+ifeq ($(BR2_PER_PACKAGE_DIRECTORIES),y)
+define APACHE_FIXUP_APR_LIBTOOL
+	$(SED) "s@$(PER_PACKAGE_DIR)/[^/]\+/@$(PER_PACKAGE_DIR)/apache/@g" \
+		$(STAGING_DIR)/usr/build-1/libtool
+endef
+APACHE_POST_CONFIGURE_HOOKS += APACHE_FIXUP_APR_LIBTOOL
+endif
 
 APACHE_CONF_ENV= \
 	ap_cv_void_ptr_lt_long=no \
@@ -109,9 +117,6 @@ endef
 define APACHE_INSTALL_INIT_SYSTEMD
 	$(INSTALL) -D -m 644 package/apache/apache.service \
 		$(TARGET_DIR)/usr/lib/systemd/system/apache.service
-	mkdir -p $(TARGET_DIR)/etc/systemd/system/multi-user.target.wants
-	ln -sf ../../../../usr/lib/systemd/system/apache.service \
-		$(TARGET_DIR)/etc/systemd/system/multi-user.target.wants/apache.service
 endef
 
 $(eval $(autotools-package))

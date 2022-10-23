@@ -897,6 +897,7 @@ typedef struct {
     Uint32 secBwWrite;
     Uint32 procBwRead;
     Uint32 procBwWrite;
+    Uint32 bwbBwWrite;
 } VPUBWData;
 
 

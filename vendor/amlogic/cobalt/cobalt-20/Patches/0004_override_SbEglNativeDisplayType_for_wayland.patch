@@ -1,0 +1,35 @@
+From 463ce310dbdf68c45db3a9a9f83282d39e855073 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Wed, 1 Apr 2020 14:56:54 +0800
+Subject: [PATCH] override SbEglNativeDisplayType for wayland.
+
+---
+ src/starboard/egl.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/starboard/egl.h b/src/starboard/egl.h
+index 7503691..07bc94a 100644
+--- a/src/starboard/egl.h
++++ b/src/starboard/egl.h
+@@ -43,14 +43,14 @@ extern "C" {
+ // The following type definitions were adapted from the types declared in
+ // https://www.khronos.org/registry/EGL/api/EGL/eglplatform.h.
+ typedef int32_t  SbEglInt32;
+-typedef intptr_t SbEglNativeDisplayType;
+-typedef intptr_t SbEglNativePixmapType;
+-typedef intptr_t SbEglNativeWindowType;
++typedef struct wl_display* SbEglNativeDisplayType;
++typedef void* SbEglNativePixmapType;
++typedef struct wl_egl_window* SbEglNativeWindowType;
+ 
+ // The following type definitions were adapted from the types declared in
+ // https://www.khronos.org/registry/EGL/api/EGL/egl.h.
+ typedef void   (*SbEglCastsToProperFunctionPointerType)(void);
+-typedef int64_t  SbEglAttrib;
++typedef intptr_t SbEglAttrib;
+ typedef uint32_t SbEglBoolean;
+ typedef void*    SbEglClientBuffer;
+ typedef void*    SbEglConfig;
+-- 
+2.7.4
+

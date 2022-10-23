@@ -143,7 +143,7 @@ class DrmSystemWidevine : public SbDrmSystemPrivate,
                           ::widevine::Cdm::Status result) override;
   // Called when the CDM requires a new device certificate.
   void onDirectIndividualizationRequest(const std::string& wvcdm_session_id,
-                                        const std::string& request) override;
+                                        const std::string& request) ;
 
   void SetTicket(const std::string& sb_drm_session_id, int ticket);
   int GetAndResetTicket(const std::string& sb_drm_session_id);
@@ -203,7 +203,8 @@ class DrmSystemWidevine : public SbDrmSystemPrivate,
   std::vector<GenerateSessionUpdateRequestData>
       pending_generate_session_update_requests_;
   std::string first_wvcdm_session_id_;
-
+  std::string wvcdm_session_id_clearstream;
+  bool bProvision_ = true;
   scoped_ptr<::widevine::Cdm> cdm_;
 #if SB_API_VERSION >= 10
   bool is_server_certificate_set_ = false;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2019 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -47,6 +47,7 @@
 #include "vsi_nn_post.h"
 #include "vsi_nn_rnn.h"
 #include "vsi_nn_test.h"
+#include "vsi_nn_pre_post_process.h"
 #include "utils/vsi_nn_code_generator.h"
 #include "utils/vsi_nn_util.h"
 #include "utils/vsi_nn_math.h"

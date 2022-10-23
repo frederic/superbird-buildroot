@@ -30,6 +30,11 @@ struct rdma_op_s {
 #define RDMA_TRIGGER_DEBUG2 0x102
 #define RDMA_AUTO_START_MASK 0x80000
 
+/* rdma write: bit[20] = 0
+ * rdma read:  bit[20] = 1
+ */
+#define RDMA_READ_MASK 0x100000
+
 enum rdma_ver_e {
 	RDMA_VER_1,
 	RDMA_VER_2,
@@ -44,6 +49,12 @@ struct rdma_device_data_s {
 	enum cpu_ver_e cpu_type;
 	enum rdma_ver_e rdma_ver;
 	u32 trigger_mask_len;
+};
+
+struct reg_handle {
+	u32 offset;   /* read-only, offset in register table */
+	u32 reg_addr; /* VCBus register address offset */
+	struct list_head list;
 };
 
 u32 is_meson_g12b_revb(void);
@@ -69,4 +80,13 @@ int rdma_write_reg(int handle, u32 adr, u32 val);
 int rdma_write_reg_bits(int handle, u32 adr, u32 val, u32 start, u32 len);
 
 int rdma_clear(int handle);
+
+s32 rdma_add_read_reg(int handle, struct reg_handle *reg_hnd);
+
+s32 rdma_remove_read_reg(int handle, struct reg_handle *reg_hnd, u32 count);
+
+u32 *rdma_get_read_back_addr(int handle, struct reg_handle *reg_hnd);
+
+struct reg_handle *rdma_query_read_handle(int handle, u32 index);
+
 #endif

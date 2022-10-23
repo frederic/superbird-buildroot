@@ -49,7 +49,7 @@
 
 #define DRV_NAME "VAD"
 
-#define DMA_BUFFER_BYTES_MAX (2 * 1024 * 1024)
+#define DMA_BUFFER_BYTES_MAX (96 * 1024)
 
 
 #define VAD_READ_FRAME_COUNT    (1024 / 2)
@@ -80,6 +80,7 @@ struct vad {
 	unsigned int start_last;
 	unsigned int end_last;
 	unsigned int addr;
+	unsigned int threshold;
 	int switch_buffer;
 
 	/* vad flag interrupt */
@@ -306,7 +307,7 @@ static int vad_engine_check(struct vad *p_vad)
 
 	if (curr_addr < start || curr_addr > end ||
 		last_addr < start || last_addr > end) {
-		pr_info("%s line:%d, start:%x,end:%x, addr:%x, curr_addr=%x\n",
+		pr_debug("%s line:%d, start:%x,end:%x, addr:%x, curr_addr=%x\n",
 			__func__, __LINE__,
 			start,
 			end,
@@ -323,8 +324,7 @@ static int vad_engine_check(struct vad *p_vad)
 
 	read_bytes = frame_count * chnum * bytes_per_sample;
 	if (bytes < read_bytes) {
-		pr_warn("%s line:%d, %d bytes, need more data\n",
-			__func__, __LINE__, bytes);
+		pr_debug("%s: need more data: %d\n", __func__, bytes);
 		return 0;
 	}
 
@@ -581,8 +581,9 @@ void vad_update_buffer(int isvad)
 
 		p_vad->start_last = tddr->start_addr;
 		p_vad->end_last   = tddr->end_addr;
+		p_vad->threshold  = tddr->threshold;
 
-		rd_th = 0x800;
+		rd_th = tddr->fifo_depth * 3 / 4;
 
 		pr_debug("Switch to VAD buffer\n");
 		pr_debug("\t ASAL start:%x, end:%x, bytes:%d\n",
@@ -599,12 +600,12 @@ void vad_update_buffer(int isvad)
 		pr_debug("Switch to ALSA buffer\n");
 		start = p_vad->start_last;
 		end   = p_vad->end_last;
-		rd_th = 0x40;
+		rd_th = p_vad->threshold;
 		vad_set_trunk_data_readable(true);
 	}
 	aml_toddr_set_buf(p_vad->tddr, start, end);
 	aml_toddr_force_finish(p_vad->tddr);
-	aml_toddr_update_fifos_rd_th(p_vad->tddr, rd_th);
+	aml_toddr_set_fifos(p_vad->tddr, rd_th);
 	p_vad->addr = 0;
 }
 

@@ -47,8 +47,6 @@ MODULE_PARM_DESC(gpu_dbg_level, "gpu debug level");
 static mali_plat_info_t* pmali_plat = NULL;
 //static u32 mali_extr_backup = 0;
 //static u32 mali_extr_sample_backup = 0;
-struct timeval start;
-struct timeval end;
 int mali_pm_statue = 0;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 16))
@@ -107,7 +105,6 @@ static int critical_clock_set(size_t param)
 	struct clk *clk_mali_x_parent = NULL;
 	struct clk *clk_mali_x_old = NULL;
 	struct clk *clk_mali   = pmali_plat->clk_mali;
-	unsigned long time_use=0;
 
 	clk_mali_x_old  = clk_get_parent(clk_mali);
 
@@ -142,18 +139,13 @@ static int critical_clock_set(size_t param)
 	ret = clk_prepare_enable(clk_mali_x);
 #endif
 	GPU_CLK_DBG("new %s:enable(%d)\n", clk_mali_x->name,  clk_mali_x->enable_count);
-	do_gettimeofday(&start);
 	udelay(1);// delay 10ns
-	do_gettimeofday(&end);
 	ret = clk_set_parent(clk_mali, clk_mali_x);
 	GPU_CLK_DBG();
 
 #ifndef AML_CLK_LOCK_ERROR
 	clk_disable_unprepare(clk_mali_x_old);
 #endif
-	GPU_CLK_DBG("old %s:enable(%d)\n", clk_mali_x_old->name,  clk_mali_x_old->enable_count);
-	time_use = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
-	GPU_CLK_DBG("step 1, mali_mux use: %ld us\n", time_use);
 
 	return 0;
 }
@@ -394,6 +386,7 @@ int mali_clock_init_clk_tree(struct platform_device* pdev)
 	mali_dvfs_threshold_table *dvfs_tbl = &pmali_plat->dvfs_table[pmali_plat->def_clock];
 	struct clk *clk_mali = pmali_plat->clk_mali;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	if ((0 == strcmp(dvfs_tbl->clk_parent, "gp0_pll")) &&
 			!IS_ERR(dvfs_tbl->clkp_handle) &&
 			(0 != dvfs_tbl->clkp_freq)) {
@@ -402,6 +395,11 @@ int mali_clock_init_clk_tree(struct platform_device* pdev)
 	}
 	clk_prepare_enable(clk_mali);
 	clk_set_rate(clk_mali, dvfs_tbl->clk_freq);
+#else
+	pr_info("kernel version >= 5.4\n");
+	clk_set_rate(clk_mali, dvfs_tbl->clk_freq);
+	clk_prepare_enable(clk_mali);
+#endif
 
 	return 0;
 }
@@ -428,20 +426,14 @@ static int critical_clock_set(size_t param)
 	mali_dvfs_threshold_table *dvfs_tbl = &pmali_plat->dvfs_table[idx];
 
 	struct clk *clk_mali   = pmali_plat->clk_mali;
-	unsigned long time_use=0;
-
 
 	GPU_CLK_DBG();
-	do_gettimeofday(&start);
 	ret = clk_set_rate(clk_mali, dvfs_tbl->clk_freq);
-	do_gettimeofday(&end);
 	GPU_CLK_DBG();
 
 #ifndef AML_CLK_LOCK_ERROR
 	clk_disable_unprepare(clk_mali_x_old);
 #endif
-	time_use = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
-	GPU_CLK_DBG("step 1, mali_mux use: %ld us\n", time_use);
 
 	return 0;
 }
@@ -578,6 +570,7 @@ int mali_dt_info(struct platform_device *pdev, struct mali_plat_info_t *mpdata)
 				&dvfs_tbl->clk_parent);
 		if (ret) {
 			dev_notice(&pdev->dev, "read clk_parent failed\n");
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		} else if (0 == strcmp(dvfs_tbl->clk_parent, "gp0_pll")) {
 			dvfs_tbl->clkp_handle = devm_clk_get(&pdev->dev, dvfs_tbl->clk_parent);
 			if (IS_ERR(dvfs_tbl->clkp_handle)) {
@@ -587,6 +580,7 @@ int mali_dt_info(struct platform_device *pdev, struct mali_plat_info_t *mpdata)
 			if (ret) {
 				dev_notice(&pdev->dev, "read clk_parent freq failed\n");
 			}
+#endif
 		}
 
 		ret = of_property_read_u32(gpu_clk_dn,"voltage", &dvfs_tbl->voltage);
@@ -658,10 +652,6 @@ int mali_dt_info(struct platform_device *pdev, struct mali_plat_info_t *mpdata)
 	_dev_info(&pdev->dev, "clock dvfs table size is %d\n", mpdata->dvfs_table_size);
 
 	mpdata->clk_mali = devm_clk_get(&pdev->dev, "gpu_mux");
-#if 0
-	mpdata->clk_mali_0 = devm_clk_get(&pdev->dev, "clk_mali_0");
-	mpdata->clk_mali_1 = devm_clk_get(&pdev->dev, "clk_mali_1");
-#endif
 	if (IS_ERR(mpdata->clk_mali)) {
 		dev_err(&pdev->dev, "failed to get clock pointer\n");
 		return -EFAULT;

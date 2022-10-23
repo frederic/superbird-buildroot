@@ -351,9 +351,55 @@ static int do_lcd_tcon(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		} else {
 			printf("no lcd_tcon_reg_read\n");
 		}
+	} else if (strcmp(argv[1], "vac") == 0) {
+		if (lcd_drv->lcd_tcon_vac_print)
+			lcd_drv->lcd_tcon_vac_print();
+		else
+			printf("no lcd tcon_vac_print\n");
+	} else if (strcmp(argv[1], "demura") == 0) {
+		if (lcd_drv->lcd_tcon_demura_print)
+			lcd_drv->lcd_tcon_demura_print();
+		else
+			printf("no lcd tcon_demura_print\n");
+	} else if (strcmp(argv[1], "acc") == 0) {
+		if (lcd_drv->lcd_tcon_acc_print)
+			lcd_drv->lcd_tcon_acc_print();
+		else
+			printf("no lcd tcon_acc_print\n");
 	} else {
 		ret = -1;
 	}
+	return ret;
+}
+
+static int do_lcd_vbyone(cmd_tbl_t *cmdtp, int flag, int argc,
+			 char * const argv[])
+{
+	struct aml_lcd_drv_s *lcd_drv;
+	int ret = 0;
+
+	if (argc == 1)
+		return -1;
+
+	lcd_drv = aml_lcd_get_driver();
+	if (lcd_drv == NULL) {
+		printf("no lcd driver\n");
+		return 0;
+	}
+	if (strcmp(argv[1], "rst") == 0) {
+		if (lcd_drv->lcd_vbyone_rst)
+			lcd_drv->lcd_vbyone_rst();
+		else
+			printf("no lcd vbyone rst\n");
+	} else if (strcmp(argv[1], "cdr") == 0) {
+		if (lcd_drv->lcd_vbyone_cdr)
+			lcd_drv->lcd_vbyone_cdr();
+		else
+			printf("no lcd vbyone cdr\n");
+	} else {
+		ret = -1;
+	}
+
 	return ret;
 }
 
@@ -418,7 +464,7 @@ static int do_lcd_prbs(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 static int do_lcd_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct aml_lcd_drv_s *lcd_drv;
-	int tmp;
+	int tmp = 0;
 
 	if (argc == 1) {
 		return -1;
@@ -453,10 +499,20 @@ static int do_lcd_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		else
 			printf("no lcd unifykey_dump\n");
 	} else if (strcmp(argv[1], "dump") == 0) {
-		if (lcd_drv->unifykey_dump)
-			lcd_drv->unifykey_dump();
-		else
-			printf("no lcd unifykey_dump\n");
+		if (argc == 3) {
+			if (strcmp(argv[2], "tcon") == 0)
+				tmp = (1 << 1);
+			if (lcd_drv->unifykey_dump)
+				lcd_drv->unifykey_dump(tmp);
+			else
+				printf("no lcd unifykey_dump\n");
+		} else {
+			tmp = (1 << 0);
+			if (lcd_drv->unifykey_dump)
+				lcd_drv->unifykey_dump(tmp);
+			else
+				printf("no lcd unifykey_dump\n");
+		}
 	}
 	return 0;
 }
@@ -524,6 +580,7 @@ static cmd_tbl_t cmd_lcd_sub[] = {
 	U_BOOT_CMD_MKENT(clk , 2, 0, do_lcd_clk, "", ""),
 	U_BOOT_CMD_MKENT(info, 2, 0, do_lcd_info, "", ""),
 	U_BOOT_CMD_MKENT(tcon, 3, 0, do_lcd_tcon, "", ""),
+	U_BOOT_CMD_MKENT(vbyone, 3, 0, do_lcd_vbyone, "", ""),
 	U_BOOT_CMD_MKENT(reg,  2, 0, do_lcd_reg, "", ""),
 	U_BOOT_CMD_MKENT(test, 3, 0, do_lcd_test, "", ""),
 	U_BOOT_CMD_MKENT(prbs, 2, 0, do_lcd_prbs, "", ""),
@@ -562,6 +619,7 @@ U_BOOT_CMD(
 	"lcd clk          - show lcd pll & clk parameters\n"
 	"lcd info         - show lcd parameters\n"
 	"lcd tcon         - show lcd tcon debug\n"
+	"lcd vbyone       - show lcd vbyone debug\n"
 	"lcd reg          - dump lcd registers\n"
 	"lcd test         - show lcd bist pattern\n"
 	"lcd key          - show lcd unifykey test\n"

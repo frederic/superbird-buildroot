@@ -452,7 +452,7 @@ static ssize_t dump_frame_write(
         }
     } else if (!strcmp(parm[0], "fr")) {
         if (parm[1] != NULL)
-            write_to_file(parm[1], isp_kaddr + buff_offset, buff_size);
+            write_to_file(parm[1], phys_to_virt(isp_paddr) + buff_offset, buff_size);
     } else
         pr_info("unsupprt cmd!\n");
 
@@ -678,8 +678,6 @@ uint32_t isp_power_on(void)
     //write_reg(0x2f440603, ANACTRL_CSI_PHY_CNTL0);		//HHI_CSI_PHY_CNTL0
     //write_reg(0x003f2222, ANACTRL_CSI_PHY_CTRL1);		//HHI_CSI_PHY_CNTL1
 
-    write_reg(0xdfff,0xfe000608);       // set GPIOA_13 output
-    write_reg(0xdfff,0xfe000604);       // pull down GPIOA_13
     return 0;
 }
 

@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a6432_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "c1_ae400.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc1_ae400/initramfs/ramfslist-32"
+

@@ -69,6 +69,10 @@ libdeps += $(ta-dev-kit-dir)/lib/libutee.a
 libdeps += $(ta-dev-kit-dir)/lib/libzlib.a
 libdeps += $(ta-dev-kit-dir)/lib/libpng.a
 libdeps += $(ta-dev-kit-dir)/lib/libnvwmk.a
+ifeq ($(CFG_TA_MBEDTLS),y)
+libnames += mbedtls
+libdeps += $(ta-dev-kit-dir)/lib/libmbedtls.a
+endif
 
 include $(ta-dev-kit-dir)/mk/cleandirs.mk
 

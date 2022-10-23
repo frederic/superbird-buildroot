@@ -69,6 +69,7 @@ typedef struct event_handler_list {
 	uint32 etype;
 	EXT_EVENT_HANDLER cb_func;
 	void *cb_argu;
+	wl_event_prio_t prio;
 } event_handler_list_t;
 
 typedef struct event_handler_head {
@@ -199,6 +200,7 @@ wl_ext_event_handler(struct work_struct *work_data)
 	struct net_device *dev = NULL;
 	struct event_handler_list *evt_node;
 	dhd_pub_t *dhd;
+	unsigned long flags = 0;
 
 	BCM_SET_CONTAINER_OF(event_params, work_data, struct wl_event_params, event_work);
 	DHD_EVENT_WAKE_LOCK(event_params->pub);
@@ -209,7 +211,7 @@ wl_ext_event_handler(struct work_struct *work_data)
 		}
 		dev = event_params->dev[e->emsg.ifidx];
 		if (!dev) {
-			EVENT_ERROR("wlan", "ifidx=%d dev not ready\n", e->emsg.ifidx);
+			EVENT_DBG("wlan", "ifidx=%d dev not ready\n", e->emsg.ifidx);
 			goto fail;
 		}
 		dhd = dhd_get_pub(dev);
@@ -217,10 +219,13 @@ wl_ext_event_handler(struct work_struct *work_data)
 			EVENT_TRACE(dev->name, "Unknown Event (%d): ignoring\n", e->etype);
 			goto fail;
 		}
-		if (dhd->busstate == DHD_BUS_DOWN) {
+		DHD_GENERAL_LOCK(dhd, flags);
+		if (DHD_BUS_CHECK_DOWN_OR_DOWN_IN_PROGRESS(dhd)) {
 			EVENT_ERROR(dev->name, "BUS is DOWN.\n");
+			DHD_GENERAL_UNLOCK(dhd, flags);
 			goto fail;
 		}
+		DHD_GENERAL_UNLOCK(dhd, flags);
 		EVENT_DBG(dev->name, "event type (%d)\n", e->etype);
 		mutex_lock(&event_params->event_sync);
 		evt_node = event_params->evt_head.evt_head;
@@ -309,10 +314,10 @@ wl_ext_event_destroy_handler(struct wl_event_params *event_params)
 
 int
 wl_ext_event_register(struct net_device *dev, dhd_pub_t *dhd, uint32 event,
-	void *cb_func, void *data)
+	void *cb_func, void *data, wl_event_prio_t prio)
 {
 	struct wl_event_params *event_params = dhd->event_params;
-	struct event_handler_list *node, *leaf, **evt_head;
+	struct event_handler_list *node, *leaf, *node_prev, **evt_head;
 	int ret = 0;
 
 	if (event_params) {
@@ -339,11 +344,27 @@ wl_ext_event_register(struct net_device *dev, dhd_pub_t *dhd, uint32 event,
 		leaf->etype = event;
 		leaf->cb_func = cb_func;
 		leaf->cb_argu = data;
+		leaf->prio = prio;
 		if (*evt_head == NULL) {
 			*evt_head = leaf;
 		} else {
-			leaf->next = *evt_head;
-			*evt_head = leaf;
+			node = *evt_head;
+			node_prev = NULL;
+			for (;node;) {
+				if (node->prio <= prio) {
+					leaf->next = node;
+					if (node_prev)
+						node_prev->next = leaf;
+					else
+						*evt_head = leaf;
+					break;
+				} else if (node->next == NULL) {
+					node->next = leaf;
+					break;
+				}
+				node_prev = node;
+				node = node->next;
+			}
 		}
 		EVENT_TRACE(dev->name, "event %d registered\n", event);
 		mutex_unlock(&event_params->event_sync);
@@ -424,7 +445,7 @@ wl_ext_event_attach_netdev(struct net_device *net, int ifidx, uint8 bssidx)
 	struct wl_event_params *event_params = dhd->event_params;
 
 	EVENT_TRACE(net->name, "ifidx=%d, bssidx=%d\n", ifidx, bssidx);
-	if (event_params) {
+	if (event_params && ifidx < WL_MAX_IFS) {
 		event_params->dev[ifidx] = net;
 	}
 
@@ -438,7 +459,7 @@ wl_ext_event_dettach_netdev(struct net_device *net, int ifidx)
 	struct wl_event_params *event_params = dhd->event_params;
 
 	EVENT_TRACE(net->name, "ifidx=%d\n", ifidx);
-	if (event_params) {
+	if (event_params && ifidx < WL_MAX_IFS) {
 		event_params->dev[ifidx] = NULL;
 	}
 

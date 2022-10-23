@@ -15,7 +15,14 @@
 #include "starboard/shared/wayland/window_internal.h"
 
 #include "starboard/log.h"
-
+#ifndef AML_OSD_USE_DRM
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <asm/types.h>
+#include <linux/fb.h>
+#include <unistd.h>
+#endif
 namespace {
 
 const int kWindowWidth = 1920;
@@ -61,7 +68,23 @@ SbWindowPrivate::SbWindowPrivate(wl_compositor* compositor,
     width = options->size.width;
     height = options->size.height;
   }
-
+#ifndef AML_OSD_USE_DRM
+  int fh;
+  if ((fh = open("/dev/fb0", O_RDONLY)) > 0)
+  {
+    struct fb_var_screeninfo var;
+    if (ioctl(fh, FBIOGET_VSCREENINFO, &var)==0)
+    {
+      if ((var.xres == 1280)&& (var.yres==720))
+      {
+        width=var.xres;
+        height=var.yres;
+        SB_LOG(INFO) << "FB is 720P " << var.xres << var.yres ;
+      }
+    }
+    close(fh);
+  }
+#endif
   FILE * fp = fopen("/sys/class/video/device_resolution", "r");
   if (fp != NULL) {
       int display_width = width;

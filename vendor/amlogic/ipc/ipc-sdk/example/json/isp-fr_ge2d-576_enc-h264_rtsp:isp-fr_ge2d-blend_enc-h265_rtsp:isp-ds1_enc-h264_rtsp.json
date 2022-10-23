@@ -1,0 +1,118 @@
+[
+  {
+    type: VBPool,
+    param: {
+      pixfmt: NV12,
+      width: 704,
+      height: 576,
+      nbuf: 3
+    },
+    bind: {output: ge2d1.ch1}
+  },
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        width: 1920,
+        height: 1080,
+        nbuf: 4
+      },
+      ds1: {
+        width: 1280,
+        height: 720,
+        nbuf: 4
+      }
+    },
+    bind: {
+      fr: [ge2d1.ch0, ge2d2.ch0],
+      ds1: venc3.input
+    }
+  },
+  {
+    type: ge2d,
+    param: {
+      name: ge2d1,
+      op: stretchblt-from
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264
+    }
+  },
+  {
+    type: GstBridge,
+    load: "ipc_gstbridge.so",
+    param: {
+      name: rtsp1,
+      rtsp-port: 554,
+      rtsp-mount: "/live1.sdp",
+      launch: "appsrc name=vin ! h264parse config-interval=1 ! rtph264pay pt=96 config-interval=1 name=pay0"
+    },
+    bind: {}
+  },
+  {
+    type: filein,
+    param: {
+      path: "/data/osd-rgba-ge2d-blend.data",
+      blksize: 1935968,
+      is-repeat: 1
+    }
+  },
+  {
+    type: rawvideoparse,
+    param: {
+      pixfmt: RGBA,
+      width: 808,
+      height: 599,
+      fps: 30
+    }
+  },
+  {
+    type: queue,
+    param: {
+      active: 0,
+      nbuf: 1
+    },
+    bind: {output: ge2d2.ch1}
+  },
+  {
+    type: ge2d,
+    param: {
+      name: ge2d2,
+      op: blend-to
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h265
+    }
+  },
+  {
+    type: GstBridge,
+    param: {
+      rtsp-server: "rtsp1",
+      rtsp-mount: "/live2.sdp",
+      launch: "appsrc name=vin ! h265parse config-interval=1 ! rtph265pay pt=96 config-interval=1 name=pay0"
+     },
+     bind: {}
+  },
+  {
+    type: venc,
+    param: {
+      name: venc3,
+      codec: h264
+    }
+  },
+  {
+    type: GstBridge,
+    param: {
+      rtsp-server: "rtsp1",
+      rtsp-mount: "/live3.sdp",
+      launch: "appsrc name=vin ! h264parse config-interval=1 ! rtph264pay pt=96 config-interval=1 name=pay0"
+    }
+  }
+]

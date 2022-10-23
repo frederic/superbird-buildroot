@@ -55,9 +55,10 @@
 		ramoops@0x07400000 {
 			compatible = "ramoops";
 			reg = <0x07400000 0x00100000>;
-			record-size = <0x8000>;
-			console-size = <0x8000>;
-			ftrace-size = <0x40000>;
+			record-size = <0x20000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x80000>;
+			pmsg-size = <0x20000>;
 		};
 
 		secmon_reserved: linux,secmon {
@@ -159,16 +160,16 @@
 		};
 
 		/* for hdmi rx emp use */
-		hdmirx_emp_cma_reserved:linux,emp_cma {
-			compatible = "shared-dma-pool";
+		/* hdmirx_emp_cma_reserved:linux,emp_cma { */
+			/*compatible = "shared-dma-pool";*/
 			/*linux,phandle = <5>;*/
-			reusable;
+			/*reusable;*/
 			/* 4M for emp to ddr */
 			/* 32M for tmds to ddr */
-			size = <0x400000>;
-			alignment = <0x400000>;
+			/*size = <0x800>;*/
+			/*alignment = <0x400000>;*/
 			/* alloc-ranges = <0x400000 0x2000000>; */
-		};
+		/*};*/
 
 		/* POST PROCESS MANAGER */
 		ppmgr_reserved:linux,ppmgr {
@@ -236,12 +237,6 @@
 		nr10bit-support = <1>;
 		nrds-enable = <1>;
 		pps-enable = <1>;
-	};
-
-	vout {
-		compatible = "amlogic, vout";
-		status = "okay";
-		fr_auto_policy = <0>;
 	};
 
 	/* Audio Related start */
@@ -443,6 +438,7 @@
 			};
 		};
 
+#if 0
 		aml-audio-card,dai-link@7 {
 			mclk-fs = <256>;
 			suffix-name = "alsaPORT-earc";
@@ -454,6 +450,7 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
+#endif
 
 		aml-audio-card,dai-link@8 {
 			mclk-fs = <256>;
@@ -576,10 +573,14 @@
 		 *if support 4K2K-YUV422-10bit-wr:3840*2160*3*6 ~= 160M
 		 *if support 4K2K-YUV422-8BIT-WR:3840*2160*2*4 ~= 64M
 		 *if support 1080p-YUV422-8BIT-WR:1920*1080*2*4 ~= 16M
-		 *worst case:(4096*2160*4 + 2M(afbce issue)) *6buf = 214.5M
+		 *worst case:(4096*2160*3 + 2M(afbce issue)) *10buf = 273.5M
+		 *for double write 4k, need extra 25M for 960x540(1/4 down)
 		 */
-		cma_size = <215>;
-		interrupts = <0 83 1>;
+		cma_size = <300>;
+		/* max buffer number */
+		frame_buff_num = <10>;
+		interrupts = <0 83 1 /* vdin0 vsync */
+			      0 72 1>;/* vpu crash */
 		rdma-irq = <2>;
 		clocks = <&clkc CLKID_FCLK_DIV5>,
 			<&clkc CLKID_VDIN_MEAS_COMP>;
@@ -593,6 +594,7 @@
 		 * bit4:support yuv422 10bit full pack mode (from txl new add)
 		 * bit8:use 8bit  at 4k_50/60hz_10bit
 		 * bit9:use 10bit at 4k_50/60hz_10bit
+		 * bit10: support 10bit when double write
 		 */
 		tv_bit_mode = <0x215>;
 		/* afbce_bit_mode: (amlogic frame buff compression encoder)
@@ -603,8 +605,9 @@
 		 * bit6 -- afbce for 720p
 		 * bit7 -- afbce for smaller resolution
 		 */
-		afbce_bit_mode = <0x31>;
-		/*urgent_en*/
+		afbce_bit_mode = <0x11>;
+		/* urgent_en; */
+		double_write_en;
 	};
 
 	vdin@1 {
@@ -856,7 +859,7 @@
 		compatible = "amlogic, hdmirx_tm2";
 		#address-cells=<1>;
 		#size-cells=<1>;
-		memory-region = <&hdmirx_emp_cma_reserved>;
+		/*memory-region = <&hdmirx_emp_cma_reserved>;*/
 		status = "okay";
 		pinctrl-names = "hdmirx_pins";
 		pinctrl-0 = <&hdmirx_a_mux &hdmirx_b_mux
@@ -896,6 +899,7 @@
 		hdmirx_id = <0>;
 		en_4k_2_2k = <0>;
 		hpd_low_cec_off = <1>;
+		arc_port = <1>;
 		/* bit4: enable feature, bit3~0: port number */
 		disable_port = <0x0>;
 		/* MAP_ADDR_MODULE_CBUS */
@@ -941,212 +945,6 @@
 			   0xFF800000 0x400>;
 		reg-names = "ao_exit","ao";
 	};
-
-	p_tsensor: p_tsensor@ff634800 {
-		compatible = "amlogic, r1p1-tsensor";
-		status = "okay";
-		reg = <0xff634800 0x50>,
-			<0xff800268 0x4>;
-		cal_type = <0x1>;
-		cal_a = <324>;
-		cal_b = <424>;
-		cal_c = <3159>;
-		cal_d = <9411>;
-		rtemp = <115000>;
-		interrupts = <0 35 0>;
-		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
-		clock-names = "ts_comp";
-		#thermal-sensor-cells = <1>;
-	};
-
-	d_tsensor: d_tsensor@ff634c00 {
-		compatible = "amlogic, r1p1-tsensor";
-		status = "okay";
-		reg = <0xff634c00 0x50>,
-			<0xff800230 0x4>;
-		cal_type = <0x1>;
-		cal_a = <324>;
-		cal_b = <424>;
-		cal_c = <3159>;
-		cal_d = <9411>;
-		rtemp = <115000>;
-		interrupts = <0 36 0>;
-		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
-		clock-names = "ts_comp";
-		#thermal-sensor-cells = <1>;
-	};
-
-	s_tsensor: s_tsensor@ff635000 {
-		compatible = "amlogic, r1p1-tsensor";
-		status = "okay";
-		reg = <0xff635000 0x50>,
-			<0xff80026c 0x4>;
-		cal_type = <0x1>;
-		cal_a = <324>;
-		cal_b = <424>;
-		cal_c = <3159>;
-		cal_d = <9411>;
-		rtemp = <115000>;
-		interrupts = <0 38 0>;
-		clocks = <&clkc CLKID_TS_CLK_COMP>; /* CLKID_TS_COMP>;*/
-		clock-names = "ts_comp";
-		#thermal-sensor-cells = <1>;
-	};
-
-	meson_cooldev: meson-cooldev@0 {
-		status = "okay";
-		compatible = "amlogic, meson-cooldev";
-		cooling_devices {
-			cpufreq_cool_cluster0 {
-				min_state = <1000000>;
-				dyn_coeff = <140>;
-				gpu_pp = <2>;
-				cluster_id = <0>;
-				node_name = "cpufreq_cool0";
-				device_type = "cpufreq";
-			};
-			cpucore_cool_cluster0 {
-				min_state = <1>;
-				dyn_coeff = <0>;
-				gpu_pp = <2>;
-				cluster_id = <0>;
-				node_name = "cpucore_cool0";
-				device_type = "cpucore";
-			};
-			gpufreq_cool {
-				min_state = <400>;
-				dyn_coeff = <160>;
-				gpu_pp = <2>;
-				cluster_id = <0>;
-				node_name = "gpufreq_cool0";
-				device_type = "gpufreq";
-			};
-			gpucore_cool {
-				min_state = <1>;
-				dyn_coeff = <0>;
-				gpu_pp = <2>;
-				cluster_id = <0>;
-				node_name = "gpucore_cool0";
-				device_type = "gpucore";
-			};
-		};
-		cpufreq_cool0:cpufreq_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
-		cpucore_cool0:cpucore_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
-		gpufreq_cool0:gpufreq_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
-		gpucore_cool0:gpucore_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
-	};/*meson cooling devices end*/
-
-	thermal-zones {
-		pll_thermal: pll_thermal {
-			polling-delay = <1000>;
-			polling-delay-passive = <100>;
-			sustainable-power = <1230>;
-			thermal-sensors = <&p_tsensor 0>;
-			trips {
-				pswitch_on: trip-point@0 {
-					temperature = <60000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				pcontrol: trip-point@1 {
-					temperature = <75000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				phot: trip-point@2 {
-					temperature = <85000>;
-					hysteresis = <5000>;
-					type = "hot";
-				};
-				pcritical: trip-point@3 {
-					temperature = <110000>;
-					hysteresis = <1000>;
-					type = "critical";
-				};
-			};
-			cooling-maps {
-				cpufreq_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&cpufreq_cool0 0 11>;
-					contribution = <1024>;
-				};
-				cpucore_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&cpucore_cool0 0 4>;
-					contribution = <1024>;
-				};
-				gpufreq_cooling_map {
-					trip = <&pcontrol>;
-					cooling-device = <&gpufreq_cool0 0 4>;
-					contribution = <1024>;
-				};
-			};
-		};
-		ddr_thermal: ddr_thermal {
-			polling-delay = <2000>;
-			polling-delay-passive = <1000>;
-			sustainable-power = <1230>;
-			thermal-sensors = <&d_tsensor 1>;
-			trips {
-				dswitch_on: trip-point@0 {
-					temperature = <60000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				dcontrol: trip-point@1 {
-					temperature = <75000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				dhot: trip-point@2 {
-					temperature = <85000>;
-					hysteresis = <5000>;
-					type = "hot";
-				};
-				dcritical: trip-point@3 {
-					temperature = <110000>;
-					hysteresis = <1000>;
-					type = "critical";
-				};
-			};
-		};
-		sar_thermal: sar_thermal {
-			polling-delay = <2000>;
-			polling-delay-passive = <1000>;
-			sustainable-power = <1230>;
-			thermal-sensors = <&s_tsensor 2>;
-			trips {
-				sswitch_on: trip-point@0 {
-					temperature = <60000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				scontrol: trip-point@1 {
-					temperature = <75000>;
-					hysteresis = <5000>;
-					type = "passive";
-				};
-				shot: trip-point@2 {
-					temperature = <85000>;
-					hysteresis = <5000>;
-					type = "hot";
-				};
-				scritical: trip-point@3 {
-					temperature = <110000>;
-					hysteresis = <1000>;
-					type = "critical";
-				};
-			};
-		};
-	};/*thermal zone end*/
 
 	cpu_opp_table0: cpu_opp_table0 {
 		compatible = "operating-points-v2";
@@ -1292,8 +1090,9 @@
 &i2c0 {
 	status = "okay";
 	clock-frequency = <300000>;
-	pinctrl-names="default";
-	pinctrl-0=<&i2c0_dv_pins>;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&i2c0_dv_pins>;
+	pinctrl-1 = <&i2c0_dv_pins_slp_input>;
 };
 
 &audiobus {
@@ -1500,7 +1299,7 @@
 	};
 
 	extn:extn {
-		compatible = "amlogic, snd-extn";
+		compatible = "amlogic, tm2-snd-extn";
 		#sound-dai-cells = <0>;
 
 		interrupts =
@@ -1723,7 +1522,7 @@
 }; /* end of audiobus */
 
 &earc {
-	status = "okay";
+	status = "disabled";
 };
 
 &pinctrl_periphs {
@@ -1819,8 +1618,9 @@
 
 &i2c2 {
 	status = "okay";
-	pinctrl-names="default";
-	pinctrl-0=<&i2c2_z_pins>;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&i2c2_z_pins>;
+	pinctrl-1 = <&i2c2_z_pins_slp_input>;
 	clock-frequency = <400000>;
 
 	tas5805: tas5805@36 {
@@ -2012,8 +1812,9 @@
 &i2c1 {
 	status = "okay";
 	clock-frequency = <300000>;
-	pinctrl-names="default";
-	pinctrl-0=<&i2c1_h_pins>;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&i2c1_h_pins>;
+	pinctrl-1 = <&i2c1_h_pins_slp_input>;
 
 	lcd_extern_i2c0: lcd_extern_i2c@0 {
 		compatible = "lcd_ext, i2c";

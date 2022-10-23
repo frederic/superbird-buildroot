@@ -22,7 +22,7 @@
 
 #include <linux/amlogic/media/utils/vformat.h>
 #include <linux/amlogic/media/utils/amstream.h>
-#include "../stream_input/parser/streambuf.h"
+#include "../stream_input/amports/streambuf.h"
 #include "aml_vcodec_drv.h"
 
 struct aml_vdec_adapt {
@@ -54,6 +54,9 @@ int vdec_vbuf_write(struct aml_vdec_adapt *ada_ctx,
 int vdec_vframe_write(struct aml_vdec_adapt *ada_ctx,
 	const char *buf, unsigned int count, u64 timestamp);
 
+int vdec_vframe_write_with_dma(struct aml_vdec_adapt *ada_ctx,
+	ulong addr, u32 count, u64 timestamp, u32 handle);
+
 bool vdec_input_full(struct aml_vdec_adapt *ada_ctx);
 
 void aml_decoder_flush(struct aml_vdec_adapt *ada_ctx);
@@ -65,6 +68,8 @@ extern void dump_write(const char __user *buf, size_t count);
 bool is_input_ready(struct aml_vdec_adapt *ada_ctx);
 
 int vdec_frame_number(struct aml_vdec_adapt *ada_ctx);
+
+u32 aml_recycle_buffer(struct aml_vdec_adapt *adaptor);
 
 #endif /* VDEC_ADAPT_H */
 

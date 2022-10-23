@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Dolby security firmware decryption
+
+DSMS12=/sbin/dolby_fw_dms12
+case "$1" in
+    start)
+    if [ ! -d "/tmp/ds/" ]; then
+        mkdir -p /tmp/ds/
+    fi
+    $DSMS12 /usr/lib/libdolbyms12.so /tmp/ds/0x4d_0x5331_0x32.so
+    mkdir -p /vendor/lib/
+    rm /vendor/lib/libdolbyms12.so
+    ln -s /tmp/ds/0x4d_0x5331_0x32.so /vendor/lib/libdolbyms12.so
+    ;;
+    *)
+    echo "Usage: S83dsd {start}" >&2
+    exit 1
+    ;;
+esac

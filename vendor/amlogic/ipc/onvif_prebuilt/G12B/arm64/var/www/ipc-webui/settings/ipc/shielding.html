@@ -1,0 +1,52 @@
+<?php
+include "../../common.php";
+check_session("login/login.html");
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IPC-Shielding</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <script src="/scripts/mp4-generator-mini.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="/settings/css/style.css" media="all">
+    <style type="text/css">
+        .box {
+            background: #f00;
+            width: 0px;
+            height: 0px;
+            position: absolute;
+            opacity: 0.5;
+            cursor: move;
+        }
+    </style>
+</head>
+
+<body>
+<form class="layui-form layui-form-pane" id="form_ipc_shielding" style="margin-left: 25px; margin-top: 25px; height:auto">
+    <div class="layui-form-item container" id="container" style="margin-top: 20px; margin-left: 25px; width: 640px; height: 360px; background-color: black; border: solid 3px grey">
+        <video class="container" tabindex=-1 width="100%" id="player" muted autoplay=false></video>
+    </div>
+    <div class="layui-form-item" style="margin-top: 20px; margin-left: 200px">
+        <button class="layui-btn layui-btn-warm locale" name="remove_all">Remove All</button>
+        <button class="layui-btn locale" name="submit">Submit</button>
+        <button class="layui-btn layui-btn-danger locale" name="reset">Reset</button>
+    </div>
+    <blockquote class="layui-elem-quote layui-quote-nm" style="margin-left:20px; width: 620px">
+        <h2 class="locale">Tips</h2>
+        <span class="layui-badge-dot layui-bg-orange" style="margin-left: 10px; margin-top: 20px"></span>
+        <span class="locale" style="margin-left: 5px">
+            Use the right button of mouse to remove the selected rectangle.
+        </span>
+    </blockquote>
+</form>
+<script> translate_html(); </script>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="/view-stream.js" type="text/javascript"></script>
+<script src="shielding.js" type="text/javascript"></script>
+<script> EnableShortCuts(false); </script>
+<body>
+</html>

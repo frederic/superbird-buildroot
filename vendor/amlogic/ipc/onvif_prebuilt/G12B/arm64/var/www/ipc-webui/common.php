@@ -1,6 +1,7 @@
 <?php
 global $data_dir;
-$GLOBALS["data_dir"] = "/etc/ipc-webui";
+$GLOBALS["data_dir"] = "/etc/ipc/webui";
+$GLOBALS["download_dir"] = "/tmp/ipc-webui-downloads/";
 
 function ipc_property($act, $key, $val = "")
 {
@@ -11,10 +12,16 @@ function ipc_property($act, $key, $val = "")
         return $ret;
     } else {
         exec($cmd, $out);
+        if (!isset($out[0])) {
+            return '';
+        }
         $v = explode(": ", $out[0]);
-        return $v[1];
+        if(count($v) < 2) {
+            return $val;
+        } else {
+            return $v[1];
+        }
     }
-    return 0;
 }
 
 function get_database_path()
@@ -27,36 +34,6 @@ function set_database_path($path)
     return ipc_property("set", "/ipc/nn/recognition/db-path", $path);
 }
 
-function face_cap_enable()
-{
-    return ipc_property("set", "/ipc/nn/store-face", "true");
-}
-
-function face_cap_with_img($img_path)
-{
-    return ipc_property("set", "/ipc/nn/custom-image", $img_path);
-}
-
-function get_capture_image_location()
-{
-    return ipc_property("get", "/ipc/image-capture/location");
-}
-
-
-function set_capture_image_location($path)
-{
-    return ipc_property("set", "/ipc/image-capture/location", $path);
-}
-
-function dump_image_enable()
-{
-    return ipc_property("set", "/ipc/image-capture/trigger", "true");
-}
-
-function get_dump_image_path()
-{
-    return ipc_property("get", "/ipc/image-capture/imagefile");
-}
 
 function download_file($filepath)
 {
@@ -82,46 +59,14 @@ function check_session($locate_path)
 {
     session_start();
     if (empty($_SESSION['user'])) {
-        header('Location: ' . $locate_path);
+        echo sprintf("<script>top.window.location = '%s'</script>", $locate_path);
+        die;
     }
 }
 
-function make_dir($dir_path)
+function startsWith ($string, $startString)
 {
-    $command_mkdir = "mkdir -p " . $dir_path;
-    exec($command_mkdir, $res, $rc);
-    if ($rc != 0) {
-        return -1;
-    } else {
-        return 0;
-    }
+    $len = strlen($startString);
+    return (substr($string, 0, $len) === $startString);
 }
 
-function rename_file($filename)
-{
-    return str_replace(" ", "_", $filename);
-}
-
-function get_gdc_resolution_from_filename($file, $flag)
-{
-    $anal = explode('-', $file);
-    if ($flag == "in") {
-        $input = explode('_', $anal[1]);
-        return $input[0] . 'x' . $input[1];
-    } else {
-        $output = explode('_', $anal[2]);
-        return $output[2] . 'x' . $output[3];
-    }
-}
-
-function get_ol_wm_max_item($type)
-{
-    return ipc_property("get", "/ipc/overlay/max-" . $type . "-item");
-}
-
-function get_ol_wm_items($type)
-{
-    return ipc_property("arrsz", "ipc/overlay/watermark/" . $type);
-}
-
-?>

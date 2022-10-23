@@ -1,0 +1,44 @@
+[
+  {
+    type:VBPool,
+    param:{
+      nbuf:3
+    },
+    bind:{
+      output:gdc.ch1
+    }
+  },
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+    {
+    type:gdc,
+    param:
+    {
+      name:gdc,
+      config-file:"/etc/gdc_config/affine-1920_1080_180_1080_0_0-0_0_1920_1080-0_0_1.0-0-nv12.bin"
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264,
+      width: 1920,
+      height: 1080
+    }
+  },
+  {
+    type: fileout,
+    param: {
+      path: "/data/isp_gdc_h264.dump",
+      skip: 60,
+      dump: 120
+    }
+  }
+]

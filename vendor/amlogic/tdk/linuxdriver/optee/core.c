@@ -29,10 +29,13 @@
 #include "../include/linux/arm-smccc.h"
 #include "optee_private.h"
 #include "optee_smc.h"
+#include "../tee_private.h"
 
 #define DRIVER_NAME "optee"
 
 #define OPTEE_SHM_NUM_PRIV_PAGES	4
+
+#define LOGGER_SHM_SIZE             (256 * 1024)
 
 /**
  * optee_from_msg_param() - convert from OPTEE_MSG parameters to
@@ -225,13 +228,14 @@ static void optee_release(struct tee_context *ctx)
 	if (!IS_ERR(shm)) {
 		arg = tee_shm_get_va(shm, 0);
 		/*
-		 * If va2pa fails for some reason, we can't call
-		 * optee_close_session(), only free the memory. Secure OS
-		 * will leak sessions and finally refuse more sessions, but
-		 * we will at least let normal world reclaim its memory.
+		 * If va2pa fails for some reason, we can't call into
+		 * secure world, only free the memory. Secure OS will leak
+		 * sessions and finally refuse more sessions, but we will
+		 * at least let normal world reclaim its memory.
 		 */
 		if (!IS_ERR(arg))
-			tee_shm_va2pa(shm, arg, &parg);
+			if (tee_shm_va2pa(shm, arg, &parg))
+				arg = NULL; /* prevent usage of parg below */
 	}
 
 	list_for_each_entry_safe(sess, sess_tmp, &ctxdata->sess_list,
@@ -242,6 +246,7 @@ static void optee_release(struct tee_context *ctx)
 			arg->cmd = OPTEE_MSG_CMD_CLOSE_SESSION;
 			arg->session = sess->session_id;
 			optee_do_call_with_arg(ctx, parg);
+			optee_timer_missed_destroy(ctx, sess->session_id);
 		}
 		kfree(sess);
 	}
@@ -342,7 +347,8 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
 }
 
 static struct tee_shm_pool *
-optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
+optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm,
+		phys_addr_t *logger_shm_pa)
 {
 	union {
 		struct arm_smccc_res smccc;
@@ -357,6 +363,11 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
 	void *va;
 	struct tee_shm_pool_mem_info priv_info;
 	struct tee_shm_pool_mem_info dmabuf_info;
+
+	if (!invoke_fn || !memremaped_shm || !logger_shm_pa) {
+		pr_err("Invalid parameters");
+		return ERR_PTR(-EINVAL);
+	}
 
 	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res.smccc);
 	if (res.result.status != OPTEE_SMC_RETURN_OK) {
@@ -396,7 +407,9 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
 	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
 	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
 	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
-	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
+	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE -
+		LOGGER_SHM_SIZE;
+	*logger_shm_pa = dmabuf_info.paddr + dmabuf_info.size;
 
 	pool = tee_shm_pool_alloc_res_mem(&priv_info, &dmabuf_info);
 	if (IS_ERR(pool)) {
@@ -431,6 +444,7 @@ static int optee_probe(struct platform_device *pdev)
 	struct tee_shm_pool *pool;
 	struct optee *optee = NULL;
 	void *memremaped_shm = NULL;
+	phys_addr_t logger_shm_pa = 0;
 	struct tee_device *teedev;
 	u32 sec_caps;
 	int rc;
@@ -461,7 +475,8 @@ static int optee_probe(struct platform_device *pdev)
 	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM))
 		return -EINVAL;
 
-	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm);
+	pool = optee_config_shm_memremap(invoke_fn, &memremaped_shm,
+			&logger_shm_pa);
 	if (IS_ERR(pool))
 		return PTR_ERR(pool);
 
@@ -494,6 +509,10 @@ static int optee_probe(struct platform_device *pdev)
 	rc = tee_device_register(optee->supp_teedev);
 	if (rc)
 		goto err;
+
+	optee_log_init(optee->teedev, logger_shm_pa, LOGGER_SHM_SIZE);
+
+	optee_timer_init(&optee->timer);
 
 	mutex_init(&optee->call_queue.mutex);
 	INIT_LIST_HEAD(&optee->call_queue.waiters);
@@ -529,6 +548,10 @@ err:
 static int optee_remove(struct platform_device *pdev)
 {
 	struct optee *optee = platform_get_drvdata(pdev);
+
+	optee_timer_destroy(&optee->timer);
+
+	optee_log_exit(optee->teedev);
 
 	/*
 	 * Ask OP-TEE to free all cached shared memory objects to decrease

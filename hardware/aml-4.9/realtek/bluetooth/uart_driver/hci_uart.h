@@ -85,7 +85,11 @@ struct hci_uart {
 	struct workqueue_struct *hci_uart_wq;
 
 	struct hci_uart_proto	*proto;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
 	struct percpu_rw_semaphore proto_lock; /* Stop work for proto close */
+#else
+	struct rw_semaphore proto_lock;
+#endif
 	void			*priv;
 
 	struct semaphore tx_sem;	/* semaphore for tx */

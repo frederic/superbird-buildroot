@@ -40,6 +40,8 @@ int spdif_source(audio_hw_device_t *dev)
 
     dev->set_parameters(dev, "audio_latency=20");
 
+    /*spdif_source iec61937_align is 1*/
+    dev->set_parameters(dev, "iec61937_align=1");
 
     /* create the audio patch*/
     memset(&sources, 0 , sizeof(struct audio_port_config));
@@ -155,6 +157,9 @@ int loopback_source(audio_hw_device_t *dev)
     dev->set_parameters(dev, "capture_samplerate=48000");
     dev->set_parameters(dev, "capture_ch=2");
 
+    /*loopback_source pcm format, iec61937_align is 0*/
+    dev->set_parameters(dev, "iec61937_align=0");
+
 
     /* create the audio patch*/
     memset(&sources, 0 , sizeof(struct audio_port_config));
@@ -194,8 +199,26 @@ int loopback_source(audio_hw_device_t *dev)
     return 0;
 }
 
+#define MAX_DECODER_MAT_FRAME_LENGTH 61424
+#define MAX_DECODER_DDP_FRAME_LENGTH 0X1800
+#define MAX_DECODER_THD_FRAME_LENGTH 8190
 
-int media_source(audio_hw_device_t *dev, audio_format_t  format)
+char temp_buf[MAX_DECODER_MAT_FRAME_LENGTH];
+
+static void byte_swap(unsigned char * input_buf, int size) {
+    unsigned char * buf = (unsigned char *) input_buf;
+    unsigned char data = 0;
+    int i = 0;
+    for (i = 0; i < size; i += 2) {
+        data = buf[i];
+        buf[i] = buf[i + 1];
+        buf[i + 1] = data;
+    }
+
+    return;
+}
+
+int media_source(audio_hw_device_t *dev, audio_format_t  format, char * file_name)
 {
     int rc = 0;
     audio_io_handle_t handle;
@@ -207,14 +230,23 @@ int media_source(audio_hw_device_t *dev, audio_format_t  format)
     struct audio_port_config sinks;
     audio_patch_handle_t halPatch = AUDIO_PATCH_HANDLE_NONE;
     FILE *fp_input = NULL;
-    char *temp_buf[1024];
+    int length = 512;
+    int endian_detect = 0;
+    int need_swap = 0;
+
     int read_size = 0;
-    char * file_name = NULL;
+
+    /*media_source iec61937_align is 0*/
+    dev->set_parameters(dev, "iec61937_align=0");
 
     if (format == AUDIO_FORMAT_AC3) {
-        file_name = "/data/test.ac3";
+        length = 512;
+    } else if (format == AUDIO_FORMAT_MAT) {
+        length = MAX_DECODER_MAT_FRAME_LENGTH;
+    } else if (format == AUDIO_FORMAT_DOLBY_TRUEHD) {
+        length = MAX_DECODER_THD_FRAME_LENGTH;
     } else if (format == AUDIO_FORMAT_DTS) {
-        file_name = "/data/test.dts";
+        length = 512;
     } else {
         return 0;
     }
@@ -259,7 +291,7 @@ int media_source(audio_hw_device_t *dev, audio_format_t  format)
         return -1;
     }
 
-
+    printf("file name=%s", file_name);
     fp_input = fopen(file_name, "r+");
     if (fp_input == NULL) {
         printf("open input file failed\n");
@@ -267,11 +299,21 @@ int media_source(audio_hw_device_t *dev, audio_format_t  format)
     } else {
         /* write data into outputstream*/
         while (1) {
-            read_size = fread(temp_buf, 1, 512, fp_input);
+            read_size = fread(temp_buf, 1, length, fp_input);
+            if (format == AUDIO_FORMAT_MAT && endian_detect == 0) {
+                if (temp_buf[0] == 0x07 && temp_buf[1] == 0x9e) {
+                    need_swap = 1;
+                }
+                endian_detect = 1;
+            }
             if (read_size <= 0) {
                 printf("read error\n");
                 fclose(fp_input);
                 break;
+            }
+            /*only do swap for mat*/
+            if (need_swap) {
+                byte_swap(temp_buf, read_size);
             }
 
             //printf("read data=%d\n",read_size);
@@ -307,13 +349,13 @@ int main(int argc, char *argv[])
 #ifdef MEM_CHECK
     mtrace();
 #endif
-    if (argc != 2 && argc != 3) {
+    if (argc != 2 && argc != 3 && argc != 4) {
         printf("cmd should be: \n");
         printf("************************\n");
         printf("test spdifin \n");
         printf("test linein \n");
         printf("test loopback \n");
-        printf("test mediain ac3 or dts\n");
+        printf("test mediain ac3, dts, mat, mlp  input file\n");
         printf("************************\n");
 
 
@@ -346,21 +388,23 @@ int main(int argc, char *argv[])
         loopback_source(dev);
     }else if (strcmp(argv[1], "mediain") == 0) {
         audio_format_t  format = AUDIO_FORMAT_INVALID;
+        if (argc != 4) {
+            goto exit;
+        }
         if (strcmp(argv[2], "ac3") == 0) {
             format = AUDIO_FORMAT_AC3;
+        } else if (strcmp(argv[2], "mat") == 0) {
+            format = AUDIO_FORMAT_MAT;
+        } else if (strcmp(argv[2], "mlp") == 0) {
+            format = AUDIO_FORMAT_DOLBY_TRUEHD;
         } else if (strcmp(argv[2], "dts") == 0) {
             format = AUDIO_FORMAT_DTS;
         }
-        media_source(dev, format);
+        media_source(dev, format, argv[3]);
     }else if (strcmp(argv[1], "all") == 0){
         //run all the case
-        
         spdif_source(dev);
         linein_source(dev);
-        media_source(dev, AUDIO_FORMAT_AC3);
-        media_source(dev, AUDIO_FORMAT_DTS);
-        
-
     }
 
 #if 0
@@ -370,6 +414,8 @@ int main(int argc, char *argv[])
         printf("waiting exit =%d\n", cnt);
     }
 #endif
+
+exit:
     /* close the audio device*/
     rc = audio_hw_device_close(dev);
     printf("audio_hw_device_close rc=%d\n", rc);

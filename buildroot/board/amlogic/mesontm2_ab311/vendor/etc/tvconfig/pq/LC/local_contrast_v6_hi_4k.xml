@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="LOCAL_CONTRAST" platform="txlx" commands="">
+<Group num="0" val="">
+<Page tab_title="Over_all_setting" layout="12x5">
+<Control ui_type="title" name="top_control" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="checkbox" name="lc_enable" range="0~1" addr="0x3fc0" mask="4:4" dst="U" desc="enable signal for local contrast enhancement, 1-enable; 0 disable" default="0" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="checkbox" name="dnlp_enable" range="0~1" addr="0" mask="31:0" dst="U" desc="" default="0" value="1" cmd="dnlp2e:dnlp_en"/>
+<Control ui_type="checkbox" name="lc_blkblend_mode" range="0~1" addr="0x3fc0" mask="0:0" dst="U" desc="use bilinear interpolation between blocks, 0: no interpolation 1: blender enabled" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="lc_blk_hnum" range="0~31" addr="0x3fc1" mask="12:8" dst="U" desc="lc processing region number of H, maximum to(STA_LEN_H-1)(0~12)" default="12" value="12" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_blk_vnum" range="0~31" addr="0x3fc1" mask="4:0" dst="U" desc="lc processing region number of V, maximum to (STA_LEN_V-1)(0~8)" default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_hlpf" range="0~3" addr="0x4000" mask="9:8" dst="U" desc="horizontal lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_curve_nodes_vlpf" range="0~3" addr="0x4000" mask="5:4" dst="U" desc="Vertical lpf of the ram_curve_nodes, 0: no LPF, 1= [1 2 1]; 2: [1 2 2 2 1]/8" default="1" value="1" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_hblank" range="0~255" addr="0x3fc0" mask="15:8" dst="U" desc="blank between two line." default="8" value="8" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lcinput_ysel" range="0~7" addr="0x3fb1" mask="6:4" dst="U" desc="reg_lcinput_ysel:luma input options 0: org_y; 1: gau_y; 2: gauadp_y; 3: edgadplpf_y; 4: nr_y;5: lti_y; 6: pk_y (before os);7: pk_y (after os)." default="5" value="5" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lcinput_csel" range="0~7" addr="0x3fb1" mask="2:0" dst="U" desc="reg_lcinput_csel:chroma input options 0: org_c; 1: gau_c; 2: gauadp_c; 3: edgadplpf_c; 4: nr_c;5: cti_c; 6: pk_c." default="5" value="5" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="curve_slop_control" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="lc_slope_min" range="0~255" addr="0x4009" mask="15:8" dst="U" desc="reg_lc_ypkbv_slope_lmt_0: min slop for the curves to avoid artifacts,norm 32 to 1" default="12" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max" range="0~255" addr="0x4009" mask="7:0" dst="U" desc="reg_lc_ypkbv_slope_lmt_1: max slop for the curves to avoid artifacts, norm 32 to 1" default="96" value="64" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_slope_max_face" range="0~255" addr="0x4007" mask="7:0" dst="U" desc="reg_lc_slope_max_face: maximum slope for the pkBin-maxBV range curve to do face protection, norm 32 to 1" default="56" value="40" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="lmtrat_minmax" range="0~255" addr="0x4002" mask="15:8" dst="U" desc="x/1024 of amount" default="6" value="6" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lmtrat_valid" range="0~255" addr="0x4002" mask="7:0" dst="U" desc="x/1024 of amount" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_num_m_coring" range="0~15" addr="0x4007" mask="19:16" dst="U" desc="coring to num_m, soft coring" default="1" value="2" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="dark_region_slop" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="lc_cntst_gain_low" range="0~1023" addr="0x4003" mask="25:16" dst="U" desc=" reg_lc_contrast_low: contrast gain to the lc for dark side" default="16" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_low" range="0~255" addr="0x4005" mask="15:8" dst="U" desc="reg_lc_cntstscl_low: scale for the contrast low, norm 8 as 1" default="64" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_low" range="0~255" addr="0x4006" mask="15:8" dst="U" desc="scale to num_m as limit of min_val to minBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_l" range="0~255" addr="0x4004" mask="31:24" dst="U" desc="reg_lc_cntstlmt_low_0: limit for the contrast low" default="10" value="10" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_low_h" range="0~255" addr="0x4004" mask="15:8" dst="U" desc="reg_lc_cntstlmt_low_1: limit for the contrast low" default="255" value="255" cmd="common:2,0xff900000"/>
+<Control ui_type="title" name="bright_region_slop" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="title" name="" range="" addr="" mask="" dst="" desc="" default="" value="" cmd=""/>
+<Control ui_type="slider" name="lc_cntst_gain_hig" range="0~1023" addr="0x4003" mask="9:0" dst="U" desc=" reg_lc_contrast_hig: contrast gain to the lc for bright side" default="24" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_scale_hig" range="0~255" addr="0x4005" mask="7:0" dst="U" desc="reg_lc_cntstscl_hig: scale for the contrast high,norm 8 as 1" default="32" value="11" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntstbvn_hig" range="0~255" addr="0x4006" mask="7:0" dst="U" desc="scale to num_m as limit of max_val to maxBV distance, to protect mono-color" default="32" value="32" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_l" range="0~255" addr="0x4004" mask="23:16" dst="U" desc="reg_lc_cntstlmt_high_0: limit for the contrast high" default="20" value="20" cmd="common:2,0xff900000"/>
+<Control ui_type="slider" name="lc_cntst_lmt_hig_h" range="0~255" addr="0x4004" mask="7:0" dst="U" desc="reg_lc_cntstlmt_high_1: limit for the contrast high" default="255" value="255" cmd="common:2,0xff900000"/>
+</Page>
+<Page tab_title="LocalContrast_Charts" layout="20x4">
+<Control ui_type="lut" name="lc_saturation" range="0~4095" addr="0x1" mask="31:0" dst="U" desc="" default=" " value="008401670249033004110490056806460723079808730947102010921163123413031372144015061572163817021766182818901951201120712130218722452301235624112465251825712623267427242774282228712919296730163065311531653217327133263384344335063571363937103785386339454032" cmd="local_contrast_lut:local_contrast_lut"/>
+<Control ui_type="lut" name="yminVal_limit" range="0~800" addr="0x2" mask="31:0" dst="U" desc="" default=" " value="004800800120012801600196022402560288032003520400" cmd="local_contrast_lut:local_contrast_lut"/>
+<Control ui_type="lut" name="ypkVal_ymaxVal_limit" range="0~800" addr="0x4" mask="31:0" dst="U" desc="" default=" " value="006801360230027403300384046805120576064007270784" cmd="local_contrast_lut:local_contrast_lut"/>
+<Control ui_type="lut" name="ypkVal_ratio" range="0~800" addr="0x8" mask="31:0" dst="U" desc="" default=" " value="0140016001200096" cmd="local_contrast_lut:local_contrast_lut"/>
+<Control ui_type="block" name="block_h" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value="blk_region htotal" cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="block_v" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value="blk_region vtotal" cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="curve_refresh" range="0~1" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value="refresh_curve" cmd="local_contrast_block_wo:local_contrast_block_wo"/>
+<Control ui_type="block" name="figure1_hist" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure2_hist" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure3_hist" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure4_hist" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure1_curve" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value="curve 000102500500075000030002" cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure2_curve" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure3_curve" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+<Control ui_type="block" name="figure4_curve" range="0~10000" addr="0x0" mask="31:0" dst="U" desc=" " default=" " value=" " cmd="local_contrast_block_rw:local_contrast_block_rw"/>
+</Page>
+</Group>
+</Form>
+

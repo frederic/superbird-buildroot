@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -40,9 +40,8 @@ typedef struct _vsi_nn_stackconcat_lcl_data
 typedef struct _vsi_nn_tensorstackconcat_param
 {
     /* local data must be the first. */
-    vsi_nn_stackconcat_lcl_data local;
-    int32_t index;
-    vx_scalar indexs;
+    vsi_nn_stackconcat_lcl_data *local;
+    int32_t axis;
 } vsi_nn_tensorstackconcat_param;
 
 #ifdef __cplusplus

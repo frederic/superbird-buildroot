@@ -715,6 +715,36 @@ void kasan_kfree_large(const void *ptr)
 
 int kasan_module_alloc(void *addr, size_t size)
 {
+#ifdef CONFIG_AMLOGIC_KASAN32
+	void *ret;
+	size_t len;
+	unsigned long start;
+	static bool kasan_module_init;
+
+	if (kasan_module_init) {
+		kasan_unpoison_shadow(addr, size);
+		return 0;
+	}
+
+	/* map whole vmalloc space one time*/
+	start = (unsigned long)kasan_mem_to_shadow((void *)MODULES_VADDR);
+	len   = (MODULES_END - MODULES_VADDR) >> KASAN_SHADOW_SCALE_SHIFT;
+
+	ret = __vmalloc_node_range(len, 1, start,
+				   start + len,
+				   GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO,
+				   PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
+				   __builtin_return_address(0));
+
+	if (ret) {
+		find_vm_area(addr)->flags |= VM_KASAN;
+		kmemleak_ignore(ret);
+		kasan_module_init = 1;
+		return 0;
+	}
+
+	return -ENOMEM;
+#else
 	void *ret;
 	size_t shadow_size;
 	unsigned long shadow_start;
@@ -739,6 +769,7 @@ int kasan_module_alloc(void *addr, size_t size)
 	}
 
 	return -ENOMEM;
+#endif
 }
 
 void kasan_free_shadow(const struct vm_struct *vm)

@@ -28,6 +28,7 @@
 #include <asm/arch/bl31_apis.h>
 #include <asm/cpu_id.h>
 #include <asm/arch/secure_apb.h>
+#include <asm/arch-tm2/usb-v2.h>
 
 static long sharemem_input_base;
 static long sharemem_output_base;
@@ -382,6 +383,8 @@ void aml_system_off(void)
 	/* TODO: Add poweroff capability */
 	unsigned int val;
 
+	/*shutdown devices for system off*/
+	set_usb_poweroff();
 	/* dram_check_channels failed in bl30,add it */
 	val = readl(HHI_VPU_MEM_PD_REG4) | 0xf;
 	writel(val, HHI_VPU_MEM_PD_REG4);
@@ -442,4 +445,38 @@ int __get_chip_id(unsigned char *buff, unsigned int size)
 	}
 
 	return -1;
+}
+
+int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen)
+{
+	const unsigned cmd = GET_AVBKEY_FROM_FIP;
+	uint32_t retlen = 0;
+	uint32_t ret = 0;
+
+	if (!buf)
+		return -1;
+
+	if (!sharemem_output_base)
+		sharemem_output_base =
+			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
+
+	asm __volatile__("" : : : "memory");
+	register uint64_t x0 asm("x0") = cmd;
+	do {
+		asm volatile(
+		    __asmeq("%0", "x0")
+		    __asmeq("%1", "x0")
+		    "smc    #0\n"
+		    : "=r"(x0)
+		    : "r"(x0));
+	} while (0);
+
+	if (!x0)
+		ret = -1;
+	retlen = x0;
+
+	if (ret != -1 && buflen >= retlen)
+		memcpy(buf, (const void *)sharemem_output_base, retlen);
+
+	return ret;
 }

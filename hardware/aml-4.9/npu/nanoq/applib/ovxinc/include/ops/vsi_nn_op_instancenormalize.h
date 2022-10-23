@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,7 +31,46 @@
 extern "C" {
 #endif
 
+#define VSI_NN_SUMSQR_SH_KERNEL_IDX(_INPUT0_TYPE, _RESHAPE_FLAG) \
+    VSI_NN_SUMSQR_##_INPUT0_TYPE##_RESHAPE_FLAG##_KERNEL,
+
+#define VSI_NN_INSTANCENORM_SH_KERNEL_IDX(_INPUT0_TYPE, _OUTPUT_TYPE, _RESHAPE_FLAG) \
+    VSI_NN_INSTANCENORM_##_INPUT0_TYPE##TO##_OUTPUT_TYPE##_RESHAPE_FLAG##_KERNEL,
+
+enum {
+    INSTANCENORM_CPU_KERNEL,
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(U8, 1)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(I8, 1)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(I16, 1)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(F16, 1)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(U8, 0)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(I8, 0)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(I16, 0)
+    VSI_NN_SUMSQR_SH_KERNEL_IDX(F16, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(U8, U8, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(U8, F16, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I8, I8, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I8, F16, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I16, I16, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I16, F16, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(F16, F16, 1)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(U8, U8, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(U8, F16, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I8, I8, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I8, F16, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I16, I16, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(I16, F16, 0)
+    VSI_NN_INSTANCENORM_SH_KERNEL_IDX(F16, F16, 0)
+};
+
 #define _VSI_NN_INSTANCENORM_LOCAL_TENSOR_NUM 5
+
+typedef struct _vsi_nn_instancenorm_lcl_data2
+{
+    uint32_t reshapeFlg;
+    uint32_t hash_idx;
+    vsi_bool execute_on_sw;
+} vsi_nn_instancenorm_lcl_data2;
 
 typedef struct _vsi_nn_instancenorm_lcl_data
 {
@@ -45,6 +84,7 @@ typedef struct _vsi_nn_instancenormalize_param
     float eps;
     int axis_num;
     int* axis;
+    vsi_nn_instancenorm_lcl_data2* lcl2_data;
 } vsi_nn_instancenormalize_param;
 
 #ifdef __cplusplus

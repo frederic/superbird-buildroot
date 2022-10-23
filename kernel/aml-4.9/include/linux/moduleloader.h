@@ -87,7 +87,11 @@ void module_arch_freeing_init(struct module *mod);
 
 #ifdef CONFIG_KASAN
 #include <linux/kasan.h>
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define MODULE_ALIGN (PAGE_SIZE)
+#else
 #define MODULE_ALIGN (PAGE_SIZE << KASAN_SHADOW_SCALE_SHIFT)
+#endif
 #else
 #define MODULE_ALIGN PAGE_SIZE
 #endif

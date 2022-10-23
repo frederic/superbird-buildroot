@@ -52,5 +52,6 @@ char *strcpy(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, size_t n);
 char *strchr(const char *s, int c);
 char *strcat(char *dest, const char *src);
+char *strstr(const char *big, const char *little);
 
 #endif /* STRING_H */

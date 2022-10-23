@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -199,8 +199,13 @@ typedef struct sLimMlmScanCnf
 {
     tSirResultCodes         resultCode;
     tANI_U16                scanResultLength;
-    tSirBssDescription      bssDescription[1];
     tANI_U8                 sessionId;
+    tSirBssDescription      bssDescription[1];
+    /*
+     * WARNING: Pls make bssDescription as last variable in struct
+     * tLimMlmScanCnf as it has ieFields followed after this bss
+     * description. Adding a variable after this corrupts the ieFields
+     */
 } tLimMlmScanCnf, *tpLimMlmScanCnf;
 
 typedef struct sLimScanResult
@@ -237,6 +242,7 @@ typedef struct sLimMlmAssocInd
     tSirMacAddr          peerMacAddr;
     tANI_U16                  aid;
     tAniAuthType         authType;
+    enum ani_akm_type    akm_type;
     tAniSSID             ssId;
     tSirRSNie            rsnIE;
     tSirWAPIie           wapiIE;
@@ -268,6 +274,7 @@ typedef struct sLimMlmAssocInd
     uint8_t              max_mcs_idx;
     uint8_t              rx_mcs_map;
     uint8_t              tx_mcs_map;
+    bool                 is_sae_authenticated;
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq
@@ -1009,7 +1016,7 @@ void limSendSmeMgmtFrameInd(
                     tpAniSirGlobal pMac, tANI_U8 frameType,
                     tANI_U8  *frame, tANI_U32 frameLen, tANI_U16 sessionId,
                     tANI_U32 rxChan, tpPESession psessionEntry,
-                    tANI_S8 rxRssi);
+                    tANI_S8 rxRssi, enum rxmgmt_flags rx_flags);
 void limProcessRemainOnChnTimeout(tpAniSirGlobal pMac);
 void limProcessInsertSingleShotNOATimeout(tpAniSirGlobal pMac);
 void limConvertActiveChannelToPassiveChannel(tpAniSirGlobal pMac);
@@ -1034,10 +1041,63 @@ typedef struct sSetLinkCbackParams
 } tSetLinkCbackParams;
 #endif
 
+/**
+ * lim_process_assoc_cleanup() - frees up resources used in function
+ * lim_process_assoc_req_frame()
+ * @mac_ctx: pointer to Global MAC structure
+ * @session: pointer to pe session entry
+ * @assoc_req: pointer to ASSOC/REASSOC Request frame
+ * @sta_ds: station dph entry
+ * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
+ *
+ * Frees up resources used in function lim_process_assoc_req_frame
+ *
+ * Return: void
+ */
+void lim_process_assoc_cleanup(tpAniSirGlobal mac_ctx,
+			       tpPESession session,
+			       tpSirAssocReq assoc_req,
+			       tpDphHashNode sta_ds,
+			       bool assoc_req_copied);
+
+/**
+ * lim_send_assoc_ind_to_sme() - Initialize PE data structures and send assoc
+ * 				 indication to SME.
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: pe session entry
+ * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
+ *            Request(=1) frame
+ * @hdr: A pointer to the MAC header
+ * @assoc_req: pointer to ASSOC/REASSOC Request frame
+ * @akm_type: AKM type
+ * @pmf_connection: flag indicating pmf connection
+ * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
+ *
+ * Return: void	1126
+ */
+bool lim_send_assoc_ind_to_sme(tpAniSirGlobal mac_ctx,
+			       tpPESession session,
+			       uint8_t sub_type,
+			       tpSirMacMgmtHdr hdr,
+			       tpSirAssocReq assoc_req,
+			       enum ani_akm_type akm_type,
+			       bool pmf_connection,
+			       bool *assoc_req_copied);
+
 void limProcessRxScanEvent(tpAniSirGlobal mac, void *buf);
 void lim_process_rx_channel_status_event(tpAniSirGlobal mac_ctx, void *buf);
 
 int limProcessRemainOnChnlReq(tpAniSirGlobal pMac, tANI_U32 *pMsg);
 void limRemainOnChnRsp(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 *data);
+
+/**
+ * lim_send_mgmt_frame_tx() - Sends mgmt frame
+ * @mac_ctx Pointer to Global MAC structure
+ * @msg: Received message info
+ *
+ * Return: None
+ */
+void lim_send_mgmt_frame_tx(tpAniSirGlobal mac_ctx,
+			    tpSirMsgQ msg);
 
 #endif /* __LIM_TYPES_H */

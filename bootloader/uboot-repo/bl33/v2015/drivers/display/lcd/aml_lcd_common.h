@@ -32,8 +32,8 @@
 /* 20190911: add lcd_tcon_load_data for tl1*/
 /* 20191025: tcon chpi phy setting update*/
 /* 20191115: add lcd_tcon_load_data chk_data for tl1*/
-
-#define LCD_DRV_VERSION    "20191115"
+/* 20191227: vbyone hw filter disable support*/
+#define LCD_DRV_VERSION    "20191227"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -72,7 +72,7 @@ extern void lcd_tcon_info_print(void);
 extern int lcd_tcon_enable(struct lcd_config_s *pconf);
 extern void lcd_tcon_disable(void);
 extern int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id);
-extern int lcd_tcon_data_load(int *vac_valid, int *demura_valid);
+extern int lcd_tcon_data_probe(void);
 
 /* lcd gpio */
 extern int aml_lcd_gpio_name_map_num(const char *name);
@@ -85,6 +85,8 @@ extern void aml_lcd_mute_setting(unsigned char flag);
 extern int aml_lcd_prbs_test(unsigned int s);
 extern void aml_lcd_info_print(void);
 extern void aml_lcd_reg_print(void);
+void aml_lcd_vbyone_rst(void);
+void aml_lcd_vbyone_cdr(void);
 extern void aml_lcd_debug_probe(struct aml_lcd_drv_s *lcd_drv);
 
 /* lcd driver */

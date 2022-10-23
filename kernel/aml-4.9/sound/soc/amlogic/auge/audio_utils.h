@@ -20,17 +20,27 @@
 
 #include <sound/soc.h>
 
-extern int snd_card_add_kcontrols(struct snd_soc_card *card);
+enum {
+	EARCTX_SPDIF_TO_HDMIRX = 0,
+	SPDIFA_TO_HDMIRX = 1,
+	SPDIFB_TO_HDMIRX = 2,
+	HDMIRX_SPDIF_TO_HDMIRX = 3,
+};
 
-extern void audio_locker_set(int enable);
+int snd_card_add_kcontrols(struct snd_soc_card *card);
 
-extern int audio_locker_get(void);
+void audio_locker_set(int enable);
 
-extern void fratv_enable(bool enable);
+int audio_locker_get(void);
 
-extern void fratv_src_select(bool src);
+void fratv_enable(bool enable);
 
-extern void fratv_LR_swap(bool swap);
+void fratv_src_select(bool src);
 
-extern void cec_arc_enable(int src, bool enable);
+void fratv_LR_swap(bool swap);
+
+void cec_arc_enable(int src, bool enable);
+
+void tm2_arc_source_select(int src);
+
 #endif

@@ -45,6 +45,8 @@ struct resample_chipinfo {
 
 	bool dividor_fn;
 	int resample_version;
+
+	bool chnum_sync;
 };
 
 struct audioresample {
@@ -72,6 +74,9 @@ struct audioresample {
 	int capture_sample_rate;
 
 	bool enable;
+
+	struct timer_list timer;
+	bool timer_running;
 };
 
 struct audioresample *s_resample_a;
@@ -126,6 +131,20 @@ bool get_resample_enable(enum resample_idx id)
 	}
 
 	return p_resample->enable;
+}
+
+bool get_resample_enable_chnum_sync(enum resample_idx id)
+{
+	struct audioresample *p_resample;
+
+	p_resample = ((id == RESAMPLE_A) ? s_resample_a : s_resample_b);
+
+	if (!p_resample || !p_resample->chipinfo) {
+		pr_debug("Not init audio resample\n");
+		return false;
+	}
+
+	return p_resample->chipinfo->chnum_sync;
 }
 
 int set_resample_source(enum resample_idx id, enum toddr_src src)
@@ -239,6 +258,30 @@ static int resample_get_enum(
 	return 0;
 }
 
+static void new_resample_timer_callback(unsigned long data)
+{
+	struct audioresample *p_resample = (struct audioresample *)data;
+	int ADJ_diff = (int)new_resample_read(p_resample->id,
+					      AUDIO_RSAMP_RO_ADJ_DIFF_BAK);
+
+	if (p_resample->timer_running == false)
+		return;
+
+	if (ADJ_diff > 100 || ADJ_diff < -100) {
+		pr_debug("reset resample ADJ: [%d]\n", ADJ_diff);
+		new_resample_update_bits(p_resample->id,
+					 AUDIO_RSAMP_ADJ_CTRL0, 0x1, 0);
+		new_resample_update_bits(p_resample->id,
+					 AUDIO_RSAMP_CTRL0, 0x1 << 2, 0x1 << 2);
+		new_resample_update_bits(p_resample->id,
+					 AUDIO_RSAMP_CTRL0, 0x1 << 2, 0x0 << 2);
+		new_resample_update_bits(p_resample->id,
+					 AUDIO_RSAMP_ADJ_CTRL0, 0x1, 1);
+	}
+
+	mod_timer(&p_resample->timer, jiffies + msecs_to_jiffies(500));
+}
+
 /* force set to new rate index whatever the resampler holds */
 int resample_set(enum resample_idx id, enum samplerate_index index)
 {
@@ -268,14 +311,31 @@ int resample_set(enum resample_idx id, enum samplerate_index index)
 		return ret;
 
 	if (index == RATE_OFF) {
-		if (p_resample->chipinfo->resample_version == 1)
+		if (p_resample->chipinfo->resample_version == 1) {
 			new_resample_enable(p_resample->id, false);
-		else if (p_resample->chipinfo->resample_version == 0)
+
+			/* delete the timer when resample is disable */
+			if (p_resample->timer_running) {
+				p_resample->timer_running = false;
+				del_timer(&p_resample->timer);
+			}
+		} else if (p_resample->chipinfo->resample_version == 0) {
 			resample_enable(p_resample->id, false);
+		}
 	} else {
 		if (p_resample->chipinfo->resample_version == 1) {
 			new_resample_set_ratio(id, resample_rate,
 					       DEFAULT_SPK_SAMPLERATE);
+
+			/* start a timer to check resample RO status */
+			if (!p_resample->timer_running) {
+				setup_timer(&p_resample->timer,
+					    new_resample_timer_callback,
+					    (unsigned long)p_resample);
+				mod_timer(&p_resample->timer,
+					  jiffies + msecs_to_jiffies(500));
+				p_resample->timer_running = true;
+			}
 		} else if (p_resample->chipinfo->resample_version == 0) {
 			resample_init(p_resample->id, resample_rate);
 			resample_set_hw_param(p_resample->id, index);
@@ -570,6 +630,22 @@ static struct resample_chipinfo sm1_resample_b_chipinfo = {
 	.resample_version = 1,
 };
 
+static struct resample_chipinfo tm2_revb_resample_a_chipinfo = {
+	.num        = 2,
+	.id         = RESAMPLE_A,
+	.dividor_fn = true,
+	.resample_version = 1,
+	.chnum_sync = true,
+};
+
+static struct resample_chipinfo tm2_revb_resample_b_chipinfo = {
+	.num        = 2,
+	.id         = RESAMPLE_B,
+	.dividor_fn = true,
+	.resample_version = 1,
+	.chnum_sync = true,
+};
+
 static const struct of_device_id resample_device_id[] = {
 	{
 		.compatible = "amlogic, axg-resample",
@@ -594,6 +670,14 @@ static const struct of_device_id resample_device_id[] = {
 	{
 		.compatible = "amlogic, sm1-resample-b",
 		.data = &sm1_resample_b_chipinfo,
+	},
+	{
+		.compatible = "amlogic, tm2-revb-resample-a",
+		.data = &tm2_revb_resample_a_chipinfo,
+	},
+	{
+		.compatible = "amlogic, tm2-revb-resample-b",
+		.data = &tm2_revb_resample_b_chipinfo,
 	},
 	{}
 };
@@ -701,10 +785,13 @@ static int resample_platform_probe(struct platform_device *pdev)
 	else
 		s_resample_a = p_resample;
 
-	if (p_chipinfo && p_chipinfo->resample_version == 1)
+	if (p_chipinfo && p_chipinfo->resample_version == 1) {
 		new_resample_init(p_resample);
-	else if (p_chipinfo && p_chipinfo->resample_version == 0)
+		if (p_chipinfo->chnum_sync)
+			aml_resample_chsync_enable(p_resample->id);
+	} else if (p_chipinfo && p_chipinfo->resample_version == 0) {
 		resample_clk_set(p_resample, DEFAULT_SPK_SAMPLERATE);
+	}
 
 	aml_set_resample(p_resample->id, p_resample->enable,
 			 p_resample->resample_module);

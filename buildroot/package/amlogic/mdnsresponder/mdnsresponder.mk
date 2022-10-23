@@ -21,7 +21,7 @@ endef
 
 define MDNSRESPONDER_INSTALL_STAGING_CMDS
 	$(INSTALL) -m 644 -D $(MDNSRESPONDER_DIR)/mDNSPosix/build/prod/libdns_sd.so $(STAGING_DIR)/usr/lib/
-	ln -sf $(STAGING_DIR)/usr/lib/libdns_sd.so $(STAGING_DIR)/usr/lib/libdns_sd.so.1
+	cd $(STAGING_DIR)/usr/lib/;ln -sf libdns_sd.so libdns_sd.so.1
 	$(INSTALL) -m 644 -D $(MDNSRESPONDER_DIR)/mDNSShared/dns_sd.h $(STAGING_DIR)/usr/include/
 endef
 
@@ -30,7 +30,7 @@ define MDNSRESPONDER_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 755 -D $(MDNSRESPONDER_DIR)/mDNSPosix/build/prod/mdnsd $(TARGET_DIR)/usr/sbin/
 
 	$(INSTALL) -m 644 -D $(MDNSRESPONDER_DIR)/mDNSPosix/build/prod/libdns_sd.so $(TARGET_DIR)/usr/lib/
-	ln -sf $(TARGET_DIR)/usr/lib/libdns_sd.so $(TARGET_DIR)/usr/lib/libdns_sd.so.1
+	cd $(TARGET_DIR)/usr/lib/;ln -sf libdns_sd.so libdns_sd.so.1
 
 	$(INSTALL) -m 0755 -D $(MDNSRESPONDER_PKGDIR)/S80mdns $(TARGET_DIR)/etc/init.d/
 

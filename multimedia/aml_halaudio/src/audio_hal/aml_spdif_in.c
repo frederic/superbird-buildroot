@@ -56,6 +56,7 @@ static const char *const resample_module_texts[] = {
     "NONE",
     "TDMIN_LB",
     "LOOPBACK",
+    'FRHDMIRX',
 };
 
 static const char *const resample_texts[] = {

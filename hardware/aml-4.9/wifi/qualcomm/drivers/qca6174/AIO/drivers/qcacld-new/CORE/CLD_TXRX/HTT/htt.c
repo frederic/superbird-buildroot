@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -217,8 +217,6 @@ htt_attach(
 
     pdev->cfg.is_full_reorder_offload =
          ol_cfg_is_full_reorder_offload(pdev->ctrl_pdev);
-    adf_os_print("is_full_reorder_offloaded? %d\n",
-                  (int)pdev->cfg.is_full_reorder_offload);
     pdev->targetdef = htc_get_targetdef(htc_pdev);
     /*
      * Connect to HTC service.

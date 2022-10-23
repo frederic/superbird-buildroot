@@ -1,0 +1,26 @@
+[
+  {
+    type: isp,
+    param: {
+      device: "/dev/video0",
+      fr: {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param: {
+      codec: h264,
+      width: 1920,
+      height: 1080
+    }
+  },
+  {
+    type: GstBridge,
+    load: "/usr/lib/ipc_gstbridge.so",
+    param: {
+      launch: "appsrc ! h264parse ! video/x-h264,stream-format=avc !amlwsssink port=8082 async=false"
+    }
+  }
+]

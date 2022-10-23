@@ -219,12 +219,13 @@ int32_t acamera_init_context( acamera_context_t *p_ctx, acamera_settings *settin
 void acamera_deinit_context( acamera_context_t *p_ctx );
 void acamera_general_interrupt_hanlder( acamera_context_ptr_t p_ctx, uint8_t event );
 
-int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx );
+int32_t acamera_init_calibrations( acamera_context_ptr_t p_ctx, char* s_name );
 void acamera_change_resolution( acamera_context_ptr_t p_ctx, uint32_t exposure_correction );
 void configure_buffers( acamera_context_ptr_t p_ctx, uint32_t start_addr, uint16_t width, uint16_t height );
 void acamera_fw_error_routine( acamera_context_t *p_ctx, uint32_t irq_mask );
 
 int acamera_3aalg_enable(void);
+int32_t acamera_extern_param_calculate(void *param);
 
 #define ACAMERA_MGR2CTX_PTR( p_fsm_mgr ) \
     ( ( p_fsm_mgr )->p_ctx )

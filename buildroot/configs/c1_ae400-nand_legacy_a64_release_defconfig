@@ -1,0 +1,9 @@
+#----------------------------------------------------------#
+#include "arch_a64_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "c1_ae400_legacy.config"
+#include "flash_nand_4k.config"
+BR2_PACKAGE_AML_RTOS=n
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc1_ae400/initramfs/ramfslist-64-ubi-release"
+

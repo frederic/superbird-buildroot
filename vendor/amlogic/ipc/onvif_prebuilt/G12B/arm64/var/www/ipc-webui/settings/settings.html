@@ -1,0 +1,76 @@
+<?php
+require "../common.php";
+check_session("/login/login.html");
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+    <title>Settings</title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8"/>
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+</head>
+
+<body>
+<div class="layui-side layui-bg-black">
+    <div class="layui-side-scroll">
+        <ul class="layui-nav layui-nav-tree site-nav" lay-filter="setting-navi">
+            <li class="layui-nav-item layui-nav-itemed">
+                <a href="javascript:">IPC</a>
+                <dl class="layui-nav-child">
+                    <dd class="layui-this"><a href="javascript:" class="site-url locale" data-url="ipc/video.html">Video</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/audio.html">Audio</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/isp.html">ISP</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/daynight.html">Day/Night Switch</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/nn.html">NN</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/overlay.html">Overlay</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/shielding.html">Shielding</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/roi.html">ROI</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/recording.html">Recording</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="ipc/other.html">Other</a></dd>
+                </dl>
+            </li>
+            <li class="layui-nav-item layui-nav-itemed">
+                <a href="javascript:">RTSP</a>
+                <dl class="layui-nav-child">
+                    <dd><a href="javascript:" class="site-url locale" data-url="rtsp/auth.html">Auth</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="rtsp/network.html">Network</a></dd>
+                </dl>
+            </li>
+            <li class="layui-nav-item layui-nav-itemed">
+                <a href="javascript:">Onvif</a>
+                <dl class="layui-nav-child">
+                    <dd><a href="javascript:" class="site-url locale" data-url="onvif/discover.html">Discover</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="onvif/device.html">Device</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="onvif/network.html">Network</a></dd>
+                </dl>
+            </li>
+            <li class="layui-nav-item layui-nav-itemed">
+                <a href="javascript:" class="locale">Storage</a>
+                <dl class="layui-nav-child">
+                    <dd><a href="javascript:" class="site-url locale" data-url="storage/internal.html">Internal</a></dd>
+                    <dd><a href="javascript:" class="site-url locale" data-url="storage/external.html">External</a></dd>
+                </dl>
+            </li>
+			<li class="layui-nav-item layui-nav-itemed">
+                <a href="javascript:" class="locale">System</a>
+                <dl class="layui-nav-child">
+                    <dd><a href="javascript:" class="site-url locale" data-url="system/maintain.html">Maintain</a></dd>
+                </dl>
+            </li>
+        </ul>
+    </div>
+</div>
+<div class="layui-body">
+    <iframe id="iframe_settings" src="" name="iframe_settings" frameborder="0"
+            onload="adaptIFrame('iframe_settings', 'iframe_main', 4)" style="width: 100%; height: 100%"></iframe>
+</div>
+
+<script> translate_html(); </script>
+<script src="/layui/layui.js" type="application/javascript"></script>
+<script src="settings.js" type="application/javascript"></script>
+</body>
+</html>

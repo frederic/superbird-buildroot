@@ -2,7 +2,7 @@
  * Linux-specific abstractions to gain some independence from linux kernel versions.
  * Pave over some 2.2 versus 2.4 versus 2.6 kernel differences.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: linuxver.h 767291 2018-06-13 06:35:04Z $
+ * $Id: linuxver.h 806092 2019-02-21 08:19:13Z $
  */
 
 #ifndef _linuxver_h_
@@ -346,6 +346,42 @@ static inline void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 
 #endif /* DMA mapping */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+
+typedef struct timer_list timer_list_compat_t;
+
+#define init_timer_compat(timer_compat, cb, priv) \
+	init_timer(timer_compat); \
+	(timer_compat)->data = (ulong)priv; \
+	(timer_compat)->function = cb
+#define timer_set_private(timer_compat, priv) (timer_compat)->data = (ulong)priv
+#define timer_expires(timer_compat) (timer_compat)->expires
+
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) */
+
+typedef struct timer_list_compat {
+	struct timer_list timer;
+	void *arg;
+	void (*callback)(ulong arg);
+} timer_list_compat_t;
+
+extern void timer_cb_compat(struct timer_list *tl);
+
+#define init_timer_compat(timer_compat, cb, priv) \
+	(timer_compat)->arg = priv; \
+	(timer_compat)->callback = cb; \
+	timer_setup(&(timer_compat)->timer, timer_cb_compat, 0);
+#define timer_set_private(timer_compat, priv) (timer_compat)->arg = priv
+#define timer_expires(timer_compat) (timer_compat)->timer.expires
+
+#define del_timer(t) del_timer(&((t)->timer))
+#define del_timer_sync(t) del_timer_sync(&((t)->timer))
+#define timer_pending(t) timer_pending(&((t)->timer))
+#define add_timer(t) add_timer(&((t)->timer))
+#define mod_timer(t, j) mod_timer(&((t)->timer), j)
+
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) */
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 43))
 
 #define dev_kfree_skb_any(a)		dev_kfree_skb(a)
@@ -632,13 +668,13 @@ static inline bool binary_sema_up(tsk_ctl_t *tsk)
 
 #define PROC_STOP(tsk_ctl) \
 { \
-	uint timeout = msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
+	uint timeout = (uint)msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
 	(tsk_ctl)->terminated = TRUE; \
 	smp_wmb(); \
 	up(&((tsk_ctl)->sema));	\
 	DBG_THR(("%s(): thread:%s:%lx wait for terminate\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
-	timeout = wait_for_completion_timeout(&((tsk_ctl)->completed), timeout); \
+	timeout = (uint)wait_for_completion_timeout(&((tsk_ctl)->completed), timeout); \
 	if (timeout == 0) \
 		DBG_THR(("%s(): thread:%s:%lx terminate timeout\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
@@ -653,13 +689,13 @@ static inline bool binary_sema_up(tsk_ctl_t *tsk)
 
 #define PROC_STOP_USING_BINARY_SEMA(tsk_ctl) \
 { \
-	uint timeout = msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
+	uint timeout = (uint)msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
 	(tsk_ctl)->terminated = TRUE; \
 	smp_wmb(); \
 	binary_sema_up(tsk_ctl);	\
 	DBG_THR(("%s(): thread:%s:%lx wait for terminate\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
-	timeout = wait_for_completion_timeout(&((tsk_ctl)->completed), timeout); \
+	timeout = (uint)wait_for_completion_timeout(&((tsk_ctl)->completed), timeout); \
 	if (timeout == 0) \
 		DBG_THR(("%s(): thread:%s:%lx terminate timeout\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
@@ -679,13 +715,13 @@ static inline bool binary_sema_up(tsk_ctl_t *tsk)
 */
 #define PROC_FLUSH_USING_BINARY_SEMA(tsk_ctl) \
 { \
-	uint timeout = msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
+	uint timeout = (uint)msecs_to_jiffies(PROC_WAIT_TIMEOUT_MSEC); \
 	(tsk_ctl)->flush_ind = TRUE; \
 	smp_wmb(); \
 	binary_sema_up(tsk_ctl);	\
 	DBG_THR(("%s(): thread:%s:%lx wait for flush\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
-	timeout = wait_for_completion_timeout(&((tsk_ctl)->flushed), timeout); \
+	timeout = (uint)wait_for_completion_timeout(&((tsk_ctl)->flushed), timeout); \
 	if (timeout == 0) \
 		DBG_THR(("%s(): thread:%s:%lx flush timeout\n", __FUNCTION__, \
 			 (tsk_ctl)->proc_name, (tsk_ctl)->thr_pid)); \
@@ -697,6 +733,11 @@ static inline bool binary_sema_up(tsk_ctl_t *tsk)
 /*  ----------------------- */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 31))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
+/* send_sig declaration moved */
+#include <linux/sched/signal.h>
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0) */
+
 #define KILL_PROC(nr, sig) \
 { \
 struct task_struct *tsk; \
@@ -831,5 +872,13 @@ static inline struct inode *file_inode(const struct file *f)
 	return f->f_dentry->d_inode;
 }
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)) */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+#define vfs_write(fp, buf, len, pos) kernel_write(fp, buf, len, pos)
+#define vfs_read(fp, buf, len, pos) kernel_read(fp, buf, len, pos)
+int kernel_read_compat(struct file *file, loff_t offset, char *addr, unsigned long count);
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
+#define kernel_read_compat(file, offset, addr, count) kernel_read(file, offset, addr, count)
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
 
 #endif /* _linuxver_h_ */

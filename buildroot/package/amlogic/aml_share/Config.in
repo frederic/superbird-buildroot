@@ -75,3 +75,15 @@ config BR2_PACKAGE_AML_VENDOR_PARTITION_PATH
 	  Please provide vendor partition content path
 endif
 
+config BR2_PACKAGE_AML_UBOOT_PATCHDIR
+	string  "uBoot additional patchdir for amlogic project"
+	default ""
+	help
+	  Please provide amlogic uboot patchdir for this project
+
+config BR2_PACKAGE_AML_KERNEL_PATCHDIR
+	string  "Kernel additional patchdir for amlogic project"
+	default ""
+	help
+	  Please provide amlogic kernel patchdir for this project
+

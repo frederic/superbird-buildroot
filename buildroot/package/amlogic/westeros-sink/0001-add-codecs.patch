@@ -1,0 +1,35 @@
+From e8d21293824bd4b21f9a7ac46ec6413c2cd7abe8 Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Tue, 18 Feb 2020 19:28:36 -0800
+Subject: [PATCH] add codecs
+
+---
+ v4l2/westeros-sink/westeros-sink-soc.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/v4l2/westeros-sink/westeros-sink-soc.c b/v4l2/westeros-sink/westeros-sink-soc.c
+index 7024b2d..0ca8614 100644
+--- a/v4l2/westeros-sink/westeros-sink-soc.c
++++ b/v4l2/westeros-sink/westeros-sink-soc.c
+@@ -597,6 +597,18 @@ gboolean gst_westeros_sink_soc_accept_caps( GstWesterosSink *sink, GstCaps *caps
+             sink->soc.inputFormat= V4L2_PIX_FMT_MPEG2;
+             result= TRUE;
+          }
++        else if ( (len == 12) && !strncmp("video/x-h265", mime, len) )
++         {
++            sink->soc.inputFormat= V4L2_PIX_FMT_HEVC;
++            result= TRUE;
++         }
++        else if ( (len == 11) && !strncmp("video/x-vp9", mime, len) )
++         {
++            sink->soc.inputFormat= V4L2_PIX_FMT_VP9;
++            result= TRUE;
++         }
++
++
+          else
+          {
+             GST_ERROR("gst_westeros_sink_soc_accept_caps: not accepting caps (%s)", mime );
+-- 
+2.24.1
+

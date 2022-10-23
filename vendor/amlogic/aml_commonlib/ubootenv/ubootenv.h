@@ -24,7 +24,7 @@ typedef struct environment {
 typedef struct env_attribute {
         struct env_attribute *next;
         char key[256];
-        char value[1024];
+        char *value;
 }env_attribute;
 
 int bootenv_init();

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -42,6 +42,22 @@
  * @see vsi_nn_AddNode
  * */
 #define VSI_NN_MAX_IO_NUM        32
+
+/**
+ * Default preprocess and postprocess node base uid.
+ * When add new preprocess node in
+ * graph, node uid is set based on it.
+ * @see vsi_nn_AddPreprocNode
+ * */
+#define VSI_NN_PREPROC_NODE_UID_BASE    10000
+
+/**
+ * Default postprocess node base uid.
+ * When add new postprocess node in
+ * graph, node uid is set based on it.
+ * @see vsi_nn_AddPostprocNode
+ * */
+#define VSI_NN_POSTPROC_NODE_UID_BASE   20000
 
 #ifdef __cplusplus
 extern "C" {
@@ -312,7 +328,7 @@ OVXLIB_API vsi_nn_tensor_id_t vsi_nn_AddTensorFromHandle
  *
  * @return The new tensor id on success, or VSI_NN_TENSOR_ID_NA otherwise.
  */
-OVXLIB_API vsi_nn_tensor_id_t vsi_nn_AttachTensorToGraph
+vsi_nn_tensor_id_t vsi_nn_AttachTensorToGraph
     (
     vsi_nn_graph_t       * graph,
     vsi_nn_tensor_id_t     id,
@@ -323,7 +339,7 @@ OVXLIB_API vsi_nn_tensor_id_t vsi_nn_AttachTensorToGraph
  * @deprecated
  * @see vsi_nn_RemoveTensor
  */
-OVXLIB_API void vsi_nn_DeleteTensor
+void vsi_nn_DeleteTensor
     (
     vsi_nn_graph_t       * graph,
     vsi_nn_tensor_id_t     id
@@ -452,7 +468,7 @@ OVXLIB_API vsi_bool vsi_nn_SetGraphOutputs
  * @param[in] graph Graph handle
  * @param[in] id Node id to be removed.
  */
-OVXLIB_API void vsi_nn_RemoveNode
+void vsi_nn_RemoveNode
     (
     vsi_nn_graph_t      * graph,
     vsi_nn_node_id_t      id
@@ -467,7 +483,7 @@ OVXLIB_API void vsi_nn_RemoveNode
  * @return Sorted nodes id. The node id buffer is malloc internal,
  *         the need to release it by user.
  */
-OVXLIB_API vsi_nn_node_id_t * vsi_nn_SortGraphNode
+vsi_nn_node_id_t * vsi_nn_SortGraphNode
     (
     vsi_nn_graph_t * graph
     );
@@ -610,7 +626,7 @@ OVXLIB_API vsi_bool vsi_nn_HasRNN
  * @param[in] graph Graph handle
  * @param[in] id Tensor id
  */
-OVXLIB_API void vsi_nn_RemoveTensor
+void vsi_nn_RemoveTensor
     (
     vsi_nn_graph_t       * graph,
     vsi_nn_tensor_id_t     id
@@ -619,6 +635,21 @@ OVXLIB_API void vsi_nn_RemoveTensor
 OVXLIB_API vsi_status vsi_nn_TrySetupCompleteSignalNode
     (
     vsi_nn_graph_t* graph
+    );
+
+void  vsi_nn_get_tensor_consumers
+    (
+    vsi_nn_graph_t* graph,
+    vsi_nn_tensor_id_t tensor_id,
+    vsi_nn_node_t** nodes,
+    uint32_t* count
+    );
+
+void vsi_nn_get_tensor_provider
+    (
+    vsi_nn_graph_t* graph,
+    vsi_nn_tensor_id_t tensor_id,
+    vsi_nn_node_t** node
     );
 
 #ifdef __cplusplus

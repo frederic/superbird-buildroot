@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -288,6 +288,15 @@ ol_txrx_update_tx_queue_groups(
     u_int32_t group_vdev_bit_mask, vdev_bit_mask, group_vdev_id_mask;
     u_int32_t membership;
     struct ol_txrx_vdev_t *vdev;
+
+    if (group_id >= OL_TX_MAX_TXQ_GROUPS) {
+        TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
+            "%s: invalid group_id=%u, ignore update.\n",
+            __func__,
+            group_id);
+        return;
+    }
+
     group = &pdev->txq_grps[group_id];
 
     membership = OL_TXQ_GROUP_MEMBERSHIP_GET(vdev_id_mask,ac_mask);
@@ -477,7 +486,7 @@ ol_txrx_pdev_attach(
         desc_per_page = desc_per_page >> 1;
     }
     pdev->tx_desc.page_divider = (sig_bit - 1);
-    TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+    TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
         "page_divider 0x%x, offset_filter 0x%x num elem %d, ol desc num page %d, ol desc per page %d",
         pdev->tx_desc.page_divider, pdev->tx_desc.offset_filter,
         desc_pool_size, pdev->tx_desc.desc_pages.num_pages,
@@ -894,7 +903,7 @@ void
 ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev, int force)
 {
     int i = 0;
-    struct ol_txrx_stats_req_internal *req;
+    struct ol_txrx_stats_req_internal *req, *temp_req;
 
     /*checking to ensure txrx pdev structure is not NULL */
     if (!pdev) {
@@ -913,7 +922,7 @@ ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev, int force)
             "Warning: the txrx req list is not empty, depth=%d\n",
             pdev->req_list_depth
             );
-    TAILQ_FOREACH(req, &pdev->req_list, req_list_elem) {
+    TAILQ_FOREACH_SAFE(req, &pdev->req_list, req_list_elem, temp_req) {
         TAILQ_REMOVE(&pdev->req_list, req, req_list_elem);
         pdev->req_list_depth--;
         TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
@@ -1299,6 +1308,25 @@ void ol_txrx_osif_vdev_register(ol_txrx_vdev_handle vdev,
     #ifdef QCA_LL_TX_FLOW_CT
     vdev->osif_flow_control_cb = txrx_ops->tx.flow_control_cb;
     #endif /* QCA_LL_TX_FLOW_CT */
+}
+
+/**
+ * ol_txrx_osif_pdev_mon_register_cbk() - register monitor rx callback
+ * @txrx_pdev: pdev handle
+ * @cbk: monitor rx callback function
+ *
+ * Return: none
+ */
+void ol_txrx_osif_pdev_mon_register_cbk(
+	ol_txrx_pdev_handle txrx_pdev,
+	ol_txrx_vir_mon_rx_fp cbk)
+{
+	TXRX_ASSERT2(txrx_pdev);
+
+	if (NULL == txrx_pdev)
+	    return;
+
+	txrx_pdev->osif_rx_mon_cb = cbk;
 }
 
 void

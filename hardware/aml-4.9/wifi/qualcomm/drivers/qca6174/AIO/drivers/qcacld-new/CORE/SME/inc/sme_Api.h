@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -130,6 +130,7 @@ typedef struct _smeConfigParams
     uint8_t      sub20_config_info;
     uint8_t      sub20_channelwidth;
     uint8_t      sub20_dynamic_channelwidth;
+    bool         sta_change_cc_via_beacon;
 } tSmeConfigParams, *tpSmeConfigParams;
 
 typedef enum
@@ -245,7 +246,24 @@ typedef struct {
     u_int8_t smeThermalMgmtEnabled;
     u_int32_t smeThrottlePeriod;
     u_int8_t sme_throttle_duty_cycle_tbl[SME_MAX_THROTTLE_LEVELS];
+#ifdef FEATURE_WLAN_THERMAL_SHUTDOWN
+    uint8_t  thermal_shutdown_enabled;
+    uint8_t  thermal_shutdown_auto_enabled;
+    uint16_t thermal_resume_threshold;
+    uint16_t thermal_warning_threshold;
+    uint16_t thermal_suspend_threshold;
+    uint16_t thermal_sample_rate;
+#endif
+
 } tSmeThermalParams;
+
+typedef struct {
+    u_int32_t enable;
+    u_int32_t delta_degreeHigh;
+    u_int32_t delta_degreeLow;
+    u_int32_t cooling_time;
+    u_int32_t dpd_dur_max;
+} tSmeDPDRecalParams;
 
 #ifdef WLAN_FEATURE_APFIND
 struct sme_ap_find_request_req{
@@ -285,6 +303,12 @@ struct sme_5g_band_pref_params {
 	int8_t      rssi_penalize_threshold_5g;
 	uint8_t     rssi_penalize_factor_5g;
 	uint8_t     max_rssi_penalize_5g;
+};
+
+struct sme_mnt_filter_type_req{
+    u_int32_t vdev_id;
+    u_int16_t request_data_len;
+    u_int8_t* request_data;
 };
 
 /*-------------------------------------------------------------------------
@@ -3809,6 +3833,14 @@ eHalStatus sme_RoamCsaIeRequest(tHalHandle hHal, tCsrBssid bssid,
 eHalStatus sme_InitThermalInfo( tHalHandle hHal, tSmeThermalParams thermalParam );
 /* ---------------------------------------------------------------------------
     \fn sme_InitThermalInfo
+    \brief  SME API to initialize the thermal mitigation parameters
+    \param  hHal
+    \param  thermalParam : thermal mitigation parameters
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_InitDPDRecalInfo( tHalHandle hHal, tSmeDPDRecalParams thermalParam );
+/* ---------------------------------------------------------------------------
+    \fn sme_InitThermalInfo
     \brief  SME API to set the thermal mitigation level
     \param  hHal
     \param  level : thermal mitigation level
@@ -4091,15 +4123,6 @@ eHalStatus sme_UpdateDFSScanMode(tHalHandle hHal,
 v_BOOL_t sme_GetDFSScanMode(tHalHandle hHal);
 
 /* ---------------------------------------------------------------------------
-    \fn sme_staInMiddleOfRoaming
-    \brief  This function returns TRUE if STA is in the middle of roaming state
-    \param  hHal - HAL handle for device
-    \param  sessionId - Session identifier
-    \- return TRUE or FALSE
-    -------------------------------------------------------------------------*/
-tANI_BOOLEAN sme_staInMiddleOfRoaming(tHalHandle hHal, tANI_U8 sessionId);
-
-/* ---------------------------------------------------------------------------
     \fn sme_PsOffloadIsStaInPowerSave
     \brief  This function returns TRUE if STA is in power save
     \param  hHal - HAL handle for device
@@ -4310,11 +4333,6 @@ eHalStatus sme_set_ll_ext_cb(tHalHandle hal,
 
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
-eHalStatus sme_fw_mem_dump(tHalHandle hHal, void *recvd_req);
-eHalStatus sme_fw_mem_dump_register_cb(tHalHandle hHal,
-    void (*callback_routine)(void *cb_context, struct fw_dump_rsp *rsp));
-eHalStatus sme_fw_mem_dump_unregister_cb(tHalHandle hHal);
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /*--------------------------------------------------------------------------
   \brief sme_UpdateRoamOffloadEnabled() - enable/disable roam offload feature
@@ -4513,6 +4531,14 @@ eHalStatus sme_set_tsfcb(tHalHandle hHal,
 VOS_STATUS sme_apfind_set_cmd(struct sme_ap_find_request_req *input);
 #endif /* WLAN_FEATURE_APFIND */
 
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+eHalStatus sme_AddCSAIndCallback
+(
+   tHalHandle hHal,
+   void (*pCallbackfn)(void *pAdapter, void *CSAindParam)
+);
+#endif//#ifdef
+
 /**
  * sme_enable_disable_mas() - Function to set MAS value to UMAC
  * @val:        1-Enable, 0-Disable
@@ -4604,11 +4630,26 @@ VOS_STATUS sme_set_btc_wlan_coex_tx_power(uint32_t coex_tx_power);
 VOS_STATUS sme_configure_pta_coex(uint8_t coex_pta_config_enable, uint32_t coex_pta_config_param);
 #endif
 
+#ifdef WMI_COEX_BTC_DUTYCYCLE
+VOS_STATUS sme_set_btc_coex_dutycycle(uint32_t coex_btc_PauseDuration,uint32_t coex_btc_UnPauseDuration);
+#endif
+
 uint8_t    sme_is_any_session_in_connected_state(tHalHandle h_hal);
 
 typedef void ( *tSmeSetThermalLevelCallback)(void *pContext, u_int8_t level);
 void sme_add_set_thermal_level_callback(tHalHandle hHal,
                    tSmeSetThermalLevelCallback callback);
+typedef void (*tSmeThermalTempIndCb)(void *pContext, u_int32_t degree_c);
+/**
+ * sme_add_thermal_temperature_ind_callback() - Set callback fn for thermal
+ * temperature indication
+ * hHal: Handler to HAL
+ * callback: The callback function
+ *
+ * Return: void
+ */
+void sme_add_thermal_temperature_ind_callback(tHalHandle hHal,
+                   tSmeThermalTempIndCb callback);
 
 eHalStatus sme_handle_set_fcc_channel(tHalHandle hHal,
 		bool fcc_constraint,
@@ -4710,6 +4751,9 @@ void sme_update_fine_time_measurement_capab(tHalHandle hal, uint32_t val);
 eHalStatus sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id);
 
 eHalStatus sme_update_txrate(tHalHandle hal, struct sir_txrate_update *req);
+
+eHalStatus sme_peer_flush_pending(tHalHandle hal,
+				  struct sme_flush_pending *req);
 
 void sme_send_disassoc_req_frame(tHalHandle hal, uint8_t session_id,
 		uint8_t *peer_mac, tANI_U16 reason, uint8_t wait_for_ack);
@@ -4825,5 +4869,181 @@ eHalStatus sme_clear_random_mac(tHalHandle hal, uint32_t session_id,
 
 eHalStatus sme_set_chip_pwr_save_fail_cb(tHalHandle hal, void (*cb)( void *,
 				struct chip_pwr_save_fail_detected_params *));
+
+eHalStatus sme_set_ac_txq_optimize(tHalHandle hal_handle, uint8_t *value);
+
+VOS_STATUS sme_mnt_filter_type_cmd(struct sme_mnt_filter_type_req *input);
+
+/**
+ * sme_is_sta_key_exchange_in_progress() - checks whether the STA/P2P client
+ * session has key exchange in progress
+ *
+ * @hal: global hal handle
+ * @session_id: session id
+ *
+ * Return: true - if key exchange in progress
+ *         false - if not in progress
+ */
+bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id);
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+typedef struct {
+	uint8_t vdev_id;                             /** Vdev ID */
+	uint32_t time_t1;                             /** T1 for motion detection (in ms) */
+	uint32_t time_t2;                             /** T2 for fine motion detection (in ms) */
+	uint32_t n1;                                  /** number of packets for coarse detection */
+	uint32_t n2;                                  /** number of packets for fine detection */
+	uint32_t time_t1_gap;                         /** gap between packets in course detection (in ms) */
+	uint32_t time_t2_gap;                         /** gap between packets in fine detection (in ms) */
+	uint32_t coarse_K;                            /** number of times fine motion detection has to be
+							  performed for coarse detection*/
+	uint32_t fine_K;                              /** number of times fine motion detection has to be
+							  performed for fine detection*/
+	uint32_t coarse_Q;                            /** number of times motion is expected to be detected
+							  for success case in coarse detection*/
+	uint32_t fine_Q;                              /** number of times motion is expected to be detected
+							  for success case in fine detection*/
+	uint32_t md_coarse_thr_high;                  /** higher threshold value (in percent)
+                                                          from host to FW, which will be used in
+                                                          coarse detection phase of motion detection.
+                                                          This is the threshold for the correlation
+                                                          of the old RF local-scattering environment
+                                                          with the current RF local-scattering
+                                                          environment.  A value of 100(%) indicates
+                                                          that neither the transceiver nor any
+                                                          nearby objects have changed position. */
+	uint32_t md_fine_thr_high;                    /** higher threshold value (in percent)
+	                                                  from host to FW, which will be used in
+	                                                  fine detection phase of motion detection.
+	                                                  This is the threshold for correlation
+                                                          between the old and current RF environments,
+                                                          as explained above. */
+	uint32_t md_coarse_thr_low;                   /** lower threshold value (in percent)
+                                                          for immediate detection of motion in
+                                                          coarse detection phase.
+                                                          This is the threshold for correlation
+                                                          between the old and current RF environments,
+                                                          as explained above. */
+	uint32_t md_fine_thr_low;                     /** lower threshold value (in percent)
+                                                          for immediate detection of motion in
+                                                          fine detection phase.
+                                                          This is the threshold for correlation
+                                                          between the old and current RF environments,
+                                                          as explained above. */
+} tSirMotionDetConfig;
+
+typedef struct {
+	uint8_t vdev_id;              /** Vdev ID */
+	uint32_t bl_time_t;            /** time T for baseline (in ms), every bl_time_t, bl_n packets are sent */
+	uint32_t bl_packet_gap;        /** gap between packets for baseline (in ms) */
+	uint32_t bl_n;                 /** number of packets to be sent during one baseline */
+	uint32_t bl_num_meas;          /** number of times the baseline measurement to be done */
+} tSirMotionDetBaseLineConfig;
+
+typedef struct {
+	uint8_t vdev_id;              /** Vdev ID */
+	bool enable;               /** start = 1, stop =0 */
+} tSirMotionDetEnable;
+
+typedef struct {
+	uint8_t vdev_id;              /** Vdev ID */
+	bool enable;               /** start = 1, stop =0 */
+} tSirMotionDetBaseLineEnable;
+
+eHalStatus sme_MotionDetConfig(tHalHandle hHal, tSirMotionDetConfig *pMotionDetConfig);
+eHalStatus sme_MotionDetEnable(tHalHandle hHal, tSirMotionDetEnable *pMotionDetEanble);
+eHalStatus sme_MotionDetBaseLineConfig(tHalHandle hHal, tSirMotionDetBaseLineConfig *pMotionDetBaseLineConfig);
+eHalStatus sme_MotionDetBaseLineEnable(tHalHandle hHal, tSirMotionDetBaseLineEnable *pMotionDetBaseLineEnable);
+
+eHalStatus sme_set_mt_host_ev_cb(tHalHandle hHal,
+	VOS_STATUS (*pcallbackfn)(void *pcallbackcontext, tSirMtEvent* pEvent),
+	void *pcallbackcontext);
+#endif
+eHalStatus sme_thermal_throttle_set_conf_cmd(tHalHandle hHal, bool enable,
+                                             tANI_U32 dc, tANI_U32 dc_off_percent,
+                                             tANI_U32 prio);
+eHalStatus sme_thermal_throttle_mgmt_cmd(tHalHandle hHal, tANI_U16 lower_thresh_deg,
+                                         tANI_U16 higher_thresh_deg);
+/**
+ * sme_unpack_rsn_ie: wrapper to unpack RSN IE and update def RSN params
+ * if optional fields are not present.
+ * @hal: handle returned by mac_open
+ * @buf: rsn ie buffer pointer
+ * @buf_len: rsn ie buffer length
+ * @rsn_ie: outframe rsn ie structure
+ * @append_ie: flag to indicate if the rsn_ie need to be appended from buf
+ *
+ * Return: parse status
+ */
+uint32_t sme_unpack_rsn_ie(tHalHandle hal, uint8_t *buf,
+                        uint8_t buf_len, tDot11fIERSN *rsn_ie);
+
+struct sme_peer_cfr_capture_conf {
+    u32 vdev_id;
+    tSirMacAddr peer_macaddr;
+    u32 request;
+    u32 periodicity;
+    u32 bandwidth;
+    u32 capture_method;
+};
+eHalStatus sme_periodic_cfr_enable(u8 cfr_enable);
+eHalStatus sme_cfr_capture_configure(struct sme_peer_cfr_capture_conf arg);
+
+typedef struct {
+	uint32_t vdev_id;              /* Vdev ID */
+	uint32_t start;                /* Start/Stop */
+	uint32_t sync_time;            /* Lower 32-bit of the TSF at which the
+                                        * pulse should be synced */
+	uint32_t pulse_interval;       /* Periodicity of pulses in micro secs */
+	uint32_t active_sync_period;   /* Number of beacons to sync before generating
+                                        * pulse in units of beacon interval.
+                                        * Valid for clock slaves only */
+	uint32_t gpio_pin;             /* GPIO Pin number to be used */
+	uint32_t pulse_width;          /* Duration of pulse in micro secs */
+} tSirHpcsPulseParmasConfig;
+
+eHalStatus sme_hpcs_pulse_params_conf_cmd(tHalHandle hHal, tSirHpcsPulseParmasConfig *pHpcsPulseParams);
+
+/**
+ * sme_update_owe_info() - Update OWE info
+ * @hHal: hal context
+ * @assoc_ind: assoc ind
+ *
+ * Return: eHalStatus
+ */
+eHalStatus sme_update_owe_info(tHalHandle hHal,
+			       struct sSirSmeAssocInd *assoc_ind);
+/**
+ * sme_send_mgmt_tx() - Sends mgmt frame from CSR to LIM
+ * @hal: The handle returned by mac_open
+ * @session_id: session id
+ * @buf: pointer to frame
+ * @len: frame length
+ *
+ * Return: eHalStatus
+ */
+eHalStatus sme_send_mgmt_tx(tHalHandle hal, uint8_t session_id,
+				const uint8_t *buf, uint32_t len);
+#ifdef WLAN_FEATURE_SAE
+/**
+ * sme_handle_sae_msg() - Sends SAE message received from supplicant
+ * @hal: The handle returned by mac_open
+ * @session_id: session id
+ * @sae_status: status of SAE authentication
+ * @peer_mac_addr: mac address of the peer to be authenticated
+ *
+ * Return: HAL_STATUS
+ */
+eHalStatus sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
+			      uint8_t sae_status,
+			      tSirMacAddr peer_mac_addr);
+#else
+static inline eHalStatus sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
+					    uint8_t sae_status,
+					    tSirMacAddr peer_mac_addr)
+{
+	return eHAL_STATUS_SUCCESS;
+}
+#endif
 
 #endif //#if !defined( __SME_API_H )

@@ -55,17 +55,19 @@ enum {
 	HDMIRX_MODE_PAO = 1,
 };
 
-struct extn_chipinfo {
-	/* try to check papb before fetch pcpd
-	 * no nonpcm2pcm irq for tl1
-	 */
-	bool no_nonpcm2pcm_clr;
+/*
+ * TXLX: hdmirx arc from spdif
+ * TL1: hdmirx arc from spdifA/spdifB
+ * TM2: hdmirx arc from spdifA/spdifB/earctx_spdif
+ */
+enum {
+	TXLX = 0,
+	TL1 = 1,
+	TM2 = 2,
+};
 
-	/* eARC-ARC or CEC-ARC
-	 * CEC-ARC: tl1
-	 * eARC-ARC: sm1/tm2, etc
-	 */
-	bool cec_arc;
+struct extn_chipinfo {
+	int arc_version;
 };
 
 struct extn {
@@ -297,18 +299,37 @@ static int extn_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct extn *p_extn = runtime->private_data;
 	unsigned int start_addr, end_addr, int_addr;
+	unsigned int period, threshold;
 
 	start_addr = runtime->dma_addr;
-	end_addr = start_addr + runtime->dma_bytes - 8;
-	int_addr = frames_to_bytes(runtime, runtime->period_size) / 8;
+	end_addr = start_addr + runtime->dma_bytes - FIFO_BURST;
+	period	 = frames_to_bytes(runtime, runtime->period_size);
+	int_addr = period / FIFO_BURST;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		struct frddr *fr = p_extn->fddr;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, fr->fifo_depth);
+		threshold /= 2;
+		/* Use all the fifo */
+		aml_frddr_set_fifos(fr, fr->fifo_depth, threshold);
 
 		aml_frddr_set_buf(fr, start_addr, end_addr);
 		aml_frddr_set_intrpt(fr, int_addr);
 	} else {
 		struct toddr *to = p_extn->tddr;
+
+		/*
+		 * Contrast minimum of period and fifo depth,
+		 * and set the value as half.
+		 */
+		threshold = min(period, to->fifo_depth);
+		threshold /= 2;
+		aml_toddr_set_fifos(to, threshold);
 
 		aml_toddr_set_buf(to, start_addr, end_addr);
 		aml_toddr_set_intrpt(to, int_addr);
@@ -426,8 +447,14 @@ static int extn_dai_probe(struct snd_soc_dai *cpu_dai)
 
 	pr_info("asoc debug: %s-%d\n", __func__, __LINE__);
 
-	if (p_extn->chipinfo && p_extn->chipinfo->cec_arc)
+	if (p_extn->chipinfo && p_extn->chipinfo->arc_version == TL1)
 		extn_create_controls(card, p_extn);
+
+	if (p_extn->chipinfo && p_extn->chipinfo->arc_version == TM2)
+		tm2_arc_source_select(SPDIFA_TO_HDMIRX);
+
+	if (get_audioresample(RESAMPLE_A))
+		resample_set(RESAMPLE_A, RATE_48K);
 
 	return 0;
 }
@@ -441,9 +468,6 @@ static int extn_dai_startup(
 	struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai)
 {
-	if (get_audioresample(RESAMPLE_A))
-		resample_set(RESAMPLE_A, RATE_48K);
-
 	return 0;
 }
 
@@ -470,7 +494,6 @@ static int extn_dai_prepare(
 			frddr_src_get_str(dst));
 
 		aml_frddr_select_dst(fr, dst);
-		aml_frddr_set_fifos(fr, 0x40, 0x20);
 	} else {
 		struct toddr *to = p_extn->tddr;
 		unsigned int msb = 0, lsb = 0, toddr_type = 0;
@@ -542,7 +565,6 @@ static int extn_dai_prepare(
 
 		aml_toddr_select_src(to, src);
 		aml_toddr_set_format(to, &fmt);
-		aml_toddr_set_fifos(to, 0x40);
 	}
 
 	return 0;
@@ -957,8 +979,11 @@ static const struct snd_soc_component_driver extn_component = {
 };
 
 struct extn_chipinfo tl1_extn_chipinfo = {
-	.no_nonpcm2pcm_clr = true,
-	.cec_arc           = true,
+	.arc_version	= TL1,
+};
+
+struct extn_chipinfo tm2_extn_chipinfo = {
+	.arc_version	= TM2,
 };
 
 static const struct of_device_id extn_device_id[] = {
@@ -969,7 +994,11 @@ static const struct of_device_id extn_device_id[] = {
 		.compatible = "amlogic, tl1-snd-extn",
 		.data       = &tl1_extn_chipinfo,
 	},
-	{},
+	{
+		.compatible = "amlogic, tm2-snd-extn",
+		.data       = &tm2_extn_chipinfo,
+	},
+	{}
 };
 
 MODULE_DEVICE_TABLE(of, extn_device_id);

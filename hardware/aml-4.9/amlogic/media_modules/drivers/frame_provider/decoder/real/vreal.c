@@ -41,8 +41,8 @@
 #include <linux/amlogic/media/utils/vdec_reg.h>
 #include "../utils/amvdec.h"
 
-#include "../../../stream_input/parser/streambuf.h"
-#include "../../../stream_input/parser/streambuf_reg.h"
+#include "../../../stream_input/amports/streambuf.h"
+#include "../../../stream_input/amports/streambuf_reg.h"
 #include "../../../stream_input/parser/rmparser.h"
 
 #include "vreal.h"

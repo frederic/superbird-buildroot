@@ -308,7 +308,24 @@ int sensor_fsm_set_param( void *fsm, uint32_t param_id, void *input, uint32_t in
 
         break;
     }
+    case FSM_PARAM_SET_SENSOR_MODE_SWITCH: {
+        if ( !input || input_size != sizeof( uint32_t ) ) {
+            LOG( LOG_ERR, "Invalid param, param_id: %d.", param_id );
+            rc = -1;
+            break;
+        }
 
+        ctx_ptr = ACAMERA_FSM2CTX_PTR(p_fsm);
+
+        p_fsm->preset_mode = *(uint32_t *)input;
+        p_fsm->ctrl.stop_streaming( p_fsm->sensor_ctx );
+        sensor_hw_init( p_fsm );
+        sensor_configure_buffers( p_fsm );
+        sensor_sw_init( p_fsm );
+        p_fsm->ctrl.start_streaming( p_fsm->sensor_ctx );
+        acamera_isp_input_port_mode_request_write( p_fsm->cmn.isp_base, ACAMERA_ISP_INPUT_PORT_MODE_REQUEST_SAFE_START );
+        break;
+    }
     default:
         rc = -1;
         break;

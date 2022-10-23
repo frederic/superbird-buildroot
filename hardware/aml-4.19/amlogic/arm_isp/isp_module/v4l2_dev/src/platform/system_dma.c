@@ -519,6 +519,8 @@ int32_t system_dma_sg_fwmem_setup( void *ctx, int32_t buff_loc, fwmem_addr_pair_
 
 inline void system_memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
 {
+    memcpy_toio(to, from, count);
+/*
     const unsigned int *f = from;
     count /= 4;
     while (count) {
@@ -527,10 +529,13 @@ inline void system_memcpy_toio(volatile void __iomem *to, const void *from, size
         f++;
         to += 4;
     }
+*/
 }
 
 inline void system_memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
 {
+    memcpy_fromio(to, from ,count);
+/*
     unsigned int *t = to;
     count /= 4;
     while (count) {
@@ -539,6 +544,7 @@ inline void system_memcpy_fromio(void *to, const volatile void __iomem *from, si
         t++;
         from += 4;
     }
+*/
 }
 
 static void memcopy_func( unsigned long p_task )

@@ -1,0 +1,18 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default,
+      channel: 2
+    }
+  },
+  {
+    type: fileout,
+    param:
+    {
+      path: "/data/ain.pcm"
+    }
+  }
+]

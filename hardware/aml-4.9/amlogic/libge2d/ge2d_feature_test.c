@@ -470,7 +470,7 @@ static int do_fill_rectangle(aml_ge2d_t *amlge2d)
 
     pge2dinfo->color = rect_color;
     pge2dinfo->dst_info.rect.x = dst_rect_x;
-    pge2dinfo->dst_info.rect.y = dst_rect_x;
+    pge2dinfo->dst_info.rect.y = dst_rect_y;
     pge2dinfo->dst_info.rect.w = dst_rect_w;
     pge2dinfo->dst_info.rect.h = dst_rect_h;
     stime = myclock();
@@ -528,8 +528,6 @@ static int do_blend(aml_ge2d_t *amlge2d)
         pge2dinfo->src_info[1].rect.w = src2_rect_w;
         pge2dinfo->src_info[1].rect.h = src2_rect_h;
         pge2dinfo->src_info[1].fill_color_en = 0;
-        if ((src2_layer_mode == LAYER_MODE_NON) && (src1_layer_mode == LAYER_MODE_PREMULTIPLIED))
-           pge2dinfo->src_info[0].format = PIXEL_FORMAT_RGBX_8888;
 
         pge2dinfo->dst_info.rect.x = dst_rect_x;
         pge2dinfo->dst_info.rect.y = dst_rect_y;

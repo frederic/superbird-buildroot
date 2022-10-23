@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -31,9 +31,9 @@
 
 #ifdef SHOW_LOGTRACE
 extern void wl_mschdbg_event_handler(dhd_pub_t *dhdp, void *raw_event_ptr, int type,
-									 void *data, int len);
+	void *data, int len);
 extern void wl_mschdbg_verboselog_handler(dhd_pub_t *dhdp, void *raw_event_ptr,
-		prcd_event_log_hdr_t *plog_hdr, uint32 *log_ptr);
+	prcd_event_log_hdr_t *plog_hdr, uint32 *log_ptr);
 #endif /* SHOW_LOGTRACE */
 
 #endif /* _dhd_mschdbg_h_ */

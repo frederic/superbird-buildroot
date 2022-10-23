@@ -1,7 +1,7 @@
 /*
  * Utility routines for configuring different memories in Broadcom chips.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -67,25 +67,25 @@ hndmem_num_banks(si_t *sih, int mem)
 		mem_info = R_REG(osh, &gciregs->wlan_mem_info);
 
 		switch (mem) {
-		case MEM_SOCRAM:
-			num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMSOCRAMBANKS_MASK) >>
+			case MEM_SOCRAM:
+				num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMSOCRAMBANKS_MASK) >>
 						WLAN_MEM_INFO_REG_NUMSOCRAMBANKS_SHIFT;
-			break;
-		case MEM_BM:
-			num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACBM_MASK) >>
+				break;
+			case MEM_BM:
+				num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACBM_MASK) >>
 						WLAN_MEM_INFO_REG_NUMD11MACBM_SHIFT;
-			break;
-		case MEM_UCM:
-			num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACUCM_MASK) >>
+				break;
+			case MEM_UCM:
+				num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACUCM_MASK) >>
 						WLAN_MEM_INFO_REG_NUMD11MACUCM_SHIFT;
-			break;
-		case MEM_SHM:
-			num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACSHM_MASK) >>
+				break;
+			case MEM_SHM:
+				num_banks = (mem_info & WLAN_MEM_INFO_REG_NUMD11MACSHM_MASK) >>
 						WLAN_MEM_INFO_REG_NUMD11MACSHM_SHIFT;
-			break;
-		default:
-			ASSERT(0);
-			break;
+				break;
+			default:
+				ASSERT(0);
+				break;
 		}
 	} else {
 		/* TODO: Figure out bank information using SOCRAM registers */
@@ -121,15 +121,15 @@ hndmem_bank_size(si_t *sih, hndmem_type_t mem, int bank_num)
 		gciregs = si_setcore(sih, GCI_CORE_ID, 0);
 
 		reg_data = ((mem &
-					 GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
-					GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
-				   ((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
-					<< GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
+				GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
+				GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
+				((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
+				 << GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
 		W_REG(osh, &gciregs->gci_indirect_addr, reg_data);
 
 		bank_info = R_REG(osh, &gciregs->wlan_bankxinfo);
 		bank_sz = (bank_info & WLAN_BANKXINFO_BANK_SIZE_MASK) >>
-				  WLAN_BANKXINFO_BANK_SIZE_SHIFT;
+			WLAN_BANKXINFO_BANK_SIZE_SHIFT;
 	} else {
 		/* TODO: Figure out bank size using SOCRAM registers */
 	}
@@ -155,7 +155,7 @@ hndmem_mem_base(si_t *sih, hndmem_type_t mem)
 	if (si_setcore(sih, SOCRAM_CORE_ID, 0))
 	{
 		base_addr = si_get_slaveport_addr(sih, CORE_SLAVE_PORT_1,
-										  CORE_BASE_ADDR_0, SOCRAM_CORE_ID, 0);
+			CORE_BASE_ADDR_0, SOCRAM_CORE_ID, 0);
 	} else {
 		/* TODO: Add code to get the base address of TCM */
 		base_addr = 0;
@@ -169,12 +169,12 @@ exit:
 
 #ifdef BCMDEBUG
 char *hndmem_type_str[] =
-{
-	"SOCRAM",	/* 0 */
-	"BM",		/* 1 */
-	"UCM",		/* 2 */
-	"SHM",		/* 3 */
-};
+	{
+		"SOCRAM",	/* 0 */
+		"BM",		/* 1 */
+		"UCM",		/* 2 */
+		"SHM",		/* 3 */
+	};
 
 /* Dumps the complete memory information */
 void
@@ -197,7 +197,7 @@ hndmem_dump_meminfo_all(si_t *sih)
 /* Configures the Sleep PDA for a particular bank for a given memory type */
 int
 hndmem_sleeppda_bank_config(si_t *sih, hndmem_type_t mem, int bank_num,
-							hndmem_config_t config, uint32 pda)
+		hndmem_config_t config, uint32 pda)
 {
 	uint32 savecore, reg_data;
 	gciregs_t *gciregs;
@@ -231,10 +231,10 @@ hndmem_sleeppda_bank_config(si_t *sih, hndmem_type_t mem, int bank_num,
 	gciregs = si_setcore(sih, GCI_CORE_ID, 0);
 
 	reg_data = ((mem &
-				 GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
-				GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
-			   ((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
-				<< GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
+			GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
+			GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
+			((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
+			 << GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
 
 	W_REG(osh, &gciregs->gci_indirect_addr, reg_data);
 
@@ -259,7 +259,7 @@ exit:
 /* Configures the Active PDA for a particular bank for a given memory type */
 int
 hndmem_activepda_bank_config(si_t *sih, hndmem_type_t mem,
-							 int bank_num, hndmem_config_t config, uint32 pda)
+		int bank_num, hndmem_config_t config, uint32 pda)
 {
 	uint32 savecore, reg_data;
 	gciregs_t *gciregs;
@@ -289,10 +289,10 @@ hndmem_activepda_bank_config(si_t *sih, hndmem_type_t mem,
 		gciregs = si_setcore(sih, GCI_CORE_ID, 0);
 
 		reg_data = ((mem &
-					 GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
-					GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
-				   ((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
-					<< GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
+				GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_MASK) <<
+				GCI_INDIRECT_ADDRESS_REG_GPIOINDEX_SHIFT) |
+				((bank_num & GCI_INDIRECT_ADDRESS_REG_REGINDEX_MASK)
+				 << GCI_INDIRECT_ADDRESS_REG_REGINDEX_SHIFT);
 
 		W_REG(osh, &gciregs->gci_indirect_addr, reg_data);
 
@@ -301,7 +301,7 @@ hndmem_activepda_bank_config(si_t *sih, hndmem_type_t mem,
 		}
 		else if (config == PDA_CONFIG_SET_FULL) {
 			W_REG(osh, &gciregs->wlan_bankxactivepda,
-				  WLAN_BANKX_SLEEPPDA_REG_SLEEPPDA_MASK);
+					WLAN_BANKX_SLEEPPDA_REG_SLEEPPDA_MASK);
 		} else {
 			W_REG(osh, &gciregs->wlan_bankxactivepda, 0);
 		}
@@ -381,7 +381,7 @@ exit:
  */
 int
 hndmem_activepda_mem_config(si_t *sih, hndmem_type_t mem, uint32 mem_start,
-							uint32 size, hndmem_config_t config)
+		uint32 size, hndmem_config_t config)
 {
 	int bank, bank_sz, num_banks;
 	int mem_end;
@@ -415,8 +415,8 @@ hndmem_activepda_mem_config(si_t *sih, hndmem_type_t mem, uint32 mem_start,
 		} else {
 			/* Check if the bank is completely overlaped with the given mem range */
 			if (((mem_start <= bank_start_addr) && (mem_end >= bank_end_addr)) ||
-					/* Check if the bank is partially overlaped with the given range */
-					((mem_start <= bank_end_addr) && (mem_end >= bank_start_addr))) {
+				/* Check if the bank is partially overlaped with the given range */
+				((mem_start <= bank_end_addr) && (mem_end >= bank_start_addr))) {
 				err = hndmem_activepda_bank_config(sih, mem, bank, config, 0);
 			}
 		}

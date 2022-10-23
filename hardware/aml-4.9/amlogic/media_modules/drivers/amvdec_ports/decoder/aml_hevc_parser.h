@@ -19,6 +19,7 @@
 #ifndef AML_HEVC_PARSER_H
 #define AML_HEVC_PARSER_H
 
+#include "../aml_vcodec_drv.h"
 #include "../utils/common.h"
 
 #define MAX_DPB_SIZE				16 // A.4.1

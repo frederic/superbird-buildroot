@@ -34,9 +34,15 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-
+#include <ctype.h>
 #include "common.h"
 #include "logs.h"
+
+#ifdef ANDROID_SLT
+	char *save_path = "/data/tmp/ca_%d_%d.rgb";
+#else
+	char *save_path = "/media/ca_%d_%d.rgb";
+#endif
 
 #define STR_VALUE(val) #val
 #define STR(name) STR_VALUE(name)
@@ -93,11 +99,10 @@ typedef struct _capture_module_t {
 
 static int sensor_bits = 10;
 
-static char *str_on_off[2] = { "ON", "OFF" };
-static unsigned char uv_buffer[1920*1080*3];
-static unsigned char buffer[1920*1080*3];
-
-uint64_t start_time,end_time;
+static int exit_status[4];
+//static char *str_on_off[2] = { "ON", "OFF" };
+static unsigned char uv_buffer[1920*1080 / 2];
+static unsigned char buffer[1920*1080 / 2];
 
 typedef enum render_mode {
     AFD_RENDER_MODE_CENTER,
@@ -198,28 +203,29 @@ int64_t GetTimeMsec() {
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-int slttest(int f, int t, int delta_s){
+int slttest(int f, int t, int delta_s, int s_type){
     FILE * read_file =NULL;
     FILE * write_file =NULL;
     int width = 1920;
     int height = 1080;
     int ret = -1;
     char name[60] = {'\0'};
+    char rm[128] = {'\0'};
     int i, j, k, err_flag;
 	int delta_set,delta;
-	int temp = 0;
+	int temp = 0, selected = 0;
     char md5[MD5_LEN + 1];
     char tempmd5[MD5_LEN + 1];
 	int index;
-	int max = 0,choosen = 0;
+	int max = 0;
 	int from, to;
 	from = f;
 	to = t;
 	delta_set = delta_s;
 	err_flag = 0;
-	printf("from: frame_%d to frame_%d\n", from, to - 1);
+
 	for (j = from; j < to; j++) {
-		sprintf(name, "/media/ca_%d.rgb", j);
+		sprintf(name, save_path, s_type, j);
 		if (!CalcFileMD5(name, tempmd5)) {
 			printf("Error occured1: read MD5 fail!\n");
 			return -1;
@@ -228,7 +234,7 @@ int slttest(int f, int t, int delta_s){
 		}
 		index = 0;
 		for (k = j; k < to; k++) {
-			sprintf(name, "/media/ca_%d.rgb", k);
+			sprintf(name, save_path, s_type, k);
 			if (CalcFileMD5(name, tempmd5)) {
 				if (strcmp(tempmd5, md5) == 0) {
 					index ++;
@@ -242,85 +248,89 @@ int slttest(int f, int t, int delta_s){
 		}
 		if (index > max) {
 			max = index;
-			choosen = j;
+			selected = j;
 		}
 		if (max > ( to - from + 1)/2)
 			break;
 	}
-	sprintf(name, "/media/ca_%d.rgb", choosen);
-	printf("choose frame_%d as base, same frames = %d\n", choosen, max);
-	if (!CalcFileMD5(name, md5)) {
-		printf("Error occured3: read MD5 fail!\n");
-		return -1;
-	}
-	read_file = fopen(name, "r");
-	for (i = 0; i < width * height * 3; i++) {
-		ret = fread(buffer + i, 1, 1, read_file);
-		if (ret < 0)
-			printf("read fail\n");
-	}
-	for (j = from; j < to; j++) {
-		sprintf(name, "/media/ca_%d.rgb", j);
-		if (!CalcFileMD5(name, tempmd5)) {
-			printf("Error occured4: read MD5 fail!\n");
-			return -1;
-		}
-		if (strcmp(tempmd5, md5) == 0) {
-			continue;
-		}
-		write_file = fopen(name, "r");
-		if (read_file == NULL || write_file == NULL) {
-			printf("open file error!\n");
-			return -1;
-		}
 
-		for (i = 0; i < width * height * 3; i++) {
-			ret = fread(uv_buffer + i, 1, 1, write_file);
-			if (ret < 0) {
-				printf("write fail\n");
+	sprintf(name, save_path, s_type, selected);
+    if (max != (to - from + 1)) {
+		if (!CalcFileMD5(name, md5)) {
+			printf("Error occured3: read MD5 fail!\n");
+			return -1;
+		}
+		read_file = fopen(name, "r");
+		for (i = 0; i < width * height / 2; i++) {
+			ret = fread(buffer + i, 1, 1, read_file);
+			if (ret < 0)
+				printf("read fail\n");
+		}
+		for (j = from; j < to; j++) {
+			sprintf(name, save_path, s_type, j);
+			if (!CalcFileMD5(name, tempmd5)) {
+				printf("Error occured4: read MD5 fail!\n");
 				return -1;
 			}
-		}
-		delta = 0;
-		for (i = 0; i < width * height * 3; i++) {
-			temp = abs(uv_buffer[i] - buffer[i]);
-			if (temp > delta) {
-				delta = temp;
+			if (strcmp(tempmd5, md5) == 0) {
+				continue;
 			}
-			if (temp > delta_set) {
-				//printf("location: x: %d, y: %d, temp: %d\n", i / 3 % width , i / (width * 3), temp);
+			write_file = fopen(name, "r");
+			if (read_file == NULL || write_file == NULL) {
+				printf("open file error!\n");
+				return -1;
 			}
+
+			for (i = 0; i < width * height / 2 ; i++) {
+				ret = fread(uv_buffer + i, 1, 1, write_file);
+				if (ret < 0) {
+					printf("write fail\n");
+					return -1;
+				}
+			}
+			delta = 0;
+			for (i = 0; i < width * height / 2; i++) {
+				temp = abs(uv_buffer[i] - buffer[i]);
+				if (temp > delta) {
+					delta = temp;
+				}
+				if (temp > delta_set) {
+					//printf("location: x: %d, y: %d, temp: %d\n", i / 3 % width , i / (width * 3), temp);
+				}
+			}
+			if (delta > delta_set) {
+				printf("WARNING: frame_%d: pixel diff max:%d larger than allow %d\n", j, delta, delta_set);
+				err_flag = -1;
+			}
+			if (write_file)
+				fclose(write_file);
 		}
-		if (delta > delta_set) {
-			printf("WARNING: frame_%d: pixel diff max:%d larger than allow %d\n", j, delta, delta_set);
-			err_flag = 1;
-		}
-		if (write_file)
-			fclose(write_file);
 	}
 	if (err_flag)
-		printf("ISP slt test fail!\n");
-	else
-		printf("ISP slt test success!\n");
+		printf("%s slt test fail!\n", (s_type == 0) ? "FR" :
+                ((s_type == 1) ? "Meta":
+                ((s_type == 2) ? "DS1":
+                ((s_type == 3) ? "DS2": "Other"))));
+	else {
+		printf("%s slt test success!\n", (s_type == 0) ? "FR" :
+                ((s_type == 1) ? "Meta":
+                ((s_type == 2) ? "DS1":
+                ((s_type == 3) ? "DS2": "Other"))));
+#ifdef ANDROID_SLT
+    sprintf(rm, "rm -rf /data/tmp/ca_%d_*",s_type);
+	system(rm);
+#else
+	sprintf(rm, "rm -rf /media/ca_%d_*",s_type);
+	system(rm);
+#endif
+	}
 	if (read_file)
 		fclose(read_file);
-	//system("rm -rf /media/ca_*");
-	return 0;
+	return err_flag;
 }
-static uint8_t cmd_do_af_refocus = 0;
+//static uint8_t cmd_do_af_refocus = 0;
 
-static void do_af_refocus(int videofd)
-{
-    struct v4l2_control ctrl;
-
-    ctrl.id = ISP_V4L2_CID_AF_REFOCUS;
-    ctrl.value = 0;
-
-    if (-1 == ioctl (videofd, VIDIOC_S_CTRL, &ctrl)) {
-        printf("Do AF refocus failed");
-    }
-}
-
+#ifndef ANDROID_SLT
 static void do_sensor_test_pattern(int videofd, int val)
 {
     struct v4l2_control ctrl;
@@ -342,18 +352,19 @@ static void do_sensor_preset(int videofd, int preset)
         printf("Do sensor preset failed");
     }
 }
-
-static void set_manual_exposure(int videofd, int enable)
+#endif
+#ifdef ANDROID_SLT
+static void do_sensor_pattern(int videofd, int val)
 {
     struct v4l2_control ctrl;
-    ctrl.id = V4L2_CID_EXPOSURE_AUTO;
-    ctrl.value = enable;
+    ctrl.id = V4L2_CID_SCENE_MODE;
+    ctrl.value = val;
     if (-1 == ioctl (videofd, VIDIOC_S_CTRL, &ctrl)) {
-        printf("set_manual_exposure failed\n");
+        printf("Do set sensor test pattern");
     }
 }
-
-void save_imgae(char *buff, unsigned int size, int flag, int count)
+#endif
+void save_image(unsigned char *buff, unsigned int size, int type, int count)
 {
     char name[60] = {'\0'};
     int fd = -1;
@@ -364,7 +375,8 @@ void save_imgae(char *buff, unsigned int size, int flag, int count)
     }
 	if(count < from_md5 )
 		return;
-    sprintf(name, "/media/ca_%d.rgb", count);
+
+    sprintf(name, save_path, type, count);
 
     fd = open(name, O_RDWR | O_CREAT, 0666);
     if (fd < 0) {
@@ -381,6 +393,7 @@ void save_imgae(char *buff, unsigned int size, int flag, int count)
  */
 void * video_thread(void *arg)
 {
+
     /* v4l2 variables */
     int                         videofd;
     struct v4l2_capability      v4l2_cap;
@@ -400,7 +413,12 @@ void * video_thread(void *arg)
     /* condition & loop flags */
     int                         rc = 0;
     int                         i,j;
+	uint64_t start_time,end_time;
+#ifdef ANDROID_SLT
+    __u32	v4l2_enum_type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
+#else
     __u32	v4l2_enum_type=V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+#endif
     unsigned char *displaybuf = NULL;
     uint64_t display_count = 0;
     int64_t start, end;
@@ -413,7 +431,11 @@ void * video_thread(void *arg)
             break;
         }
     }
-
+    if (stream_type != ARM_V4L2_TEST_STREAM_META)
+		ERR("%s: width %d, height %d\n",(stream_type == 0) ? "FR" :
+                ((stream_type == 2) ? "DS1":
+                ((stream_type == 3) ? "DS2": "Other")), tparm->width, tparm->height);
+	start_time = GetTimeMsec();
     /**************************************************
      * device open
      *************************************************/
@@ -423,8 +445,6 @@ void * video_thread(void *arg)
         printf("Error: cannot open video device\n");
         exit(1);
     }
-    INFO("[T#%d] The %s device was opened successfully.\n", stream_type, tparm->devname);
-
     tparm->videofd = videofd;
     /* check capability */
     memset (&v4l2_cap, 0, sizeof (struct v4l2_capability));
@@ -433,10 +453,6 @@ void * video_thread(void *arg)
         printf ("Error: get capability.\n");
         goto fatal;
     }
-
-    INFO("[T#%d] VIDIOC_QUERYCAP: capabilities=0x%x, device_caps:0x%x\n",
-        stream_type, v4l2_cap.capabilities, v4l2_cap.device_caps);
-
 
     /**************************************************
      * format configuration
@@ -452,7 +468,7 @@ void * video_thread(void *arg)
     //v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage = v4l2_fmt.fmt.pix_mp.width * v4l2_fmt.fmt.pix_mp.height;
     v4l2_fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
     //v4l2_fmt.fmt.pix_mp.num_planes = 2;
-
+#if 0
     INFO("[T#%d] VIDIO_S_FMT: type=%d, w=%d, h=%d, fmt=0x%x, field=%d\n",
         stream_type,
         v4l2_fmt.type,
@@ -460,7 +476,7 @@ void * video_thread(void *arg)
         v4l2_fmt.fmt.pix.height,
         v4l2_fmt.fmt.pix.pixelformat,
         v4l2_fmt.fmt.pix.field);
-
+#endif
     rc = ioctl (videofd, VIDIOC_S_FMT, &v4l2_fmt);
     if (rc < 0) {
         printf("Error: set format %d.\n", rc);
@@ -471,20 +487,9 @@ void * video_thread(void *arg)
         printf("Error: get format %d.\n", rc);
         goto fatal;
     }
-    INFO("[T#%d] VIDIO_G_FMT: type=%d, w=%d, h=%d, fmt=0x%x, field=%d\n",
-        stream_type,
-        v4l2_fmt.type,
-        v4l2_fmt.fmt.pix.width,
-        v4l2_fmt.fmt.pix.height,
-        v4l2_fmt.fmt.pix.pixelformat,
-        v4l2_fmt.fmt.pix.field);
 
     //real type and planes here
     v4l2_enum_type=v4l2_fmt.type;
-    if(v4l2_fmt.type==V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
-        INFO("[T#%d] multiplanar support planes=%d\n",
-            stream_type, v4l2_fmt.fmt.pix_mp.num_planes);
-    }
 
     int fr_bitdepth;
     //get the pixel format
@@ -506,7 +511,6 @@ void * video_thread(void *arg)
     /* request buffers */
     memset (&v4l2_rb, 0, sizeof (struct v4l2_requestbuffers));
     v4l2_rb.count = NB_BUFFER;
-    //v4l2_rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     v4l2_rb.type = v4l2_enum_type;
     v4l2_rb.memory = V4L2_MEMORY_MMAP;
     rc = ioctl (videofd, VIDIOC_REQBUFS, &v4l2_rb);
@@ -521,7 +525,6 @@ void * video_thread(void *arg)
         struct v4l2_plane buf_planes[v4l2_fmt.fmt.pix_mp.num_planes];
         memset (&v4l2_buf, 0, sizeof (struct v4l2_buffer));
         v4l2_buf.index = i;
-        //v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.type = v4l2_enum_type;
         v4l2_buf.memory = V4L2_MEMORY_MMAP;
         if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
@@ -536,20 +539,18 @@ void * video_thread(void *arg)
 
         if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE){
             v4l2_buf_length = v4l2_buf.length;
-            INFO("[T#%d] length: %u offset: %u\n", stream_type, v4l2_buf.length, v4l2_buf.m.offset);
-            v4l2_mem[i] = mmap (0, v4l2_buf.length, PROT_READ, MAP_SHARED,
+            v4l2_mem[i] = mmap (0, v4l2_buf.length, PROT_READ | PROT_WRITE, MAP_SHARED,
                 videofd, v4l2_buf.m.offset);
             ++total_mapped_mem;
-            INFO("[T#%d] Buffer[%d] mapped at address %p total_mapped_mem:%d.\n", stream_type, i, v4l2_mem[i],total_mapped_mem);
+
         }
         else if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
             for (j=0;j<v4l2_fmt.fmt.pix_mp.num_planes;j++) {
                 v4l2_buf_length = v4l2_buf.m.planes[j].length;
-                INFO("[T#%d] plane:%d multiplanar length: %u offset: %u\n", stream_type, j, v4l2_buf.m.planes[j].length, v4l2_buf.m.planes[j].m.mem_offset);
                 v4l2_mem[i*v4l2_fmt.fmt.pix_mp.num_planes + j] = mmap (0, v4l2_buf.m.planes[j].length, PROT_READ, MAP_SHARED,
                     videofd, v4l2_buf.m.planes[j].m.mem_offset);
                 ++total_mapped_mem;
-                INFO("[T#%d] Buffer[%d] mapped at address %p total_mapped_mem:%d.\n", stream_type,i*v4l2_fmt.fmt.pix_mp.num_planes + j, v4l2_mem[i*v4l2_fmt.fmt.pix_mp.num_planes + j],total_mapped_mem);
+
             }
         }
         if (v4l2_mem[i] == MAP_FAILED) {
@@ -564,7 +565,6 @@ void * video_thread(void *arg)
         struct v4l2_plane buf_planes[v4l2_fmt.fmt.pix_mp.num_planes];
         memset (&v4l2_buf, 0, sizeof (struct v4l2_buffer));
         v4l2_buf.index = i;
-        //v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.type = v4l2_enum_type;
         v4l2_buf.memory = V4L2_MEMORY_MMAP;
         if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
@@ -577,22 +577,35 @@ void * video_thread(void *arg)
             goto fatal;;
         }
     }
-    DBG("[T#%d] Queue buf done.\n", stream_type);
-
 
     /**************************************************
      * V4L2 stream on, get buffers
      *************************************************/
+#ifndef ANDROID_SLT
+if (stream_type == ARM_V4L2_TEST_STREAM_FR)
+{
+    do_sensor_test_pattern(videofd, 1);
     do_sensor_test_pattern(videofd, 5);
+}
+#endif
+#ifdef ANDROID_SLT
+    do_sensor_pattern(videofd, 0);
+    do_sensor_pattern(videofd, 1);
+#endif
     /* stream on */
     //int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     int type = v4l2_enum_type;
+	if (stream_type == ARM_V4L2_TEST_HAS_META)
+		goto fatal;
     rc = ioctl (videofd, VIDIOC_STREAMON, &type);
     if (rc < 0) {
         printf("Error: streamon.\n");
         goto fatal;
     }
-    INFO("[T#%d] Video stream is on.\n", stream_type);
+    INFO("%s Video stream is on.\n", (stream_type == 0) ? "FR" :
+                ((stream_type == 1) ? "Meta":
+                ((stream_type == 2) ? "DS1":
+                ((stream_type == 3) ? "DS2": "Other"))));
 
     if (stream_type == fps_test_port) {
         start = GetTimeMsec();
@@ -630,8 +643,6 @@ void * video_thread(void *arg)
         }
 
         /* wait (poll) for a frame event */
-        //printf ("[T#%d] Start polling (exit flag = %d, capture count = %d)\n",
-        //    stream_type, v4l2_test_thread_exit, tparm->capture_count);
         pfds[0].fd = videofd;
         pfds[0].events = POLLIN;
         pfds[0].revents = 0;
@@ -646,12 +657,10 @@ void * video_thread(void *arg)
             printf ("Error: poll error\n");
             // break;
         } else {
-            // DBG ("[T#%d] Frame ready (pollret = %d, results = %d)\n", stream_type, pollret, pfds[0].revents);
         }
 
         // dqbuf from video node
         memset (&v4l2_buf, 0, sizeof (struct v4l2_buffer));
-        //v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.type = v4l2_enum_type;
         v4l2_buf.memory = V4L2_MEMORY_MMAP;
         if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
@@ -680,7 +689,6 @@ void * video_thread(void *arg)
             newframe.bit_depth[0] = sensor_bits;
             newframe.bytes_per_line[0] = (((newframe.width[0] * ((sensor_bits + 7) >> 3)) + 127) >> 7 ) << 7;  // for padding
             newframe.paddr[0] = v4l2_mem[idx];
-            DBG("[T#%d] Buffer[%d] single to capture.\n", stream_type, newframe.paddr[0]);
             newframe.num_planes=1;
         }else if(v4l2_buf.type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE){
             newframe.num_planes=v4l2_fmt.fmt.pix_mp.num_planes;
@@ -693,16 +701,8 @@ void * video_thread(void *arg)
                 else
 #endif
                     newframe.bit_depth[i] = fr_bitdepth;
-                /*
-                if (stream_type == ARM_V4L2_TEST_STREAM_RAW) {
-                    printf("i:%d newframe.bit_depth[i]:%d sensor_bits:%d",i,newframe.bit_depth[i],sensor_bits);
-                }
-                */
-                //newframe.bytes_per_line[i] = (((newframe.width[i] * ((sensor_bits + 7) >> 3)) + 127) >> 7 ) << 7;  // for padding
                 newframe.bytes_per_line[i] = v4l2_fmt.fmt.pix_mp.plane_fmt[i].bytesperline;
                 newframe.paddr[i] = v4l2_mem[idx*newframe.num_planes+i];
-                //DBG("[T#%d] i:%d newframe.paddr:%p to capture idx:%d.\n", stream_type,i, newframe.paddr[i],idx);
-                //newframe.paddr[i] = v4l2_mem[idx];
             }
         }
 
@@ -714,11 +714,15 @@ void * video_thread(void *arg)
         src.fmt = v4l2_fmt.fmt.pix.pixelformat;
 
         if (src.fmt == V4L2_PIX_FMT_NV12) {
+#ifdef ANDROID_SLT
+			memcpy(displaybuf, v4l2_mem[idx], src.width * src.height * 3 / 2);
+#else
 			memcpy(displaybuf, v4l2_mem[idx * 2], v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage);
 			memcpy(displaybuf + v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, v4l2_mem[idx * 2 + 1],
 									v4l2_fmt.fmt.pix_mp.plane_fmt[1].sizeimage);
+#endif
         } else {
-                memcpy(displaybuf, src.ptr, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage);
+            memcpy(displaybuf, src.ptr, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage);
         }
 
         rc = ioctl (videofd, VIDIOC_QBUF, &v4l2_buf);
@@ -729,24 +733,24 @@ void * video_thread(void *arg)
 
         /***** select save file or display through different stream_type *****/
         if (stream_type == ARM_V4L2_TEST_STREAM_FR) {
-			save_imgae(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type, display_count);
+#ifdef ANDROID_SLT
+			save_image(displaybuf, src.width * src.height * 3 / 2, stream_type, display_count);
+#else
+			save_image(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type, display_count);
+
         } else if (stream_type == ARM_V4L2_TEST_STREAM_META) {
         //do nothing
         } else if (stream_type == ARM_V4L2_TEST_STREAM_DS1) {
-        //save_imgae(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type);
+		    save_image(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type, display_count);
         } else if (stream_type == ARM_V4L2_TEST_STREAM_DS2) {
-        //save_imgae(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type);
+            save_image(displaybuf, v4l2_fmt.fmt.pix_mp.plane_fmt[0].sizeimage, stream_type, display_count);
+#endif
         }
 
         display_count++;
         if ((stream_type == fps_test_port) && (display_count % 100 == 0)) {
             end = GetTimeMsec();
             end = end - start;
-            printf("stream port %s fps is : %d\n",
-                (stream_type == 0) ? "FR" :
-                ((stream_type == 1) ? "Meta":
-                ((stream_type == 2) ? "DS1":
-                ((stream_type == 3) ? "DS2": "Other"))), (100 * 1000) /end);
             start = GetTimeMsec();
         }
 
@@ -754,13 +758,10 @@ void * video_thread(void *arg)
             tparm->capture_count--;
 
     } while (tparm->capture_count != 0);
-    do_sensor_test_pattern(videofd, 1);
 
     /**************************************************
      * resource clean-up
      *************************************************/
-    /* release all buffers from capture_module */
-    free(displaybuf);
     /* stream off */
     rc = ioctl (videofd, VIDIOC_STREAMOFF, &type);
     if (rc < 0) {
@@ -768,26 +769,38 @@ void * video_thread(void *arg)
         goto fatal;
     }
 
+    /* release all buffers from capture_module */
+	if (displaybuf) {
+		free(displaybuf);
+		displaybuf = NULL;
+	}
+
     /* unmap buffers */
     //for (i = 0; i < NB_BUFFER; i++) {
     for (i = 0; i < total_mapped_mem; i++) {
         munmap (v4l2_mem[i], v4l2_buf_length);
     }
 
-    if (stream_type == ARM_V4L2_TEST_STREAM_FR) {
-        rc = slttest(from_md5,to_md5, slt_control);
-        if (rc < 0)
-            printf("Error: slt test exit due to error,pls check if isp is ok!\n");
-    }
     end_time = GetTimeMsec();
     end_time = end_time - start_time;
-    printf("cost time : %ld\n", end_time);
+    //printf("Stream[%d]cost time : %llu ms\n", stream_type, end_time);
 fatal:
+    if (stream_type == ARM_V4L2_TEST_STREAM_FR ||
+        stream_type == ARM_V4L2_TEST_STREAM_DS1 ||
+        stream_type == ARM_V4L2_TEST_STREAM_DS2) {
+        rc = slttest(from_md5,to_md5, slt_control, stream_type);
+		exit_status[stream_type] = rc;
+        if (rc < 0)
+            printf("Failed:%s slt failed,pls check isp!\n", (stream_type == 0) ? "FR" :
+                ((stream_type == 2) ? "DS1":
+                ((stream_type == 3) ? "DS2": "Other")));
+    }
 
     close(videofd);
-
-    MSG("thread %d terminated ...\n", stream_type);
-
+	if (stream_type == ARM_V4L2_TEST_STREAM_META) {
+		exit_status[stream_type] = 0;
+		//MSG("Stream[%d] terminated ...\n", stream_type);
+	}
     return NULL;
 }
 
@@ -915,36 +928,35 @@ void parse_fmt_res(uint8_t fmt, int res, uint32_t fr_wdr_mode, uint32_t fr_expos
     t_param->height = height;
     t_param->wdr_mode = wdr_mode;
     t_param->exposure = exposure;
-
-    ERR("pixel fmt 0x%x, width %d, height %d, wdr_mode %d, exposure %d",
-        pixel_format, width, height, wdr_mode, exposure);
 }
 
 int main(int argc, char *argv[])
 {
     /* variables for device name / format with default values  */
     int sensor_preset = 0;
+#ifdef ANDROID_SLT
+    uint8_t fr_out_fmt = 1;
+#else
     uint8_t fr_out_fmt = 0;
+#endif
     uint8_t ds1_out_fmt = 0;
     uint8_t ds2_out_fmt = 0;
     int fr_res = 1;
-    int ds1_res = 2;
-    int ds2_res = 2;
+    int ds1_res = 3;
+    int ds2_res = 3;
     int fr_num = 31;
     int ds_num = 21;
-    uint32_t pixel_format = ISP_V4L2_PIX_FMT_ARGB2101010;
+    uint32_t pixel_format = V4L2_PIX_FMT_RGB24;
     uint32_t wdr_mode = 0;
     uint32_t exposure = 1;
     char *v4ldevname = "/dev/video0";
     int rc = 0;
     int i;
-    int command = 1;
-	start_time = GetTimeMsec();
+	int ret = 0;
     if (argc < 0) {
         printf("v4l test API\n");
         printf("usage:\n");
-        printf(" example   : ./v4l2_test  -c 1 -p 0 -F 0 -f 0 -D 0 -R 1 -r 2 -d 2 -N 31 -n 21 -w 0 -e 1 -v /dev/video0 \n");
-        printf("    c : command           : default 1, 7: set_manual_exposure(just enable manual exposure)\n");
+        printf(" example   : ./v4l2_test -p 0 -F 0 -f 0 -D 0 -R 1 -r 2 -d 2 -N 31 -n 21 -w 0 -e 1 -v /dev/video0 \n");
         printf("    p : sensor_preset     : default 0 \n");
         printf("    F : fr_out_fmt        : 0 : rgb24 1:nv12 2: raw16 \n");
         printf("    f : ds1_out_fmt       : 0 : rgb24 1:nv12 \n");
@@ -964,13 +976,12 @@ int main(int argc, char *argv[])
     }
 
     int c;
-	system("echo 0xff15c0e8 > /sys/kernel/debug/aml_reg/paddr;");
+#ifdef ANDROID_SLT
+	system("mkdir -p /data/tmp;chmod 777 /data/tmp");
+#endif
     while(optind < argc){
-        if ((c = getopt (argc, argv, "c:p:F:f:D:R:r:d:N:n:w:e:v:t:x:y:")) != -1) {
+        if ((c = getopt (argc, argv, "p:F:f:D:R:r:d:N:n:w:e:v:t:x:y:")) != -1) {
             switch (c) {
-            case 'c':
-                command = atoi(optarg);
-                break;
             case 'p':
                 sensor_preset = atoi(optarg);
                 break;
@@ -1027,7 +1038,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("ds1_out_fmt = %d, ds2_out_fmt = %d, ds1_res = %d, ds2_res = %d\n", ds1_out_fmt, ds2_out_fmt, ds1_res, ds2_res);
     /**************************************************
      * Frame buffer initialize
      *************************************************/
@@ -1036,8 +1046,6 @@ int main(int argc, char *argv[])
     /* Open the file for reading and writing */
 
     /* Get fixed screen information */
-
-    printf("fr_num = %d, ds_num = %d\n", fr_num, ds_num);
 
     /**************************************************
      * Starting streams
@@ -1072,7 +1080,7 @@ int main(int argc, char *argv[])
             .wdr_mode	= 0,
             .exposure	= 1,
 
-            .capture_count = -1,
+            .capture_count = fr_num,
         },
 #endif
         {
@@ -1084,7 +1092,7 @@ int main(int argc, char *argv[])
             .wdr_mode	= 0,
             .exposure	= 1,
 
-            .capture_count = ds_num,
+            .capture_count = fr_num,
         },
         {
             .devname    = v4ldevname,
@@ -1095,7 +1103,7 @@ int main(int argc, char *argv[])
             .wdr_mode	= 0,
             .exposure	= 1,
 
-            .capture_count = ds_num,
+            .capture_count = fr_num,
         },
     };
 
@@ -1121,17 +1129,20 @@ int main(int argc, char *argv[])
     };
 #endif
 
-
+#ifndef ANDROID_SLT
     if(sensor_preset>=0){
         int videofd = open(v4ldevname, O_RDWR);
         if (videofd == -1) {
             printf("Error: cannot open video device\n");
             exit(1);
         }
-        MSG("Setting %d sensor preset\n", sensor_preset);
         do_sensor_preset(videofd,sensor_preset);
         close(videofd);
         sleep(3); //let the sensor settle
+    }
+#endif
+    for (i = 0; i < open_port_cnt; i++) {
+		exit_status[i] = 1;
     }
 
     /* Launch threads */
@@ -1139,141 +1150,28 @@ int main(int argc, char *argv[])
         rc = pthread_create(&tid[i], NULL, &video_thread, &tparam[i]);
         if (rc != 0)
             ERR("can't create thread :[%s]\n", strerror(rc));
-        else
-            MSG("Thread %d created successfully\n", i);
-
         usleep(300000);
     }
-
-
-    /**************************************************
-     * Control interface
-     *************************************************/
-    enum {
-        V4L2_TEST_MENU_PREVIEW_ON_OFF = 1,
-        V4L2_TEST_MENU_DO_CAPTURE_LEGACY,
-        V4L2_TEST_MENU_DO_CAPTURE_FRM,
-        V4L2_TEST_MENU_DO_CAPTURE_DNG,
-        V4L2_TEST_MENU_DO_AF_REFOCUS,
-        V4L2_TEST_MENU_DUMP_LAST_CAPTURE,
-        V4L2_TEST_MENU_SET_MANUAL_EXP,
-        V4L2_TEST_MENU_EXIT,
-        V4L2_TEST_MENU_MAX
-    };
-
-    if(command>=V4L2_TEST_MENU_MAX)
-        command=-1;
-
-    do {
-        int menu;
-        int enable;
-        if(command>=V4L2_TEST_MENU_PREVIEW_ON_OFF){
-            menu=command;
-        }else{
-            MSG("\nV4L2 test application\n");
-            MSG("%d) turn preview %s\n",
-                V4L2_TEST_MENU_PREVIEW_ON_OFF, str_on_off[v4l2_test_thread_preview]);
-            MSG("%d) Do capture (Legacy)\n", V4L2_TEST_MENU_DO_CAPTURE_LEGACY);
-            MSG("%d) Do capture (FRM)\n", V4L2_TEST_MENU_DO_CAPTURE_FRM);
-            MSG("%d) Do capture (DNG)\n", V4L2_TEST_MENU_DO_CAPTURE_DNG);
-            MSG("%d) Do AF Refocus\n", V4L2_TEST_MENU_DO_AF_REFOCUS);
-            MSG("%d) Dump last capture\n", V4L2_TEST_MENU_DUMP_LAST_CAPTURE);
-            MSG("%d) SET_MANUAL_EXP\n", V4L2_TEST_MENU_SET_MANUAL_EXP);
-            MSG("%d) Exit\n", V4L2_TEST_MENU_EXIT);
-            MSG("Choose menu > ");
-            //fflush(stdout);
-            scanf("%d", &menu);
-        }
-        switch(menu) {
-        case V4L2_TEST_MENU_PREVIEW_ON_OFF:
-            v4l2_test_thread_preview = (v4l2_test_thread_preview + 1) % 2;
-            usleep(250000);
-            break;
-        case V4L2_TEST_MENU_DO_CAPTURE_LEGACY:
-        case V4L2_TEST_MENU_DO_CAPTURE_FRM:
-#if ARM_V4L2_TEST_HAS_RAW
-            /* turn on raw capture stream */
-            if (prepareRawCapture(&tparam_raw) != 0) {
-                ERR("Error: Can't start raw stream, cancelling capture.\n");
-                break;
-            }
-#endif
-            if(menu==V4L2_TEST_MENU_DO_CAPTURE_LEGACY)
-                v4l2_test_thread_capture = V4L2_TEST_CAPTURE_LEGACY;
-            else
-                v4l2_test_thread_capture = V4L2_TEST_CAPTURE_FRM;
-            v4l2_test_thread_capture_count = 1;
-
-            do {
-                printf("sleeping while v4l2_test_thread_capture:%d\n",v4l2_test_thread_capture);
-                usleep(200000);
-            } while(v4l2_test_thread_capture != V4L2_TEST_CAPTURE_NONE);
-
-#if ARM_V4L2_TEST_HAS_RAW
-            /* wait raw capture stream to be turned off */
-            finishRawCapture(&tparam_raw);
-#endif
-
-            break;
-        case V4L2_TEST_MENU_DO_CAPTURE_DNG:
-#if ARM_V4L2_TEST_HAS_RAW
-            /* turn on raw capture stream */
-            if (prepareRawCapture(&tparam_raw) != 0) {
-                ERR("Error: Can't start raw stream, cancelling capture.\n");
-                break;
-            }
-#endif
-
-            v4l2_test_thread_capture = V4L2_TEST_CAPTURE_DNG;
-            v4l2_test_thread_capture_count = 1;
-
-            do {
-                usleep(200000);
-            } while(v4l2_test_thread_capture != V4L2_TEST_CAPTURE_NONE);
-
-#if ARM_V4L2_TEST_HAS_RAW
-            /* wait raw capture stream to be turned off */
-            finishRawCapture(&tparam_raw);
-#endif
-            break;
-        case V4L2_TEST_MENU_DO_AF_REFOCUS:
-            cmd_do_af_refocus = 1;
-            break;
-        case V4L2_TEST_MENU_DUMP_LAST_CAPTURE:
-            MSG("Turning off preview ...\n");
-            v4l2_test_thread_preview = 0;
-            v4l2_test_thread_dump = STREAM_FLAG_PREVIEW;
-            do {
-                usleep(200000);
-            } while(v4l2_test_thread_dump);
-            break;
-        case V4L2_TEST_MENU_SET_MANUAL_EXP:
-            enable = 1;
-            set_manual_exposure(tparam[0].videofd, enable);
-            break;
-        case V4L2_TEST_MENU_EXIT:
-            v4l2_test_thread_exit = 1;
-            break;
-        default:
-            ERR("invalid input.\n");
-            break;
-        }
-
-        if(command>=V4L2_TEST_MENU_PREVIEW_ON_OFF)
-            v4l2_test_thread_exit = 1;
-
-    } while (!v4l2_test_thread_exit);
-
-
-    /**************************************************
-     * Terminating threads and process
-     *************************************************/
-    MSG("terminating all threads ...\n");
 
     for (i = 0; i < open_port_cnt; i++) {
         pthread_join(tid[i], NULL);
     }
-
-    MSG("terminating v4l2 test app, thank you ...\n");
-    return 0;
+	while (1) {
+		ret = 0;
+		for (i = 0; i < open_port_cnt; i++) {
+			if (exit_status[i] < 0) {
+				ret = -1;
+				break;
+			} else if (exit_status[i] > 0) {
+				ret = 1;
+				break;
+			} else
+				ret = ret + exit_status[i];
+		}
+		if (0 >= ret) {
+			break;
+		}
+		usleep(500000);
+	}
+    return ret;
 }

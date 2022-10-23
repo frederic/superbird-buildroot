@@ -1,7 +1,7 @@
 /*
  * BCMSDH Function Driver for the native SDIO/MMC driver in the Linux Kernel
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Proprietary,Open:>>
  *
- * $Id: bcmsdh_sdmmc_linux.c 753315 2018-03-21 04:10:12Z $
+ * $Id: bcmsdh_sdmmc_linux.c 825481 2019-06-14 10:06:03Z $
  */
 
 #include <typedefs.h>
@@ -43,6 +43,7 @@
 #include <dhd_linux.h>
 #include <bcmsdh_sdmmc.h>
 #include <dhd_dbg.h>
+#include <bcmdevs.h>
 
 #if !defined(SDIO_VENDOR_ID_BROADCOM)
 #define SDIO_VENDOR_ID_BROADCOM		0x02d0
@@ -50,15 +51,11 @@
 
 #define SDIO_DEVICE_ID_BROADCOM_DEFAULT	0x0000
 
-#if !defined(SDIO_DEVICE_ID_BROADCOM_4362)
-#define SDIO_DEVICE_ID_BROADCOM_4362    0x4362
-#endif // endif
-
 extern void wl_cfg80211_set_parent_dev(void *dev);
 extern void sdioh_sdmmc_devintr_off(sdioh_info_t *sd);
 extern void sdioh_sdmmc_devintr_on(sdioh_info_t *sd);
 extern void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint bus_type,
-						  uint bus_num, uint slot_num);
+	uint bus_num, uint slot_num);
 extern int bcmsdh_remove(bcmsdh_info_t *bcmsdh);
 
 int sdio_function_init(void);
@@ -104,23 +101,23 @@ static int sdioh_probe(struct sdio_func *func)
 	wl_cfg80211_set_parent_dev(&func->dev);
 #endif // endif
 
-	/* allocate SDIO Host Controller state info */
-	osh = osl_attach(&func->dev, SDIO_BUS, TRUE);
-	if (osh == NULL) {
-		sd_err(("%s: osl_attach failed\n", __FUNCTION__));
-		goto fail;
-	}
-	osl_static_mem_init(osh, adapter);
-	sdioh = sdioh_attach(osh, func);
-	if (sdioh == NULL) {
-		sd_err(("%s: sdioh_attach failed\n", __FUNCTION__));
-		goto fail;
-	}
-	sdioh->bcmsdh = bcmsdh_probe(osh, &func->dev, sdioh, adapter, SDIO_BUS, host_idx, rca);
-	if (sdioh->bcmsdh == NULL) {
-		sd_err(("%s: bcmsdh_probe failed\n", __FUNCTION__));
-		goto fail;
-	}
+	 /* allocate SDIO Host Controller state info */
+	 osh = osl_attach(&func->dev, SDIO_BUS, TRUE);
+	 if (osh == NULL) {
+		 sd_err(("%s: osl_attach failed\n", __FUNCTION__));
+		 goto fail;
+	 }
+	 osl_static_mem_init(osh, adapter);
+	 sdioh = sdioh_attach(osh, func);
+	 if (sdioh == NULL) {
+		 sd_err(("%s: sdioh_attach failed\n", __FUNCTION__));
+		 goto fail;
+	 }
+	 sdioh->bcmsdh = bcmsdh_probe(osh, &func->dev, sdioh, adapter, SDIO_BUS, host_idx, rca);
+	 if (sdioh->bcmsdh == NULL) {
+		 sd_err(("%s: bcmsdh_probe failed\n", __FUNCTION__));
+		 goto fail;
+	 }
 
 	sdio_set_drvdata(func, sdioh);
 	return 0;
@@ -152,7 +149,7 @@ static void sdioh_remove(struct sdio_func *func)
 }
 
 static int bcmsdh_sdmmc_probe(struct sdio_func *func,
-							  const struct sdio_device_id *id)
+                              const struct sdio_device_id *id)
 {
 	int ret = 0;
 
@@ -196,10 +193,18 @@ static void bcmsdh_sdmmc_remove(struct sdio_func *func)
 /* devices we support, null terminated */
 static const struct sdio_device_id bcmsdh_sdmmc_ids[] = {
 	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, SDIO_DEVICE_ID_BROADCOM_DEFAULT) },
-	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, SDIO_DEVICE_ID_BROADCOM_4362) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM4362_CHIP_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43751_CHIP_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43752_CHIP_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43012_CHIP_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43014_CHIP_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43014_D11N_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43014_D11N2G_ID) },
+	{ SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, BCM43014_D11N5G_ID) },
+	/* { SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, SDIO_ANY_ID) }, */
 	{ SDIO_DEVICE_CLASS(SDIO_CLASS_NONE)		},
-	{	0, 0, 0, 0 /* end: all zeroes */
-	},
+	 /* end: all zeroes */
+	{ 0, 0, 0, 0},
 };
 
 MODULE_DEVICE_TABLE(sdio, bcmsdh_sdmmc_ids);
@@ -273,7 +278,7 @@ static const struct dev_pm_ops bcmsdh_sdmmc_pm_ops = {
 static struct semaphore *notify_semaphore = NULL;
 
 static int dummy_probe(struct sdio_func *func,
-					   const struct sdio_device_id *id)
+                              const struct sdio_device_id *id)
 {
 	if (func && (func->num != 2)) {
 		return 0;
@@ -293,7 +298,7 @@ static struct sdio_driver dummy_sdmmc_driver = {
 	.remove		= dummy_remove,
 	.name		= "dummy_sdmmc",
 	.id_table	= bcmsdh_sdmmc_ids,
-};
+	};
 
 int sdio_func_reg_notify(void* semaphore)
 {
@@ -316,10 +321,10 @@ static struct sdio_driver bcmsdh_sdmmc_driver = {
 	.id_table	= bcmsdh_sdmmc_ids,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM)
 	.drv = {
-		.pm	= &bcmsdh_sdmmc_pm_ops,
+	.pm	= &bcmsdh_sdmmc_pm_ops,
 	},
 #endif /* (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM) */
-};
+	};
 
 struct sdos_info {
 	sdioh_info_t *sd;

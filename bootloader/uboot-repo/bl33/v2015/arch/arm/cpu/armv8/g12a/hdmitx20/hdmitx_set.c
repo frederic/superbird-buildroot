@@ -350,6 +350,10 @@ static struct hdmi_support_mode gxbb_modes[] = {
 	{HDMI_720x576i50_16x9, "576i50hz", 0},
 	{HDMI_720x480i60_16x9, "480i60hz", 0},
 	{HDMIV_1440x2560p60hz, "1440x2560p60hz", 0},
+	{HDMIV_3440x1440p60hz, "3440x1440p60hz", 0},
+	{HDMIV_2400x1200p90hz, "2400x1200p90hz", 0},
+	{HDMIV_1280x1024p60hz, "1280x1024p60hz", 0},
+	{HDMIV_1680x1050p60hz, "1680x1050p60hz", 0},
 };
 
 static void hdmitx_list_support_modes(void)
@@ -1384,6 +1388,8 @@ static void hdmitx_set_phy(struct hdmitx_dev *hdev)
 	case HDMI_3840x2160p25_16x9:
 	case HDMI_3840x2160p25_64x27:
 	case HDMI_3840x2160p30_16x9:
+	case HDMI_3840x2160p30_64x27:
+	case HDMI_4096x2160p24_256x135:
 	case HDMI_4096x2160p25_256x135:
 	case HDMI_4096x2160p30_256x135:
 		if ((hdev->para->cs == HDMI_COLOR_FORMAT_422)

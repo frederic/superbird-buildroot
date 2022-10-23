@@ -426,6 +426,24 @@ struct optee_smc_disable_shm_cache_result {
 #define OPTEE_SMC_RETURN_RPC_CMD \
 	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_CMD)
 
+/*
+ * set logger
+ *
+ * Call register usage:
+ * a0      SMC Function ID, OPTEE_SMC_SET_LOGGER
+ * a1      start logger: a1 > 0; stop logger: a1 = 0;
+ * a2      logger share-mem phy addr
+ * a3      logger share-mem size
+ * a4-7    Not used
+ *
+ * Normal return register usage:
+ * a0      set logger result
+ * a1-7    Preserved
+ */
+#define OPTEE_SMC_FUNCID_SET_LOGGER    0xE001
+#define OPTEE_SMC_SET_LOGGER \
+    OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_SET_LOGGER)
+
 /* Returned in a0 */
 #define OPTEE_SMC_RETURN_UNKNOWN_FUNCTION 0xFFFFFFFF
 

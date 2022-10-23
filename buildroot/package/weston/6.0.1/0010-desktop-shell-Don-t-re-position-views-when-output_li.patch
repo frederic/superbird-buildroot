@@ -1,0 +1,28 @@
+From bfb7a9c4b5ebb66ab06ef01851987f9bc604c86b Mon Sep 17 00:00:00 2001
+From: Harish Krupo <harishkrupo@gmail.com>
+Date: Sat, 20 Apr 2019 18:10:56 +0530
+Subject: [PATCH 10/11] desktop-shell: Don't re-position views when output_list
+ is empty
+
+Signed-off-by: Harish Krupo <harishkrupo@gmail.com>
+---
+ desktop-shell/shell.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/desktop-shell/shell.c b/desktop-shell/shell.c
+index 7b55af2..cf5519e 100644
+--- a/desktop-shell/shell.c
++++ b/desktop-shell/shell.c
+@@ -4732,6 +4732,9 @@ shell_reposition_view_on_output_destroy(struct weston_view *view)
+ 	float x, y;
+ 	int visible;
+ 
++	if (wl_list_empty(&ec->output_list))
++		return;
++
+ 	x = view->geometry.x;
+ 	y = view->geometry.y;
+ 
+-- 
+2.26.1
+

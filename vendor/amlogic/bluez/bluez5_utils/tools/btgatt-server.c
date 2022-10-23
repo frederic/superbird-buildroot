@@ -136,7 +136,7 @@ char version[8] = "20171211";
 char frame_buf[FRAME_BUF_MAX] = {0};
 char ssid_psk_file[] = "/var/www/cgi-bin/wifi/select.txt";
 /*0: wifi set success, 1: wifi set fail*/
-char wifi_status_file[] = "/etc/bsa/config/wifi_status";
+char wifi_status_file[] = "/etc/bluetooth/wifi_status";
 char wifi_status = 0;
 char wifi_success = '1';
 void ble_init(void);
@@ -945,7 +945,7 @@ static void *check_wifi_status(void *user_data)
 
 		if (wifi_configured) {
 			PRLOG("wifi configured\n");
-			system("sh /etc/bsa/config/wifi_tool.sh");
+			system("sh /etc/bluetooth/wifi_tool.sh");
 			fd = fopen(wifi_status_file, "r+");
 			if (fd <= 0) {
 				PRLOG("read wifi status file error\n");

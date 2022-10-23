@@ -33,5 +33,6 @@
 #define HHI_PCIE_PLL_CNTL5	0x16c /* 0x5b offset in data sheet */
 #define HHI_PCIE_PLL_STS	0x170 /* 0x5c offset in data sheet */
 #define HHI_DSP_CLK_CNTL	0x3f0 /* 0xfc offset in data sheet */
+#define HHI_VIPNANOQ_CLK_CNTL	0x1c8 /* 0x72 offset in data sheet */
 
 #endif /* __TL1_H */

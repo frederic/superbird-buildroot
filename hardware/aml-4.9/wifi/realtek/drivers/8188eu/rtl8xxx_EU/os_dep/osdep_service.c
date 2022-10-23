@@ -1808,6 +1808,20 @@ void rtw_yield_os(void)
 #endif
 }
 
+bool rtw_macaddr_is_larger(const u8 *a, const u8 *b)
+{
+	u32 va, vb;
+
+	va = be32_to_cpu(*((u32 *)a));
+	vb = be32_to_cpu(*((u32 *)b));
+	if (va > vb)
+		return 1;
+	else if (va < vb)
+		return 0;
+
+	return be16_to_cpu(*((u16 *)(a + 4))) > be16_to_cpu(*((u16 *)(b + 4)));
+}
+
 #define RTW_SUSPEND_LOCK_NAME "rtw_wifi"
 #define RTW_SUSPEND_TRAFFIC_LOCK_NAME "rtw_wifi_traffic"
 #define RTW_SUSPEND_RESUME_LOCK_NAME "rtw_wifi_resume"
@@ -2312,6 +2326,25 @@ int rtw_is_file_readable_with_size(const char *path, u32 *sz)
 	/* Todo... */
 	return _FALSE;
 #endif
+}
+
+/*
+* Test if the specifi @param path is a readable file with valid size.
+* If readable, @param sz is got
+* @param path the path of the file to test
+* @return _TRUE or _FALSE
+*/
+int rtw_readable_file_sz_chk(const char *path, u32 sz)
+{
+	u32 fsz;
+
+	if (rtw_is_file_readable_with_size(path, &fsz) == _FALSE)
+		return _FALSE;
+
+	if (fsz > sz)
+		return _FALSE;
+	
+	return _TRUE;
 }
 
 /*
@@ -2871,7 +2904,6 @@ int rtw_blacklist_add(_queue *blist, const u8 *addr, u32 timeout_ms)
 
 	exit_critical_bh(&blist->lock);
 
-exit:
 	return (exist == _TRUE && timeout == _FALSE) ? RTW_ALREADY : (ent ? _SUCCESS : _FAIL);
 }
 
@@ -2903,7 +2935,6 @@ int rtw_blacklist_del(_queue *blist, const u8 *addr)
 
 	exit_critical_bh(&blist->lock);
 
-exit:
 	return exist == _TRUE ? _SUCCESS : RTW_ALREADY;
 }
 
@@ -2937,7 +2968,6 @@ int rtw_blacklist_search(_queue *blist, const u8 *addr)
 
 	exit_critical_bh(&blist->lock);
 
-exit:
 	return exist;
 }
 

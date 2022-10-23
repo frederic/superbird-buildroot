@@ -31,6 +31,7 @@
 #define DEBUG_FLAG_GET_COUNT                 0x8
 #define DEBUG_FLAG_PRINT_DISBUF_PER_VSYNC        0x10
 #define DEBUG_FLAG_PRINT_PATH_SWITCH        0x20
+#define DEBUG_FLAG_TRACE_EVENT	        0x40
 #define DEBUG_FLAG_LOG_RDMA_LINE_MAX         0x100
 #define DEBUG_FLAG_TOGGLE_SKIP_KEEP_CURRENT  0x10000
 #define DEBUG_FLAG_TOGGLE_FRAME_PER_VSYNC    0x20000
@@ -44,6 +45,8 @@
 #define DEBUG_FLAG_OMX_DISABLE_DROP_FRAME        0x2000000
 #define DEBUG_FLAG_PRINT_DROP_FRAME        0x4000000
 #define DEBUG_FLAG_OMX_DV_DROP_FRAME        0x8000000
+#define DEBUG_FLAG_AXIS_NO_UPDATE     0x20000000
+#define DEBUG_FLAG_HDMI_AVSYNC_DEBUG     0x40000000
 
 #define VOUT_TYPE_TOP_FIELD 0
 #define VOUT_TYPE_BOT_FIELD 1
@@ -68,6 +71,13 @@
 #define COMPOSE_MODE_3D			1
 #define COMPOSE_MODE_DV			2
 #define COMPOSE_MODE_BYPASS_CM	4
+
+#define VIDEO_PROP_CHANGE_NONE		0
+#define VIDEO_PROP_CHANGE_SIZE		0x1
+#define VIDEO_PROP_CHANGE_FMT		0x2
+#define VIDEO_PROP_CHANGE_ENABLE	0x4
+#define VIDEO_PROP_CHANGE_DISABLE	0x8
+#define VIDEO_PROP_CHANGE_AXIS		0x10
 
 #define MAX_ZOOM_RATIO 300
 
@@ -189,6 +199,23 @@ struct blend_setting_s {
 	struct vpp_frame_par_s *frame_par;
 };
 
+struct fgrain_setting_s {
+	u32 id;
+	u32 start_x;
+	u32 end_x;
+	u32 start_y;
+	u32 end_y;
+	u32 fmt_mode; /* only support 420 */
+	u32 bitdepth; /* 8 bit or 10 bit */
+	u32 reverse;
+	u32 afbc; /* afbc or not */
+	u32 last_in_mode; /* related with afbc */
+	u32 used;
+	/* lut dma */
+	u32 fgs_table_adr;
+	u32 table_size;
+};
+
 enum mode_3d_e {
 	mode_3d_disable = 0,
 	mode_3d_enable,
@@ -218,6 +245,7 @@ struct video_layer_s {
 	bool property_changed;
 	u8 force_config_cnt;
 	bool new_vpp_setting;
+	bool new_frame;
 	u32 vout_type;
 	bool bypass_pps;
 
@@ -229,7 +257,7 @@ struct video_layer_s {
 	struct mif_pos_s mif_setting;
 	struct scaler_setting_s sc_setting;
 	struct blend_setting_s bld_setting;
-
+	struct fgrain_setting_s fgrain_setting;
 	u32 new_vframe_count;
 
 	u32 start_x_lines;
@@ -253,6 +281,16 @@ struct video_layer_s {
 	u32 global_debug;
 };
 
+enum cpu_type_e {
+	MESON_CPU_MAJOR_ID_COMPATIBALE = 0x1,
+	MESON_CPU_MAJOR_ID_TM2_REVB,
+	MESON_CPU_MAJOR_ID_UNKNOWN,
+};
+
+struct amvideo_device_data_s {
+	enum cpu_type_e cpu_type;
+};
+
 /* from video_hw.c */
 extern struct video_layer_s vd_layer[MAX_VD_LAYER];
 extern struct disp_info_s glayer_info[MAX_VD_LAYER];
@@ -272,6 +310,8 @@ u32 get_videopip_enabled(void);
 bool is_di_on(void);
 bool is_di_post_on(void);
 bool is_di_post_link_on(void);
+bool is_di_post_mode(struct vframe_s *vf);
+
 bool is_afbc_enabled(u8 layer_id);
 bool is_local_vf(struct vframe_s *vf);
 
@@ -343,6 +383,7 @@ void proc_vd_vsc_phase_per_vsync(
 void vpp_blend_update(
 	const struct vinfo_s *vinfo);
 
+void set_video_ipt(u8 layer_id, u32 enable);
 int get_layer_display_canvas(u8 layer_id);
 int set_layer_display_canvas(
 	u8 layer_id, struct vframe_s *vf,
@@ -359,6 +400,7 @@ int detect_vout_type(
 int calc_hold_line(void);
 u32 get_cur_enc_line(void);
 void vpu_work_process(void);
+int vpp_crc_check(u32 vpp_crc_en);
 
 int video_hw_init(void);
 int video_early_init(void);
@@ -368,6 +410,7 @@ int video_late_uninit(void);
 extern u32 osd_vpp_misc;
 extern u32 osd_vpp_misc_mask;
 extern bool update_osd_vpp_misc;
+extern u32 osd_preblend_en;
 extern u32 framepacking_support;
 extern unsigned int framepacking_blank;
 extern unsigned int process_3d_type;
@@ -383,6 +426,7 @@ extern struct vframe_s *cur_dispbuf;
 extern struct vframe_s *cur_pipbuf;
 extern bool need_disable_vd2;
 extern u32 last_el_status;
+extern u32 video_prop_status;
 
 bool black_threshold_check(u8 id);
 void update_cur_dispbuf(void *buf);
@@ -399,6 +443,20 @@ struct device *get_video_device(void);
 #ifdef CONFIG_AMLOGIC_MEDIA_VIDEOCAPTURE
 int ext_frame_capture_poll(int endflags);
 #endif
+bool is_meson_tm2_revb(void);
 
+#ifdef CONFIG_AMLOGIC_MEDIA_DEINTERLACE
+void di_trig_free_mirror_mem(void);
+#endif
+void fgrain_config(u8 layer_id,
+		   struct vpp_frame_par_s *frame_par,
+		   struct mif_pos_s *mif_setting,
+		   struct fgrain_setting_s *setting,
+		   struct vframe_s *vf);
+void fgrain_setting(u8 layer_id,
+		    struct fgrain_setting_s *setting,
+		    struct vframe_s *vf);
+void fgrain_update_table(u8 layer_id,
+			 struct vframe_s *vf);
 #endif
 /*VIDEO_PRIV_HEADER_HH*/

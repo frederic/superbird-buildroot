@@ -63,29 +63,7 @@ struct vpu_device_data_s {
 	u32 viu1_osd_count;
 	struct clk *vpu_clkc;
 };
-
-static struct am_vout_mode am_vout_modes[] = {
-	{ "1080p60hz", VMODE_HDMI, 1920, 1080, 60, 0},
-	{ "1080p30hz", VMODE_HDMI, 1920, 1080, 30, 0},
-	{ "1080p50hz", VMODE_HDMI, 1920, 1080, 50, 0},
-	{ "1080p25hz", VMODE_HDMI, 1920, 1080, 25, 0},
-	{ "1080p24hz", VMODE_HDMI, 1920, 1080, 24, 0},
-	{ "2160p30hz", VMODE_HDMI, 3840, 2160, 30, 0},
-	{ "2160p60hz", VMODE_HDMI, 3840, 2160, 60, 0},
-	{ "2160p50hz", VMODE_HDMI, 3840, 2160, 50, 0},
-	{ "2160p25hz", VMODE_HDMI, 3840, 2160, 25, 0},
-	{ "2160p24hz", VMODE_HDMI, 3840, 2160, 24, 0},
-	{ "1080i60hz", VMODE_HDMI, 1920, 1080, 60, DRM_MODE_FLAG_INTERLACE},
-	{ "1080i50hz", VMODE_HDMI, 1920, 1080, 50, DRM_MODE_FLAG_INTERLACE},
-	{ "720p60hz", VMODE_HDMI, 1280, 720, 60, 0},
-	{ "720p50hz", VMODE_HDMI, 1280, 720, 50, 0},
-	{ "480p60hz", VMODE_HDMI, 720, 480, 60, 0},
-	{ "480i60hz", VMODE_HDMI, 720, 480, 60, DRM_MODE_FLAG_INTERLACE},
-	{ "576p50hz", VMODE_HDMI, 720, 576, 50, 0},
-	{ "576i50hz", VMODE_HDMI, 720, 576, 50, DRM_MODE_FLAG_INTERLACE},
-	{ "480p60hz", VMODE_HDMI, 720, 480, 60, 0},
-};
-
+#define AM_VOUT_NULL_MODE "null"
 
 static struct osd_device_data_s osd_gxbb = {
 	.cpu_id = __MESON_CPU_MAJOR_ID_GXBB,
@@ -328,55 +306,45 @@ const struct meson_crtc_funcs meson_private_crtc_funcs = {
 
 char *am_meson_crtc_get_voutmode(struct drm_display_mode *mode)
 {
-	int i;
 	struct vinfo_s *vinfo;
+	char *name = NULL;
 
 	vinfo = get_current_vinfo();
 
 	if (vinfo && vinfo->mode == VMODE_LCD)
 		return mode->name;
-
-	for (i = 0; i < ARRAY_SIZE(am_vout_modes); i++) {
-		if (am_vout_modes[i].width == mode->hdisplay &&
-		    am_vout_modes[i].height == mode->vdisplay &&
-		    am_vout_modes[i].vrefresh == mode->vrefresh &&
-		    am_vout_modes[i].flags ==
-		    (mode->flags & DRM_MODE_FLAG_INTERLACE))
-			return am_vout_modes[i].name;
-	}
-	return NULL;
-}
-
-bool am_meson_crtc_check_mode(struct drm_display_mode *mode, char *outputmode)
-{
-	int i;
-
-	if (!mode || !outputmode)
-		return false;
-	if (!strcmp(mode->name, "panel"))
-		return true;
-
-	for (i = 0; i < ARRAY_SIZE(am_vout_modes); i++) {
-		if (!strcmp(am_vout_modes[i].name, outputmode) &&
-		    am_vout_modes[i].width == mode->hdisplay &&
-		    am_vout_modes[i].height == mode->vdisplay &&
-		    am_vout_modes[i].vrefresh == mode->vrefresh &&
-		    am_vout_modes[i].flags ==
-		    (mode->flags & DRM_MODE_FLAG_INTERLACE)) {
-			return true;
-		}
-	}
-	return false;
+#ifdef CONFIG_DRM_MESON_HDMI
+	name = am_meson_hdmi_get_voutmode(mode);
+#endif
+#ifdef CONFIG_DRM_MESON_CVBS
+	if (name == NULL)
+		name = am_cvbs_get_voutmode(mode);
+#endif
+	if (name == NULL)
+		return AM_VOUT_NULL_MODE;
+	else
+		return name;
 }
 
 void am_meson_crtc_handle_vsync(struct am_meson_crtc *amcrtc)
 {
 	unsigned long flags;
 	struct drm_crtc *crtc;
+	int i;
 
 	crtc = &amcrtc->base;
 	drm_crtc_handle_vblank(crtc);
-
+	for (i = 0; i < VIDEO_LATENCY_VSYNC; i++) {
+		if (!amcrtc->video_fence[i].fence)
+			continue;
+		atomic_dec(&amcrtc->video_fence[i].refcount);
+		if (!atomic_read(&amcrtc->video_fence[i].refcount)) {
+			fence_signal(amcrtc->video_fence[i].fence);
+			fence_put(amcrtc->video_fence[i].fence);
+			amcrtc->video_fence[i].fence = NULL;
+			DRM_DEBUG("video fence signal done index:%d\n", i);
+		}
+	}
 	spin_lock_irqsave(&crtc->dev->event_lock, flags);
 	if (amcrtc->event) {
 		drm_crtc_send_vblank_event(crtc, amcrtc->event);

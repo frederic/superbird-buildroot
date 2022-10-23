@@ -3,7 +3,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_debug.h 771435 2018-07-10 05:35:24Z $
+ * $Id: dhd_debug.h 783721 2018-10-08 13:05:26Z $
  */
 
 #ifndef _dhd_debug_h_
@@ -240,37 +240,37 @@ typedef enum {
 } nan_event_id_t;
 
 typedef struct {
-	uint16 tag;
-	uint16 len; /* length of value */
-	uint8 value[0];
+    uint16 tag;
+    uint16 len; /* length of value */
+    uint8 value[0];
 } tlv_log;
 
 typedef struct per_packet_status_entry {
-	uint8 flags;
-	uint8 tid; /* transmit or received tid */
-	uint16 MCS; /* modulation and bandwidth */
+    uint8 flags;
+    uint8 tid; /* transmit or received tid */
+    uint16 MCS; /* modulation and bandwidth */
 	/*
 	* TX: RSSI of ACK for that packet
 	* RX: RSSI of packet
 	*/
-	uint8 rssi;
-	uint8 num_retries; /* number of attempted retries */
-	uint16 last_transmit_rate; /* last transmit rate in .5 mbps */
-	/* transmit/reeive sequence for that MPDU packet */
-	uint16 link_layer_transmit_sequence;
+    uint8 rssi;
+    uint8 num_retries; /* number of attempted retries */
+    uint16 last_transmit_rate; /* last transmit rate in .5 mbps */
+	 /* transmit/reeive sequence for that MPDU packet */
+    uint16 link_layer_transmit_sequence;
 	/*
 	* TX: firmware timestamp (us) when packet is queued within firmware buffer
 	* for SDIO/HSIC or into PCIe buffer
 	* RX : firmware receive timestamp
 	*/
-	uint64 firmware_entry_timestamp;
+    uint64 firmware_entry_timestamp;
 	/*
 	* firmware timestamp (us) when packet start contending for the
 	* medium for the first time, at head of its AC queue,
 	* or as part of an MPDU or A-MPDU. This timestamp is not updated
 	* for each retry, only the first transmit attempt.
 	*/
-	uint64 start_contention_timestamp;
+    uint64 start_contention_timestamp;
 	/*
 	* fimrware timestamp (us) when packet is successfully transmitted
 	* or aborted because it has exhausted its maximum number of retries
@@ -281,14 +281,14 @@ typedef struct per_packet_status_entry {
 	* the wifi_ring_buffer_entry structure. It is expected that first bytes of the
 	* packet, or packet headers only (up to TCP or RTP/UDP headers) will be copied into the ring
 	*/
-	uint8 *data;
+    uint8 *data;
 } per_packet_status_entry_t;
 
 #define PACKED_STRUCT __attribute__ ((packed))
 
 typedef struct log_conn_event {
-	uint16 event;
-	tlv_log *tlvs;
+    uint16 event;
+    tlv_log *tlvs;
 	/*
 	* separate parameter structure per event to be provided and optional data
 	* the event_data is expected to include an official android part, with some
@@ -304,22 +304,22 @@ typedef struct log_conn_event {
  */
 
 typedef struct wake_lock_event {
-	uint32 status; /* 0 taken, 1 released */
-	uint32 reason; /* reason why this wake lock is taken */
-	char *name; /* null terminated */
+    uint32 status; /* 0 taken, 1 released */
+    uint32 reason; /* reason why this wake lock is taken */
+    char *name; /* null terminated */
 } wake_lock_event_t;
 
 typedef struct wifi_power_event {
-	uint16 event;
-	tlv_log *tlvs;
+    uint16 event;
+    tlv_log *tlvs;
 } wifi_power_event_t;
 
 #define NAN_EVENT_VERSION 1
 typedef struct log_nan_event {
-	uint8 version;
-	uint8 pad;
-	uint16 event;
-	tlv_log *tlvs;
+    uint8 version;
+    uint8 pad;
+    uint16 event;
+    tlv_log *tlvs;
 } log_nan_event_t;
 
 /* entry type */
@@ -403,7 +403,7 @@ typedef enum {
 	/* Packet free by firmware. */
 	TX_PKT_FATE_FW_PKT_FREE,
 
-} wifi_tx_packet_fate;
+	} wifi_tx_packet_fate;
 
 typedef enum {
 	/* Valid and delivered to network stack (e.g., netif_rx()). */
@@ -442,13 +442,13 @@ typedef enum {
 	/* Dropped by driver for any other reason. */
 	RX_PKT_FATE_DRV_DROP_OTHER,
 
-} wifi_rx_packet_fate;
+	} wifi_rx_packet_fate;
 
 typedef enum {
 	FRAME_TYPE_UNKNOWN,
 	FRAME_TYPE_ETHERNET_II,
 	FRAME_TYPE_80211_MGMT,
-} frame_type;
+	} frame_type;
 
 typedef struct wifi_frame_info {
 	/*
@@ -568,7 +568,7 @@ typedef enum dhd_dbg_pkt_mon_state {
 	PKT_MON_STOPPING,
 	PKT_MON_STOPPED,
 	PKT_MON_DETACHED,
-} dhd_dbg_pkt_mon_state_t;
+	} dhd_dbg_pkt_mon_state_t;
 
 typedef struct dhd_dbg_pkt_info {
 	frame_type payload_type;
@@ -617,7 +617,7 @@ typedef void (*dbg_pullreq_t)(void *os_priv, const int ring_id);
 typedef void (*dbg_urgent_noti_t) (dhd_pub_t *dhdp, const void *data, const uint32 len);
 typedef int (*dbg_mon_tx_pkts_t) (dhd_pub_t *dhdp, void *pkt, uint32 pktid);
 typedef int (*dbg_mon_tx_status_t) (dhd_pub_t *dhdp, void *pkt,
-									uint32 pktid, uint16 status);
+	uint32 pktid, uint16 status);
 typedef int (*dbg_mon_rx_pkts_t) (dhd_pub_t *dhdp, void *pkt);
 
 typedef struct dhd_dbg_pkt_mon
@@ -710,6 +710,8 @@ typedef struct {
 } dhd_dbg_mwli_t;
 #endif /* DHD_DEBUG */
 
+#define DHD_OW_BI_RAW_EVENT_LOG_FMT 0xFFFF
+
 /* LSB 2 bits of format number to identify the type of event log */
 #define DHD_EVENT_LOG_HDR_MASK 0x3
 
@@ -752,67 +754,72 @@ typedef struct prcd_event_log_hdr {
 
 /* dhd_dbg functions */
 extern void dhd_dbg_trace_evnt_handler(dhd_pub_t *dhdp, void *event_data,
-									   void *raw_event_ptr, uint datalen);
+		void *raw_event_ptr, uint datalen);
 void dhd_dbg_msgtrace_log_parser(dhd_pub_t *dhdp, void *event_data,
-								 void *raw_event_ptr, uint datalen, bool msgtrace_hdr_present,
-								 uint32 msgtrace_seqnum);
+	void *raw_event_ptr, uint datalen, bool msgtrace_hdr_present,
+	uint32 msgtrace_seqnum);
 
 extern int dhd_dbg_attach(dhd_pub_t *dhdp, dbg_pullreq_t os_pullreq,
-						  dbg_urgent_noti_t os_urgent_notifier, void *os_priv);
+	dbg_urgent_noti_t os_urgent_notifier, void *os_priv);
 extern void dhd_dbg_detach(dhd_pub_t *dhdp);
 extern int dhd_dbg_start(dhd_pub_t *dhdp, bool start);
 extern int dhd_dbg_set_configuration(dhd_pub_t *dhdp, int ring_id,
-									 int log_level, int flags, uint32 threshold);
+		int log_level, int flags, uint32 threshold);
 extern int dhd_dbg_find_ring_id(dhd_pub_t *dhdp, char *ring_name);
+extern dhd_dbg_ring_t *dhd_dbg_get_ring_from_ring_id(dhd_pub_t *dhdp, int ring_id);
 extern void *dhd_dbg_get_priv(dhd_pub_t *dhdp);
 extern int dhd_dbg_send_urgent_evt(dhd_pub_t *dhdp, const void *data, const uint32 len);
 extern void dhd_dbg_verboselog_printf(dhd_pub_t *dhdp, prcd_event_log_hdr_t *plog_hdr,
-									  void *raw_event_ptr, uint32 *log_ptr, uint32 logset, uint16 block);
+	void *raw_event_ptr, uint32 *log_ptr, uint32 logset, uint16 block);
 int dhd_dbg_pull_from_ring(dhd_pub_t *dhdp, int ring_id, void *data, uint32 buf_len);
 int dhd_dbg_pull_single_from_ring(dhd_pub_t *dhdp, int ring_id, void *data, uint32 buf_len,
-								  bool strip_header);
+	bool strip_header);
 int dhd_dbg_push_to_ring(dhd_pub_t *dhdp, int ring_id, dhd_dbg_ring_entry_t *hdr,
-						 void *data);
+		void *data);
+int __dhd_dbg_get_ring_status(dhd_dbg_ring_t *ring, dhd_dbg_ring_status_t *ring_status);
 int dhd_dbg_get_ring_status(dhd_pub_t *dhdp, int ring_id,
-							dhd_dbg_ring_status_t *dbg_ring_status);
+		dhd_dbg_ring_status_t *dbg_ring_status);
+#ifdef SHOW_LOGTRACE
+void dhd_dbg_read_ring_into_trace_buf(dhd_dbg_ring_t *ring, trace_buf_info_t *trace_buf_info);
+#endif /* SHOW_LOGTRACE */
 
 #ifdef DBG_PKT_MON
 extern int dhd_dbg_attach_pkt_monitor(dhd_pub_t *dhdp,
-									  dbg_mon_tx_pkts_t tx_pkt_mon,
-									  dbg_mon_tx_status_t tx_status_mon,
-									  dbg_mon_rx_pkts_t rx_pkt_mon);
+		dbg_mon_tx_pkts_t tx_pkt_mon,
+		dbg_mon_tx_status_t tx_status_mon,
+		dbg_mon_rx_pkts_t rx_pkt_mon);
 extern int dhd_dbg_start_pkt_monitor(dhd_pub_t *dhdp);
 extern int dhd_dbg_monitor_tx_pkts(dhd_pub_t *dhdp, void *pkt, uint32 pktid);
 extern int dhd_dbg_monitor_tx_status(dhd_pub_t *dhdp, void *pkt,
-									 uint32 pktid, uint16 status);
+		uint32 pktid, uint16 status);
 extern int dhd_dbg_monitor_rx_pkts(dhd_pub_t *dhdp, void *pkt);
 extern int dhd_dbg_stop_pkt_monitor(dhd_pub_t *dhdp);
 extern int dhd_dbg_monitor_get_tx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
-									   uint16 req_count, uint16 *resp_count);
+		uint16 req_count, uint16 *resp_count);
 extern int dhd_dbg_monitor_get_rx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
-									   uint16 req_count, uint16 *resp_count);
+		uint16 req_count, uint16 *resp_count);
 extern int dhd_dbg_detach_pkt_monitor(dhd_pub_t *dhdp);
 #endif /* DBG_PKT_MON */
 
 extern bool dhd_dbg_process_tx_status(dhd_pub_t *dhdp, void *pkt,
-									  uint32 pktid, uint16 status);
+		uint32 pktid, uint16 status);
 
 /* os wrapper function */
 extern int dhd_os_dbg_attach(dhd_pub_t *dhdp);
 extern void dhd_os_dbg_detach(dhd_pub_t *dhdp);
 extern int dhd_os_dbg_register_callback(int ring_id,
-										void (*dbg_ring_sub_cb)(void *ctx, const int ring_id, const void *data,
-												const uint32 len, const dhd_dbg_ring_status_t dbg_ring_status));
+	void (*dbg_ring_sub_cb)(void *ctx, const int ring_id, const void *data,
+		const uint32 len, const dhd_dbg_ring_status_t dbg_ring_status));
 extern int dhd_os_dbg_register_urgent_notifier(dhd_pub_t *dhdp,
-		void (*urgent_noti)(void *ctx, const void *data, const uint32 len, const uint32 fw_len));
+	void (*urgent_noti)(void *ctx, const void *data, const uint32 len, const uint32 fw_len));
 
 extern int dhd_os_start_logging(dhd_pub_t *dhdp, char *ring_name, int log_level,
-								int flags, int time_intval, int threshold);
+		int flags, int time_intval, int threshold);
 extern int dhd_os_reset_logging(dhd_pub_t *dhdp);
 extern int dhd_os_suppress_logging(dhd_pub_t *dhdp, bool suppress);
 
 extern int dhd_os_get_ring_status(dhd_pub_t *dhdp, int ring_id,
-								  dhd_dbg_ring_status_t *dbg_ring_status);
+		dhd_dbg_ring_status_t *dbg_ring_status);
 extern int dhd_os_trigger_get_ring_data(dhd_pub_t *dhdp, char *ring_name);
 extern int dhd_os_push_push_ring_data(dhd_pub_t *dhdp, int ring_id, void *data, int32 data_len);
 extern int dhd_os_dbg_get_feature(dhd_pub_t *dhdp, int32 *features);
@@ -821,15 +828,15 @@ extern int dhd_os_dbg_get_feature(dhd_pub_t *dhdp, int32 *features);
 extern int dhd_os_dbg_attach_pkt_monitor(dhd_pub_t *dhdp);
 extern int dhd_os_dbg_start_pkt_monitor(dhd_pub_t *dhdp);
 extern int dhd_os_dbg_monitor_tx_pkts(dhd_pub_t *dhdp, void *pkt,
-									  uint32 pktid);
+	uint32 pktid);
 extern int dhd_os_dbg_monitor_tx_status(dhd_pub_t *dhdp, void *pkt,
-										uint32 pktid, uint16 status);
+	uint32 pktid, uint16 status);
 extern int dhd_os_dbg_monitor_rx_pkts(dhd_pub_t *dhdp, void *pkt);
 extern int dhd_os_dbg_stop_pkt_monitor(dhd_pub_t *dhdp);
 extern int dhd_os_dbg_monitor_get_tx_pkts(dhd_pub_t *dhdp,
-		void __user *user_buf, uint16 req_count, uint16 *resp_count);
+	void __user *user_buf, uint16 req_count, uint16 *resp_count);
 extern int dhd_os_dbg_monitor_get_rx_pkts(dhd_pub_t *dhdp,
-		void __user *user_buf, uint16 req_count, uint16 *resp_count);
+	void __user *user_buf, uint16 req_count, uint16 *resp_count);
 extern int dhd_os_dbg_detach_pkt_monitor(dhd_pub_t *dhdp);
 #endif /* DBG_PKT_MON */
 

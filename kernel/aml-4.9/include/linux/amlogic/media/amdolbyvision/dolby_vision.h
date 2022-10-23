@@ -23,6 +23,7 @@
 
 #include <linux/types.h>
 #include <linux/amlogic/media/vout/vinfo.h>
+#include <linux/amlogic/media/vfm/vframe.h>
 
 #define DOLBY_VISION_OUTPUT_MODE_IPT			0
 #define DOLBY_VISION_OUTPUT_MODE_IPT_TUNNEL		1
@@ -53,6 +54,66 @@
 #define MUTE_TYPE_RGB	2
 #define MUTE_TYPE_IPT	3
 
+enum pq_item_e {
+	PQ_BRIGHTNESS = 0,     /*Brightness */
+	PQ_CONTRAST = 1,       /*Contrast */
+	PQ_COLORSHIFT = 2,     /*ColorShift or Tint*/
+	PQ_SATURATION = 3      /*Saturation or color */
+};
+
+enum pq_reset_e {
+	RESET_ALL = 0,         /*reset picture mode / pq for all picture mode*/
+	RESET_PQ_FOR_ALL = 1,  /*reset pq for all picture mode*/
+	RESET_PQ_FOR_CUR = 2   /*reset pq for current picture mode */
+};
+
+struct pic_mode_info_s {
+	int pic_mode_id;
+	unsigned char name[32];
+} __aligned(8);
+
+struct dv_pq_info_s {
+	int pic_mode_id;
+	enum pq_item_e item;
+	s16 value;
+} __aligned(8);
+
+struct dv_full_pq_info_s {
+	int pic_mode_id;
+	s16  brightness;  /*Brightness */
+	s16  contrast;    /*Contrast */
+	s16  colorshift;  /*ColorShift or Tint*/
+	s16  saturation;  /*Saturation or color */
+} __aligned(8);
+
+#define DV_M 'D'
+/* get Number of Picture Mode */
+#define DV_IOC_GET_DV_PIC_MODE_NUM _IOR((DV_M), 0x0, int)
+
+/* get Picture Mode Name of input pic_mode_id */
+#define DV_IOC_GET_DV_PIC_MODE_NAME _IOWR((DV_M), 0x1, struct pic_mode_info_s)
+
+/* get current active picture mode */
+#define DV_IOC_GET_DV_PIC_MODE_ID _IOR((DV_M), 0x2, int)
+
+/* select active picture mode */
+#define DV_IOC_SET_DV_PIC_MODE_ID _IOW((DV_M), 0x3, int)
+
+/* get single pq(contrast or brightness or colorshift or saturation) */
+#define DV_IOC_GET_DV_SINGLE_PQ_VALUE _IOWR((DV_M), 0x4, struct dv_pq_info_s)
+
+/* get all pq(contrast, brightness,colorshift ,saturation) */
+#define DV_IOC_GET_DV_FULL_PQ_VALUE _IOWR((DV_M), 0x5, struct dv_full_pq_info_s)
+
+/* set single pq(contrast or brightness or colorshift or saturation) */
+#define DV_IOC_SET_DV_SINGLE_PQ_VALUE _IOWR((DV_M), 0x6, struct dv_pq_info_s)
+
+/* set all pq(contrast,brightness ,colorshift , saturation) */
+#define DV_IOC_SET_DV_FULL_PQ_VALUE _IOWR((DV_M), 0x7, struct dv_full_pq_info_s)
+
+/* reset all pq item  for current picture mode */
+#define DV_IOC_SET_DV_PQ_RESET _IOWR((DV_M), 0x8, enum pq_reset_e)
+
 void enable_dolby_vision(int enable);
 bool is_dolby_vision_enable(void);
 bool is_dolby_vision_on(void);
@@ -66,8 +127,8 @@ int dolby_vision_wait_metadata(struct vframe_s *vf);
 int dolby_vision_pop_metadata(void);
 int dolby_vision_update_metadata(struct vframe_s *vf, bool drop_flag);
 int dolby_vision_process(
-	struct vframe_s *rpt_vf, struct vframe_s *vf,
-	u32 display_size, u8 pps_state);
+	struct vframe_s *vf, u32 display_size,
+	u8 toggle_mode, u8 pps_state);
 void dolby_vision_init_receiver(void *pdev);
 void dolby_vision_vf_put(struct vframe_s *vf);
 struct vframe_s *dolby_vision_vf_peek_el(struct vframe_s *vf);
@@ -79,16 +140,6 @@ void dolby_vision_update_pq_config(
 	char *pq_config_buf);
 int dolby_vision_update_setting(void);
 bool is_dolby_vision_stb_mode(void);
-bool is_meson_g12(void);
-bool is_meson_gxm(void);
-bool is_meson_box(void);
-bool is_meson_txlx(void);
-bool is_meson_txlx_tvmode(void);
-bool is_meson_txlx_stbmode(void);
-bool is_meson_tm2(void);
-bool is_meson_tm2_tvmode(void);
-bool is_meson_tm2_stbmode(void);
-bool is_meson_tvmode(void);
 void tv_dolby_vision_crc_clear(int flag);
 char *tv_dolby_vision_get_crc(u32 *len);
 void tv_dolby_vision_insert_crc(bool print);
@@ -108,7 +159,7 @@ void tv_dolby_vision_el_info(void);
 int enable_rgb_to_yuv_matrix_for_dvll(
 	int32_t on, uint32_t *coeff_orig, uint32_t bits);
 
-bool is_dovi_frame(struct vframe_s *vf);
+int is_dovi_frame(struct vframe_s *vf);
 void update_graphic_width_height(unsigned int width, unsigned int height);
 int get_dolby_vision_policy(void);
 void set_dolby_vision_policy(int policy);
@@ -117,4 +168,7 @@ bool is_dolby_vision_el_disable(void);
 bool is_dovi_dual_layer_frame(struct vframe_s *vf);
 void dolby_vision_set_provider(char *prov_name);
 int dolby_vision_check_mvc(struct vframe_s *vf);
+bool for_dolby_vision_video_effect(void);
+int get_dolby_vision_hdr_policy(void);
+int get_dv_support_info(void);
 #endif

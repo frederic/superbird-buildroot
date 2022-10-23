@@ -1,0 +1,190 @@
+diff -Nur gst1-plugins-base-1.16.1-orig/ext/alsa/gstalsasink.c gst1-plugins-base-1.16.1/ext/alsa/gstalsasink.c
+--- gst1-plugins-base-1.16.1-orig/ext/alsa/gstalsasink.c	2019-04-19 17:16:20.000000000 +0800
++++ gst1-plugins-base-1.16.1/ext/alsa/gstalsasink.c	2020-01-10 18:12:54.653080944 +0800
+@@ -54,6 +54,8 @@
+ #include <gst/audio/gstaudioiec61937.h>
+ #include <gst/gst-i18n-plugin.h>
+ 
++#include <libconfig.h>
++
+ #ifndef ESTRPIPE
+ #define ESTRPIPE EPIPE
+ #endif
+@@ -64,6 +66,8 @@
+ #define SPDIF_PERIOD_SIZE 1536
+ #define SPDIF_BUFFER_SIZE 15360
+ 
++#define CONFIG_FILE "/etc/gst-soundcard.conf"
++
+ enum
+ {
+   PROP_0,
+@@ -104,6 +108,8 @@
+ static snd_output_t *output;    /* NULL */
+ static GMutex output_mutex;
+ 
++static char* gst_soundcard_device = DEFAULT_DEVICE;
++
+ static GstStaticPadTemplate alsasink_sink_factory =
+     GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+@@ -146,6 +152,8 @@
+ static void
+ gst_alsasink_class_init (GstAlsaSinkClass * klass)
+ {
++  char* config_file_real_path;
++  config_t cfg;
+   GObjectClass *gobject_class;
+   GstElementClass *gstelement_class;
+   GstBaseSinkClass *gstbasesink_class;
+@@ -184,10 +192,21 @@
+   gstaudiosink_class->delay = GST_DEBUG_FUNCPTR (gst_alsasink_delay);
+   gstaudiosink_class->reset = GST_DEBUG_FUNCPTR (gst_alsasink_reset);
+ 
++  //GST_DEBUG_OBJECT (alsasink, "gst_alsasink_class_init...");
++
++  config_init(&cfg);
++  config_file_real_path = realpath(CONFIG_FILE, NULL);
++  if(config_file_real_path != NULL) {
++     if (config_read_file(&cfg, config_file_real_path)) {
++		if (!config_lookup_string(&cfg, "gst-sound-card.hw", (const char**)&gst_soundcard_device))
++			gst_soundcard_device=DEFAULT_DEVICE;
++	 }
++  }
++
+   g_object_class_install_property (gobject_class, PROP_DEVICE,
+       g_param_spec_string ("device", "Device",
+           "ALSA device, as defined in an asound configuration file",
+-          DEFAULT_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++          gst_soundcard_device, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
+   g_object_class_install_property (gobject_class, PROP_DEVICE_NAME,
+       g_param_spec_string ("device-name", "Device name",
+@@ -214,7 +233,7 @@
+       sink->device = g_value_dup_string (value);
+       /* setting NULL restores the default device */
+       if (sink->device == NULL) {
+-        sink->device = g_strdup (DEFAULT_DEVICE);
++        sink->device = g_strdup (gst_soundcard_device);
+       }
+       break;
+     default:
+@@ -256,7 +275,7 @@
+ {
+   GST_DEBUG_OBJECT (alsasink, "initializing alsasink");
+ 
+-  alsasink->device = g_strdup (DEFAULT_DEVICE);
++  alsasink->device = g_strdup (gst_soundcard_device);
+   alsasink->handle = NULL;
+   alsasink->cached_caps = NULL;
+   g_mutex_init (&alsasink->alsa_lock);
+diff -Nur gst1-plugins-base-1.16.1-orig/ext/alsa/meson.build gst1-plugins-base-1.16.1/ext/alsa/meson.build
+--- gst1-plugins-base-1.16.1-orig/ext/alsa/meson.build	2019-04-19 17:16:20.000000000 +0800
++++ gst1-plugins-base-1.16.1/ext/alsa/meson.build	2020-01-10 18:14:40.113239669 +0800
+@@ -8,13 +8,14 @@
+ ]
+ 
+ alsa_dep = dependency('alsa', version : '>=0.9.1', required : get_option('alsa'))
++aml_audio_dep = dependency('libconfig')
+ 
+ if alsa_dep.found()
+   gstalsa = library('gstalsa',
+     alsa_sources,
+     c_args : gst_plugins_base_args,
+     include_directories: [configinc, libsinc],
+-    dependencies : glib_deps + [alsa_dep, audio_dep, tag_dep, gst_dep, gst_base_dep],
++    dependencies : glib_deps + [alsa_dep, audio_dep, tag_dep, gst_dep, gst_base_dep, aml_audio_dep],
+     install : true,
+     install_dir : plugins_install_dir,
+   )
+diff -Nur gst1-plugins-base-1.16.1-orig/gst-libs/gst/audio/streamvolume.c gst1-plugins-base-1.16.1/gst-libs/gst/audio/streamvolume.c
+--- gst1-plugins-base-1.16.1-orig/gst-libs/gst/audio/streamvolume.c	2019-04-19 17:16:20.000000000 +0800
++++ gst1-plugins-base-1.16.1/gst-libs/gst/audio/streamvolume.c	2020-01-10 18:13:08.789102220 +0800
+@@ -48,6 +48,8 @@
+ #include "streamvolume.h"
+ #include <math.h>
+ 
++#define VOLUME_STEPS 20
++
+ static void
+ gst_stream_volume_class_init (GstStreamVolumeInterface * iface)
+ {
+@@ -209,3 +211,17 @@
+   }
+   g_return_val_if_reached (0.0);
+ }
++
++void gst_set_relative_volume (GstElement * play, gdouble volume_step)
++{
++   //gdouble volume;
++   //volume = gst_stream_volume_get_volume (GST_STREAM_VOLUME (play),
++   //GST_STREAM_VOLUME_FORMAT_CUBIC);
++
++   //volume = round ((volume + volume_step) * VOLUME_STEPS) / VOLUME_STEPS;
++   //volume = CLAMP (volume, 0.0, 10.0);
++
++   gst_stream_volume_set_volume (GST_STREAM_VOLUME (play),
++   GST_STREAM_VOLUME_FORMAT_CUBIC, volume_step/100);
++}
++
+diff -Nur gst1-plugins-base-1.16.1-orig/gst-libs/gst/audio/streamvolume.h gst1-plugins-base-1.16.1/gst-libs/gst/audio/streamvolume.h
+--- gst1-plugins-base-1.16.1-orig/gst-libs/gst/audio/streamvolume.h	2019-04-19 17:16:20.000000000 +0800
++++ gst1-plugins-base-1.16.1/gst-libs/gst/audio/streamvolume.h	2020-01-10 18:13:08.789102220 +0800
+@@ -83,6 +83,10 @@
+                                                    GstStreamVolumeFormat to,
+                                                    gdouble val) G_GNUC_CONST;
+ 
++GST_AUDIO_API
++void            gst_set_relative_volume            (GstElement * play,
++                                                   gdouble volume_step);
++
+ G_END_DECLS
+ 
+ #endif /* __GST_STREAM_VOLUME_H__ */
+diff -Nur gst1-plugins-base-1.16.1-orig/tools/gst-play.c gst1-plugins-base-1.16.1/tools/gst-play.c
+--- gst1-plugins-base-1.16.1-orig/tools/gst-play.c	2019-04-19 17:16:21.000000000 +0800
++++ gst1-plugins-base-1.16.1/tools/gst-play.c	2020-01-10 18:13:16.381113646 +0800
+@@ -112,6 +112,7 @@
+ static void play_about_to_finish (GstElement * playbin, gpointer user_data);
+ static void play_reset (GstPlay * play);
+ static void play_set_relative_volume (GstPlay * play, gdouble volume_step);
++static void play_info_print (GstPlay * play);
+ static gboolean play_do_seek (GstPlay * play, gint64 pos, gdouble rate,
+     GstPlayTrickMode mode);
+ 
+@@ -262,6 +263,9 @@
+ 
+   play_reset (play);
+ 
++  play->desired_state = GST_STATE_NULL;
++  play_info_print(play);
++
+   gst_element_set_state (play->playbin, GST_STATE_NULL);
+   gst_object_unref (play->playbin);
+ 
+@@ -628,6 +632,8 @@
+     status[len] = '\0';
+   }
+ 
++  play_info_print(play);
++
+   if (pos >= 0 && dur > 0) {
+     gchar dstr[32], pstr[32];
+ 
+@@ -642,6 +648,16 @@
+   return TRUE;
+ }
+ 
++static void play_info_print (GstPlay * play) {
++  gint64 pos = -1, dur = -1;
++  gchar *state[5] = {"GST_STATE_VOID_PENDING", "GST_STATE_NULL", "GST_STATE_READY", "GST_STATE_PAUSED", "GST_STATE_PLAYING"};
++
++  gst_element_query_position (play->playbin, GST_FORMAT_TIME, &pos);
++  gst_element_query_duration (play->playbin, GST_FORMAT_TIME, &dur);
++
++  GST_INFO ("[update_state] state=%s curtime=%lld (ms:%lld) fulltime=%lld\n", state[play->desired_state], pos / 1000000000, pos / 1000000, dur / 1000000000);
++}
++
+ static gchar *
+ play_uri_get_display_name (GstPlay * play, const gchar * uri)
+ {

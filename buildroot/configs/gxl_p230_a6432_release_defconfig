@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "gxl_p230.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesongxl_p230_32_kernel49/initramfs/ramfslist-32"

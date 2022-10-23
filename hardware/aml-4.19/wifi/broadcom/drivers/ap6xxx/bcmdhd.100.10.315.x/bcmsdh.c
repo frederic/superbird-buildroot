@@ -2,7 +2,7 @@
  *  BCMSDH interface glue
  *  implement bcmsdh API for SDIOH driver
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -81,31 +81,31 @@ void bcmsdh_btsdio_process_hang_state(dhd_hang_state_t new_state)
 	bool state_change = false;
 
 	BCMSDH_ERROR(("%s: DHD hang state changed - [%d] -> [%d]\n",
-				  __FUNCTION__, g_dhd_hang_state, new_state));
+		__FUNCTION__, g_dhd_hang_state, new_state));
 
 	if (g_dhd_hang_state == new_state)
 		return;
 
 	switch (g_dhd_hang_state) {
-	case NO_HANG_STATE:
-		if (HANG_START_STATE == new_state)
-			state_change = true;
+		case NO_HANG_STATE:
+			if (HANG_START_STATE == new_state)
+				state_change = true;
 		break;
 
-	case HANG_START_STATE:
-		if (HANG_RECOVERY_STATE == new_state ||
+		case HANG_START_STATE:
+			if (HANG_RECOVERY_STATE == new_state ||
 				NO_HANG_STATE == new_state)
-			state_change = true;
+				state_change = true;
 
 		break;
 
-	case HANG_RECOVERY_STATE:
-		if (NO_HANG_STATE == new_state)
-			state_change = true;
+		case HANG_RECOVERY_STATE:
+			if (NO_HANG_STATE == new_state)
+				state_change = true;
 		break;
 
-	default:
-		BCMSDH_ERROR(("%s: Unhandled Hang state\n", __FUNCTION__));
+		default:
+			BCMSDH_ERROR(("%s: Unhandled Hang state\n", __FUNCTION__));
 		break;
 	}
 
@@ -139,7 +139,7 @@ void bcmsdh_btsdio_process_dhd_hang_notification(bool wifi_recovery_completed)
 }
 
 void bcmsdh_btsdio_interface_init(struct sdio_func *func,
-								  f3intr_handler f3intr_fun, dhd_hang_notification hang_notification)
+	f3intr_handler f3intr_fun, dhd_hang_notification hang_notification)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)l_bcmsdh;
 	BCMSDH_INFO(("%s: func %p \n", __FUNCTION__, func));
@@ -148,8 +148,7 @@ void bcmsdh_btsdio_interface_init(struct sdio_func *func,
 	sdioh_sdmmc_card_enable_func_f3(bcmsdh->sdioh, func);
 	process_dhd_hang_notification = hang_notification;
 
-}
-EXPORT_SYMBOL(bcmsdh_btsdio_interface_init);
+} EXPORT_SYMBOL(bcmsdh_btsdio_interface_init);
 #endif /* defined (BT_OVER_SDIO) */
 
 /* Attach BCMSDH layer to SDIO Host Controller Driver
@@ -203,7 +202,7 @@ bcmsdh_detach(osl_t *osh, void *sdh)
 
 int
 bcmsdh_iovar_op(void *sdh, const char *name,
-				void *params, uint plen, void *arg, uint len, bool set)
+                void *params, uint plen, void *arg, uint len, bool set)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	return sdioh_iovar_op(bcmsdh->sdioh, name, params, plen, arg, len, set);
@@ -340,7 +339,7 @@ bcmsdh_cfg_read(void *sdh, uint fnc_num, uint32 addr, int *err)
 		if (retry)	/* wait for 1 ms till bus get settled down */
 			OSL_DELAY(1000);
 #endif // endif
-		status = sdioh_cfg_read(bcmsdh->sdioh, fnc_num, addr, (uint8 *)&data);
+	status = sdioh_cfg_read(bcmsdh->sdioh, fnc_num, addr, (uint8 *)&data);
 #ifdef SDIOH_API_ACCESS_RETRY_LIMIT
 	} while (!SDIOH_API_SUCCESS(status) && (retry++ < SDIOH_API_ACCESS_RETRY_LIMIT));
 #endif // endif
@@ -348,11 +347,10 @@ bcmsdh_cfg_read(void *sdh, uint fnc_num, uint32 addr, int *err)
 		*err = (SDIOH_API_SUCCESS(status) ? 0 : BCME_SDIO_ERROR);
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, uint8data = 0x%x\n", __FUNCTION__,
-				 fnc_num, addr, data));
+	            fnc_num, addr, data));
 
 	return data;
-}
-EXPORT_SYMBOL(bcmsdh_cfg_read);
+} EXPORT_SYMBOL(bcmsdh_cfg_read);
 
 void
 bcmsdh_cfg_write(void *sdh, uint fnc_num, uint32 addr, uint8 data, int *err)
@@ -373,7 +371,7 @@ bcmsdh_cfg_write(void *sdh, uint fnc_num, uint32 addr, uint8 data, int *err)
 		if (retry)	/* wait for 1 ms till bus get settled down */
 			OSL_DELAY(1000);
 #endif // endif
-		status = sdioh_cfg_write(bcmsdh->sdioh, fnc_num, addr, (uint8 *)&data);
+	status = sdioh_cfg_write(bcmsdh->sdioh, fnc_num, addr, (uint8 *)&data);
 #ifdef SDIOH_API_ACCESS_RETRY_LIMIT
 	} while (!SDIOH_API_SUCCESS(status) && (retry++ < SDIOH_API_ACCESS_RETRY_LIMIT));
 #endif // endif
@@ -381,9 +379,8 @@ bcmsdh_cfg_write(void *sdh, uint fnc_num, uint32 addr, uint8 data, int *err)
 		*err = SDIOH_API_SUCCESS(status) ? 0 : BCME_SDIO_ERROR;
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, uint8data = 0x%x\n", __FUNCTION__,
-				 fnc_num, addr, data));
-}
-EXPORT_SYMBOL(bcmsdh_cfg_write);
+	            fnc_num, addr, data));
+} EXPORT_SYMBOL(bcmsdh_cfg_write);
 
 uint32
 bcmsdh_cfg_read_word(void *sdh, uint fnc_num, uint32 addr, int *err)
@@ -398,13 +395,13 @@ bcmsdh_cfg_read_word(void *sdh, uint fnc_num, uint32 addr, int *err)
 	ASSERT(bcmsdh->init_success);
 
 	status = sdioh_request_word(bcmsdh->sdioh, SDIOH_CMD_TYPE_NORMAL, SDIOH_READ, fnc_num,
-								addr, &data, 4);
+	                            addr, &data, 4);
 
 	if (err)
 		*err = (SDIOH_API_SUCCESS(status) ? 0 : BCME_SDIO_ERROR);
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, uint32data = 0x%x\n", __FUNCTION__,
-				 fnc_num, addr, data));
+	            fnc_num, addr, data));
 
 	return data;
 }
@@ -421,13 +418,13 @@ bcmsdh_cfg_write_word(void *sdh, uint fnc_num, uint32 addr, uint32 data, int *er
 	ASSERT(bcmsdh->init_success);
 
 	status = sdioh_request_word(bcmsdh->sdioh, SDIOH_CMD_TYPE_NORMAL, SDIOH_WRITE, fnc_num,
-								addr, &data, 4);
+	                            addr, &data, 4);
 
 	if (err)
 		*err = (SDIOH_API_SUCCESS(status) ? 0 : BCME_SDIO_ERROR);
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, uint32data = 0x%x\n", __FUNCTION__, fnc_num,
-				 addr, data));
+	             addr, data));
 }
 
 int
@@ -459,9 +456,9 @@ bcmsdh_cis_read(void *sdh, uint func, uint8 *cis, uint length)
 		bcopy(cis, tmp_buf, length);
 		for (tmp_ptr = tmp_buf, ptr = cis; ptr < (cis + length - 4); tmp_ptr++) {
 			ptr += snprintf((char*)ptr, (cis + length - ptr - 4),
-							"%.2x ", *tmp_ptr & 0xff);
+				"%.2x ", *tmp_ptr & 0xff);
 			if ((((tmp_ptr - tmp_buf) + 1) & 0xf) == 0)
-				ptr += snprintf((char *)ptr, (cis + length - ptr - 4), "\n");
+				ptr += snprintf((char *)ptr, (cis + length - ptr -4), "\n");
 		}
 		MFREE(bcmsdh->osh, tmp_buf, length);
 	}
@@ -498,13 +495,13 @@ bcmsdhsdio_set_sbaddr_window(void *sdh, uint32 address, bool force_set)
 
 	if (bar0 != bcmsdh->sbwad || force_set) {
 		bcmsdh_cfg_write(bcmsdh, SDIO_FUNC_1, SBSDIO_FUNC1_SBADDRLOW,
-						 (address >> 8) & SBSDIO_SBADDRLOW_MASK, &err);
+			(address >> 8) & SBSDIO_SBADDRLOW_MASK, &err);
 		if (!err)
 			bcmsdh_cfg_write(bcmsdh, SDIO_FUNC_1, SBSDIO_FUNC1_SBADDRMID,
-							 (address >> 16) & SBSDIO_SBADDRMID_MASK, &err);
+				(address >> 16) & SBSDIO_SBADDRMID_MASK, &err);
 		if (!err)
 			bcmsdh_cfg_write(bcmsdh, SDIO_FUNC_1, SBSDIO_FUNC1_SBADDRHIGH,
-							 (address >> 24) & SBSDIO_SBADDRHIGH_MASK, &err);
+				(address >> 24) & SBSDIO_SBADDRHIGH_MASK, &err);
 
 		if (!err)
 			bcmsdh->sbwad = bar0;
@@ -541,7 +538,7 @@ bcmsdh_reg_read(void *sdh, uintptr addr, uint size)
 		addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
 
 	status = sdioh_request_word(bcmsdh->sdioh, SDIOH_CMD_TYPE_NORMAL,
-								SDIOH_READ, SDIO_FUNC_1, addr, &word, size);
+		SDIOH_READ, SDIO_FUNC_1, addr, &word, size);
 
 	bcmsdh->regfail = !(SDIOH_API_SUCCESS(status));
 
@@ -550,21 +547,21 @@ bcmsdh_reg_read(void *sdh, uintptr addr, uint size)
 	/* if ok, return appropriately masked word */
 	if (SDIOH_API_SUCCESS(status)) {
 		switch (size) {
-		case sizeof(uint8):
-			return (word & 0xff);
-		case sizeof(uint16):
-			return (word & 0xffff);
-		case sizeof(uint32):
-			return word;
-		default:
-			bcmsdh->regfail = TRUE;
+			case sizeof(uint8):
+				return (word & 0xff);
+			case sizeof(uint16):
+				return (word & 0xffff);
+			case sizeof(uint32):
+				return word;
+			default:
+				bcmsdh->regfail = TRUE;
 
 		}
 	}
 
 	/* otherwise, bad sdio access or invalid size */
 	BCMSDH_ERROR(("%s: error reading addr 0x%x size %d\n",
-				  __FUNCTION__, (unsigned int)addr, size));
+		__FUNCTION__, (unsigned int)addr, size));
 	return 0xFFFFFFFF;
 }
 
@@ -576,7 +573,7 @@ bcmsdh_reg_write(void *sdh, uintptr addr, uint size, uint32 data)
 	int err = 0;
 
 	BCMSDH_INFO(("%s:fun = 1, addr = 0x%x, uint%ddata = 0x%x\n",
-				 __FUNCTION__, (unsigned int)addr, size * 8, data));
+	             __FUNCTION__, (unsigned int)addr, size*8, data));
 
 	if (!bcmsdh)
 		bcmsdh = l_bcmsdh;
@@ -592,14 +589,14 @@ bcmsdh_reg_write(void *sdh, uintptr addr, uint size, uint32 data)
 	if (size == 4)
 		addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
 	status = sdioh_request_word(bcmsdh->sdioh, SDIOH_CMD_TYPE_NORMAL, SDIOH_WRITE, SDIO_FUNC_1,
-								addr, &data, size);
+	                            addr, &data, size);
 	bcmsdh->regfail = !(SDIOH_API_SUCCESS(status));
 
 	if (SDIOH_API_SUCCESS(status))
 		return 0;
 
 	BCMSDH_ERROR(("%s: error writing 0x%08x to addr 0x%04x size %d\n",
-				  __FUNCTION__, data, (unsigned int)addr, size));
+	              __FUNCTION__, data, (unsigned int)addr, size));
 	return 0xFFFFFFFF;
 }
 
@@ -611,8 +608,8 @@ bcmsdh_regfail(void *sdh)
 
 int
 bcmsdh_recv_buf(void *sdh, uint32 addr, uint fn, uint flags,
-				uint8 *buf, uint nbytes, void *pkt,
-				bcmsdh_cmplt_fn_t complete_fn, void *handle)
+                uint8 *buf, uint nbytes, void *pkt,
+                bcmsdh_cmplt_fn_t complete_fn, void *handle)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	SDIOH_API_RC status;
@@ -624,7 +621,7 @@ bcmsdh_recv_buf(void *sdh, uint32 addr, uint fn, uint flags,
 	ASSERT(bcmsdh->init_success);
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, size = %d\n",
-				 __FUNCTION__, fn, addr, nbytes));
+	             __FUNCTION__, fn, addr, nbytes));
 
 	/* Async not implemented yet */
 	ASSERT(!(flags & SDIO_REQ_ASYNC));
@@ -642,15 +639,15 @@ bcmsdh_recv_buf(void *sdh, uint32 addr, uint fn, uint flags,
 		addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
 
 	status = sdioh_request_buffer(bcmsdh->sdioh, SDIOH_DATA_PIO, incr_fix,
-								  SDIOH_READ, fn, addr, width, nbytes, buf, pkt);
+	                              SDIOH_READ, fn, addr, width, nbytes, buf, pkt);
 
 	return (SDIOH_API_SUCCESS(status) ? 0 : BCME_SDIO_ERROR);
 }
 
 int
 bcmsdh_send_buf(void *sdh, uint32 addr, uint fn, uint flags,
-				uint8 *buf, uint nbytes, void *pkt,
-				bcmsdh_cmplt_fn_t complete_fn, void *handle)
+                uint8 *buf, uint nbytes, void *pkt,
+                bcmsdh_cmplt_fn_t complete_fn, void *handle)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	SDIOH_API_RC status;
@@ -662,7 +659,7 @@ bcmsdh_send_buf(void *sdh, uint32 addr, uint fn, uint flags,
 	ASSERT(bcmsdh->init_success);
 
 	BCMSDH_INFO(("%s:fun = %d, addr = 0x%x, size = %d\n",
-				 __FUNCTION__, fn, addr, nbytes));
+	            __FUNCTION__, fn, addr, nbytes));
 
 	/* Async not implemented yet */
 	ASSERT(!(flags & SDIO_REQ_ASYNC));
@@ -680,7 +677,7 @@ bcmsdh_send_buf(void *sdh, uint32 addr, uint fn, uint flags,
 		addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
 
 	status = sdioh_request_buffer(bcmsdh->sdioh, SDIOH_DATA_PIO, incr_fix,
-								  SDIOH_WRITE, fn, addr, width, nbytes, buf, pkt);
+	                              SDIOH_WRITE, fn, addr, width, nbytes, buf, pkt);
 
 	return (SDIOH_API_SUCCESS(status) ? 0 : BCME_ERROR);
 }
@@ -699,8 +696,8 @@ bcmsdh_rwdata(void *sdh, uint rw, uint32 addr, uint8 *buf, uint nbytes)
 	addr |= SBSDIO_SB_ACCESS_2_4B_FLAG;
 
 	status = sdioh_request_buffer(bcmsdh->sdioh, SDIOH_DATA_PIO, SDIOH_DATA_INC,
-								  (rw ? SDIOH_WRITE : SDIOH_READ), SDIO_FUNC_1,
-								  addr, 4, nbytes, buf, NULL);
+	                              (rw ? SDIOH_WRITE : SDIOH_READ), SDIO_FUNC_1,
+	                              addr, 4, nbytes, buf, NULL);
 
 	return (SDIOH_API_SUCCESS(status) ? 0 : BCME_ERROR);
 }
@@ -879,7 +876,7 @@ bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 }
 
 uint
-bcmsdh_set_mode(void *sdh, uint mode)
+bcmsdh_set_mode(void *sdh, uint mode) 
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
 	return (sdioh_set_mode(bcmsdh->sdioh, mode));

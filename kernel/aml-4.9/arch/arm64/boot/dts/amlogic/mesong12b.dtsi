@@ -1212,7 +1212,7 @@
 	};
 
 	aocec: aocec {
-		compatible = "amlogic, aocec-g12a";
+		compatible = "amlogic, aocec-g12b";
 		device_name = "aocec";
 		status = "okay";
 		vendor_name = "Amlogic"; /* Max Chars: 8     */
@@ -1223,7 +1223,8 @@
 		product_desc = "G12B"; /* Max Chars: 16    */
 		cec_osd_string = "AML_MBOX"; /* Max Chars: 14    */
 		port_num = <1>;
-		ee_cec;
+		output = <1>;
+		/*ee_cec;*/
 		arc_port_mask = <0x2>;
 		interrupts = <0 203 1
 					0 199 1>;	/*0:snps 1:ts*/
@@ -1290,6 +1291,27 @@
 			<&clkc CLKID_VPU_CLKC_MUX>;
 		clock-names = "vpu_clkc0",
 			"vpu_clkc";
+	};
+
+	dummy_venc: dummy_venc {
+		compatible = "amlogic, dummy_venc";
+		status = "okay";
+		clocks = <&clkc CLKID_VCLK2_ENCP
+			&clkc CLKID_VCLK2_VENCP0
+			&clkc CLKID_VCLK2_VENCP1
+			&clkc CLKID_VCLK2_ENCI
+			&clkc CLKID_VCLK2_VENCI0
+			&clkc CLKID_VCLK2_VENCI1
+			&clkc CLKID_VCLK2_ENCL
+			&clkc CLKID_VCLK2_VENCL>;
+		clock-names = "encp_top_gate",
+			"encp_int_gate0",
+			"encp_int_gate1",
+			"venci_top_gate",
+			"enci_int_gate0",
+			"enci_int_gate1",
+			"encl_top_gate",
+			"encl_int_gate";
 	};
 
 	vdac {
@@ -1411,6 +1433,12 @@
 			"mailbox_2";
 	};
 
+	vcodec_dec {
+		compatible = "amlogic, vcodec-dec";
+		dev_name = "aml-vcodec-dec";
+		status = "okay";
+	};
+
 	amvenc_avc{
 		compatible = "amlogic, amvenc_avc";
 		dev_name = "amvenc_avc";
@@ -1432,6 +1460,24 @@
 		io_reg_base{
 			reg = <0x0 0xff610000 0x0 0x4000>;
 		};
+	};
+
+	jpegenc{
+		compatible = "amlogic, jpegenc";
+		//memory-region = <&jpegenc_cma_reserved>;
+		dev_name = "jpegenc";
+		status = "okay";
+		//power-domains = <&pwrdm PDID_HCODEC>;
+		//clocks = <&clkc CLKID_SYS_DOS
+		//	&clkc CLKID_DOS_APB
+		//	&clkc CLKID_JPEG_GATE>;
+		//clock-names = "clk_dos",
+		//	"clk_apb_dos",
+		//	"clk_jpeg_enc";
+		//interrupts = <GIC_SPI 88 IRQ_TYPE_EDGE_RISING>;
+		//interrupt-names = "mailbox_0";
+		interrupts = <0 45 1>;
+		interrupt-names = "mailbox_2";
 	};
 
 	rdma{
@@ -1909,6 +1955,7 @@
 		status = "okay";
 		reg = <0x0 0xff638000 0x0 0x100
 		       0x0 0xff638c00 0x0 0x100>;
+		sec_base = <0xff639000>;
 		interrupts = <0 52 1>;
 		interrupt-names = "ddr_bandwidth";
 	};
@@ -1980,6 +2027,45 @@
 		reg = <0x0 0xff630218 0x0 0x4>; /*RNG_USR_DATA*/
 		mem_size = <0x0 0x100000>;
 		status = "okay";
+	};
+
+	efuse: efuse{
+		compatible = "amlogic, efuse";
+		read_cmd = <0x82000030>;
+		write_cmd = <0x82000031>;
+		get_max_cmd = <0x82000033>;
+		key = <&efusekey>;
+		clocks = <&clkc CLKID_EFUSE>;
+		clock-names = "efuse_clk";
+		status = "disabled";
+	};
+
+	efusekey:efusekey{
+		keynum = <4>;
+		key0 = <&key_0>;
+		key1 = <&key_1>;
+		key2 = <&key_2>;
+		key3 = <&key_3>;
+		key_0:key_0{
+			keyname = "mac";
+			offset = <0>;
+			size = <6>;
+		};
+		key_1:key_1{
+			keyname = "mac_bt";
+			offset = <6>;
+			size = <6>;
+		};
+		key_2:key_2{
+			keyname = "mac_wifi";
+			offset = <12>;
+			size = <6>;
+		};
+		key_3:key_3{
+			keyname = "usid";
+			offset = <18>;
+			size = <16>;
+		};
 	};
 };/* end of / */
 
@@ -2608,7 +2694,6 @@
 			"eth_rxd2_rgmii",
 			"eth_rxd3_rgmii",
 			"eth_rgmii_tx_clk",
-			"eth_txen",
 			"eth_txd0",
 			"eth_txd1",
 			"eth_txd2_rgmii",

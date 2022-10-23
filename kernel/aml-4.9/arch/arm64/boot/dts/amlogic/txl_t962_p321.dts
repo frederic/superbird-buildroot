@@ -320,6 +320,7 @@
 		hdmirx_id = <0>;
 		en_4k_2_2k = <0>;
 		hpd_low_cec_off = <1>;
+		arc_port = <1>;
 		/* bit4: enable feature, bit3~0: port number */
 		disable_port = <0x0>;
 		reg = <0x0 0xc0800000 0x0 0xa00000
@@ -596,7 +597,7 @@
 		compatible = "amlogic, unifykey";
 		status = "okay";
 
-		unifykey-num = <20>;
+		unifykey-num = <21>;
 		unifykey-index-0 = <&keysn_0>;
 		unifykey-index-1 = <&keysn_1>;
 		unifykey-index-2 = <&keysn_2>;
@@ -617,6 +618,7 @@
 		unifykey-index-17 = <&keysn_17>;
 		unifykey-index-18 = <&keysn_18>;
 		unifykey-index-19 = <&keysn_19>;
+		unifykey-index-20 = <&keysn_20>;
 
 		keysn_0: key_0{
 			key-name = "usid";
@@ -721,6 +723,11 @@
 		keysn_19:key_19{
 			key-name = "attestationkeybox";// attestation key
 			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+		keysn_20:key_20{
+			key-name = "oemkey";
+			key-device = "normal";
 			key-permit = "read","write","del";
 		};
 	}; /* End unifykey */

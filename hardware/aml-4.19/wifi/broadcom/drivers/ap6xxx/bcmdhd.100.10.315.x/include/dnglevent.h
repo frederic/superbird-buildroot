@@ -1,7 +1,9 @@
 /*
- * Broadcom Event  protocol definitions
+ * Broadcom Event protocol definitions
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Dependencies: bcmeth.h
+ *
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,11 +23,10 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * Dependencies: bcmeth.h
- *
- * $Id: dnglevent.h $
  *
  * <<Broadcom-WL-IPTag/Open:>>
+ *
+ * $Id: dnglevent.h $
  *
  * -----------------------------------------------------------------------------
  *
@@ -108,8 +109,9 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_dngl_healthcheck {
 #define HEALTH_CHECK_PCIEDEV_D3ACK_STALL_IND	0x5
 #define HEALTH_CHECK_PCIEDEV_NODS_IND	0x6
 #define HEALTH_CHECK_PCIEDEV_LINKSPEED_FALLBACK_IND	0x7
+#define HEALTH_CHECK_PCIEDEV_DSACK_STALL_IND	0x8
 
-#define HC_PCIEDEV_CONFIG_REGLIST_MAX	20
+#define HC_PCIEDEV_CONFIG_REGLIST_MAX	25
 typedef BWL_PRE_PACKED_STRUCT struct bcm_dngl_pcie_hc {
 	uint16			version; /* HEALTH_CHECK_PCIEDEV_VERSION_1 */
 	uint16			reserved;

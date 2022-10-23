@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -163,7 +163,7 @@ ol_tx_queue_vdev_flush(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
     } while (peer_count >= PEER_ARRAY_COUNT);
 }
 
-static inline void
+void
 ol_tx_queue_flush(struct ol_txrx_pdev_t *pdev)
 {
     struct ol_txrx_vdev_t *vdev;
@@ -637,6 +637,103 @@ ol_txrx_pdev_pause_other_vdev(ol_txrx_pdev_handle pdev, u_int32_t reason, u_int3
 	}
 }
 
+void
+ol_txrx_vdev_unpause_txq(ol_txrx_vdev_handle vdev, u_int32_t reason)
+{
+	struct ol_tx_sched_notify_ctx_t notify_ctx;
+	struct ol_tx_frms_queue_t *txq;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
+	u_int8_t i;
+
+	adf_os_spin_lock_bh(&pdev->tx_queue_spinlock);
+	if (pdev->cfg.is_high_latency && (vdev->hl_paused_reason & reason)) {
+		vdev->hl_paused_reason &= ~reason;
+		for (i = 0; i < OL_TX_VDEV_NUM_QUEUES; i++) {
+			txq = &vdev->txqs[i];
+			/*
+			 * Don't actually unpause the tx queue until all pause
+			 * requests have been removed.
+			 */
+			TXRX_ASSERT2(txq->paused_count.total > 0);
+			/* return, if not already paused */
+			if (txq->paused_count.total == 0)
+				continue;
+			if (--txq->paused_count.total == 0) {
+				notify_ctx.event = OL_TX_UNPAUSE_QUEUE;
+				notify_ctx.txq = txq;
+				notify_ctx.info.ext_tid = OL_TX_NUM_TIDS + i;
+				ol_tx_sched_notify(pdev, &notify_ctx);
+				if (txq->frms == 0) {
+					txq->flag = ol_tx_queue_empty;
+				} else {
+					txq->flag = ol_tx_queue_active;
+					/*
+					 * Now that the are new tx frames
+					 * available to download, invoke the
+					 * scheduling function, to see if it
+					 * wants to download the new frames.
+					 * Since the queue lock is currently
+					 * held, and since scheduler function
+					 * takes the lock, temporarily release
+					 * the lock.
+					 */
+					adf_os_spin_unlock_bh(
+						&pdev->tx_queue_spinlock);
+					ol_tx_sched(pdev);
+					adf_os_spin_lock_bh(
+						&pdev->tx_queue_spinlock);
+				}
+			}
+		}
+	}
+	adf_os_spin_unlock_bh(&pdev->tx_queue_spinlock);
+}
+
+void
+ol_txrx_pdev_unpause_vdev_txq(ol_txrx_pdev_handle pdev, u_int32_t reason)
+{
+	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
+
+	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
+		ol_txrx_vdev_unpause_txq(vdev, reason);
+	}
+}
+
+void
+ol_txrx_vdev_pause_txq(ol_txrx_vdev_handle vdev, u_int32_t reason)
+{
+	struct ol_tx_sched_notify_ctx_t notify_ctx;
+	struct ol_tx_frms_queue_t *txq;
+	u_int8_t i;
+
+	adf_os_spin_lock_bh(&vdev->pdev->tx_queue_spinlock);
+	if (vdev->pdev->cfg.is_high_latency &&
+	    ((vdev->hl_paused_reason & reason) == 0)) {
+		vdev->hl_paused_reason |= reason;
+		for (i = 0; i < OL_TX_VDEV_NUM_QUEUES; i++) {
+			txq = &vdev->txqs[i];
+			if (txq->paused_count.total++ == 0) {
+				notify_ctx.event = OL_TX_PAUSE_QUEUE;
+				notify_ctx.txq = txq;
+				notify_ctx.info.ext_tid = OL_TX_NUM_TIDS + i;
+				ol_tx_sched_notify(vdev->pdev, &notify_ctx);
+				txq->flag = ol_tx_queue_paused;
+			}
+		}
+	}
+	adf_os_spin_unlock_bh(&vdev->pdev->tx_queue_spinlock);
+}
+
+void
+ol_txrx_pdev_pause_vdev_txq(ol_txrx_pdev_handle pdev, u_int32_t reason)
+{
+	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
+
+	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
+		ol_txrx_vdev_pause_txq(vdev, reason);
+	}
+}
+
 /**
  * ol_txrx_pdev_unpause_other_vdev() - Resume tx for the paused vdevs..
  * @data_pdev: the physical device being paused.
@@ -868,11 +965,20 @@ ol_txrx_bad_peer_txctl_update_threshold(struct ol_txrx_pdev_t *pdev,
 			tx_limit;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void
+ol_tx_pdev_peer_bal_timer(struct timer_list *t)
+{
+	int i;
+	struct ol_txrx_pdev_t *pdev =
+			from_timer(pdev, t, tx_peer_bal.peer_bal_timer);
+#else
 void
 ol_tx_pdev_peer_bal_timer(void *context)
 {
 	int i;
 	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)context;
+#endif
 
 	adf_os_spin_lock_bh(&pdev->tx_peer_bal.mutex);
 
@@ -1138,7 +1244,11 @@ ol_txrx_vdev_unpause(ol_txrx_vdev_handle vdev, u_int32_t reason)
 #endif
             if (!vdev->ll_pause.paused_reason) {
                 adf_os_spin_unlock_bh(&vdev->ll_pause.mutex);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+                ol_tx_vdev_ll_pause_queue_send(&vdev->ll_pause.timer);
+#else
                 ol_tx_vdev_ll_pause_queue_send(vdev);
+#endif
             } else {
                 adf_os_spin_unlock_bh(&vdev->ll_pause.mutex);
             }
@@ -1164,8 +1274,10 @@ ol_txrx_vdev_flush(ol_txrx_vdev_handle vdev)
         while (vdev->ll_pause.txq.head) {
             adf_nbuf_t next = adf_nbuf_next(vdev->ll_pause.txq.head);
             adf_nbuf_set_next(vdev->ll_pause.txq.head, NULL);
-            adf_nbuf_unmap(vdev->pdev->osdev, vdev->ll_pause.txq.head,
-                           ADF_OS_DMA_TO_DEVICE);
+            if (NBUF_MAPPED_PADDR_LO(vdev->ll_pause.txq.head) &&
+                !adf_nbuf_is_ipa_nbuf(vdev->ll_pause.txq.head))
+                adf_nbuf_unmap(vdev->pdev->osdev, vdev->ll_pause.txq.head,
+                               ADF_OS_DMA_TO_DEVICE);
             adf_nbuf_tx_free(vdev->ll_pause.txq.head, ADF_NBUF_PKT_ERROR);
             vdev->ll_pause.txq.head = next;
         }
@@ -1185,9 +1297,15 @@ u_int8_t ol_tx_pdev_is_target_empty(void)
     return 1;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void ol_tx_pdev_throttle_phase_timer(struct timer_list *t)
+{
+   struct ol_txrx_pdev_t *pdev = from_timer(pdev, t, tx_throttle.phase_timer);
+#else
 void ol_tx_pdev_throttle_phase_timer(void *context)
 {
     struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)context;
+#endif
     int ms = 0;
     throttle_level cur_level;
     throttle_phase cur_phase;
@@ -1238,11 +1356,20 @@ void ol_tx_pdev_throttle_phase_timer(void *context)
 }
 
 #ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void ol_tx_pdev_throttle_tx_timer(struct timer_list *t)
+{
+	struct ol_txrx_pdev_t *pdev =
+			from_timer(pdev, t, tx_throttle.tx_timer);
+	ol_tx_pdev_ll_pause_queue_send_all(pdev);
+}
+#else
 void ol_tx_pdev_throttle_tx_timer(void *context)
 {
     struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)context;
     ol_tx_pdev_ll_pause_queue_send_all(pdev);
 }
+#endif
 #endif
 
 void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev, int level)

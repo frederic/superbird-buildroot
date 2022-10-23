@@ -37,6 +37,7 @@
 #include <linux/amlogic/pm.h>
 #include <linux/kobject.h>
 #include <../kernel/power/power.h>
+#include <linux/timer.h>
 
 static DEFINE_MUTEX(early_suspend_lock);
 static DEFINE_MUTEX(sysfs_trigger_lock);
@@ -55,6 +56,30 @@ unsigned int early_suspend_state;
  * Avoid run early_suspend/late_resume repeatly.
  */
 unsigned int already_early_suspend;
+
+ktime_t callback_debug_start(void)
+{
+	ktime_t calltime = ktime_set(0, 0);
+
+	if (pm_print_times_enabled) {
+		calltime = ktime_get();
+	}
+
+	return calltime;
+}
+
+void callback_debug_report(ktime_t calltime, void *callback)
+{
+	ktime_t rettime;
+	s64 nsecs;
+
+	if (pm_print_times_enabled) {
+		rettime = ktime_get();
+		nsecs = (s64) ktime_to_ns(ktime_sub(rettime, calltime));
+		pr_info("call %pf done after %lld usecs\n", callback,
+				(unsigned long long)nsecs >> 10);
+	}
+}
 
 void register_early_suspend(struct early_suspend *handler)
 {
@@ -84,6 +109,7 @@ EXPORT_SYMBOL(unregister_early_suspend);
 static inline void early_suspend(void)
 {
 	struct early_suspend *pos;
+	ktime_t starttime;
 
 	mutex_lock(&early_suspend_lock);
 
@@ -96,7 +122,9 @@ static inline void early_suspend(void)
 	list_for_each_entry(pos, &early_suspend_handlers, link)
 		if (pos->suspend != NULL) {
 			pr_info("early_suspend: %pf\n", pos->suspend);
+			starttime = callback_debug_start();
 			pos->suspend(pos);
+			callback_debug_report(starttime, pos->suspend);
 		}
 
 	pr_info("early_suspend: done\n");
@@ -110,6 +138,7 @@ end_early_suspend:
 static inline void late_resume(void)
 {
 	struct early_suspend *pos;
+	ktime_t starttime;
 
 	mutex_lock(&early_suspend_lock);
 
@@ -122,7 +151,9 @@ static inline void late_resume(void)
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link)
 		if (pos->resume != NULL) {
 			pr_info("late_resume: %pf\n", pos->resume);
+			starttime = callback_debug_start();
 			pos->resume(pos);
+			callback_debug_report(starttime, pos->resume);
 		}
 	pr_info("late_resume: done\n");
 

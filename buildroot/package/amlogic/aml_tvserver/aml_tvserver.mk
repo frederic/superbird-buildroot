@@ -7,7 +7,7 @@ AML_TVSERVER_SITE = $(TOPDIR)/../vendor/amlogic/aml_tvserver
 AML_TVSERVER_VERSION=1.0
 AML_TVSERVER_SITE_METHOD=local
 AML_TVSERVER_DEPENDENCIES += dbus linux
-AML_TVSERVER_DEPENDENCIES += libzlib sqlite
+AML_TVSERVER_DEPENDENCIES += libzlib sqlite hal_audio_service
 
 
 define AML_TVSERVER_BUILD_CMDS

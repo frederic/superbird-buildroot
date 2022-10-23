@@ -18,7 +18,10 @@
 #include "pred.h"
 #include <stdlib.h>
 
+#if defined LOG_TAG
+#undef LOG_TAG
 #define LOG_TAG "PRED_MODE"
+#endif
 
 #include <utils/Log.h>
 #define TH_I4  0  /* threshold biasing toward I16 mode instead of I4 mode */
@@ -134,7 +137,7 @@ amvenc_curr_pred_mode_t *InitcurrMBStruct()
 #endif
     if (NULL == curr)
     {
-        ALOGE("%s failed\n", __func__);
+        LOGAPI("%s failed\n", __func__);
     }
     return curr;
 }

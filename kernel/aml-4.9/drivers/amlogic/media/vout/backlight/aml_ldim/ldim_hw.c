@@ -43,6 +43,7 @@
 #include <linux/amlogic/iomap.h>
 #include <linux/workqueue.h>
 #include <linux/amlogic/media/vfm/vframe.h>
+#include <linux/amlogic/media/vpu/vpu.h>
 #include <linux/amlogic/media/vout/lcd/aml_ldim.h>
 #include <linux/amlogic/media/vout/lcd/aml_bl.h>
 #include <linux/amlogic/media/vout/vout_notify.h>
@@ -56,7 +57,29 @@
 #define Wr(reg, val)    Wr_reg(reg, val)
 #define Rd(reg)         Rd_reg(reg)
 
-static int LDIM_Update_Matrix(int NewBlMatrix[], int BlMatrixNum)
+static void LDIM_Update_Matrix_tm2(int NewBlMatrix[], int BlMatrixNum)
+{
+	struct aml_ldim_driver_s *ldim_drv = aml_ldim_get_driver();
+	unsigned int *ptr;
+	int i;
+
+	if (!ldim_drv->rmem)
+		return;
+	if (!ldim_drv->rmem->rd_mem_vaddr1)
+		return;
+
+	ptr = (unsigned int *)ldim_drv->rmem->rd_mem_vaddr1;
+	for (i = 0; i < (BlMatrixNum + 1) / 2; i++) {
+		*(unsigned int *) (ptr) = (unsigned int)
+			(((NewBlMatrix[2 * i + 1] & 0xfff) << 16) |
+			 (NewBlMatrix[2 * i] & 0xfff));
+		ptr++;
+	}
+	Wr_reg_bits(VPU_DMA_RDMIF_CTRL3, (BlMatrixNum + 7) / 8, 0, 13);
+	Wr_reg_bits(VPU_DMA_RDMIF_CTRL, 1, 13, 1);
+}
+
+static int LDIM_Update_Matrix_txlx(int NewBlMatrix[], int BlMatrixNum)
 {
 	int data;
 
@@ -90,7 +113,7 @@ Previous_Matrix:
 	return 1;
 }
 
-void ldim_initial_txlx(struct LDReg_s *nPRM,
+void remapping_initial_txlx(struct LDReg_s *nPRM,
 		unsigned int ldim_bl_en, unsigned int ldim_hvcnt_bypass)
 {
 	unsigned int i;
@@ -266,8 +289,191 @@ void ldim_initial_txlx(struct LDReg_s *nPRM,
 		(3 << 9) | (1 << 12);
 	LDIM_WR_32Bits(REG_LD_MISC_CTRL0, data);
 
-	LDIM_Update_Matrix(nPRM->BL_matrix, 16 * 24);
+	LDIM_Update_Matrix_txlx(nPRM->BL_matrix, 16 * 24);
 
+	kfree(arrayTmp);
+}
+
+void remapping_initial_tm2(struct LDReg_s *nPRM,
+		unsigned int ldim_bl_en, unsigned int ldim_hvcnt_bypass)
+{
+	unsigned int i;
+	unsigned int data;
+	unsigned int *arrayTmp;
+
+	arrayTmp = kcalloc(1536, sizeof(unsigned int), GFP_KERNEL);
+	if (arrayTmp == NULL) {
+		LDIMERR("%s malloc error\n", __func__);
+		return;
+	}
+
+	/*  LD_FRM_SIZE  */
+	data = ((nPRM->reg_LD_pic_RowMax & 0xfff)<<16) |
+		(nPRM->reg_LD_pic_ColMax & 0xfff);
+	LDIM_WR_32Bits(REG_LD_FRM_SIZE, data);
+
+	/* LD_RGB_MOD */
+	data = ((0 & 0xfff)                               << 20) |
+		((nPRM->reg_LD_RGBmapping_demo & 0x1)      << 19) |
+		((nPRM->reg_LD_X_LUT_interp_mode[2] & 0x1) << 18) |
+		((nPRM->reg_LD_X_LUT_interp_mode[1] & 0x1) << 17) |
+		((nPRM->reg_LD_X_LUT_interp_mode[0] & 0x1) << 16) |
+		((0 & 0x1) << 15) |
+		((nPRM->reg_LD_BkLit_LPFmod & 0x7) << 12) |
+		((nPRM->reg_LD_Litshft & 0x7)      << 8)  |
+		((nPRM->reg_LD_BackLit_Xtlk & 0x1) << 7)  |
+		((nPRM->reg_LD_BkLit_Intmod & 0x1) << 6)  |
+		((nPRM->reg_LD_BkLUT_Intmod & 0x1) << 5)  |
+		((nPRM->reg_LD_BkLit_curmod & 0x1) << 4)  |
+		((nPRM->reg_LD_BackLit_mode & 0x3));
+	LDIM_WR_32Bits(REG_LD_RGB_MOD, data);
+
+	/* LD_BLK_HVNUM  */
+	data = ((nPRM->reg_LD_Reflect_Vnum & 0x7)  << 20) |
+		((nPRM->reg_LD_Reflect_Hnum & 0x7) << 16) |
+		((nPRM->reg_LD_BLK_Vnum & 0x3f)    <<  8) |
+		((nPRM->reg_LD_BLK_Hnum & 0x3f));
+	LDIM_WR_32Bits(REG_LD_BLK_HVNUM, data);
+
+	/* LD_HVGAIN */
+	data = ((nPRM->reg_LD_Vgain & 0xfff) << 16) |
+		(nPRM->reg_LD_Hgain & 0xfff);
+	LDIM_WR_32Bits(REG_LD_HVGAIN, data);
+
+	/*  LD_BKLIT_VLD  */
+	data = 0;
+	for (i = 0; i < 32; i++)
+		if (nPRM->reg_LD_BkLit_valid[i])
+			data = data | (1 << i);
+	LDIM_WR_32Bits(REG_LD_BKLIT_VLD, data);
+
+	/* LD_BKLIT_PARAM */
+	data = ((nPRM->reg_LD_BkLit_Celnum & 0xff) << 16) |
+		(nPRM->reg_BL_matrix_AVG & 0xfff);
+	LDIM_WR_32Bits(REG_LD_BKLIT_PARAM, data);
+
+	/*  LD_LIT_GAIN_COMP */
+	data = ((nPRM->reg_LD_Litgain & 0xfff) << 16) |
+		(nPRM->reg_BL_matrix_Compensate & 0xfff);
+	LDIM_WR_32Bits(REG_LD_LIT_GAIN_COMP, data);
+
+	/* LD_FRM_RST_POS */
+	data = (1 << 16) | (5); /* h=1,v=5 :ldim_param_frm_rst_pos */
+	LDIM_WR_32Bits(REG_LD_FRM_RST_POS, data);
+
+	/* LD_FRM_BL_START_POS */
+	data = (1 << 16) | (6); /* ldim_param_frm_bl_start_pos; */
+	LDIM_WR_32Bits(REG_LD_FRM_BL_START_POS, data);
+
+	/* REG_LD_FRM_HBLAN_VHOLS  */
+	data = ((nPRM->reg_LD_LUT_VHo_LS & 0x7) << 16) |
+		((6 & 0x1fff)) ;  /*frm_hblank_num */
+	LDIM_WR_32Bits(REG_LD_FRM_HBLAN_VHOLS, data);
+
+	/* REG_LD_XLUT_DEMO_ROI_XPOS */
+	data = ((nPRM->reg_LD_xlut_demo_roi_xend & 0x1fff) << 16) |
+		(nPRM->reg_LD_xlut_demo_roi_xstart & 0x1fff);
+	LDIM_WR_32Bits(REG_LD_XLUT_DEMO_ROI_XPOS, data);
+
+	/* REG_LD_XLUT_DEMO_ROI_YPOS */
+	data = ((nPRM->reg_LD_xlut_demo_roi_yend & 0x1fff) << 16) |
+		(nPRM->reg_LD_xlut_demo_roi_ystart & 0x1fff);
+	LDIM_WR_32Bits(REG_LD_XLUT_DEMO_ROI_YPOS, data);
+
+	/* REG_LD_XLUT_DEMO_ROI_CTRL */
+	data = ((nPRM->reg_LD_xlut_oroi_enable & 0x1) << 1) |
+		(nPRM->reg_LD_xlut_iroi_enable & 0x1);
+	LDIM_WR_32Bits(REG_LD_XLUT_DEMO_ROI_CTRL, data);
+
+	/*  X_idx: 12*16  */
+	LDIM_WR_BASE_LUT(REG_LD_RGB_IDX_BASE, nPRM->X_idx[0], 16, 16);
+
+	/* X_nrm[16]: 4 * 16 */
+	LDIM_WR_BASE_LUT(REG_LD_RGB_NRMW_BASE_TM2, nPRM->X_nrm[0], 4, 16);
+
+	/*reg_LD_BLK_Hidx[57]: 14*57 */
+	LDIM_WR_BASE_LUT(REG_LD_BLK_HIDX_BASE_TM2,
+			nPRM->reg_LD_BLK_Hidx, 16, LD_BLK_LEN_H);
+
+	/* reg_LD_BLK_Vidx[57]: 14*57 */
+	LDIM_WR_BASE_LUT(REG_LD_BLK_VIDX_BASE_TM2,
+			nPRM->reg_LD_BLK_Vidx, 16, LD_BLK_LEN_V);
+
+	/* reg_LD_LUT_VHk_pos[32]/reg_LD_LUT_VHk_neg[32]: u8 */
+	for (i = 0; i < 32; i++)
+		arrayTmp[i]    =  nPRM->reg_LD_LUT_VHk_pos[i];
+	for (i = 0; i < 32; i++)
+		arrayTmp[32+i] =  nPRM->reg_LD_LUT_VHk_neg[i];
+	LDIM_WR_BASE_LUT(REG_LD_LUT_VHK_NEGPOS_BASE_TM2, arrayTmp, 8, 64);
+
+	/* reg_LD_LUT_VHo_pos[32]/reg_LD_LUT_VHo_neg[32]: s8 */
+	for (i = 0; i < 32; i++)
+		arrayTmp[i]    =  nPRM->reg_LD_LUT_VHo_pos[i];
+	for (i = 0; i < 32; i++)
+		arrayTmp[32+i] =  nPRM->reg_LD_LUT_VHo_neg[i];
+	LDIM_WR_BASE_LUT(REG_LD_LUT_VHO_NEGPOS_BASE_TM2, arrayTmp, 8, 64);
+
+	/* reg_LD_LUT_HHk[32]:u8 */
+	LDIM_WR_BASE_LUT(REG_LD_LUT_HHK_BASE_TM2, nPRM->reg_LD_LUT_HHk, 8, 32);
+
+	/*reg_LD_Reflect_Hdgr[20],reg_LD_Reflect_Vdgr[20],
+	 *	reg_LD_Reflect_Xdgr[4]
+	 */
+	for (i = 0; i < 20; i++)
+		arrayTmp[i] = nPRM->reg_LD_Reflect_Hdgr[i];
+	for (i = 0; i < 20; i++)
+		arrayTmp[20+i] = nPRM->reg_LD_Reflect_Vdgr[i];
+	for (i = 0; i < 4; i++)
+		arrayTmp[40+i] = nPRM->reg_LD_Reflect_Xdgr[i];
+	LDIM_WR_BASE_LUT(REG_LD_REFLECT_DGR_BASE_TM2, arrayTmp, 8, 44);
+
+	//reg_LD_LUT_Hdg_LEXT[16]
+	//reg_LD_LUT_Vdg_LEXT[16]
+	//reg_LD_LUT_VHk_LEXT[16]
+	for (i = 0; i < LD_NUM_PROFILE; i++)
+		arrayTmp[i] = (nPRM->reg_LD_LUT_Hdg_LEXT_TXLX[i] & 0x3ff) |
+			((nPRM->reg_LD_LUT_VHk_LEXT_TXLX[i] & 0x3ff) << 10) |
+			((nPRM->reg_LD_LUT_Vdg_LEXT_TXLX[i] & 0x3ff) << 20);
+	LDIM_WR_BASE_LUT_DRT(REG_LD_LUT_LEXT_BASE_TM2, arrayTmp, 8);
+
+	/*reg_LD_LUT_Hdg[16][32]: u10*16*32*/
+	LDIM_WR_BASE_LUT(REG_LD_LUT_HDG_BASE_TM2,
+		nPRM->reg_LD_LUT_Hdg_TXLX[0], 16, LD_NUM_PROFILE * 32);
+
+	/*reg_LD_LUT_Vdg[16][32]: u10*16*32*/
+	LDIM_WR_BASE_LUT(REG_LD_LUT_VDG_BASE_TM2,
+		nPRM->reg_LD_LUT_Vdg_TXLX[0], 16, LD_NUM_PROFILE * 32);
+
+	/*reg_LD_LUT_VHk[16][32]: u10*16*32*/
+	LDIM_WR_BASE_LUT(REG_LD_LUT_VHK_BASE_TM2,
+		nPRM->reg_LD_LUT_VHk_TXLX[0], 16, LD_NUM_PROFILE * 32);
+
+	/*reg_LD_LUT_Id[16][24]: u3*32*48=u3*1536 */
+	LDIM_WR_BASE_LUT(REG_LD_LUT_ID_BASE_TM2, nPRM->reg_LD_LUT_Id, 4,
+			LD_BLKREGNUM);
+
+	/*enable the CBUS configure the RAM*/
+	/*LD_MISC_CTRL0  {reg_blmat_ram_mode,
+	 *1'h0,ram_bus_sel,ram_clk_sel,ram_clk_gate_en,
+	 *2'h0,reg_hvcnt_bypass,reg_demo_synmode,reg_ldbl_synmode,
+	 *reg_ldim_bl_en,soft_bl_start,reg_soft_rst)
+	 */
+	data = LDIM_RD_32Bits(REG_LD_MISC_CTRL0);
+	data = (data & (~(3 << 9))) | (1 << 8) | (1 << 4);
+	LDIM_WR_32Bits(REG_LD_MISC_CTRL0, data);
+
+	/*X_lut[3][16][16]*/
+	LDIM_WR_BASE_LUT_DRT(REG_LD_RGB_LUT_BASE, nPRM->X_lut2[0][0],
+			     (3 * 16 * 32 / 2));
+
+	LDIM_WR_32Bits(REG_LD_MISC_CTRL0, data);
+	data = 0 | (0 << 1) | ((ldim_bl_en & 0x1) << 2) |
+		(1 << 8) | (3 << 9) | (1 << 4);	//(ldim_hvcnt_bypass << 5)
+	LDIM_WR_32Bits(REG_LD_MISC_CTRL0, data);
+
+	//LDIM_Update_Matrix(nPRM->BL_matrix, 16 * 24);
+
+	set_vpu_dma_mif(1, nPRM->reg_LD_BLK_Vnum, nPRM->reg_LD_BLK_Hnum);
 	kfree(arrayTmp);
 }
 
@@ -301,6 +507,30 @@ int ldim_hw_reg_dump(char *buf)
 	return len;
 }
 
+int ldim_hw_reg_dump_tm2(char *buf)
+{
+	unsigned int reg, data32;
+	int i, size, len = 0;
+
+	data32 = Rd(LDIM_STTS_HIST_REGION_IDX);
+	Wr(LDIM_STTS_HIST_REGION_IDX, 0xffc0ffff & data32);
+
+	size = sizeof(ldim_hw_reg_dump_table) / sizeof(unsigned int);
+	for (i = 0; i < size; i++) {
+		reg = ldim_hw_reg_dump_table[i];
+		data32 = Rd(reg);
+		len += sprintf(buf+len, "0x%x = 0x%08x\n", reg, data32);
+	}
+
+	for (i = 0; i < 51; i++) {
+		reg = LDIM_STTS_HIST_SET_REGION;
+		data32 = Rd(reg);
+		len += sprintf(buf+len, "0x%x = 0x%08x\n", reg, data32);
+	}
+
+	return len;
+}
+
 /***** local dimming stts functions begin *****/
 /*hist mode: 0: comp0 hist only, 1: Max(comp0,1,2) for hist,
  *2: the hist of all comp0,1,2 are calculated
@@ -325,6 +555,25 @@ static void ldim_stts_en(unsigned int resolution, unsigned int pix_drop_mode,
 	data32 = data32 | ((hist_mode & 0x3) << 22);
 	data32 = data32 | ((lpf_en & 0x1) << 21);
 	data32 = data32 | ((rd_idx_auto_inc_mode & 0xff) << 14);
+	Wr(LDIM_STTS_HIST_REGION_IDX, data32);
+}
+
+static void ldim_stts_en_tm2(unsigned int resolution,
+	unsigned int pix_drop_mode, unsigned int eol_en,
+	unsigned int hist_mode, unsigned int lpf_en,
+	unsigned int rd_idx_auto_inc_mode, unsigned int region_num)
+{
+	int data32;
+
+	Wr(LDIM_STTS_GCLK_CTRL0, region_num<<8);
+	Wr(LDIM_STTS_WIDTHM1_HEIGHTM1, resolution);
+
+	data32 = 0x80000000 | ((pix_drop_mode & 0x3) << 29);
+	data32 = data32 | ((eol_en & 0x1) << 28);
+	//data32 = data32 | ((one_ram_en & 0x1) << 27);
+	data32 = data32 | ((hist_mode & 0x3) << 22);
+	data32 = data32 | ((lpf_en & 0x1) << 21);
+	//data32 = data32 | ((rd_idx_auto_inc_mode & 0xff) << 14);
 	Wr(LDIM_STTS_HIST_REGION_IDX, data32);
 }
 
@@ -868,6 +1117,66 @@ static void ldim_stts_set_region_tl1(
 	}
 }
 
+void ldim_stts_set_region_tm2(unsigned int resolution,
+			/* 0: auto calc by height/width/row_start/col_start
+			 * 1: 720p
+			 * 2: 1080p
+			 */
+		unsigned int height, unsigned int width,
+	//	unsigned int blk_height, unsigned int blk_width,
+		unsigned int row_start, unsigned int col_start,
+		unsigned int blk_vnum, unsigned int blk_hnum)
+{
+	int data32;
+	int heightm1, widthm1;
+	int i;
+	int hend_odd, hend_even;
+	int vend_odd, vend_even;
+	int blk_height, blk_width;
+
+	blk_height = (height - row_start) / blk_vnum;
+	blk_width = (width - col_start) / blk_hnum;
+
+	heightm1 = height - 1;
+	widthm1  = width - 1;
+
+	LDIMPR("%s: %d %d %d %d %d %d %d %d\n",
+		__func__, height, width, blk_height, blk_width,
+		row_start, col_start, blk_vnum, blk_hnum);
+
+	if (resolution == 0) {
+		hend_odd  = col_start + blk_width - 1;
+		data32 = Rd(LDIM_STTS_HIST_REGION_IDX);
+		Wr(LDIM_STTS_HIST_REGION_IDX, 0xffc0ffff & data32);
+		Wr(LDIM_STTS_HIST_SET_REGION,
+		((((row_start & 0x1fff) << 16) & 0xffff0000) |
+			(col_start & 0x1fff)));
+		for (i = 0; i < 24; i++) {
+			hend_even = (hend_odd  + blk_width > widthm1) ?
+			hend_odd : (hend_odd  + blk_width);
+			Wr(LDIM_STTS_HIST_SET_REGION,
+			(((hend_even & 0x1fff) << 16) | (hend_odd & 0x1fff)));
+			hend_odd  = (hend_even  + blk_width > widthm1) ?
+			hend_even : (hend_even + blk_width);
+		}
+		vend_odd  = row_start + blk_height - 1;
+		for (i = 0; i < 24; i++) {
+			vend_even = (vend_odd  + blk_height > heightm1) ?
+			vend_odd : (vend_odd  + blk_height);
+			Wr(LDIM_STTS_HIST_SET_REGION,
+			(((vend_even & 0x1fff) << 16) | (vend_odd & 0x1fff)));
+			vend_odd  = (vend_even + blk_height > heightm1) ?
+			vend_even : (vend_even + blk_height);
+		}
+
+		Wr(LDIM_STTS_HIST_SET_REGION, blk_hnum); //h region number
+		Wr(LDIM_STTS_HIST_SET_REGION, 0); // line_n_int_num
+	} else {
+		LDIMERR("unsopport resolution\n");
+		return;
+	}
+}
+
 void ldim_stts_initial_txlx(unsigned int pic_h, unsigned int pic_v,
 		unsigned int blk_vnum, unsigned int blk_hnum)
 {
@@ -919,11 +1228,48 @@ void ldim_stts_initial_tl1(unsigned int pic_h, unsigned int pic_v,
 		row_start, col_start, blk_vnum, blk_hnum);
 }
 
+void ldim_stts_initial_tm2(unsigned int pic_h, unsigned int pic_v,
+		unsigned int blk_vnum, unsigned int blk_hnum)
+{
+	unsigned int resolution, blk_height, blk_width;
+	unsigned int row_start, col_start;
+
+	blk_vnum = (blk_vnum == 0) ? 1 : blk_vnum;
+	blk_hnum = (blk_hnum == 0) ? 1 : blk_hnum;
+
+	resolution = (((pic_h - 1) & 0xffff) << 16) | ((pic_v - 1) & 0xffff);
+	/*Wr_reg(VDIN0_HIST_CTRL, 0x10d);*/
+
+	blk_height = (pic_v - 8) / blk_vnum;
+	blk_width = (pic_h - 8) / blk_hnum;
+	row_start = (pic_v - (blk_height * blk_vnum)) >> 1;
+	col_start = (pic_h - (blk_width * blk_hnum)) >> 1;
+
+	switch_vpu_mem_pd_vmod(VPU_DMA, VPU_MEM_POWER_ON);
+
+	ldim_stts_en_tm2(resolution, 0, 0, 0, 1, 1, (blk_vnum * blk_hnum));
+	ldim_set_matrix_rgb2ycbcr(0);// vpp out format : RGB
+
+	/*0:di  1:vdin  2:null  3:postblend  4:vpp out  5:vd1  6:vd2  7:osd1*/
+	Wr_reg_bits(LDIM_STTS_CTRL0, 4, 3, 3);
+
+	/* bit21:20  3: input is RGB   0:input is YUV */
+	Wr_reg_bits(LDIM_STTS_CTRL0, 3, 20, 2);
+
+	//ldim_stts_set_region_tm2(0, pic_v, pic_h, blk_height, blk_width,
+	ldim_stts_set_region_tm2(0, pic_v, pic_h,
+		row_start, col_start, blk_vnum, blk_hnum);
+
+	//config vpu dma
+	LDIMPR("set vpu dma mif\n");
+	set_vpu_dma_mif(0, blk_vnum, blk_hnum);
+}
+
 static unsigned int invalid_val_cnt;
 void ldim_stts_read_region(unsigned int nrow, unsigned int ncol)
 {
 	unsigned int i, j, k;
-	unsigned int data32;
+	unsigned int n, data32;
 	struct aml_ldim_driver_s *ldim_drv = aml_ldim_get_driver();
 
 	if (invalid_val_cnt > 0xfffffff)
@@ -936,15 +1282,19 @@ void ldim_stts_read_region(unsigned int nrow, unsigned int ncol)
 	for (i = 0; i < nrow; i++) {
 		for (j = 0; j < ncol; j++) {
 			data32 = Rd(LDIM_STTS_HIST_START_RD_REGION);
+			n = i * ncol + j;
 			for (k = 0; k < 17; k++) {
+				data32 = Rd(LDIM_STTS_HIST_READ_REGION);
 				if (k == 16) {
-					data32 = Rd(LDIM_STTS_HIST_READ_REGION);
-					ldim_drv->max_rgb[i * ncol + j]
-						= data32;
+					ldim_drv->max_rgb[n * 3] =
+						data32 & 0x3ff;
+					ldim_drv->max_rgb[n * 3 + 1] =
+						(data32 >> 10) & 0x3ff;
+					ldim_drv->max_rgb[n * 3 + 2] =
+						(data32 >> 20) & 0x3ff;
 				} else {
-					data32 = Rd(LDIM_STTS_HIST_READ_REGION);
-					ldim_drv->hist_matrix[i * ncol * 16 +
-						j * 16 + k] = data32;
+					ldim_drv->hist_matrix[n * 16 + k] =
+						data32;
 				}
 				if (!(data32 & 0x40000000))
 					invalid_val_cnt++;
@@ -1016,6 +1366,30 @@ void ldim_remap_update_txlx(struct LDReg_s *nPRM,
 
 	if (matrix_update_en) {
 		data = nPRM->reg_LD_BLK_Vnum * nPRM->reg_LD_BLK_Hnum;
-		LDIM_Update_Matrix(nPRM->BL_matrix, data);
+		LDIM_Update_Matrix_txlx(nPRM->BL_matrix, data);
+	}
+}
+
+void ldim_remap_update_tm2(struct LDReg_s *nPRM, unsigned int avg_update_en,
+			   unsigned int matrix_update_en)
+{
+	int data;
+
+	if (avg_update_en) {
+		/* LD_BKLIT_PARAM */
+		data = LDIM_RD_32Bits(REG_LD_BKLIT_PARAM);
+		data = (data & (~0xfff)) | (nPRM->reg_BL_matrix_AVG & 0xfff);
+		LDIM_WR_32Bits(REG_LD_BKLIT_PARAM, data);
+
+		/* compensate */
+		data = LDIM_RD_32Bits(REG_LD_LIT_GAIN_COMP);
+		data = (data & (~0xfff)) |
+			(nPRM->reg_BL_matrix_Compensate & 0xfff);
+		LDIM_WR_32Bits(REG_LD_LIT_GAIN_COMP, data);
+	}
+
+	if (matrix_update_en) {
+		data = nPRM->reg_LD_BLK_Vnum * nPRM->reg_LD_BLK_Hnum;
+		LDIM_Update_Matrix_tm2(nPRM->BL_matrix, data);
 	}
 }

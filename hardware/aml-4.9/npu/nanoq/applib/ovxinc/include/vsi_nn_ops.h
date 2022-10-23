@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -145,6 +145,23 @@ OVXLIB_API vsi_status vsi_nn_op_common_deinit
     );
 
 OVXLIB_API vsi_bool vsi_nn_op_common_setup
+    (
+    vsi_nn_node_t * node,
+    vsi_nn_tensor_t ** inputs,
+    vsi_nn_tensor_t ** outputs
+    );
+
+/**
+ * Setup for eltwise binary op
+ * Setup for eltwise binary op, which need broadcast shape.
+ *
+ * @param[in] node Node handle.
+ * @param[in] inputs input tensors.
+ * @param[in] outputs output tensors.
+ *
+ * @return VSI_SUCCESS on success, or error code otherwise.
+ */
+OVXLIB_API vsi_bool vsi_nn_op_eltwise_setup
     (
     vsi_nn_node_t * node,
     vsi_nn_tensor_t ** inputs,
@@ -330,6 +347,7 @@ OVXLIB_API const char * vsi_nn_OpGetName
     /* setup      */ setup,\
     /* optimize   */ optimize,\
     /* input_num  */ in,\
-    /* output_num */ out,\
+    /* output_num */ out \
 };
+
 #endif

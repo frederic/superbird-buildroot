@@ -833,6 +833,9 @@ static void clone_endio(struct bio *bio)
 	struct mapped_device *md = tio->io->md;
 	dm_endio_fn endio = tio->ti->type->end_io;
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+	md->queued_request--;
+#endif
 	if (endio) {
 		r = endio(tio->ti, bio, error);
 		if (r < 0 || r == DM_ENDIO_REQUEUE)
@@ -1358,6 +1361,16 @@ static blk_qc_t dm_make_request(struct request_queue *q, struct bio *bio)
 	}
 
 	__split_and_process_bio(md, map, bio);
+#ifdef CONFIG_AMLOGIC_MODIFY
+	md->queued_request++;
+	if (md->queued_request >= 20000) {
+		/*
+		 * sleep for a while if too many bio need to transfer,
+		 * if not limit rate, memory pressure will be high
+		 */
+		congestion_wait(BLK_RW_ASYNC, 5);
+	}
+#endif
 	dm_put_live_table(md, srcu_idx);
 	return BLK_QC_T_NONE;
 }

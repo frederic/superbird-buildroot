@@ -1,0 +1,6 @@
+config BR2_PACKAGE_LOGCAT
+    bool "logcat"
+    select BR2_PACKAGE_LIBLOG
+    select BR2_PACKAGE_LOGWRAPPER
+    help
+      logcat

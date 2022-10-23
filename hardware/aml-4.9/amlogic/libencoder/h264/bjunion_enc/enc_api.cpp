@@ -1,7 +1,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AMLVENC_API"
-#ifdef MAKEANDROID
+#ifdef __ANDROID__
 #include <utils/Log.h>
 #endif
 #include <unistd.h>
@@ -53,11 +53,15 @@ const AMVencRCFuncPtr gx_fast_rc = {
 };
 
 const AMVencHWFuncPtr *gdev[] = {
+	NULL,
+	NULL,
     &gx_fast_dev,
     NULL,
 };
 
 const AMVencRCFuncPtr *grc[] = {
+	NULL,
+	NULL,
     &gx_fast_rc,
     NULL,
 };
@@ -68,8 +72,13 @@ AMVEnc_Status AMInitRateControlModule(amvenc_hw_t *hw_info)
         return AMVENC_MEMORY_FAIL;
     if ((hw_info->dev_id <= NO_DEFINE) || (hw_info->dev_id >= MAX_DEV) || (hw_info->dev_fd < 0) || (!hw_info->dev_data))
         return AMVENC_FAIL;
-    if (grc[hw_info->dev_id]->Initialize != NULL)
-        hw_info->rc_data = grc[hw_info->dev_id]->Initialize(&hw_info->init_para);
+    if (grc[hw_info->dev_id]->Initialize != NULL) {
+    	if (!(&(hw_info->init_para))) {
+    		LOGAPI("AMInitRateControlModule: init_para NULL!");
+    		return AMVENC_MEMORY_FAIL;
+    	}
+        hw_info->rc_data = grc[hw_info->dev_id]->Initialize(&(hw_info->init_para));
+    }
 
     if (!hw_info->rc_data) {
         LOGAPI("AMInitRateControlModule Fail, dev type:%d. fd:%d",hw_info->dev_id, hw_info->dev_fd);
@@ -132,16 +141,66 @@ AMVEnc_Status InitAMVEncode(amvenc_hw_t *hw_info, int force_mode)
         return AMVENC_MEMORY_FAIL;
     hw_info->dev_fd = -1;
     hw_info->dev_data = NULL;
+    hw_info->init_para.cbr_hw = false;
 
     fd = open(ENCODER_PATH, O_RDWR);
     if (fd<0) {
         return AMVENC_FAIL;
     }
+
     memset(dev_info,0,sizeof(dev_info));
 
-//    iret = ioctl(fd, AMVENC_AVC_IOC_GET_DEVINFO,&dev_info[0]);
-    hw_info->dev_id = M8;
-    hw_info->init_para.cbr_hw = true;
+    iret = ioctl(fd, AMVENC_AVC_IOC_GET_DEVINFO, &dev_info[0]);
+
+    LOGAPI("AMVENC_AVC_IOC_GET_DEVINFO: dev_info=%s", dev_info);
+
+    if((iret<0)||(dev_info[0] == 0)){
+        LOGAPI("The old encoder driver, not support query the dev info. set as M8 type!");
+        hw_info->dev_id = M8_FAST;
+    }else if((strcmp(dev_info, (char *)AMVENC_DEVINFO_M8) == 0)
+      ||(strcmp(dev_info, (char *)AMVENC_DEVINFO_G9) == 0)){
+    	LOGAPI("shitty m8");
+        hw_info->dev_id = M8_FAST;
+    }else if(strcmp(dev_info, (char *)AMVENC_DEVINFO_GXBB) == 0){
+    	LOGAPI("gxbb");
+        hw_info->dev_id = GXBB;
+    }else if (strcmp(dev_info, (char *)AMVENC_DEVINFO_GXTVBB) == 0){
+    	LOGAPI("gxtvbb");
+        hw_info->dev_id = GXBB;
+        hw_info->init_para.cbr_hw = true;
+    }else{
+        hw_info->dev_id = NO_DEFINE;
+    }
+
+    if (hw_info->dev_id == M8_FAST) {
+        if((hw_info->init_para.enc_width >= 1280) && (hw_info->init_para.enc_height >= 720))
+            hw_info->dev_id = M8_FAST;
+        else
+            hw_info->dev_id = M8;
+        if(1 == force_mode){
+            hw_info->dev_id = M8_FAST;
+        } else if(2 == force_mode){
+            hw_info->dev_id = M8;
+        }
+
+        int value = 0;
+//        memset(prop,0,sizeof(prop));
+//#ifdef SUPPORT_STANDARD_PROP
+//        if (property_get("vendor.hw.encoder.forcemode", prop, NULL) > 0) {
+//#else
+//        if (property_get("hw.encoder.forcemode", prop, NULL) > 0) {
+//#endif
+//            sscanf(prop,"%d", &value);
+//        }else{
+//            value = 0;
+//        }
+        if(1 == value){
+            hw_info->dev_id = M8_FAST;
+        } else if(2 == value){
+            hw_info->dev_id = M8;
+        }
+        LOGAPI("hw.encoder.forcemode = %d, dev_id=%d. fd:%d", value, hw_info->dev_id, fd);
+    }
     if ((hw_info->dev_id <= NO_DEFINE) || (hw_info->dev_id >= MAX_DEV)) {
         LOGAPI("Not found available hw encoder device, fd:%d", fd);
         close(fd);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -127,9 +127,9 @@ limGetBssDescription( tpAniSirGlobal pMac, tSirBssDescription *pBssDescription,
 
     // Extract timer
     vos_mem_copy( (tANI_U8 *) (&pBssDescription->scansystimensec),
-                               pBuf, sizeof(v_TIME_t));
-    pBuf += sizeof(v_TIME_t);
-    len  -= sizeof(v_TIME_t);
+                               pBuf, sizeof(pBssDescription->scansystimensec));
+    pBuf += sizeof(pBssDescription->scansystimensec);
+    len  -= sizeof(pBssDescription->scansystimensec);
     if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
         return eSIR_FAILURE;
 
@@ -947,6 +947,13 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
         limLog(pMac, LOGE, FL("remaining len %d is too short"), len);
         return eSIR_FAILURE;
     }
+    pJoinReq->sae_pmk_cached = *pBuf++;
+    len--;
+    if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
+    {
+        limLog(pMac, LOGE, FL("remaining len %d is too short"), len);
+        return eSIR_FAILURE;
+    }
     pJoinReq->osen_association = *pBuf++;
     len--;
     if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
@@ -1527,19 +1534,10 @@ limAssocIndSerDes(tpAniSirGlobal pMac, tpLimMlmAssocInd pAssocInd, tANI_U8 *pBuf
 tSirRetStatus
 limAssocCnfSerDes(tpAniSirGlobal pMac, tpSirSmeAssocCnf pAssocCnf, tANI_U8 *pBuf)
 {
-#ifdef PE_DEBUG_LOG1
-    tANI_U8  *pTemp = pBuf;
-#endif
-
     if (!pAssocCnf || !pBuf)
         return eSIR_FAILURE;
 
-    pAssocCnf->messageType = limGetU16(pBuf);
-    pBuf += sizeof(tANI_U16);
-
-    pAssocCnf->length = limGetU16(pBuf);
-    pBuf += sizeof(tANI_U16);
-
+    vos_mem_copy(pAssocCnf, pBuf, sizeof(*pAssocCnf));
     if (pAssocCnf->messageType == eWNI_SME_ASSOC_CNF)
     {
         PELOG1(limLog(pMac, LOG1, FL("SME_ASSOC_CNF length %d bytes is:"), pAssocCnf->length);)
@@ -1548,35 +1546,10 @@ limAssocCnfSerDes(tpAniSirGlobal pMac, tpSirSmeAssocCnf pAssocCnf, tANI_U8 *pBuf
     {
         PELOG1(limLog(pMac, LOG1, FL("SME_REASSOC_CNF length %d bytes is:"), pAssocCnf->length);)
     }
-    PELOG1(sirDumpBuf(pMac, SIR_LIM_MODULE_ID, LOG1, pTemp, pAssocCnf->length);)
-
-    // status code
-    pAssocCnf->statusCode = (tSirResultCodes) limGetU32(pBuf);
-    pBuf += sizeof(tSirResultCodes);
-
-    // bssId
-    vos_mem_copy( pAssocCnf->bssId, pBuf, sizeof(tSirMacAddr));
-    pBuf += sizeof(tSirMacAddr);
-
-    // peerMacAddr
-    vos_mem_copy( pAssocCnf->peerMacAddr, pBuf, sizeof(tSirMacAddr));
-    pBuf += sizeof(tSirMacAddr);
-
-
-    pAssocCnf->aid = limGetU16(pBuf);
-    pBuf += sizeof(tANI_U16);
-    // alternateBssId
-    vos_mem_copy( pAssocCnf->alternateBssId, pBuf, sizeof(tSirMacAddr));
-    pBuf += sizeof(tSirMacAddr);
-
-    // alternateChannelId
-    pAssocCnf->alternateChannelId = *pBuf;
-    pBuf++;
+    PELOG1(sirDumpBuf(pMac, SIR_LIM_MODULE_ID, LOG1, pBuf, pAssocCnf->length);)
 
     return eSIR_SUCCESS;
 } /*** end limAssocCnfSerDes() ***/
-
-
 
 /**
  * limDisassocCnfSerDes()

@@ -376,7 +376,6 @@ static BOOL SetSequenceInfo(ComponentImpl* com)
     EncInitialInfo* initialInfo = &ctx->initialInfo;
     CNMComListenerEncCompleteSeq lsnpCompleteSeq   = {0};
 
-
     if (ctx->stateDoing == FALSE) {
         do {
             ret = VPU_EncIssueSeqInit(handle);
@@ -492,7 +491,6 @@ static BOOL Encode(ComponentImpl* com, PortContainerYuv* in, PortContainerES* ou
     lsnpReadyOneFrame.handle = ctx->handle;
     ComponentNotifyListeners(com, COMPONENT_EVENT_ENC_READY_ONE_FRAME, &lsnpReadyOneFrame);
 
-
     ctx->stateDoing = TRUE;
     if (out) {
         if (out->buf.phys_addr != 0) {
@@ -607,8 +605,6 @@ static BOOL Encode(ComponentImpl* com, PortContainerYuv* in, PortContainerES* ou
         VLOG(TRACE, "<%s:%d> INT_BSBUF_FULL inst=%d, %p, %p\n", __FUNCTION__, __LINE__, ctx->handle->instIndex, paRdPtr, paWrPtr);
 
 
-        osal_msleep(10000);
-
         lsnpFull.handle = ctx->handle;
         ComponentNotifyListeners(com, COMPONENT_EVENT_ENC_FULL_INTERRUPT, (void*)&lsnpFull);
 
@@ -686,6 +682,7 @@ static BOOL Encode(ComponentImpl* com, PortContainerYuv* in, PortContainerES* ou
     else {
         DisplayEncodedInformation(ctx->handle, ctx->encOpenParam.bitstreamFormat, ctx->frameIdx, &encOutputInfo, encParam->srcEndFlag, encParam->srcIdx, ctx->testEncConfig.performance);
     }
+
     lsnpPicDone.handle = ctx->handle;
     lsnpPicDone.output = &encOutputInfo;
     lsnpPicDone.fullInterrupted = ctx->fullInterrupt;
@@ -735,7 +732,6 @@ static BOOL Encode(ComponentImpl* com, PortContainerYuv* in, PortContainerES* ou
         }
     }
 
-
     return TRUE;
 }
 
@@ -775,6 +771,16 @@ static BOOL AllocateCustomBuffer(EncHandle handle, ComponentImpl* com)
         parse_custom_lambda(ctx->customLambda, testEncConfig.custom_lambda_file);
         vdi_write_memory(testEncConfig.coreIdx, ctx->vbCustomLambda.phys_addr, (unsigned char*)&ctx->customLambda[0], ctx->vbCustomLambda.size, VDI_LITTLE_ENDIAN);
     }
+
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+    pParam->enReportMvHisto = testEncConfig.mvHistogramEn;
+    if (pParam->enReportMvHisto) {
+        pParam->reportMvHistoThreshold0 = testEncConfig.mvHistoThreshold0;
+        pParam->reportMvHistoThreshold1 = testEncConfig.mvHistoThreshold1;
+        pParam->reportMvHistoThreshold2 = testEncConfig.mvHistoThreshold2;
+        pParam->reportMvHistoThreshold3 = testEncConfig.mvHistoThreshold3;
+    }
+#endif
 
 
     return TRUE;
@@ -1092,7 +1098,6 @@ static Component CreateEncoder(ComponentImpl* com, CNMComponentConfig* component
         com->numSinkPortQueue = 10;
     else
         com->numSinkPortQueue = componentParam->encOpenParam.streamBufCount;
-
 
     return (Component)com;
 }

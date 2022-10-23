@@ -158,8 +158,10 @@ static BOOL ExecuteReader(ComponentImpl* com, PortContainer* in, PortContainer* 
                     }
                 }
                 if (srcData->streamBufFull == TRUE) {
-                    if (ctx->ringBufferWrapEnable == FALSE )
+                    if (ctx->ringBufferWrapEnable == FALSE) {
                         vdi_free_dma_memory(ctx->coreIdx, &srcData->buf, ENC_BS, ctx->handle->instIndex);
+                        osal_memcpy(ctx->bsBuffer, &srcData->newBsBuf, sizeof(*ctx->bsBuffer));
+                    }
                     srcData->buf.size = 0;
                 }
                 osal_free(buf);

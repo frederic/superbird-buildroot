@@ -666,13 +666,19 @@ static unsigned int small_local_mtn = 70;
 module_param(small_local_mtn, uint, 0644);
 MODULE_PARM_DESC(small_local_mtn, "small_local_mtn");
 
+static unsigned int small_local_mtn1 = 30;
+module_param(small_local_mtn1, uint, 0644);
+MODULE_PARM_DESC(small_local_mtn1, "small_local_mtn1");
+
 unsigned int adp_set_mtn_ctrl10(unsigned int diff, unsigned int dlvel,
 	unsigned int frame_diff_avg)
 {
 	int istp = 0, idats = 0, idatm = 0, idatr = 0;
 	unsigned int rst = 0;
 
-	if (frame_diff_avg < small_local_mtn)
+	if (
+		(frame_diff_avg < small_local_mtn) &&
+		(frame_diff_avg > small_local_mtn1))
 		rst = combing_very_motion_setting[9];
 	else if (dlvel == 0) {
 		if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX))
@@ -781,8 +787,10 @@ static void set_combing_regs(int lvl, int bit_mode)
 			 *confirmed with vlsi-baozheng, G12a/G12B/SM1
 			 *is same as TL1, Change the condition to cpu after G12a
 			 */
-		if (((bit_mode != 10) || cpu_after_eq(MESON_CPU_MAJOR_ID_G12A))
-			&& combing_setting_registers[i] == NR2_MATNR_DEGHOST)
+		if (((bit_mode != 10) ||
+		     cpu_after_eq(MESON_CPU_MAJOR_ID_G12A) ||
+		     is_meson_txlx_cpu()) &&
+		    combing_setting_registers[i] == NR2_MATNR_DEGHOST)
 			break;
 		else if (i < GXTVBB_REG_START) {
 			/* TODO: need change to check if
@@ -914,9 +922,16 @@ int adaptive_combing_fixing(
 		combing_cnt = combing_cnt + 1;
 	else
 		combing_cnt = 0;
-	if (glb_mot[0] < combing_diff_min && glb_mot[1] > combing_diff_max &&
-		combing_cnt <= combing_cnt_thd)
-		glb_mot[0] = glb_mot[1];
+	if (
+		is_meson_txhd_cpu() ||
+		is_meson_tl1_cpu() ||
+		is_meson_tm2_cpu()) {
+		if (
+			glb_mot[0] < combing_diff_min &&
+			glb_mot[1] > combing_diff_max &&
+			combing_cnt <= combing_cnt_thd)
+			glb_mot[0] = glb_mot[1];
+	}
 	glb_mot_avg5 =
 		(glb_mot[0] + glb_mot[1] + glb_mot[2] + glb_mot[3] +
 		 glb_mot[4]) / 5;

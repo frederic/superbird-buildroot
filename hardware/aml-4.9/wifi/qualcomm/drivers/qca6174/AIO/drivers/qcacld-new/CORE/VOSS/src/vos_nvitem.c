@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -53,8 +53,10 @@
 #include "regdomain.h"
 #include "regdomain_common.h"
 #include "vos_cnss.h"
-#include "vos_regdb.h"
+#ifdef CLD_REGDB
+#include "regdb.h"
 #include <net/regulatory.h>
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)) && !defined(WITH_BACKPORTS)
 #define IEEE80211_CHAN_NO_80MHZ		1<<7
@@ -121,6 +123,8 @@ static v_BOOL_t init_by_reg_core = VOS_FALSE;
 #define WORLD_SKU_MASK          0x00F0
 #define WORLD_SKU_PREFIX        0x0060
 
+#define REG_SET_WAIT_MS        100
+
 /**
  * struct bonded_chan
  * @start_ch: start channel
@@ -143,7 +147,8 @@ static const struct bonded_chan bonded_chan_40mhz_array[] = {
 	{132, 136},
 	{140, 144},
 	{149, 153},
-	{157, 161}
+	{157, 161},
+	{165, 169}
 };
 
 static const struct bonded_chan bonded_chan_80mhz_array[] = {
@@ -532,6 +537,7 @@ const tRfChannelProps rfChannels[NUM_RF_CHANNELS] =
     { 5785, 157, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_157,
     { 5805, 161, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_161,
     { 5825, 165, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_165,
+    { 5845, 169, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_169,
 
     /* 5.9GHz 10 MHz bandwidth (802.11p) */
     { 5852, 170, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_170,
@@ -734,6 +740,15 @@ static int regd_init_wiphy(hdd_context_t *pHddCtx, struct regulatory *reg,
 #else
 	pHddCtx->reg.reg_flags = wiphy->flags;
 #endif
+	/*
+	 * add this to avoid the warning in kernel when invoking
+	 * function wiphy_apply_custom_regulatory.
+	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) || defined(WITH_BACKPORTS)
+	wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
+#else
+	wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+#endif
 
 	wiphy_apply_custom_regulatory(wiphy, regd);
 
@@ -748,6 +763,17 @@ static int regd_init_wiphy(hdd_context_t *pHddCtx, struct regulatory *reg,
 	wiphy->flags = pHddCtx->reg.reg_flags;
 #endif
 
+#ifdef CLD_REGDB
+	/*
+	 * Set wiphy->regulatory_flags to REGULATORY_WIPHY_SELF_MANAGED
+	 * So kernel would not change wiphy channel flags.
+	 * Later wiphy->regulatory_flags would be changed by
+	 * __wlan_hdd_linux_reg_notifier.
+	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) || defined(WITH_BACKPORTS)
+	wiphy->regulatory_flags = REGULATORY_WIPHY_SELF_MANAGED;
+#endif
+#endif
 	return 0;
 }
 
@@ -976,7 +1002,7 @@ static void vos_set_5g_channel_params(uint16_t oper_ch,
 				      struct ch_params_s *ch_params)
 {
 	eNVChannelEnabledType chan_state = NV_CHANNEL_ENABLE;
-	const struct bonded_chan *bonded_chan_ptr;
+	const struct bonded_chan *bonded_chan_ptr = NULL;
 	uint16_t center_chan;
 
 	if (CH_WIDTH_MAX <= ch_params->ch_width)
@@ -1539,8 +1565,10 @@ VOS_STATUS vos_nv_get_dfs_region(uint8_t *dfs_region)
 	return VOS_STATUS_SUCCESS;
 }
 
-void __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,struct regulatory_request *request);
-
+#ifdef CLD_REGDB
+void __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+                                   struct regulatory_request *request);
+#endif
 /**------------------------------------------------------------------------
   \brief vos_nv_getRegDomainFromCountryCode() - get the regulatory domain of
   a country given its country code
@@ -1565,8 +1593,9 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
     struct wiphy *wiphy = NULL;
     int i;
     int wait_result;
-
+#ifdef CLD_REGDB
     struct regulatory_request request;
+#endif
 
     /* sanity checks */
     if (NULL == pRegDomain)
@@ -1607,10 +1636,12 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
         return VOS_STATUS_E_FAULT;
     }
 
+#ifdef CLD_REGDB
     request.alpha2[0] = pHddCtx->reg.alpha2[0];
     request.alpha2[1] = pHddCtx->reg.alpha2[1];
     request.initiator = NL80211_REGDOM_SET_BY_DRIVER;
     request.dfs_region = 0;
+#endif
 
     if (pHddCtx->isLogpInProgress) {
         VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1674,7 +1705,9 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
             regulatory_hint(wiphy, country_code);
             wait_for_completion_timeout(&pHddCtx->reg_init,
                                         msecs_to_jiffies(REG_WAIT_TIME));
+#ifdef CLD_REGDB
             __wlan_hdd_linux_reg_notifier(wiphy, &request);
+#endif
         }
 
     } else if (COUNTRY_IE == source || COUNTRY_USER == source) {
@@ -1684,12 +1717,14 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
             vos_set_cc_source(CNSS_SOURCE_11D);
 
         INIT_COMPLETION(pHddCtx->reg_init);
-#if 0
+#ifdef CONFIG_REGD_HINT_USER
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)) || defined(WITH_BACKPORTS)
         regulatory_hint_user(country_code, NL80211_USER_REG_HINT_USER);
 #else
         regulatory_hint_user(country_code);
 #endif
+#else
+        regulatory_hint(wiphy, country_code);
 #endif
         wait_result = wait_for_completion_interruptible_timeout(
                                &pHddCtx->reg_init,
@@ -1794,7 +1829,7 @@ bool vos_is_channel_support_sub20(uint16_t operation_channel,
 	eNVChannelEnabledType channel_state;
 
 	if (VOS_IS_CHANNEL_5GHZ(operation_channel)) {
-		const struct bonded_chan *bonded_chan_ptr;
+		const struct bonded_chan *bonded_chan_ptr = NULL;
 
 		channel_state =
 		    vos_search_5g_bonded_channel(operation_channel,
@@ -1926,6 +1961,7 @@ int vos_update_band(v_U8_t  band_capability)
 	return 0;
 }
 
+#ifdef CLD_REGDB
 static bool freq_in_rule_band(const struct ieee80211_freq_range *freq_range,u32 freq_khz)
 {
 #define ONE_GHZ_IN_KHZ	1000000
@@ -2018,6 +2054,7 @@ freq_reg_info_regd(struct wiphy *wiphy, u32 center_freq,
 
     return ERR_PTR(-EINVAL);
 }
+#endif
 
 /* create_linux_regulatory_entry to populate internal structures from wiphy */
 static int create_linux_regulatory_entry(struct wiphy *wiphy,
@@ -2032,8 +2069,9 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
 	 int err;
 #endif
     const struct ieee80211_reg_rule *reg_rule;
-	const struct ieee80211_regdomain* regd;
-
+#ifdef CLD_REGDB
+    const struct ieee80211_regdomain* regd;
+#endif
     pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
 
     if (NULL != pVosContext)
@@ -2062,6 +2100,15 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                   "BandCapability is set to 2G only");
 
+    if (pnvEFSTable == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "error: pnvEFSTable is NULL, probably not parsed nv.bin yet");
+        return -1;
+    }
+    vos_mem_zero(pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels,
+		 NUM_RF_CHANNELS * sizeof(sRegulatoryChannel));
+
     for (i = 0, m = 0; i<IEEE80211_NUM_BANDS; i++)
     {
         if (wiphy->bands[i] == NULL)
@@ -2074,13 +2121,6 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
             m = 0;
         else
             m = wiphy->bands[i-1]->n_channels + m;
-
-        if (pnvEFSTable == NULL)
-        {
-            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                      "error: pnvEFSTable is NULL, probably not parsed nv.bin yet");
-            return -1;
-        }
 
         for (j = 0; j < wiphy->bands[i]->n_channels; j++)
         {
@@ -2103,18 +2143,22 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)) || defined(WITH_BACKPORTS)
-                #if 1
+#ifdef CLD_REGDB
                 regd = search_regd(pHddCtx->reg.alpha2);
-                reg_rule = freq_reg_info_regd(wiphy, MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq), regd);
-                #else
-                reg_rule = freq_reg_info(wiphy, MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
-                #endif
+                reg_rule = freq_reg_info_regd(wiphy,
+                           MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq), regd);
+#else
+                reg_rule = freq_reg_info(wiphy,
+                           MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
+#endif
 #else
                 err = freq_reg_info(wiphy, MHZ_TO_KHZ(wiphy->bands[i]->
                                     channels[j].center_freq),
                                     0, &reg_rule);
 #endif
+#ifdef CLD_REGDB
                 wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)) || defined(WITH_BACKPORTS)
                 if (!IS_ERR(reg_rule)) {
@@ -2325,7 +2369,7 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
 
             }
             /* Copy wiphy flags in nv table */
-            if (n != -1)
+            if (n != INVALID_RF_CHANNEL)
                 pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
                     channels[n].flags = wiphy->bands[i]->channels[j].flags;
             pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
@@ -2378,6 +2422,19 @@ static void restore_custom_reg_settings(struct wiphy *wiphy)
 }
 #endif
 
+static void hdd_debug_cc_timer_expired_handler(void *arg)
+{
+	hdd_context_t *pHddCtx;
+	VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+		  ("%s ENTER "), __func__);
+
+	if (!arg)
+		return;
+	pHddCtx = (hdd_context_t *)arg;
+	vos_timer_destroy(&(pHddCtx->reg.reg_set_timer));
+	regdmn_set_regval(&pHddCtx->reg);
+}
+
 /*
  * Function: wlan_hdd_linux_reg_notifier
  * This function is called from cfg80211 core to provide regulatory settings
@@ -2399,6 +2456,7 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     int i;
     v_BOOL_t isVHT80Allowed;
     bool reset = false;
+    VOS_TIMER_STATE timer_status;
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
               FL("country: %c%c, initiator %d, dfs_region: %d"),
@@ -2567,8 +2625,27 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
                                          temp_reg_domain);
         }
 
-        /* send CTL info to firmware */
-        regdmn_set_regval(&pHddCtx->reg);
+        if (pHddCtx->cfg_ini->sta_change_cc_via_beacon) {
+            /* Due the firmware process, host side need to send
+             * WMI_SCAN_CHAN_LIST_CMDID before WMI_PDEV_SET_REGDOMAIN_CMDID, so
+             * that tx-power setting for operation channel can be applied,
+             * so use timer to postpone SET_REGDOMAIN_CMDID
+             */
+            if (pHddCtx->reg.reg_set_timer.state == 0)
+                timer_status = VOS_TIMER_STATE_UNUSED;
+            else {
+                do {
+                    timer_status =
+                    vos_timer_getCurrentState(&(pHddCtx->reg.reg_set_timer));
+                } while(timer_status != VOS_TIMER_STATE_UNUSED);
+            }
+            vos_timer_init(&(pHddCtx->reg.reg_set_timer), VOS_TIMER_TYPE_SW,
+                           hdd_debug_cc_timer_expired_handler,
+                           (void *)pHddCtx);
+            vos_timer_start(&(pHddCtx->reg.reg_set_timer), REG_SET_WAIT_MS);
+        } else {
+            regdmn_set_regval(&pHddCtx->reg);
+        }
 
         /* set dfs_region info */
         vos_nv_set_dfs_region(request->dfs_region);

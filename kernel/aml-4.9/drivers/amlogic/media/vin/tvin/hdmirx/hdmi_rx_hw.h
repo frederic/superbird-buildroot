@@ -1054,27 +1054,51 @@
 #define HHI_HDMIRX_AXI_CLK_CNTL			(0xb8<<2)
 
 /* tl1 HIU apll register */
-#define HHI_HDMIRX_APLL_CNTL0			(0xd2<<2)/* 0x4C */
-#define HHI_HDMIRX_APLL_CNTL1			(0xd3<<2)/* 0x4D */
-#define HHI_HDMIRX_APLL_CNTL2			(0xd4<<2)/* 0x4E */
-#define HHI_HDMIRX_APLL_CNTL3			(0xd5<<2)/* 0x4F */
-#define HHI_HDMIRX_APLL_CNTL4			(0xd6<<2)/* 0x50 */
+#define HHI_HDMIRX_APLL_CNTL0			(0xd2<<2)
+#define HHI_HDMIRX_APLL_CNTL1			(0xd3<<2)
+#define HHI_HDMIRX_APLL_CNTL2			(0xd4<<2)
+#define HHI_HDMIRX_APLL_CNTL3			(0xd5<<2)
+#define HHI_HDMIRX_APLL_CNTL4			(0xd6<<2)
 
 /* tl1 HIU PHY register */
-#define HHI_HDMIRX_PHY_MISC_CNTL0		(0xd7<<2)/*0x040*/
+#define HHI_HDMIRX_PHY_MISC_CNTL0		(0xd7<<2)
 #define MISCI_COMMON_RST				_BIT(10)
-#define HHI_HDMIRX_PHY_MISC_CNTL1		(0xd8<<2)/*0x041*/
+#define HHI_HDMIRX_PHY_MISC_CNTL1		(0xd8<<2)
 #define MISCI_MANUAL_MODE				_BIT(22)
-#define HHI_HDMIRX_PHY_MISC_CNTL2		(0xe0<<2)/*0x042*/
-#define HHI_HDMIRX_PHY_MISC_CNTL3		(0xe1<<2)/*0x043*/
-#define HHI_HDMIRX_PHY_DCHA_CNTL0		(0xe2<<2)/*0x045*/
-#define HHI_HDMIRX_PHY_DCHA_CNTL1		(0xe3<<2)/*0x046*/
-#define HHI_HDMIRX_PHY_DCHA_CNTL2		(0xe4<<2)/*0x047*/
-#define HHI_HDMIRX_PHY_DCHD_CNTL0		(0xe5<<2)/*0x048*/
-#define HHI_HDMIRX_PHY_DCHD_CNTL1		(0xe6<<2)/*0x049*/
-#define HHI_HDMIRX_PHY_DCHD_CNTL2		(0xe7<<2)/*0x04A*/
-#define HHI_HDMIRX_PHY_MISC_STAT		(0xee << 2)//0x044
-#define HHI_HDMIRX_PHY_DCHD_STAT		(0xef<<2)/*0x04B*/
+#define HHI_HDMIRX_PHY_MISC_CNTL2		(0xe0<<2)
+#define HHI_HDMIRX_PHY_MISC_CNTL3		(0xe1<<2)
+#define HHI_HDMIRX_PHY_DCHA_CNTL0		(0xe2<<2)
+#define HHI_HDMIRX_PHY_DCHA_CNTL1		(0xe3<<2)
+	#define DFE_OFSETCAL_START			_BIT(27)
+	#define DFE_TAP1_EN					_BIT(17)
+	#define DEF_SUM_RS_TRIM				MSK(3, 12)
+	/*[4:5] in trim,[6:7] im trim*/
+	#define DFE_SUM_TRIM				MSK(4, 4)
+#define HHI_HDMIRX_PHY_DCHA_CNTL2		(0xe4<<2)
+	#define DFE_VADC_EN					_BIT(21)
+#define HHI_HDMIRX_PHY_DCHA_CNTL3		(0xc5<<2)/*for revB*/
+#define HHI_HDMIRX_PHY_DCHD_CNTL0		(0xe5<<2)
+	#define CDR_LKDET_EN				_BIT(28)
+	/*bit'24:eq rst bit'25:cdr rst*/
+	#define CDR_EQ_RSTB					MSK(2, 24)
+	/*0:manual 1:c only 2:r only 3:both rc*/
+	#define EQ_ADP_MODE					MSK(2, 10)
+	#define EQ_ADP_STG					MSK(2, 8)
+#define HHI_HDMIRX_PHY_DCHD_CNTL1		(0xe6<<2)
+	#define OFST_CAL_START				_BIT(31)
+	#define EQ_BYP_VAL					MSK(5, 12)
+#define HHI_HDMIRX_PHY_DCHD_CNTL2		(0xe7<<2)
+	#define DFE_DBG_STL					MSK(3, 28)
+	#define	DFE_EN						_BIT(27)
+	#define DFE_RSTB					_BIT(26)
+	#define TAP1_BYP_EN					_BIT(19)
+#define HHI_HDMIRX_PHY_DCHD_CNTL3		(0xc6<<2)/*for revB*/
+	#define DBG_STS_SEL					MSK(2, 30)
+#define HHI_HDMIRX_PHY_ARC_CNTL			(0xe8<<2)
+#define HHI_HDMIRX_EARCTX_CNTL0			(0x69<<2)
+#define HHI_HDMIRX_EARCTX_CNTL1			(0x6a<<2)
+#define HHI_HDMIRX_PHY_MISC_STAT		(0xee<<2)
+#define HHI_HDMIRX_PHY_DCHD_STAT		(0xef<<2)
 
 #define TMDS_CLK_MIN			(24000UL)
 #define TMDS_CLK_MAX			(340000UL)
@@ -1125,7 +1149,25 @@ extern bool hdcp_hpd_ctrl_en;
 extern int eq_dbg_lvl;
 extern int phy_term_lel;
 extern bool phy_tdr_en;
+extern int hdcp_tee_path;
+extern int os_rate;
+extern bool sqrst_en;
+extern int vga_dbg;
+extern int dfe_en;
+extern int ofst_en;
+extern int cdr_mode;
+extern int pre_int;
+extern int pre_int_en;
+extern int phy_bw;
+extern int vga_dbg_delay;
+extern int alirst_en;
+extern int tap1_byp;
+extern int eq_byp;
+extern int long_cable;
+extern int osc_mode;
+extern int pll_div;
 
+extern char emp_buf[1024];
 extern void rx_get_best_eq_setting(void);
 extern void wr_reg_hhi(unsigned int offset, unsigned int val);
 extern void wr_reg_hhi_bits(unsigned int offset, unsigned int mask,
@@ -1233,6 +1275,7 @@ void rx_audio_bandgap_en(void);
 void rx_aml_eq_debug(int eq_lvl);
 extern void rx_phy_rxsense_pulse(unsigned int t1, unsigned int t2, bool en);
 extern void rx_phy_power_on(unsigned int onoff);
+extern void dump_reg_phy(void);
 
 enum measure_clk_top_e {
 	TOP_HDMI_TMDSCLK = 0,
@@ -1257,22 +1300,22 @@ enum measure_clk_src_e {
 #define PHY_DEFAULT_FRQ	((100)*MHz)
 
 enum phy_frq_band {
-	phy_frq_band_0 = 0,	/*45Mhz*/
-	phy_frq_band_1,		/*77Mhz*/
-	phy_frq_band_2,		/*155Mhz*/
-	phy_frq_band_3,		/*340Mhz*/
-	phy_frq_band_4,		/*525Mhz*/
-	phy_frq_band_5,		/*600Mhz*/
-	phy_frq_null = 0xf,
+	PHY_BW_0 = 0,	/*45Mhz*/
+	PHY_BW_1,		/*77Mhz*/
+	PHY_BW_2,		/*155Mhz*/
+	PHY_BW_3,		/*340Mhz*/
+	PHY_BW_4,		/*525Mhz*/
+	PHY_BW_5,		/*600Mhz*/
+	PHY_BW_NULL = 0xf,
 };
 
 enum pll_frq_band {
-	pll_frq_band_0 = 0,	/*35Mhz*/
-	pll_frq_band_1,		/*77Mhz*/
-	pll_frq_band_2,		/*155Mhz*/
-	pll_frq_band_3,		/*300Mhz*/
-	pll_frq_band_4,		/*600Mhz*/
-	pll_frq_null = 0xf,
+	PLL_BW_0 = 0,	/*35Mhz*/
+	PLL_BW_1,		/*77Mhz*/
+	PLL_BW_2,		/*155Mhz*/
+	PLL_BW_3,		/*300Mhz*/
+	PLL_BW_4,		/*600Mhz*/
+	PLL_BW_NULL = 0xf,
 };
 
 struct apll_param {
@@ -1290,7 +1333,7 @@ extern int rx_get_clock(enum measure_clk_top_e clk_src);
 extern unsigned int clk_util_clk_msr(unsigned int clk_mux);
 extern unsigned int rx_measure_clock(enum measure_clk_src_e clksrc);
 extern void aml_phy_init(void);
-extern void aml_phy_pw_onoff(uint32_t onoff);
+/*extern void aml_phy_pw_onoff(uint32_t onoff);*/
 extern uint32_t aml_cable_clk_band(uint32_t cableclk,
 	uint32_t clkrate);
 extern uint32_t aml_phy_pll_band(uint32_t cableclk,
@@ -1315,6 +1358,8 @@ extern void hdmirx_top_irq_en(bool flag);
 void rx_phy_rt_cal(void);
 bool is_ft_trim_done(void);
 void aml_phy_get_trim_val(void);
+unsigned int rx_set_hdcp14_secure_key(void);
+bool rx_clr_tmds_valid(void);
 #endif
 
 

@@ -44,10 +44,9 @@
 #include "debug_linux.h"
 #include "adf_os_io.h"
 #include "vos_timer.h"
-#include "osdep.h"
 
 /* Static and Global variables */
-static spinlock_t l_dp_trace_lock;
+static adf_os_spinlock_t l_dp_trace_lock;
 
 static struct adf_dp_trace_record_s
 			g_adf_dp_trace_tbl[MAX_ADF_DP_TRACE_RECORDS];
@@ -73,7 +72,7 @@ void adf_dp_trace_init(void)
 {
 	uint8_t i;
 
-	spin_lock_init(&l_dp_trace_lock);
+	adf_os_spinlock_init(&l_dp_trace_lock);
 	g_adf_dp_trace_data.head = INVALID_ADF_DP_TRACE_ADDR;
 	g_adf_dp_trace_data.tail = INVALID_ADF_DP_TRACE_ADDR;
 	g_adf_dp_trace_data.num = 0;
@@ -115,11 +114,11 @@ void adf_dp_trace_init(void)
 void adf_dp_trace_set_value(uint8_t proto_bitmap, uint8_t no_of_record,
 			 uint8_t verbosity)
 {
-	SPIN_LOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_lock_bh(&l_dp_trace_lock);
 	g_adf_dp_trace_data.proto_bitmap = proto_bitmap;
 	g_adf_dp_trace_data.no_of_record = no_of_record;
 	g_adf_dp_trace_data.verbosity    = verbosity;
-	SPIN_UNLOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_unlock_bh(&l_dp_trace_lock);
 }
 
 /**
@@ -174,7 +173,7 @@ void adf_dp_trace_set_track(adf_nbuf_t nbuf,  enum adf_proto_dir dir)
 {
 	uint32_t count = 0;
 
-	SPIN_LOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_lock_bh(&l_dp_trace_lock);
 	if (ADF_TX == dir)
 		count = ++g_adf_dp_trace_data.tx_count;
 	else if (ADF_RX == dir)
@@ -187,7 +186,7 @@ void adf_dp_trace_set_track(adf_nbuf_t nbuf,  enum adf_proto_dir dir)
 		else if (ADF_RX == dir)
 			ADF_NBUF_CB_RX_DP_TRACE(nbuf) = 1;
 	}
-	SPIN_UNLOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_unlock_bh(&l_dp_trace_lock);
 }
 
 #define DPTRACE_PRINT(args...) \
@@ -416,7 +415,7 @@ void adf_dp_add_record(enum ADF_DP_TRACE_ID code,
 	struct adf_dp_trace_record_s *rec = NULL;
 	int index;
 
-	SPIN_LOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_lock_bh(&l_dp_trace_lock);
 
 	g_adf_dp_trace_data.num++;
 
@@ -457,7 +456,7 @@ void adf_dp_add_record(enum ADF_DP_TRACE_ID code,
 	vos_get_time_of_the_day_in_hr_min_sec_usec(rec->time,
 					sizeof(rec->time));
 	rec->pid = (in_interrupt() ? 0 : current->pid);
-	SPIN_UNLOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_unlock_bh(&l_dp_trace_lock);
 
 	if ((g_adf_dp_trace_data.live_mode || print == true) &&
 	    (rec->code < ADF_DP_TRACE_MAX))
@@ -875,7 +874,7 @@ void adf_dp_trace_dump_all(uint32_t count)
 	/* aquire the lock so that only one thread at a time can read
 	 * the ring buffer
 	 */
-	SPIN_LOCK_BH(&l_dp_trace_lock);
+	adf_os_spin_lock_bh(&l_dp_trace_lock);
 
 	if (g_adf_dp_trace_data.head != INVALID_ADF_DP_TRACE_ADDR) {
 		i = g_adf_dp_trace_data.head;
@@ -892,7 +891,7 @@ void adf_dp_trace_dump_all(uint32_t count)
 		}
 
 		pRecord = g_adf_dp_trace_tbl[i];
-		SPIN_UNLOCK_BH(&l_dp_trace_lock);
+		adf_os_spin_unlock_bh(&l_dp_trace_lock);
 		for (;; ) {
 			adf_dp_trace_cb_table[pRecord.
 					   code] (&pRecord, (uint16_t)i);
@@ -900,14 +899,14 @@ void adf_dp_trace_dump_all(uint32_t count)
 				break;
 			i += 1;
 
-			SPIN_LOCK_BH(&l_dp_trace_lock);
+			adf_os_spin_lock_bh(&l_dp_trace_lock);
 			if (MAX_ADF_DP_TRACE_RECORDS == i)
 				i = 0;
 
 			pRecord = g_adf_dp_trace_tbl[i];
-			SPIN_UNLOCK_BH(&l_dp_trace_lock);
+			adf_os_spin_unlock_bh(&l_dp_trace_lock);
 		}
 	} else {
-		SPIN_UNLOCK_BH(&l_dp_trace_lock);
+		adf_os_spin_unlock_bh(&l_dp_trace_lock);
 	}
 }

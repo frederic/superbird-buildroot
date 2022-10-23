@@ -1,7 +1,7 @@
 /*
  * Broadcom HND chip & on-chip-interconnect-related definitions.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: hndsoc.h 672520 2016-11-28 23:30:55Z $
+ * $Id: hndsoc.h 795345 2018-12-18 16:52:03Z $
  */
 
 #ifndef	_HNDSOC_H
@@ -212,6 +212,7 @@
 #define ARMCA7_CORE_ID		0x847		/* ARM CA7 CPU */
 #define SYSMEM_CORE_ID		0x849		/* System memory core */
 #define HUB_CORE_ID		0x84b           /* Hub core ID */
+#define HND_OOBR_CORE_ID        0x85c           /* Hnd oob router core ID */
 #define APB_BRIDGE_CORE_ID	0x135		/* APB bridge core ID */
 #define AXI_CORE_ID		0x301		/* AXI/GPV core ID */
 #define EROM_CORE_ID		0x366		/* EROM core ID */

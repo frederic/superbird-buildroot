@@ -2,7 +2,7 @@
  * Misc utility routines for accessing chip-specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: siutils.c 769534 2018-06-26 21:19:11Z $
+ * $Id: siutils.c 798061 2019-01-04 23:27:15Z $
  */
 
 #include <bcm_cfg.h>
@@ -348,7 +348,7 @@ si_get_pmu_reg_addr(si_t *sih, uint32 offset)
 		pmuaddr = SI_ENUM_BASE(sih) + offset;
 
 done:
-	printf("%s: addrRET: %x\n", __FUNCTION__, pmuaddr);
+	SI_MSG(("%s: addrRET: %x\n", __FUNCTION__, pmuaddr));
 	return pmuaddr;
 }
 
@@ -1042,6 +1042,23 @@ si_setint(si_t *sih, int siflag)
 		ub_setint(sih, siflag);
 	else
 		ASSERT(0);
+}
+
+uint32
+si_oobr_baseaddr(si_t *sih, bool second)
+{
+	si_info_t *sii = SI_INFO(sih);
+
+	if (CHIPTYPE(sih->socitype) == SOCI_SB)
+		return 0;
+	else if ((CHIPTYPE(sih->socitype) == SOCI_AI) ||
+		(CHIPTYPE(sih->socitype) == SOCI_DVTBUS) ||
+		(CHIPTYPE(sih->socitype) == SOCI_NAI))
+		return (second ? sii->oob_router1 : sii->oob_router);
+	else {
+		ASSERT(0);
+		return 0;
+	}
 }
 
 uint
@@ -1972,6 +1989,7 @@ si_chip_hostif(si_t *sih)
 		 else if (CST4369_CHIPMODE_PCIE(sih->chipst))
 			 hosti = CHIP_HOSTIF_PCIEMODE;
 		 break;
+
 	case BCM4350_CHIP_ID:
 	case BCM4354_CHIP_ID:
 	case BCM43556_CHIP_ID:
@@ -2866,6 +2884,7 @@ si_tcm_size(si_t *sih)
 	bool wasup;
 	uint32 corecap;
 	uint memsize = 0;
+	uint banku_size = 0;
 	uint32 nab = 0;
 	uint32 nbb = 0;
 	uint32 totb = 0;
@@ -2902,7 +2921,12 @@ si_tcm_size(si_t *sih)
 		W_REG(sii->osh, arm_bidx, idx);
 
 		bxinfo = R_REG(sii->osh, arm_binfo);
-		memsize += ((bxinfo & ARMCR4_BSZ_MASK) + 1) * ARMCR4_BSZ_MULT;
+		if (bxinfo & ARMCR4_BUNITSZ_MASK) {
+			banku_size = ARMCR4_BSZ_1K;
+		} else {
+			banku_size = ARMCR4_BSZ_8K;
+		}
+		memsize += ((bxinfo & ARMCR4_BSZ_MASK) + 1) * banku_size;
 	}
 
 	/* Return to previous state and core */
@@ -3527,11 +3551,7 @@ bool _bcmsrpwr = TRUE;
 bool _bcmsrpwr = FALSE;
 #endif // endif
 
-#ifndef BCMSDIO
-#define PWRREQ_OFFSET(sih)	DAR_PCIE_PWR_CTRL((sih)->buscorerev)
-#else
 #define PWRREQ_OFFSET(sih)	OFFSETOF(chipcregs_t, powerctl)
-#endif // endif
 
 static void
 si_corereg_pciefast_write(si_t *sih, uint regoff, uint val)
@@ -3554,12 +3574,6 @@ si_corereg_pciefast_read(si_t *sih, uint regoff)
 	si_info_t *sii = SI_INFO(sih);
 
 	ASSERT((BUSTYPE(sih->bustype) == PCI_BUS));
-
-#ifndef BCMSDIO
-	if (PCIECOREREV(sih->buscorerev) == 66) {
-		si_corereg_pciefast_write(sih, OFFSETOF(sbpcieregs_t, u1.dar_64.dar_ctrl), 0);
-	}
-#endif // endif
 
 	r = (volatile uint32 *)((volatile char *)sii->curmap +
 		PCI_16KB0_PCIREGS_OFFSET + regoff);
@@ -3647,7 +3661,7 @@ si_srpwr_stat_spinwait(si_t *sih, uint32 mask, uint32 val)
 		ASSERT(r == val);
 	}
 
-	r = (r >> SRPWR_STATUS_SHIFT) & SRPWR_DMN_ALL_MASK;
+	r = (r >> SRPWR_STATUS_SHIFT) & SRPWR_DMN_ALL_MASK(sih);
 
 	return r;
 }
@@ -3665,7 +3679,7 @@ si_srpwr_stat(si_t *sih)
 		r = si_corereg_pciefast_read(sih, offset);
 	}
 
-	r = (r >> SRPWR_STATUS_SHIFT) & SRPWR_DMN_ALL_MASK;
+	r = (r >> SRPWR_STATUS_SHIFT) & SRPWR_DMN_ALL_MASK(sih);
 
 	return r;
 }
@@ -3683,9 +3697,24 @@ si_srpwr_domain(si_t *sih)
 		r = si_corereg_pciefast_read(sih, offset);
 	}
 
-	r = (r >> SRPWR_DMN_SHIFT) & SRPWR_DMN_ALL_MASK;
+	r = (r >> SRPWR_DMN_ID_SHIFT) & SRPWR_DMN_ID_MASK;
 
 	return r;
+}
+
+uint32
+si_srpwr_domain_all_mask(si_t *sih)
+{
+	uint32 mask = SRPWR_DMN0_PCIE_MASK |
+	              SRPWR_DMN1_ARMBPSD_MASK |
+	              SRPWR_DMN2_MACAUX_MASK |
+	              SRPWR_DMN3_MACMAIN_MASK;
+
+	if (si_scan_core_present(sih)) {
+		mask |= SRPWR_DMN4_MACSCAN_MASK;
+	}
+
+	return mask;
 }
 
 /* Utility API to read/write the raw registers with absolute address.
@@ -3761,4 +3790,11 @@ si_lhl_ps_mode(si_t *sih)
 {
 	si_info_t *sii = SI_INFO(sih);
 	return sii->lhl_ps_mode;
+}
+
+bool
+BCMRAMFN(si_scan_core_present)(si_t *sih)
+{
+	return ((si_numcoreunits(sih, D11_CORE_ID) >= 2) &&
+		(si_numcoreunits(sih, SR_CORE_ID) > 4));
 }

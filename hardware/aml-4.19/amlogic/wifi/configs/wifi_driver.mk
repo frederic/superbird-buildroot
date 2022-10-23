@@ -199,6 +199,8 @@ multiwifi:
 	cp $(shell pwd)/hardware/wifi/realtek/drivers/8821cs/rtl8821CS/8821cs.ko $(TARGET_OUT)/8821cs.ko
 	$(MAKE) -C $(shell pwd)/$(PRODUCT_OUT)/obj/KERNEL_OBJ TopDIR=$(shell pwd)/hardware/wifi/realtek/drivers/8821cu/rtl8821CU M=$(shell pwd)/hardware/wifi/realtek/drivers/8821cu/rtl8821CU ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 	cp $(shell pwd)/hardware/wifi/realtek/drivers/8821cu/rtl8821CU/8821cu.ko $(TARGET_OUT)/8821cu.ko
+	$(MAKE) -C $(shell pwd)/$(PRODUCT_OUT)/obj/KERNEL_OBJ TopDIR=$(shell pwd)/hardware/wifi/realtek/drivers/8821au/rtl8821AU M=$(shell pwd)/hardware/wifi/realtek/drivers/8821au/rtl8821AU ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+	cp $(shell pwd)/hardware/wifi/realtek/drivers/8821au/rtl8821AU/8821au.ko $(TARGET_OUT)/8821au.ko
 	$(MAKE) -C $(shell pwd)/hardware/wifi/qualcomm/drivers/qca9377/AIO/build ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(CROSS_COMPILE) KERNELPATH=$(shell pwd)/$(PRODUCT_OUT)/obj/KERNEL_OBJ
 	cp $(shell pwd)/hardware/wifi/qualcomm/drivers/qca9377/AIO/rootfs-x86-android.build/lib/modules/wlan.ko $(TARGET_OUT)/wlan_9377.ko
 	$(MAKE) -C $(shell pwd)/hardware/wifi/qualcomm/drivers/qca9379/AIO/build KERNELARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(CROSS_COMPILE) KERNELPATH=$(shell pwd)/$(PRODUCT_OUT)/obj/KERNEL_OBJ

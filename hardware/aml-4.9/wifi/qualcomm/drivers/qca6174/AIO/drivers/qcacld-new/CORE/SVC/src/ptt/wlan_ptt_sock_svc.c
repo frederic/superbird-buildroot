@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -125,7 +125,7 @@ int ptt_sock_send_msg_to_app(tAniHdr *wmsg, int radio, int src_mod, int pid)
          __func__, radio);
       return -EINVAL;
    }
-   payload_len = wmsg_length + sizeof(wnl->radio) + sizeof(tAniHdr);
+   payload_len = wmsg_length + sizeof(wnl->radio);
    tot_msg_len = NLMSG_SPACE(payload_len);
    if ((skb = dev_alloc_skb(tot_msg_len)) == NULL) {
       PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "%s: dev_alloc_skb() failed for msg size[%d]\n",
@@ -245,6 +245,7 @@ static int ptt_sock_rx_nlink_msg (struct sk_buff * skb)
  */
 static void ptt_cmd_handler(const void *data, int data_len, void *ctx, int pid)
 {
+	uint16_t length;
 	ptt_app_reg_req *payload;
 	struct nlattr *tb[CLD80211_ATTR_MAX + 1];
 
@@ -269,6 +270,14 @@ static void ptt_cmd_handler(const void *data, int data_len, void *ctx, int pid)
 	}
 
 	payload = (ptt_app_reg_req *)(nla_data(tb[CLD80211_ATTR_DATA]));
+	length = be16_to_cpu(payload->wmsg.length);
+
+	if (nla_len(tb[CLD80211_ATTR_DATA]) <  (length +
+						sizeof(payload->radio))) {
+		PTT_TRACE(VOS_TRACE_LEVEL_ERROR, "ATTR_DATA len check failed");
+		return;
+	}
+
 	switch (payload->wmsg.type) {
 	case ANI_MSG_APP_REG_REQ:
 		ptt_sock_send_msg_to_app(&payload->wmsg, payload->radio,

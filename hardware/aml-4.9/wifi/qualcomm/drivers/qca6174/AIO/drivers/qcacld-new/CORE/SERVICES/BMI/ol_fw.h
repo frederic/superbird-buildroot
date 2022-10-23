@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -54,6 +54,7 @@
 #define QCA_BOARD_DATA_FILE          "fakeboar.bin"
 #define QCA_OTP_FILE                 "otp.bin"
 #define QCA_SETUP_FILE               "athsetup.bin"
+#define QCA_USB_WARM_RESET_FILE      "warm_reset.bin"
 #define AR61X4_SINGLE_FILE           "qca61x4.bin"
 #define QCA_FIRMWARE_EPPING_FILE     "epping.bin"
 
@@ -71,67 +72,36 @@
  * access to it or the value of the particular register
  * read might change
  */
-#define REGISTER_LOCATION       0x00000800
-#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
-#ifdef HIF_SDIO
-#define REG_SIZE		0x0007F820
-#endif
-#endif
 
-#if defined(TARGET_DUMP_FOR_NON_QC_PLATFORM) && !defined(HIF_PCI)
-#define DRAM_LOCATION           0x00400000
-#ifdef HIF_USB
-#define DRAM_SIZE               0x00098000
-#else
-#define DRAM_SIZE               0x00097FFC
-#endif
-
-#define IRAM_LOCATION           0x00980000
-#ifdef HIF_USB
-#define IRAM_SIZE               0x000C0000
-#else
-#define IRAM_SIZE               0x000BFFFC
-#endif
-
-#define AXI_LOCATION            0x000a0000
-#ifdef HIF_USB
-#define AXI_SIZE                0x00020000
-#else
-#define AXI_SIZE                0x0001FFFC
-#endif
-
-#else /* ELSE TARGET_DUMP_FOR_NON_QC_PLATFORM */
+#ifdef HIF_PCI
 #define DRAM_LOCATION           0x00400000
 #define DRAM_LOCAL_BASE_ADDRESS (0x100000)
-#ifdef HIF_PCI
 #define DRAM_SIZE               0x000a8000
-#else
-#define DRAM_SIZE               0x00098000
-#endif
 
-#ifdef HIF_PCI
 #define IRAM1_LOCATION          0x00980000
 #define IRAM1_SIZE              0x00080000
 #define IRAM2_LOCATION          0x00a00000
 #define IRAM2_SIZE              0x00040000
-#ifdef CONFIG_NON_QC_PLATFORM_PCI
+
+#define REGISTER_LOCATION       0x00000800
 #define REG_SIZE		0x0007F820
-#endif
-#elif defined(HIF_SDIO)
-#define IRAM_LOCATION           0x00980000
-#define IRAM_SIZE               0x000C0000
-#else /* ELSE HIF_PCI */
-#define IRAM_LOCATION           0x00980000
-#define IRAM_SIZE               0x00038000
-#endif /* END HIF_PCI */
 
 #define AXI_LOCATION            0x000a0000
-#ifdef HIF_PCI
 #define AXI_SIZE                0x00018000
 #else
+#define DRAM_LOCATION           0x00400000
+#define DRAM_LOCAL_BASE_ADDRESS (0x100000)
+#define DRAM_SIZE               0x00098000
+
+#define REGISTER_LOCATION       0x00000800
+#define REG_SIZE		0x0007F820
+
+#define IRAM_LOCATION           0x00980000
+#define IRAM_SIZE               0x000C0000
+
+#define AXI_LOCATION            0x000a0000
 #define AXI_SIZE                0x00020000
-#endif /* #ifdef HIF_PCIE */
-#endif /* END of ELSE TARGET_DUMP_FOR_NON_QC_PLATFORM*/
+#endif /* END of HIF_PCI*/
 
 #define CE_OFFSET               0x00000400
 #define CE_USEFUL_SIZE          0x00000058
@@ -148,7 +118,6 @@ struct hash_fw {
 	u8 utf[SHA256_DIGEST_SIZE];
 };
 
-void crash_dump_flush(const char* filename, char* buf, unsigned int len);
 int ol_target_coredump(void *instance, void* memoryBlock,
                         u_int32_t blockLength);
 int ol_diag_read(struct ol_softc *scn, u_int8_t* buffer,

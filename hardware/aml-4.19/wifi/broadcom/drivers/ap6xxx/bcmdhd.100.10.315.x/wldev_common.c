@@ -1,7 +1,7 @@
 /*
  * Common function shared by Linux WEXT, cfg80211 and p2p drivers
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wldev_common.c 754283 2018-03-27 02:51:46Z $
+ * $Id: wldev_common.c 786015 2018-10-24 08:21:53Z $
  */
 
 #include <osl.h>
@@ -36,6 +36,7 @@
 #include <bcmutils.h>
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
+#include <wl_cfgscan.h>
 #endif /* WL_CFG80211 */
 #include <dhd_config.h>
 
@@ -46,17 +47,17 @@
 #define htodchanspec(i) (i)
 #define dtohchanspec(i) (i)
 
-#define	WLDEV_ERROR(args)						\
-	do {										\
-		printk(KERN_ERR "WLDEV-ERROR) ");	\
-		printk args;							\
+#define	WLDEV_ERROR_MSG(x, args...)						\
+	do {												\
+		printk(KERN_INFO "WLDEV-ERROR) " x, ## args);	\
 	} while (0)
+#define WLDEV_ERROR(x) WLDEV_ERROR_MSG x
 
-#define	WLDEV_INFO(args)						\
-	do {										\
-		printk(KERN_INFO "WLDEV-INFO) ");	\
-		printk args;							\
+#define	WLDEV_INFO_MSG(x, args...)						\
+	do {												\
+		printk(KERN_INFO "WLDEV-INFO) " x, ## args);	\
 	} while (0)
+#define WLDEV_INFO(x) WLDEV_INFO_MSG x
 
 extern int dhd_ioctl_entry_local(struct net_device *net, wl_ioctl_t *ioc, int cmd);
 

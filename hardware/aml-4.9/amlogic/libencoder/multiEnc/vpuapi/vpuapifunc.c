@@ -1133,14 +1133,14 @@ int LevelCalculation(int MbNumX, int MbNumY, int frameRateInfo, int interlaceFla
 }
 
 Int32 CalcLumaSize(
-    CodecInst*          inst,
-    Int32           productId,
-    Int32           stride,
-    Int32           height,
+    CodecInst*        inst,
+    Int32             productId,
+    Int32             stride,
+    Int32             height,
     FrameBufferFormat format,
-    BOOL            cbcrIntl,
-    TiledMapType    mapType,
-    DRAMConfig      *pDramCfg
+    BOOL              cbcrIntl,
+    TiledMapType      mapType,
+    DRAMConfig        *pDramCfg
     )
 {
     Int32 unit_size_hor_lum, unit_size_ver_lum, size_dpb_lum, field_map, size_dpb_lum_4k;
@@ -1456,7 +1456,6 @@ Int32 CalcChromaSize(
             return 0;
         size_dpb_chr = VP5_ENC_FBC50_LOSSY_422_CHROMA_FRAME_SIZE(stride, height, pDramCfg->tx16c);
     }
-
     else if (mapType == TILED_FRAME_NO_BANK_MAP || mapType == TILED_FIELD_NO_BANK_MAP) {
         chr_size_y = (height>>field_map)/chr_hscale;
         chr_size_x = stride/chr_vscale;

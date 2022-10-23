@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "gxlx_p271.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesongxlx_p271/initramfs/ramfslist-32"

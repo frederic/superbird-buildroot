@@ -1,0 +1,76 @@
+From b2f7b68aa3ee4cf6c39f2dde2ce5a65e13dd16f1 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Tue, 10 Dec 2019 15:15:36 +0800
+Subject: [PATCH] Revert "build: wire-up wayland-egl" because it conflict with
+ mali wayland implement.
+
+This reverts commit 1fcb4d1387e2a40ed8cd35b11a7788de52b9cdb9.
+---
+ Makefile.am  | 20 +-------------------
+ configure.ac |  2 --
+ 2 files changed, 1 insertion(+), 21 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 6bf5d1d..a2e0f17 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -146,20 +146,9 @@ libwayland_cursor_la_CFLAGS =			\
+ 	-I$(top_srcdir)/src			\
+ 	-DICONDIR=\"$(ICONDIR)\"
+ 
+-lib_LTLIBRARIES += libwayland-egl.la
+-
+ include_HEADERS += egl/wayland-egl.h
+ include_HEADERS += egl/wayland-egl-core.h
+ 
+-libwayland_egl_la_SOURCES = egl/wayland-egl.c
+-libwayland_egl_la_LDFLAGS = -version-info 1
+-
+-pkgconfig_DATA += egl/wayland-egl.pc
+-
+-## XXX: backend interface
+-include_HEADERS += egl/wayland-egl-backend.h
+-pkgconfig_DATA += egl/wayland-egl-backend.pc
+-
+ if ENABLE_TESTS
+ built_test_programs =				\
+ 	array-test				\
+@@ -181,13 +170,7 @@ built_test_programs =				\
+ 	message-test				\
+ 	headers-test				\
+ 	compositor-introspection-test		\
+-	protocol-logger-test			\
+-	wayland-egl-abi-check
+-
+-EXTRA_DIST += egl/wayland-egl-symbols-check
+-
+-check_PROGRAMS = wayland-egl-abi-check
+-wayland_egl_abi_check_SOURCES = egl/wayland-egl-abi-check.c
++	protocol-logger-test
+ 
+ if ENABLE_CPP_TEST
+ built_test_programs += cpp-compile-test
+@@ -203,7 +186,6 @@ AM_TESTS_ENVIRONMENT =							\
+ 	;
+ 
+ TESTS = $(built_test_programs)			\
+-	egl/wayland-egl-symbols-check		\
+ 	tests/scanner-test.sh
+ 
+ noinst_PROGRAMS =				\
+diff --git a/configure.ac b/configure.ac
+index 9a83505..3a9317f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -193,8 +193,6 @@ AC_CONFIG_FILES([Makefile
+ 		 doc/publican/Makefile
+ 		 doc/doxygen/Makefile
+ 		 doc/man/Makefile
+-		 egl/wayland-egl.pc
+-		 egl/wayland-egl-backend.pc
+ 		 src/wayland-server-uninstalled.pc
+ 		 src/wayland-client-uninstalled.pc
+ 		 src/wayland-scanner-uninstalled.pc
+-- 
+2.7.4
+

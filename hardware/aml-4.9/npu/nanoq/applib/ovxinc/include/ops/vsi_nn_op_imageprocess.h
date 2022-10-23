@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -69,6 +69,17 @@ typedef struct _vsi_nn_imageprocess_param
     } mean;
 } vsi_nn_imageprocess_param;
 
+/**
+* Insert imageprocess op for image pre process
+* @deprecated
+* @see vsi_nn_InsertImageprocessSingleNode
+*
+* @param[in] graph.
+* @param[in] the attr of the input tensor of graph.
+* @param[in] the parameters of imageprocess.
+* @param[in] bmp buffer of input image.
+* @param[in] output tensor.
+*/
 OVXLIB_API vsi_status vsi_nn_op_imageprocess_single_node
     (
     vsi_nn_graph_t *graph,
@@ -77,6 +88,32 @@ OVXLIB_API vsi_status vsi_nn_op_imageprocess_single_node
     uint8_t *data,
     vsi_nn_tensor_t *tensor_out
     );
+
+/**
+* Insert imageprocess op for image pre process.
+*
+* @param[in] graph.
+* @param[in] the attr of the input tensor of graph.
+* @param[in] the parameters of imageprocess.
+* @param[in] bmp buffer of input image.
+* @param[in] output tensor.
+* @param[in] id. There may be multi models in a process. Each one has a uniqe id.\n
+*            But repeatedly running one model with different images should share the same id.
+*/
+OVXLIB_API vsi_status vsi_nn_InsertImageprocessSingleNode
+    (
+    vsi_nn_graph_t *graph,
+    vsi_nn_tensor_attr_t *attr,
+    vsi_nn_imageprocess_param *p,
+    uint8_t *data,
+    vsi_nn_tensor_t *tensor_out,
+    int32_t id
+    );
+
+/**
+* Release the resource of imageprocess op.
+*/
+OVXLIB_API vsi_status vsi_nn_ReleaseImageprocessSingleNode();
 
 #ifdef __cplusplus
 }

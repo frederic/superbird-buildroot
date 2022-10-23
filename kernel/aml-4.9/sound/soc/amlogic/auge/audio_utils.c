@@ -978,3 +978,18 @@ void cec_arc_enable(int src, bool enable)
 		0x1f << 0,
 		src << 2 | (enable ? 0x1 : 0) << 0);
 }
+
+void tm2_arc_source_select(int src)
+{
+	if (src == SPDIFA_TO_HDMIRX || src == SPDIFB_TO_HDMIRX) {
+		/* spdif_a = 1; spdif_b = 2*/
+		aml_write_hiubus(HHI_HDMIRX_ARC_CNTL, 0xfffffff8 | src);
+		/* analog registers, enable arc*/
+		aml_write_hiubus(HHI_HDMIRX_EARCTX_CNTL0, 0x94810490);
+		aml_write_hiubus(HHI_HDMIRX_EARCTX_CNTL1, 0x40013508);
+	} else {
+		/* earctx_spdif*/
+		aml_write_hiubus(HHI_HDMIRX_ARC_CNTL, 0x0);
+	}
+}
+

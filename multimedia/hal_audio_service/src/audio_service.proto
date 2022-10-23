@@ -1,0 +1,540 @@
+// Copyright 2019 Amlogic, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package audio_service;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service AudioService {
+  rpc Device_common_close(google.protobuf.Empty) returns (StatusReturn) {}
+
+  ////////////////////////////
+  // Device API
+  ////////////////////////////
+
+  // check to see if the audio hardware interface has been initialized.
+  // returns 0 on success, -ENODEV on failure.
+  rpc Device_init_check(google.protobuf.Empty) returns (StatusReturn) {}
+
+  // set the audio volume of a voice call. Range is between 0.0 and 1.0
+  rpc Device_set_voice_volume(Volume) returns (StatusReturn) {}
+
+  // set the audio volume for all audio activities other than voice call.
+  // Range between 0.0 and 1.0. If any value other than 0 is returned,
+  // the software mixer will emulate this capability.
+  rpc Device_set_master_volume(Volume) returns (StatusReturn) {}
+
+  // Get the current master volume value for the HAL, if the HAL supports
+  // master volume control.  AudioFlinger will query this value from the
+  // primary audio HAL when the service starts and use the value for setting
+  // the initial master volume across all HALs.  HALs which do not support
+  // this method may leave it set to NULL.
+  rpc Device_get_master_volume(google.protobuf.Empty) returns (StatusReturn) {}
+
+  // set_mode is called when the audio mode changes. AUDIO_MODE_NORMAL mode
+  // is for standard audio playback, AUDIO_MODE_RINGTONE when a ringtone is
+  // playing, and AUDIO_MODE_IN_CALL when a call is in progress.
+  rpc Device_set_mode(Mode) returns (StatusReturn) {}
+
+  // mic mute
+  rpc Device_set_mic_mute(Mute) returns (StatusReturn) {}
+  rpc Device_get_mic_mute(google.protobuf.Empty) returns (StatusReturn) {}
+
+  // set/get global audio parameters
+  rpc Device_set_parameters(Kv_pairs) returns (StatusReturn) {}
+  rpc Device_get_parameters(Keys) returns (StatusReturn) {}
+
+  // Returns audio input buffer size according to parameters passed or
+  // 0 if one of the parameters is not supported.
+  // See also get_buffer_size which is for a particular stream.
+  rpc Device_get_input_buffer_size(AudioConfig) returns (StatusReturn) {}
+
+  // This method creates and opens the audio hardware output stream.
+  // The "address" parameter qualifies the "devices" audio device type if needed.
+  // The format format depends on the device type:
+  // - Bluetooth devices use the MAC address of the device in the form "00:11:22:AA:BB:CC"
+  // - USB devices use the ALSA card and device numbers in the form  "card=X;device=Y"
+  // - Other devices may use a number or any other string.
+  rpc Device_open_output_stream(OpenOutputStream) returns (StatusReturn) {}
+  rpc Device_close_output_stream(Stream) returns (StatusReturn) {}
+
+  // This method creates and opens the audio hardware input stream
+  rpc Device_open_input_stream(OpenInputStream) returns (StatusReturn) {}
+  rpc Device_close_input_stream(Stream) returns (StatusReturn) {}
+
+  rpc Device_dump(google.protobuf.Empty) returns (StatusReturn) {}
+
+  // set the audio mute status for all audio activities.  If any value other
+  // than 0 is returned, the software mixer will emulate this capability.
+  rpc Device_set_master_mute(Mute) returns (StatusReturn) {}
+  rpc Device_get_master_mute(google.protobuf.Empty) returns (StatusReturn) {}
+
+  // Routing control
+  // Creates an audio patch between several source and sink ports.
+  // The handle is allocated by the HAL and should be unique for this
+  // audio HAL module.
+  rpc Device_create_audio_patch(CreateAudioPatch) returns (StatusReturn) {}
+  rpc Device_release_audio_patch(Handle) returns (StatusReturn) {}
+
+  // Set audio port configuration
+  rpc Device_set_audio_port_config(AudioPortConfig) returns (StatusReturn) {}
+
+  ////////////////////////////
+  // Stream API
+  ////////////////////////////
+
+  // Return the sampling rate in Hz - eg. 44100.
+  rpc Stream_get_sample_rate(Stream) returns (StatusReturn) {}
+
+  // currently unused - use set_parameters with key
+  //    AUDIO_PARAMETER_STREAM_SAMPLING_RATE
+  // int (*set_sample_rate)(struct audio_stream *stream, uint32_t rate);
+  // OBSOLETE
+
+  // Return size of input/output buffer in bytes for this stream - eg. 4800.
+  // It should be a multiple of the frame size.  See also get_input_buffer_size.
+  rpc Stream_get_buffer_size(Stream) returns (StatusReturn) {}
+
+  // Return the channel mask -
+  //  e.g. AUDIO_CHANNEL_OUT_STEREO or AUDIO_CHANNEL_IN_STEREO
+  rpc Stream_get_channels(Stream) returns (StatusReturn) {}
+
+  // Return the audio format - e.g. AUDIO_FORMAT_PCM_16_BIT
+  rpc Stream_get_format(Stream) returns (StatusReturn) {}
+
+  // currently unused - use set_parameters with key
+  //    AUDIO_PARAMETER_STREAM_FORMAT
+  // int (*set_format)(struct audio_stream *stream, audio_format_t format);
+  // OBSOLETE
+
+  // Put the audio hardware input/output into standby mode.
+  // Driver should exit from standby mode at the next I/O operation.
+  // Returns 0 on success and <0 on failure.
+  rpc Stream_standby(Stream) returns (StatusReturn) {}
+
+  // Return the set of device(s) which this stream is connected to
+  rpc Stream_get_device(Stream) returns (StatusReturn) {}
+
+  // Currently unused - set_device() corresponds to set_parameters() with key
+  // AUDIO_PARAMETER_STREAM_ROUTING for both input and output.
+  // AUDIO_PARAMETER_STREAM_INPUT_SOURCE is an additional information used by
+  // input streams only.
+  // int (*set_device)(struct audio_stream *stream, audio_devices_t device);
+  // OBSOLETE
+
+  // set/get audio stream parameters. The function accepts a list of
+  // parameter key value pairs in the form: key1=value1;key2=value2;...
+  //
+  // Some keys are reserved for standard parameters (See AudioParameter class)
+  //
+  // If the implementation does not accept a parameter change while
+  // the output is active but the parameter is acceptable otherwise, it must
+  // return -ENOSYS.
+  //
+  // The audio flinger will put the stream in standby and then change the
+  // parameter value.
+  rpc Stream_set_parameters(StreamSetParameters) returns (StatusReturn) {}
+
+  rpc Stream_get_parameters(StreamGetParameters) returns (StatusReturn) {}
+
+    ////////////////////////////
+  // Stream Common MMAP API
+  ////////////////////////////
+  // Called by the framework to start a stream operating in mmap mode.
+  // create_mmap_buffer must be called before calling start()
+  //
+  // note Function only implemented by streams operating in mmap mode.
+  //
+  // param[in] stream the stream object.
+  // return 0 in case of success.
+  //        -ENOSYS if called out of sequence or on non mmap stream
+  // TBD
+
+  // Called by the framework to stop a stream operating in mmap mode.
+  // Must be called after start()
+  //
+  // note Function only implemented by streams operating in mmap mode.
+  //
+  // param[in] stream the stream object.
+  // return 0 in case of success.
+  //        -ENOSYS if called out of sequence or on non mmap stream
+  // TBD
+
+  // Called by the framework to retrieve information on the mmap buffer used for audio
+  // samples transfer.
+  //
+  // note Function only implemented by streams operating in mmap mode.
+  //
+  // param[in] stream the stream object.
+  // param[in] min_size_frames minimum buffer size requested. The actual buffer
+  //       size returned in struct audio_mmap_buffer_info can be larger.
+  // param[out] info address at which the mmap buffer information should be returned.
+  //
+  // return 0 if the buffer was allocated.
+  //        -ENODEV in case of initialization error
+  //        -EINVAL if the requested buffer size is too large
+  //        -ENOSYS if called out of sequence (e.g. buffer already allocated)
+  // int (*create_mmap_buffer)(const struct audio_stream_out *stream,
+  //                          int32_t min_size_frames,
+  //                          struct audio_mmap_buffer_info *info);
+  // TBD
+
+  // Called by the framework to read current read/write position in the mmap buffer
+  // with associated time stamp.
+  //
+  // note Function only implemented by streams operating in mmap mode.
+  //
+  // param[in] stream the stream object.
+  // param[out] position address at which the mmap read/write position should be returned.
+  //
+  // return 0 if the position is successfully returned.
+  //        -ENODATA if the position cannot be retrieved
+  //        -ENOSYS if called before create_mmap_buffer()
+  // int (*get_mmap_position)(const struct audio_stream_out *stream,
+  //                          struct audio_mmap_position *position);
+  // TBD
+
+  ////////////////////////////
+  // Stream Out API
+  ////////////////////////////
+
+  // Return the audio hardware driver estimated latency in milliseconds.
+  rpc StreamOut_get_latency(Stream) returns (StatusReturn) {}
+
+  // Use this method in situations where audio mixing is done in the
+  // hardware. This method serves as a direct interface with hardware,
+  // allowing you to directly set the volume as apposed to via the framework.
+  // This method might produce multiple PCM outputs or hardware accelerated
+  // codecs, such as MP3 or AAC.
+  rpc StreamOut_set_volume(StreamOutSetVolume) returns (StatusReturn) {}
+
+  // Write audio buffer to driver. Returns number of bytes written, or a
+  // negative status_t. If at least one frame was written successfully prior to the error,
+  // it is suggested that the driver return that successful (short) byte count
+  // and then return an error in the subsequent call.
+  //
+  // If set_callback() has previously been called to enable non-blocking mode
+  // the write() is not allowed to block. It must write only the number of
+  // bytes that currently fit in the driver/hardware buffer and then return
+  // this byte count. If this is less than the requested write size the
+  // callback function must be called when more space is available in the
+  // driver/hardware buffer.
+  rpc StreamOut_write(StreamReadWrite) returns (StatusReturn) {}
+
+  // return the number of audio frames written by the audio dsp to DAC since
+  // the output has exited standby
+  rpc StreamOut_get_render_position(Stream) returns (StatusReturn) {}
+
+  // get the local time at which the next write to the audio driver will be presented.
+  // The units are microseconds, where the epoch is decided by the local audio HAL.
+  rpc StreamOut_get_next_write_timestamp(Stream) returns (StatusReturn) {}
+
+  // set the callback function for notifying completion of non-blocking
+  // write and drain.
+  // Calling this function implies that all future write() and drain()
+  // must be non-blocking and use the callback to signal completion.
+  // int (*set_callback)(struct audio_stream_out *stream,
+  //         stream_callback_t callback, void *cookie);
+  // TBD
+
+  // Notifies to the audio driver to stop playback however the queued buffers are
+  // retained by the hardware. Useful for implementing pause/resume. Empty implementation
+  // if not supported however should be implemented for hardware with non-trivial
+  // latency. In the pause state audio hardware could still be using power. User may
+  // consider calling suspend after a timeout.
+  //
+  // Implementation of this function is mandatory for offloaded playback.
+  rpc StreamOut_pause(Stream) returns (StatusReturn) {}
+
+  // Notifies to the audio driver to resume playback following a pause.
+  // Returns error if called without matching pause.
+  //
+  // Implementation of this function is mandatory for offloaded playback.
+  rpc StreamOut_resume(Stream) returns (StatusReturn) {}
+
+  // Requests notification when data buffered by the driver/hardware has
+  // been played. If set_callback() has previously been called to enable
+  // non-blocking mode, the drain() must not block, instead it should return
+  // quickly and completion of the drain is notified through the callback.
+  // If set_callback() has not been called, the drain() must block until
+  // completion.
+  // If type==AUDIO_DRAIN_ALL, the drain completes when all previously written
+  // data has been played.
+  // If type==AUDIO_DRAIN_EARLY_NOTIFY, the drain completes shortly before all
+  // data for the current track has played to allow time for the framework
+  // to perform a gapless track switch.
+  //
+  // Drain must return immediately on stop() and flush() call
+  //
+  // Implementation of this function is mandatory for offloaded playback.
+  // int (*drain)(struct audio_stream_out* stream, audio_drain_type_t type );
+  // TBD
+
+  // Notifies to the audio driver to flush the queued data. Stream must already
+  // be paused before calling flush().
+  //
+  // Implementation of this function is mandatory for offloaded playback.
+  rpc StreamOut_flush(Stream) returns (StatusReturn) {}
+
+  // Return a recent count of the number of audio frames presented to an external observer.
+  // This excludes frames which have been written but are still in the pipeline.
+  // The count is not reset to zero when output enters standby.
+  // Also returns the value of CLOCK_MONOTONIC as of this presentation count.
+  // The returned count is expected to be 'recent',
+  // but does not need to be the most recent possible value.
+  // However, the associated time should correspond to whatever count is returned.
+  // Example:  assume that N+M frames have been presented, where M is a 'small' number.
+  // Then it is permissible to return N instead of N+M,
+  // and the timestamp should correspond to N rather than N+M.
+  // The terms 'recent' and 'small' are not defined.
+  // They reflect the quality of the implementation.
+  //
+  // 3.0 and higher only.
+  rpc StreamOut_get_presentation_position(Stream) returns (GetFrameTimestampReturn) {}
+
+  // Called when the metadata of the stream's source has been changed.
+  // @param source_metadata Description of the audio that is played by the clients.
+  //
+  // void (*update_source_metadata)(struct audio_stream_out *stream,
+  //                                const struct source_metadata* source_metadata);
+  // TBD
+
+  ////////////////////////////
+  // Stream In API
+  ////////////////////////////
+  // set the input gain for the audio driver. This method is for
+  // for future use */
+  // int (*set_gain)(struct audio_stream_in *stream, float gain);
+  rpc StreamIn_set_gain(StreamGain) returns (StatusReturn) {}
+
+  // Read audio buffer in from audio driver. Returns number of bytes read, or a
+  // negative status_t. If at least one frame was read prior to the error,
+  // read should return that byte count and then return an error in the subsequent call.
+  rpc StreamIn_read(StreamReadWrite) returns (StatusReturn) {}
+
+  // Return the amount of input frames lost in the audio driver since the
+  // last call of this function.
+  // Audio driver is expected to reset the value to 0 and restart counting
+  // upon returning the current value by this function call.
+  // Such loss typically occurs when the user space process is blocked
+  // longer than the capacity of audio driver buffers.
+  //
+  // Unit: the number of input audio frames
+  // uint32_t (*get_input_frames_lost)(struct audio_stream_in *stream);
+  rpc StreamIn_get_input_frames_lost(Stream) returns (StatusReturn) {}
+
+  // Return a recent count of the number of audio frames received and
+  // the clock time associated with that frame count.
+  //
+  // frames is the total frame count received. This should be as early in
+  //     the capture pipeline as possible. In general,
+  //     frames should be non-negative and should not go "backwards".
+  //
+  // time is the clock MONOTONIC time when frames was measured. In general,
+  //     time should be a positive quantity and should not go "backwards".
+  //
+  // The status returned is 0 on success, -ENOSYS if the device is not
+  // ready/available, or -EINVAL if the arguments are null or otherwise invalid.
+  rpc StreamIn_get_capture_position(Stream) returns (GetCapturePositionReturn) {}
+
+  // Called by the framework to read active microphones
+  //
+  // param[in] stream the stream object.
+  // param[out] mic_array Pointer to first element on array with microphone info
+  // param[out] mic_count When called, this holds the value of the max number of elements
+  //                      allowed in the mic_array. The actual number of elements written
+  //                      is returned here.
+  //                      if mic_count is passed as zero, mic_array will not be populated,
+  //                      and mic_count will return the actual number of active microphones.
+  //
+  // return 0 if the microphone array is successfully filled.
+  //        -ENOSYS if there is an error filling the data
+  // int (*get_active_microphones)(const struct audio_stream_in *stream,
+  //                               struct audio_microphone_characteristic_t *mic_array,
+  //                               size_t *mic_count);
+  // TBD
+
+  // Called when the metadata of the stream's sink has been changed.
+  // @param sink_metadata Description of the audio that is recorded by the clients.
+  // void (*update_sink_metadata)(struct audio_stream_in *stream,
+  //                              const struct sink_metadata* sink_metadata);
+  // TBD
+
+  ////////////////////////////
+  // Misc API
+  ////////////////////////////
+  rpc Service_ping(google.protobuf.Empty) returns (StatusReturn) {}
+}
+
+message StatusReturn {
+  int32 ret = 1;
+  oneof status_oneof {
+    bool status_bool = 2;
+    int32 status_32 = 3;
+    int64 status_64 = 4;
+    float status_float = 5;
+    string status_string = 6;
+  }
+}
+
+message Volume {
+  float vol = 1;
+}
+
+message Mode {
+  int32 mode = 1;
+}
+
+message Mute {
+  bool mute = 1;
+}
+
+message Kv_pairs {
+  string params = 1;
+}
+
+message Keys {
+  string keys = 1;
+}
+
+message Handle {
+  int32 handle = 1;
+}
+
+message OpenOutputStream {
+  string name = 1;
+  uint32 size = 2;
+  uint32 handle = 3;
+  uint32 devices = 4;
+  uint32 flags = 5;
+  AudioConfig config = 6;
+  string address = 7;
+}
+
+message AudioConfig {
+  uint32 sample_rate = 1;
+  uint32 channel_mask = 2;
+  uint32 format = 3;
+  uint32 frame_count = 4;
+}
+
+message Stream {
+  string name = 1;
+}
+
+message OpenInputStream {
+  string name = 1;
+  uint32 size = 2;
+  int32 handle = 3;
+  uint32 devices = 4;
+  AudioConfig config = 5;
+  uint32 flags = 6;
+  string address = 7;
+  uint32 source = 8;
+}
+
+message CreateAudioPatch {
+  repeated AudioPortConfig sources = 1;
+  repeated AudioPortConfig sinks = 2;
+}
+
+message AudioPortConfig {
+  uint32 id = 1;               // port unique ID
+  uint32 role = 2;             // sink or source
+  uint32 type = 3;             // device, mix ...
+  uint32 config_mask = 4;      // e.g AUDIO_PORT_CONFIG_ALL
+  uint32 sample_rate = 5;      // sampling rate in Hz
+  uint32 channel_mask = 6;     // channel mask if applicable
+  uint32 format = 7;           // format if applicable
+  AudioGainConfig gain = 8;    // gain to apply if applicable
+  uint32 flags = 9;            // framework only: HW_AV_SYNC, DIRECT, ...
+  oneof ext {
+    AudioPortConfigDeviceExt device = 10;   // device specific info
+    AudioPortConfigMixExt mix = 11;         // mix specific info
+    AudioPortConfigSessionExt session = 12; // session specific info
+  }
+}
+
+message AudioGainConfig {
+  int32 index = 1;             // index of the corresponding audio_gain in the audio_port gains[] table
+  uint32 mode = 2;             // mode requested for this command
+  uint32 channel_mask = 3;     // channels which gain value follows. N/A in joint mode
+  repeated int32 values = 4;   // values[sizeof(audio_channel_mask_t) * 8]; gain values in millibels
+                               // for each channel ordered from LSb to MSb in
+                               // channel mask. The number of values is 1 in joint
+                               // mode or popcount(channel_mask)
+  uint32 ramp_duration_ms = 5; // ramp duration in ms
+}
+
+message AudioPortConfigDeviceExt {
+  uint32 hw_module = 1;        // module the device is attached to
+  uint32 type = 2;             // device type (e.g AUDIO_DEVICE_OUT_SPEAKER)
+  string address = 3;          // address[AUDIO_DEVICE_MAX_ADDRESS_LEN], device address. "" if N/A
+}
+
+message AudioPortConfigMixExt {
+  uint32 hw_module = 1;        // module the device is attached to
+  int32 handle = 2;            // I/O handle of the input/output stream
+  uint32 stream_source = 3;    // audio_stream_type_t or audio_source_t
+}
+
+message AudioPortConfigSessionExt {
+  int32 session = 1;           // audio session
+}
+
+message StreamSetParameters {
+  string name = 1;             // Stream
+  string kv_pairs = 2;         // Parameters
+}
+
+message StreamGetParameters {
+  string name = 1;             // Stream
+  string keys = 2;             // keys
+}
+
+message StreamAudioEffect {
+  string name = 1;             // Stream
+  uint32 effect = 2;           // effect
+}
+
+message StreamOutSetVolume {
+  string name = 1;             // Stream
+  float left = 2;              // left channel volume
+  float right = 3;             // right channel volume
+}
+
+message StreamReadWrite {
+  string name = 1;             // Stream
+  uint32 size = 2;             // size
+}
+
+message GetFrameTimestampReturn {
+  int32 ret = 1;
+  uint64 frames = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message StreamGain {
+  string name = 1;
+  float gain = 2;
+}
+
+message GetCapturePositionReturn {
+  int32 ret = 1;
+  uint64 frames = 2;
+  uint64 time = 3;
+}

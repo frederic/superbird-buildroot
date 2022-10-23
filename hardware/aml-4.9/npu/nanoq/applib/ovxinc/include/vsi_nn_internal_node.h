@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -83,17 +83,51 @@ typedef struct _vsi_nn_internal_node_wksp_t
 /**********************************************************
 * PUBLIC FUNCTIONS
 **********************************************************/
-vsi_status vsi_nn_init_internal_node_wksp
+vsi_nn_internal_tensor_t* vsi_nn_internal_create_zero_bias_tensor
+    (
+    vsi_nn_node_t* node,
+    vsi_nn_tensor_attr_t* input_attr,
+    vsi_nn_tensor_attr_t* weight_attr
+    );
+
+vsi_status vsi_nn_internal_deinit_node
     (
     vsi_nn_node_t* node
     );
 
-vsi_status vsi_nn_deinit_internal_node_wksp
+vsi_status vsi_nn_internal_deinit_node_wksp
     (
     vsi_nn_node_t* node
     );
 
-vsi_nn_internal_node_t* vsi_nn_new_internal_node
+void vsi_nn_internal_dump_node_output
+    (
+    vsi_nn_graph_t* graph,
+    const char* path,
+    const char* filename_prefix,
+    vsi_bool force_fp32,
+    vsi_nn_node_t* node
+    );
+
+vsi_nn_internal_node_t* vsi_nn_internal_get_node_by_uid
+    (
+    vsi_nn_node_t* node,
+    int uid
+    );
+
+vsi_status vsi_nn_internal_init_node_wksp
+    (
+    vsi_nn_node_t* node
+    );
+
+void vsi_nn_internal_init_tensor_attr
+    (
+    vsi_nn_tensor_attr_t* attr,
+    const vsi_nn_dtype_t* dtype,
+    vsi_bool use_virtual_tensor
+    );
+
+vsi_nn_internal_node_t* vsi_nn_internal_new_node
     (
     vsi_nn_node_t* node,
     vsi_nn_op_t op,
@@ -101,56 +135,44 @@ vsi_nn_internal_node_t* vsi_nn_new_internal_node
     uint32_t output_num
     );
 
-void* vsi_nn_new_internal_node_param
+void* vsi_nn_internal_new_node_param
     (
     vsi_nn_internal_node_t* inode,
     size_t size /* in bytes */
     );
 
-vsi_nn_internal_tensor_t* vsi_nn_new_internal_tensor
+vsi_nn_internal_tensor_t* vsi_nn_internal_new_tensor
     (
-    vsi_nn_node_t*          node,
-    vsi_nn_tensor_attr_t*   attr,
-    float                   default_value
+    vsi_nn_node_t* node,
+    vsi_nn_tensor_attr_t* attr,
+    float default_value
     );
 
-vsi_bool vsi_nn_setup_internal_node_op
+vsi_status vsi_nn_internal_release_node
+    (
+    vsi_nn_internal_node_t** node
+    );
+
+vsi_status vsi_nn_internal_release_tensor
+    (
+    vsi_nn_internal_tensor_t** tensor
+    );
+
+vsi_bool vsi_nn_internal_setup_node
     (
     vsi_nn_node_t* node,
     vsi_nn_internal_node_t* inode
     );
 
-vsi_status vsi_nn_compute_internal_node
+vsi_status vsi_nn_internal_compute_node
     (
     vsi_nn_node_t * node
     );
 
-vsi_status vsi_nn_optimize_internal_node
+vsi_status vsi_nn_internal_optimize_node
     (
     vsi_nn_node_t * node,
     vsi_nn_opt_direction_e direction
-    );
-
-vsi_status vsi_nn_deinit_internal_node
-    (
-    vsi_nn_node_t * node
-    );
-
-vsi_status vsi_nn_release_internal_node
-    (
-    vsi_nn_internal_node_t** node
-    );
-
-vsi_status vsi_nn_release_internal_tensor
-    (
-    vsi_nn_internal_tensor_t** tensor
-    );
-
-vsi_nn_internal_tensor_t* vsi_nn_create_zero_bias_tensor
-    (
-    vsi_nn_node_t * node,
-    vsi_nn_tensor_attr_t* input_attr,
-    vsi_nn_tensor_attr_t* weight_attr
     );
 
 #endif /* _VSI_NN_INTRNAL_NODE_H */

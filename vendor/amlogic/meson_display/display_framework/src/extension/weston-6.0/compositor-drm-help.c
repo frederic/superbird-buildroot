@@ -7,6 +7,7 @@
  * Description:
  */
 
+//#define DEBUG 1
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -26,6 +27,17 @@
 #define for_each_list(pos, list_p)  for (pos = list_p; pos->next != NULL; pos = pos->next)
 
 /**
+ *
+ */
+static const char *const aspect_ratio_as_string[] = {
+    "",
+    " 4:3",
+    " 16:9",
+    " 64:27",
+    " 256:135",
+};
+
+/**
  * DRM properties are allocated dynamically, and maintained as DRM objects
  * within the normal object ID space; they thus do not have a stable ID
  * to refer to.
@@ -42,6 +54,8 @@ typedef struct _drm_property_info {
  */
 enum drm_connector_property {
     DRM_CONNECTOR_PROPERTY_CP,
+    DRM_COLOR_DEPTH_CP,
+    DRM_COLOR_SPACE_CP,
     DRM_CONNECTOR_PROPERTY__COUNT
 };
 
@@ -49,6 +63,14 @@ enum drm_connector_property {
 static const drm_property_info connector_props[] = {
     [DRM_CONNECTOR_PROPERTY_CP] = {
         .name = "Content Protection",
+        .need_change = 0,
+    },
+    [DRM_COLOR_DEPTH_CP] = {
+        .name = "Color Depth",
+        .need_change = 0,
+    },
+    [DRM_COLOR_SPACE_CP] = {
+        .name = "Color Space",
         .need_change = 0,
     },
 };
@@ -90,11 +112,14 @@ drmModeModeInfo g_display_mode;
 /* TODO: reduce the codesize
  * NOTE :The format need same as the client's json resovle format.
  */
-static json_object* dumpConnectorInfo(drmModeConnector* connector)
+static json_object* dumpConnectorInfo(connector_list* current)
 {
     int i = 0;
     char id[8];
     json_object* data = json_object_new_object();
+    drmModeConnector* connector = current->data;
+    if (!current->data)
+        return data;
     json_object_object_add(data, "connection", json_object_new_int(connector->connection));
     json_object_object_add(data, "connection_type", json_object_new_int(connector->connector_type));
     json_object_object_add(data, "encoder_id", json_object_new_int(connector->encoder_id));
@@ -103,6 +128,7 @@ static json_object* dumpConnectorInfo(drmModeConnector* connector)
 
     json_object_object_add(data, "count_props", json_object_new_int(connector->count_props));
     json_object* props = json_object_new_object();
+    update_connector_props(current);
     for (i = 0; i < connector->count_props; i++) {
         snprintf(id, 8, "%d", i);
         json_object_object_add(props, id, json_object_new_int(connector->props[i]));
@@ -165,7 +191,6 @@ static json_object* dumpConnectorInfo(drmModeConnector* connector)
 
 void update_connector_props(connector_list* connector) {
     int j,i;
-    memcpy(connector->props, connector_props, sizeof(connector->props));
     drmModeObjectPropertiesPtr  props = drmModeObjectGetProperties(g_drm_fd,
             connector->data->connector_id, DRM_MODE_OBJECT_CONNECTOR);
     if (!props) {
@@ -199,6 +224,81 @@ void update_connector_props(connector_list* connector) {
     drmModeFreeObjectProperties(props);
 }
 
+bool is_hdmi_connector(connector_list* current) {
+    if (current->data &&
+            (current->data->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+             current->data->connector_type == DRM_MODE_CONNECTOR_HDMIB)) {
+        return true;
+    }
+    return false;
+}
+
+
+bool parse_modestring(const char* modestring, drm_helper_mode* mode) {
+    int32_t width = 0;
+    int32_t height = 0;
+    char* height_str = NULL;
+    uint32_t refresh = 0;
+    uint32_t flags = 0;
+    uint32_t aspect_width = 0;
+    uint32_t aspect_height = 0;
+    char* others = NULL;
+    const char* aspect_ratio = aspect_ratio_as_string[0];
+    int n, k;
+
+    n = sscanf(modestring , "%dx%m[^@]@%d %u:%u", &width, &height_str, &refresh, &aspect_width, &aspect_height);
+    if (n == 5) {
+        if (aspect_width == 4 && aspect_height == 3)
+            aspect_ratio = aspect_ratio_as_string[1];
+        else if (aspect_width == 16 && aspect_height == 9)
+            aspect_ratio = aspect_ratio_as_string[2];
+        else if (aspect_width == 64 && aspect_height == 27)
+            aspect_ratio = aspect_ratio_as_string[3];
+        else if (aspect_width == 256 && aspect_height == 135)
+            aspect_ratio = aspect_ratio_as_string[4];
+        else
+            fprintf(stderr, "Invalid modestring \"%s\"\n", modestring);
+    }
+    if (height_str == NULL || (n != 2 && n != 3 && n != 5)) {
+        if (height_str != NULL) {
+            free(height_str);
+        }
+        return false;
+    }
+    n = sscanf(height_str, "%d%ms", &height, &others);
+    if (n == 0) {
+        free(height_str);
+        return false;
+    }
+    if (n == 2) {
+        n = strlen(others);
+        for (k = 0; k < n; k++) {
+            switch (others[k]) {
+                case 'i':
+                    flags |= DRM_MODE_FLAG_INTERLACE;
+                    break;
+                case 'd':
+                    flags |= DRM_MODE_FLAG_DBLSCAN;
+                    break;
+                default:
+                    break;
+            }
+        }
+        free(others);
+    }
+    mode->width = width;
+    mode->height = height;
+    mode->flags = flags;
+    mode->refresh = refresh;
+    mode->aspect_ratio = aspect_ratio;
+    DEBUG_INFO("set mode to: %dx%d%c %dhz %s", mode->width, mode->height,
+            (mode->flags & DRM_MODE_FLAG_INTERLACE) ? 'i': (mode->flags & DRM_MODE_FLAG_DBLSCAN) ? 'd' : ' ',
+            mode->refresh, mode->aspect_ratio);
+    free(height_str);
+    return true;
+}
+
+
 /*
    json formate:
    {
@@ -223,14 +323,14 @@ void m_message_handle(json_object* data_in, json_object** data_out) {
     json_object_object_get_ex(data_in, "value", &opt);
     DEBUG_INFO("Handle CMD:%s", cmd);
     if (0 == strcmp("set mode", cmd)) {
+        //Support mode string like: "%dx%m[^@]@%d %u:%u": "1920x1080i@60 16:9"
         if (opt == NULL) {
             ret = -1;
         } else {
             const char* value = json_object_get_string(opt);
             DEBUG_INFO("CMD set mode :%s", value);
             drm_helper_mode m;
-            if (3 != sscanf(value, "%dx%d@%d", &m.width, &m.height, &m.refresh/*, &aspect_width, &aspect_height*/)) {
-                DEBUG_INFO("The Value format error");
+            if (false == parse_modestring(value, &m)) {
                 ret = -1;
             } else {
                 pthread_mutex_lock(&mutex);
@@ -256,7 +356,7 @@ void m_message_handle(json_object* data_in, json_object** data_out) {
         for_each_list(current, &global_connector_list) {
             if (current->data) {
                 snprintf(buf,sizeof(buf), "%d", current->data->connector_id);
-                connector = dumpConnectorInfo(current->data);
+                connector = dumpConnectorInfo(current);
                 json_object_object_add(*data_out, buf, connector);
             }
         }
@@ -287,6 +387,11 @@ void m_message_handle(json_object* data_in, json_object** data_out) {
                         }
                         pthread_mutex_lock(&mutex);
                         for_each_list(current, &global_connector_list) {
+                            if (!is_hdmi_connector(current)) {
+                                if (i == DRM_COLOR_DEPTH_CP || i == DRM_COLOR_SPACE_CP || i == DRM_CONNECTOR_PROPERTY_CP) {
+                                    continue;
+                                }
+                            }
                             if (current->data) {
                                 current->props[i].need_change = 1;
                                 current->props[i].new_value = value;
@@ -404,6 +509,17 @@ void stop_help_worker() {
     pthread_mutex_destroy(&mutex);
 }
 
+void dump_connector_status(const char* fname) {
+#if DEBUG
+    connector_list* current;
+    fprintf(stderr, "Dump connector info at [%s]:", fname);
+    for_each_list(current, &global_connector_list) {
+        fprintf(stderr, "==>[connect:%d p=%p type=%d] ", current->data->connector_id, current->data, current->data->connector_type);
+    };
+    fprintf(stderr, "\n");
+#endif
+}
+
 void help_append_connector(drmModeConnector* connector) {
     BEGING_EVENT;
     connector_list* current;
@@ -416,17 +532,17 @@ void help_append_connector(drmModeConnector* connector) {
         }
     };
     if (exist == 0) {
-        if (current->data == NULL) {
-            current->data = connector;
-        } else {
-            current->next = malloc(sizeof(connector_list));
-            current->next->prev = current;
-            current = current->next;
-            current->next = NULL;
-            current->data = connector;
-        }
-        update_connector_props(current);
+        //we already hold a empty at tail, and keep a empty at tail.
+        assert(!current->data);
+        current->data = connector;
+        current->next = malloc(sizeof(connector_list));
+        current->next->prev = current;
+        current->next->next = NULL;
+        current->next->data = NULL;;
+        dump_connector_status(__func__);
+        memcpy(current->props, connector_props, sizeof(current->props));
     }
+    update_connector_props(current);
     END_EVENT;
 }
 
@@ -439,8 +555,10 @@ void help_update_connector(drmModeConnector* old_connector, drmModeConnector* ne
         for_each_list(current, &global_connector_list) {
             if (current->data == old_connector) {
                 current->data = new_connector;
+                memcpy(current->props, connector_props, sizeof(current->props));
                 update_connector_props(current);
                 updated = 1;
+                dump_connector_status(__func__);
                 break;
             }
         }
@@ -491,8 +609,9 @@ void help_delete_connector(drmModeConnector* connector) {
     connector_list* current;
     for_each_list(current, &global_connector_list) {
         if (current->data != connector) {
-            break;
+            continue;
         }
+        dump_connector_status(__func__);
         if (current == &global_connector_list) {
             current->data = NULL;
             break;

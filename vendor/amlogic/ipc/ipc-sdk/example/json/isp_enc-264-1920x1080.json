@@ -1,0 +1,29 @@
+[
+  {
+    type: isp,
+    param:
+    {
+      device: "/dev/video0",
+      fr:
+      {
+        pixfmt: NV12,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: venc,
+    param:
+    {
+      codec: h264,
+      width: 1920,
+      height: 1080,
+      pixfmt: NV12,
+      framerate: 30
+    }
+  }
+]
+

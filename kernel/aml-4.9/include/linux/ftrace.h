@@ -968,4 +968,15 @@ unsigned long arch_syscall_addr(int nr);
 
 #endif /* CONFIG_FTRACE_SYSCALLS */
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+typedef void (*aml_wdt_stop_func_t)(void *data);
+#ifdef CONFIG_TRACING
+void set_aml_wdt_stop_func(aml_wdt_stop_func_t func, void *data);
+#else
+static inline void set_aml_wdt_stop_func(aml_wdt_stop_func_t func, void *data)
+{
+}
+#endif
+#endif
+
 #endif /* _LINUX_FTRACE_H */

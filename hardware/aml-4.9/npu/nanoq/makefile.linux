@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -209,65 +209,15 @@ drivers:            $(LIB_VULKAN)
 endif # USE_VULKAN
 endif # VIVANTE_ENABLE_3D
 
+
 ifeq ($(VIVANTE_ENABLE_3D),1)
-ifeq ($(EGL_API_DRI),1)
-
-ifeq ($(GL4_LINUX_ENABLE),1)
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
-else
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
-endif
-
-
+LIB_GL4X            := $(AQROOT)/driver/khronos/libGL4
 ifeq ($(LINUX_VSIMULATOR),0)
-LIB_LIST            += $(LIB_GL21)
+LIB_LIST            += $(LIB_GL4X)
 endif
-
-$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
-
-.PHONY: gl21
-gl21:               $(LIB_GL21)
-endif # EGL_API_DRI
-ifeq ($(X11_DRI3),1)
-
-ifeq ($(GL4_LINUX_ENABLE),1)
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
-else
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
-endif
-
-
-ifeq ($(LINUX_VSIMULATOR),0)
-LIB_LIST            += $(LIB_GL21)
-endif
-
-$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
-
-.PHONY: gl21
-gl21:               $(LIB_GL21)
-endif # X11_DRI3
-
-ifeq ($(EGL_API_WL),1)
-
-ifeq ($(GL4_LINUX_ENABLE),1)
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
-else
-LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
-endif
-
-
-ifeq ($(LINUX_VSIMULATOR),0)
-LIB_LIST            += $(LIB_GL21)
-endif
-
-$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
-
-.PHONY: gl21
-gl21:               $(LIB_GL21)
-
-endif # EgL_API_WL
-
-
+$(LIB_GL4X):        $(LIB_GAL) $(LIB_VSC)
+.PHONY: GL4X
+GL4X:               $(LIB_GL4X)
 endif # VIVANTE_ENABLE_3D
 
 
@@ -304,7 +254,7 @@ LIB_LIST            += $(LIB_EXA) $(LIB_DRM)
 
 $(LIB_EXA):         $(LIB_GAL) $(LIB_DRM)
 $(LIB_EGL):         $(LIB_DRM)
-$(LIB_GL21):        $(LIB_DRM)
+$(LIB_GL4X):        $(LIB_DRM)
 endif # X11_DRI3
 
 else
@@ -365,7 +315,7 @@ $(warning "-------------------------------------------------")
 
 else
 $(GAL_CORE):
-	@test ! -d $@ || $(MAKE) -f Kbuild -C $@ $(V_TARGET)
+	@test ! -d $@ || $(MAKE) -f Kbuild M=$(AQROOT) -C $@ $(V_TARGET)
 
 drivers:            $(GAL_CORE)
 endif

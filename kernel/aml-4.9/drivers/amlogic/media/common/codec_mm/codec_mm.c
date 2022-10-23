@@ -47,6 +47,7 @@
 #include <linux/highmem.h>
 #include <linux/page-flags.h>
 #include <linux/vmalloc.h>
+#include <linux/amlogic/tee.h>
 
 #define TVP_POOL_NAME "TVP_POOL"
 #define CMA_RES_POOL_NAME "CMA_RES"
@@ -58,7 +59,7 @@
 #define MM_ALIGN_UP2N(addr, alg2n) ((addr+(1<<alg2n)-1)&(~((1<<alg2n)-1)))
 
 #define RES_IS_MAPED
-#define DEFAULT_TVP_SIZE_FOR_4K (192 * SZ_1M)
+#define DEFAULT_TVP_SIZE_FOR_4K (236 * SZ_1M)
 #define DEFAULT_TVP_SIZE_FOR_NO4K (160 * SZ_1M)
 
 #define ALLOC_MAX_RETRY 1
@@ -111,6 +112,12 @@ static int default_tvp_4k_size;
 static int default_cma_res_size;
 
 #define TVP_MAX_SLOT 8
+/*
+ *tvp_mode == 0 means protect secure memory in secmem ta
+ *tvp_mode == 1 means use protect secure memory in codec_mm
+ */
+static u32 tvp_mode;
+
 struct extpool_mgt_s {
 	struct gen_pool *gen_pool[TVP_MAX_SLOT];
 	struct codec_mm_s *mm[TVP_MAX_SLOT];
@@ -151,6 +158,9 @@ struct codec_mm_mgt_s {
 	/*1:for 1080p,2:for 4k */
 	int fastplay_enable;
 	spinlock_t lock;
+	atomic_t tvp_user_count;
+	/* for tvp operator used */
+	struct mutex tvp_protect_lock;
 };
 
 #define PHY_OFF() offsetof(struct codec_mm_s, phy_addr)
@@ -158,13 +168,39 @@ struct codec_mm_mgt_s {
 #define VADDR_OFF() offsetof(struct codec_mm_s, vbuffer)
 #define VAL_OFF_VAL(mem, off) (*(unsigned long *)((unsigned long)(mem) + off))
 
+#ifndef CONFIG_AMLOGIC_TEE
+uint32_t tee_protect_tvp_mem(uint32_t start, uint32_t size,
+			uint32_t *handle)
+{
+	return 0xFFFFFFFF;
+}
+
+void tee_unprotect_tvp_mem(uint32_t handle)
+{
+}
+#endif
+
+static int codec_mm_extpool_pool_release(struct extpool_mgt_s *tvp_pool);
+
 static struct codec_mm_mgt_s *get_mem_mgt(void)
 {
+	int ret = 0;
+	int handle = 0;
 	static struct codec_mm_mgt_s mgt;
 	static int inited;
 
 	if (!inited) {
 		memset(&mgt, 0, sizeof(struct codec_mm_mgt_s));
+		/*If tee_protect_tvp_mem is not implement
+		 *will return 0xFFFFFFF we used to init use
+		 *which mode
+		 */
+		ret = tee_protect_tvp_mem(0, 0, &handle);
+		if (ret == 0xFFFFFFFF)
+			tvp_mode = 0;
+		else
+			tvp_mode = 1;
+		mutex_init(&mgt.tvp_protect_lock);
 		inited++;
 	}
 	return &mgt;
@@ -619,6 +655,27 @@ static int codec_mm_alloc_in(
 	}
 }
 
+static int codec_mm_tvp_pool_unprotect(struct extpool_mgt_s *tvp_pool)
+{
+	struct codec_mm_mgt_s *mgt = get_mem_mgt();
+	int ret = -1;
+	int i = 0;
+
+	if (mgt->tvp_pool.alloced_size <= 0) {
+		for (i = 0; i < tvp_pool->slot_num; i++) {
+			pr_info("unprotect tvp %d handle is %d\n",
+				i, tvp_pool->mm[i]->tvp_handle);
+			if (tvp_pool->mm[i]->tvp_handle > 0) {
+				tee_unprotect_tvp_mem(
+					tvp_pool->mm[i]->tvp_handle);
+				tvp_pool->mm[i]->tvp_handle = -1;
+			}
+		}
+		ret = 0;
+	}
+	return ret;
+}
+
 static void codec_mm_free_in(struct codec_mm_mgt_s *mgt,
 		struct codec_mm_s *mem)
 {
@@ -672,7 +729,18 @@ static void codec_mm_free_in(struct codec_mm_mgt_s *mgt,
 	}
 
 	spin_unlock_irqrestore(&mgt->lock, flags);
-
+	if ((mem->from_flags == AMPORTS_MEM_FLAGS_FROM_GET_FROM_TVP) &&
+	    (tvp_mode >= 1)) {
+		mutex_lock(&mgt->tvp_protect_lock);
+		if (atomic_read(&mgt->tvp_user_count) == 0) {
+			if (codec_mm_tvp_pool_unprotect(&mgt->tvp_pool) == 0) {
+				codec_mm_extpool_pool_release(&mgt->tvp_pool);
+				mgt->tvp_enable = 0;
+				pr_info("disalbe tvp\n");
+			}
+		}
+		mutex_unlock(&mgt->tvp_protect_lock);
+	}
 	return;
 }
 
@@ -721,7 +789,10 @@ struct codec_mm_s *codec_mm_alloc(const char *owner, int size,
 		/*if not scatter, free scatter caches. */
 		pr_err(" No mem ret=%d, clear scatter cache!!\n", ret);
 		dump_free_mem_infos(NULL, 0);
-		codec_mm_scatter_free_all_ignorecache(1);
+		if (memflags & CODEC_MM_FLAGS_TVP)
+			codec_mm_scatter_free_all_ignorecache(2);
+		else
+			codec_mm_scatter_free_all_ignorecache(1);
 		ret = codec_mm_alloc_in(mgt, mem);
 	}
 	if (ret < 0) {
@@ -1035,8 +1106,30 @@ static int codec_mm_init_tvp_pool(
 		return -1;
 	}
 	tvp_pool->gen_pool[tvp_pool->slot_num] = pool;
+	mm->tvp_handle = -1;
 	tvp_pool->mm[tvp_pool->slot_num] = mm;
 	return 0;
+}
+
+static int codec_mm_tvp_pool_protect(struct extpool_mgt_s *tvp_pool)
+{
+	int ret = 0;
+	int i = 0;
+
+	for (i = 0; i < tvp_pool->slot_num; i++) {
+		if (tvp_pool->mm[i]->tvp_handle == -1) {
+			ret = tee_protect_tvp_mem(
+				(uint32_t)tvp_pool->mm[i]->phy_addr,
+				(uint32_t)tvp_pool->mm[i]->buffer_size,
+				&tvp_pool->mm[i]->tvp_handle);
+			pr_info("protect tvp %d %d ret %d\n",
+				i, tvp_pool->mm[i]->tvp_handle, ret);
+		} else {
+			pr_info("protect tvp %d %d ret %d\n",
+				i, tvp_pool->mm[i]->tvp_handle, ret);
+		}
+	}
+	return ret;
 }
 
 int codec_mm_extpool_pool_alloc(
@@ -1144,6 +1237,8 @@ int codec_mm_extpool_pool_alloc(
 alloced_finished:
 	if (alloced_size > 0)
 		tvp_pool->total_size = alloced_size;
+	if (tvp_mode >= 1 && for_tvp)
+		codec_mm_tvp_pool_protect(tvp_pool);
 	mutex_unlock(&tvp_pool->pool_lock);
 	return alloced_size;
 }
@@ -1234,7 +1329,7 @@ static int codec_mm_tvp_get_mem_resource(ulong *res, int victor_size)
 	struct codec_mm_mgt_s *mgt = get_mem_mgt();
 	struct extpool_mgt_s *tvp_pool = &mgt->tvp_pool;
 	int i;
-
+	mutex_lock(&tvp_pool->pool_lock);
 	for (i = 0; i < tvp_pool->slot_num && i < victor_size / 2; i++) {
 		if (tvp_pool->mm[i]) {
 			res[2 * i] = tvp_pool->mm[i]->phy_addr;
@@ -1242,6 +1337,7 @@ static int codec_mm_tvp_get_mem_resource(ulong *res, int victor_size)
 				tvp_pool->mm[i]->buffer_size - 1;
 		}
 	}
+	mutex_unlock(&tvp_pool->pool_lock);
 	return i;
 }
 
@@ -1251,7 +1347,7 @@ static int codec_mm_is_in_tvp_region(ulong phy_addr)
 	struct extpool_mgt_s *tvp_pool = &mgt->tvp_pool;
 	int i;
 	int in = 0, in2 = 0;
-
+	mutex_lock(&tvp_pool->pool_lock);
 	for (i = 0; i < tvp_pool->slot_num; i++) {
 		if (tvp_pool->mm[i]) {
 			in = tvp_pool->mm[i]->phy_addr <= phy_addr;
@@ -1263,6 +1359,7 @@ static int codec_mm_is_in_tvp_region(ulong phy_addr)
 			in = 0;
 		}
 	}
+	mutex_unlock(&tvp_pool->pool_lock);
 	return in;
 }
 
@@ -1522,6 +1619,60 @@ static int dump_free_mem_infos(void *buf, int size)
 	kfree(usedb);
 	return 0;
 }
+
+int codec_mm_enable_tvp(void)
+{
+	int ret;
+	struct codec_mm_mgt_s *mgt = get_mem_mgt();
+
+	mutex_lock(&mgt->tvp_protect_lock);
+	if (tvp_mode == 0) {
+		pr_err("not support in tvp_mode 0\n");
+		mutex_unlock(&mgt->tvp_protect_lock);
+		return -1;
+	}
+	ret = atomic_add_return(1, &mgt->tvp_user_count);
+	if (ret == 1) {
+		codec_mm_extpool_pool_alloc(
+			&mgt->tvp_pool,
+			default_tvp_4k_size, 0, 1);
+		mgt->tvp_enable = 2;
+	}
+	pr_info("tvp_user_count is %d\n", atomic_read(&mgt->tvp_user_count));
+	mutex_unlock(&mgt->tvp_protect_lock);
+	return ret;
+}
+EXPORT_SYMBOL(codec_mm_enable_tvp);
+
+int codec_mm_disable_tvp(void)
+{
+	int ret = -1;
+	struct codec_mm_mgt_s *mgt = get_mem_mgt();
+
+	mutex_lock(&mgt->tvp_protect_lock);
+	if (tvp_mode == 0) {
+		pr_err("not support in tvp_mode 0\n");
+		mutex_unlock(&mgt->tvp_protect_lock);
+		return ret;
+	}
+	if (atomic_dec_and_test(&mgt->tvp_user_count)) {
+		if (codec_mm_tvp_pool_unprotect(&mgt->tvp_pool) == 0) {
+			ret = codec_mm_extpool_pool_release(&mgt->tvp_pool);
+			mgt->tvp_enable = 0;
+			pr_info("disalbe tvp\n");
+			mutex_unlock(&mgt->tvp_protect_lock);
+			return ret;
+		}
+	}
+	ret = 0;
+	if (atomic_read(&mgt->tvp_user_count) < 0)
+		atomic_set(&mgt->tvp_user_count, 0);
+	pr_info("tvp_user_count is %d\n",
+		atomic_read(&mgt->tvp_user_count));
+	mutex_unlock(&mgt->tvp_protect_lock);
+	return ret;
+}
+EXPORT_SYMBOL(codec_mm_disable_tvp);
 
 int codec_mm_video_tvp_enabled(void)
 {
@@ -1819,7 +1970,11 @@ static ssize_t tvp_enable_help_show(struct class *class,
 
 	struct codec_mm_mgt_s *mgt = get_mem_mgt();
 
-	size += sprintf(buf, "tvp_flag=%d\n", mgt->tvp_enable);
+	mutex_lock(&mgt->tvp_protect_lock);
+	size += sprintf(buf, "tvp_flag=%d\n",
+			(tvp_mode << 4) + mgt->tvp_enable);
+	size += sprintf(buf + size, "tvp ref count=%d\n",
+			atomic_read(&mgt->tvp_user_count));
 	size += sprintf(buf + size, "tvp enable help:\n");
 	size += sprintf(buf + size, "echo n > tvp_enable\n");
 	size += sprintf(buf + size, "0: disable tvp(tvp size to 0)\n");
@@ -1827,6 +1982,7 @@ static ssize_t tvp_enable_help_show(struct class *class,
 		"1: enable tvp for 1080p playing(use default size)\n");
 	size += sprintf(buf + size,
 		"2: enable tvp for 4k playing(use default 4k size)\n");
+	mutex_unlock(&mgt->tvp_protect_lock);
 	return size;
 }
 
@@ -1843,34 +1999,57 @@ static ssize_t tvp_enable_store(struct class *class,
 	ret = kstrtoint(buf, 0, &val);
 	if (ret != 0)
 		return -EINVAL;
-	/*
-	always free all scatter cache for
-	tvp changes.
-	*/
-	codec_mm_keeper_free_all_keep(2);
-	codec_mm_scatter_free_all_ignorecache(3);
-	switch (val) {
-	case 0:
-		ret = codec_mm_extpool_pool_release(&mgt->tvp_pool);
-		mgt->tvp_enable = 0;
-		pr_info("disalbe tvp\n");
+	switch (tvp_mode) {
+	case  0: {
+		/*
+		 * always free all scatter cache for
+		 * tvp changes.
+		 */
+		mutex_lock(&mgt->tvp_protect_lock);
+		codec_mm_keeper_free_all_keep(2);
+		codec_mm_scatter_free_all_ignorecache(3);
+		switch (val) {
+		case 0:
+			ret = codec_mm_extpool_pool_release(&mgt->tvp_pool);
+			mgt->tvp_enable = 0;
+			pr_info("disalbe tvp\n");
+			break;
+		case 1:
+			codec_mm_extpool_pool_alloc(
+				&mgt->tvp_pool,
+				default_tvp_size, 0, 1);
+			mgt->tvp_enable = 1;
+			pr_info("enable tvp for 1080p\n");
+			break;
+		case 2:
+			codec_mm_extpool_pool_alloc(
+				&mgt->tvp_pool,
+				default_tvp_4k_size, 0, 1);
+			mgt->tvp_enable = 2;
+			pr_info("enable tvp for 4k\n");
+			break;
+		default:
+			pr_err("unknown cmd! %d\n", val);
+		}
+		mutex_unlock(&mgt->tvp_protect_lock);
 		break;
-	case 1:
-		codec_mm_extpool_pool_alloc(
-			&mgt->tvp_pool,
-			default_tvp_size, 0, 1);
-		mgt->tvp_enable = 1;
-		pr_info("enable tvp for 1080p\n");
+	}
+	case 1: {
+		switch (val) {
+		case 0:
+			codec_mm_disable_tvp();
+			break;
+		case 1:
+		case 2:
+			codec_mm_enable_tvp();
+			break;
+		default:
+			pr_err("unknown cmd! %d\n", val);
+		}
 		break;
-	case 2:
-		codec_mm_extpool_pool_alloc(
-			&mgt->tvp_pool,
-			default_tvp_4k_size, 0, 1);
-		mgt->tvp_enable = 2;
-		pr_info("enable tvp for 4k\n");
-		break;
+	}
 	default:
-		pr_err("unknown cmd! %d\n", val);
+		break;
 	}
 	return size;
 }
@@ -2326,3 +2505,5 @@ module_param(debug_sc_mode, uint, 0664);
 MODULE_PARM_DESC(debug_sc_mode, "\n debug scatter module\n");
 module_param(debug_keep_mode, uint, 0664);
 MODULE_PARM_DESC(debug_keep_mode, "\n debug keep module\n");
+module_param(tvp_mode, uint, 0664);
+MODULE_PARM_DESC(tvp_mode, "\n tvp module\n");

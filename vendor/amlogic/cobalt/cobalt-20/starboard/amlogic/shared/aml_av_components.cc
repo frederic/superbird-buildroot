@@ -4,9 +4,27 @@
 #include "third_party/starboard/amlogic/shared/decode_target_internal.h"
 #if defined(COBALT_WIDEVINE_OPTEE)
 #include "widevine/drm_system_widevine.h"
+
+#if defined(SECMEM_V2)
+static DlFuncWrapper<unsigned int (*)(void **)> dlSecure_V2_SessionCreate;
+static DlFuncWrapper<unsigned int (*)(void **)> dlSecure_V2_SessionDestroy;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int,unsigned int,unsigned int,unsigned int)> dlSecure_V2_Init;
+static DlFuncWrapper<unsigned int (*)(void *,void *)> dlSecure_V2_MemCreate;
+static DlFuncWrapper<unsigned int (*)(void *, unsigned int ,unsigned int,unsigned int *)> dlSecure_V2_MemAlloc;
+static DlFuncWrapper<unsigned int (*)(void *, unsigned int)> dlSecure_V2_MemFree;
+static DlFuncWrapper<unsigned int (*)(void * ,void *, unsigned int, unsigned int *,unsigned int *)> dlSecure_V2_GetVp9HeaderSize;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int,unsigned int *)> dlSecure_V2_MemToPhy;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemPop;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int)> dlSecure_V2_MemRelease;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemFlush;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemClear;
+
+#else
 static DlFuncWrapper<unsigned int (*)(unsigned int,unsigned int)> dlSecure_AllocSecureMem;
 static DlFuncWrapper<unsigned int(*)()> dlSecure_ReleaseResource;
 static DlFuncWrapper<unsigned int (*)(void *, unsigned int, unsigned int *)> dlSecure_GetVp9HeaderSize;
+#endif
+
 #endif
 
 #include <fcntl.h>
@@ -29,8 +47,13 @@ uint8_t * AmlAVCodec::sec_drm_mem_virt = NULL;
 int AmlAVCodec::sec_drm_mem_off = 0;
 int AmlAVCodec::sec_mem_size = 1024*1024*2;
 int AmlAVCodec::sec_mem_pos = 0;
+#if defined(SECMEM_V2)
+void * AmlAVCodec::secmem_session =NULL;
+unsigned int  AmlAVCodec::secmem_handle=0;
 #endif
-
+#endif
+int AmlAVCodec::sub_eos_state = 0;
+int  AmlAVCodec::sub_audio_retpts= 0;
 AmlAVCodec::AmlAVCodec()
     : eos_state(0), name("none: "), prerolled(false), feed_data_func(nullptr) {
   codec_param = (codec_para_t *)calloc(1, sizeof(codec_para_t));
@@ -39,6 +62,7 @@ AmlAVCodec::AmlAVCodec()
 #if defined(COBALT_WIDEVINE_OPTEE)
   has_fed_encrypt_data = false;
 #endif
+  sub_eos_state = 0;
 }
 
 AmlAVCodec::~AmlAVCodec() {
@@ -49,6 +73,23 @@ AmlAVCodec::~AmlAVCodec() {
     codec_reset(codec_param);
     codec_close(codec_param);
 #if defined(COBALT_WIDEVINE_OPTEE)
+
+#if defined(SECMEM_V2)
+  if (codec_param->drmmode == 1) {
+    if (secmem_session) {
+      dlSecure_V2_MemFlush(secmem_session);
+      dlSecure_V2_MemClear(secmem_session);
+      dlSecure_V2_SessionDestroy(&secmem_session);
+      sec_drm_mem = NULL;
+    }
+
+    if (sec_drm_mem_virt) {
+        munmap(sec_drm_mem_virt, sec_mem_size);
+        sec_drm_mem_virt = NULL;
+    }
+    sec_mem_pos = 0;
+  }
+#else
     if (codec_param->drmmode == 1) {
       if (sec_drm_mem) {
         dlSecure_ReleaseResource();
@@ -61,6 +102,7 @@ AmlAVCodec::~AmlAVCodec() {
       sec_mem_pos = 0;
     }
 #endif
+#endif
     free(codec_param);
     codec_param = NULL;
     if (dump_fp) {
@@ -70,13 +112,18 @@ AmlAVCodec::~AmlAVCodec() {
     if (output_mode_ == kSbPlayerOutputModeDecodeToTexture) {
       amsysfs_set_sysfs_str("/sys/class/vfm/map", "rm default");
       amsysfs_set_sysfs_str("/sys/class/vfm/map", "add default decoder amvideo");
-      amsysfs_set_sysfs_int( "/sys/module/amvdec_vp9/parameters/double_write_mode", 0);
+      amsysfs_set_sysfs_int( "/sys/module/amvdec_vp9/parameters/double_write_mode", 0x03);
       amsysfs_set_sysfs_int( "/sys/module/am_vecm/parameters/customer_master_display_en", 0);
+    }
+    if (bsubdecoder_ && isvideo){
+      amsysfs_set_sysfs_int( "/sys/class/video/pip_global_output", 0);
     }
   }
 }
 
 bool AmlAVCodec::AVInitCodec() {
+  if (bsubdecoder_)
+    codec_param->has_audio = 0;
   func_check_eos = std::bind(&AmlAudioRenderer::AVCheckDecoderEos, this);
   if (codec_param->has_audio) {
     amthreadpool_system_init();
@@ -217,11 +264,14 @@ void AmlAVCodec::AVSeek(SbTime seek_to_time) {
   log_last_append_time = 0LL;
   log_last_pts = 0LL;
   eos_state = 0;
+  sub_eos_state = 0;
   CLOG(WARNING) << "seek to " << seek_to_time/1000000.0;
 }
 
 SbTime AmlAVCodec::AVGetCurrentMediaTime(bool *is_playing,
                                          bool *is_eos_played) {
+  if (bsubdecoder_ && !isvideo)
+    return sub_audio_retpts;
   if (!codec_param) {
     CLOG(ERROR) << "codec does not initialize";
     return kSbTimeMax;
@@ -250,6 +300,7 @@ SbTime AmlAVCodec::AVGetCurrentMediaTime(bool *is_playing,
       retpts = pts_seek_to;
     }
   }
+    sub_audio_retpts = retpts;
   return retpts;
 }
 
@@ -389,12 +440,14 @@ static bool AddVP9Header(uint8_t *buf, int dsize, std::vector<uint8_t> & data)
       framesize -= 4;
       data.insert(data.end(), old_framedata, old_framedata+framesize);
     }
+  #if 0
     // VP9 decoder may not work for a small frame, padding to 4K bytes
     if (data.size() < 1023 * 4) {
       data.insert(data.end(), 1023 * 4 - data.size(), 0x00);
       const uint8_t padding[] = {0, 0, 1, 0xff};
       data.insert(data.end(), padding, padding + 4);
     }
+  #endif   
     return true;
   }
   SB_LOG(ERROR) << "AddVP9Header Wrong frame_number:" << frame_number << " size:" << dsize;
@@ -472,17 +525,40 @@ bool AmlAVCodec::LoadDrmRequiredLibraries(void) {
       }
     }
   }
+
+#if defined(SECMEM_V2)
+  dlSecure_V2_SessionCreate.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_SessionCreate");
+  dlSecure_V2_SessionDestroy.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_SessionDestroy");
+  dlSecure_V2_Init.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_Init");
+  dlSecure_V2_MemCreate.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemCreate");
+  dlSecure_V2_MemRelease.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemRelease");
+  dlSecure_V2_MemAlloc.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemAlloc");
+  dlSecure_V2_MemFree.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemFree");
+  dlSecure_V2_GetVp9HeaderSize.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_GetVp9HeaderSize");
+  dlSecure_V2_MemToPhy.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemToPhy");
+  dlSecure_V2_MemPop.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemPop");
+  dlSecure_V2_MemRelease.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemRelease");
+  dlSecure_V2_MemFlush.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemFlush");
+  dlSecure_V2_MemClear.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemClear");
+  s_drm_libraries_loaded = true;
+  return true;
+#else
   dlSecure_AllocSecureMem.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_AllocSecureMem");
   dlSecure_ReleaseResource.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_ReleaseResource");
   dlSecure_GetVp9HeaderSize.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_GetVp9HeaderSize");
   s_drm_libraries_loaded = true;
   return true;
+#endif
 }
 #endif
 
 
 bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
                                bool *written) {
+  if (!isvideo && bsubdecoder_){
+    *written = true;
+    return true;
+  }
   if (!codec_param) {
     CLOG(ERROR) << "codec does not initialize";
     return false;
@@ -494,11 +570,13 @@ bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
       prerolled = true;
       CLOG(ERROR) << "prerolled buffnum " << num_frame_pts << " full " << buffer_full;
       Schedule(prerolled_cb_);
-    }}
+    }
+  }
   else
   {
     //youtube 20 require to start after 0.5 second data, every audio frame is 20ms
-    if ((!prerolled) && ((num_frame_pts * 20 >= 500) || buffer_full) ) {
+    //in MSE test items, cobalt only send out 23 audio frame before we start to play stream.
+    if ((!prerolled) && ((num_frame_pts  >= 20 ) || buffer_full) ) {
       prerolled = true;
       CLOG(ERROR) << "prerolled buffnum " << num_frame_pts << " full " << buffer_full;
       Schedule(prerolled_cb_);
@@ -580,7 +658,7 @@ bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
     return true;
   }
   pts_sb = input_buffer->timestamp();
-  if (input_buffer->drm_info()) {
+  if (input_buffer->drm_info() || (SbDrmSystemIsValid(drm_system_) && isvideo)) {
     if (!SbDrmSystemIsValid(drm_system_)) {
       return false;
     }
@@ -631,6 +709,15 @@ bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
   if (feed_data_func) {
     success = feed_data_func(data, size, written);
   } else {
+#if defined(SECMEM_V2)
+    if ((input_buffer->drm_info() || (SbDrmSystemIsValid(drm_system_) && isvideo)))//only for encrypt H264 video, same condition as enter TEE Decrypt
+    {
+      unsigned int phyaddr;
+      drminfo_t *drminfo = (drminfo_t *)data;
+      dlSecure_V2_MemToPhy(secmem_session, secmem_handle, &phyaddr);
+      drminfo->drm_phy = phyaddr;
+    }
+#endif
     success = WriteCodec(data, size, written);
   }
   if (success && *written) {
@@ -677,7 +764,7 @@ int AmlAVCodec::GetNumFramesBuffered(bool dump) {
 }
 
 void AmlAVCodec::AVCheckDecoderEos() {
-  if (eos_state == 1) {
+  if (eos_state == 1 ||(bsubdecoder_ && (sub_eos_state == 1))) {
     struct buf_status bufstat;
     int ret;
     if (isvideo)
@@ -700,6 +787,8 @@ void AmlAVCodec::AVCheckDecoderEos() {
             bufstat.read_pointer, bufstat.write_pointer);
         ended_cb_();
         eos_state = 2;
+        if (bsubdecoder_)
+          sub_eos_state = eos_state;
         return;
       }
     }
@@ -721,6 +810,11 @@ void AmlAVCodec::AVWriteEndOfStream() {
   if (eos_state == 0) {
     eos_state = 1;
     last_read_point = 0;
+    if (bsubdecoder_&&isvideo)
+    {
+      sub_eos_state = eos_state;
+      CLOG(WARNING) << "WriteEndOfStream sub_eos_state : " << eos_state;
+    }
     AVCheckDecoderEos();
   }
 }
@@ -737,6 +831,10 @@ void AmlAVCodec::AVSetVolume(double volume) {
 }
 
 bool AmlAVCodec::AVIsEndOfStreamWritten() const {
+  if (bsubdecoder_ && !isvideo)
+  {
+    return false; //fake audio status
+  }
   if (!codec_param) {
     CLOG(ERROR) << "codec does not initialize";
     return false;
@@ -761,7 +859,8 @@ int AmlAVCodec::AVGetDroppedFrames() const {
 
 AmlAudioRenderer::AmlAudioRenderer(SbMediaAudioCodec audio_codec,
                                    SbMediaAudioSampleInfo  audio_sample_info,
-                                   SbDrmSystem drm_system) {
+                                   SbDrmSystem drm_system,
+                                   bool bsubdecoder) {
   CLOG(WARNING) << "audio format_tag:" << audio_sample_info.format_tag
               << " number_of_channels:" << audio_sample_info.number_of_channels
               << " samples_per_second:" << audio_sample_info.samples_per_second
@@ -771,6 +870,7 @@ AmlAudioRenderer::AmlAudioRenderer(SbMediaAudioCodec audio_codec,
               << " audio_specific_config_size:"
               << audio_sample_info.audio_specific_config_size;
   drm_system_ = drm_system;
+  bsubdecoder_ = bsubdecoder;
   if (audio_codec == kSbMediaAudioCodecAac) {
     codec_param->audio_type = AFORMAT_AAC;
   } else if (audio_codec == kSbMediaAudioCodecOpus) {
@@ -795,6 +895,24 @@ AmlAudioRenderer::AmlAudioRenderer(SbMediaAudioCodec audio_codec,
   codec_param->stream_type = STREAM_TYPE_ES_AUDIO;
   codec_param->has_audio = 1;
   codec_param->has_video = 1;
+
+
+  if (bsubdecoder_)
+  {
+    codec_param->has_audio = 0;
+    buffer_full = false;
+    log_last_append_time = 0LL;
+    log_last_pts = 0LL;
+    isPaused = false;
+    num_frame_pts = 0;
+    pts_seek_to = 0;
+    time_seek = 0;
+    name = "fake audio: ";
+    isvideo = false;
+    free(codec_param);
+    codec_param = NULL;
+    return;
+  }
   AVInitCodec();
 }
 
@@ -806,17 +924,71 @@ bool AmlAudioRenderer::WriteOpusSample(uint8_t * buf, int dsize, bool *written)
   SbMemoryCopy(&frame_data[2], buf, dsize);
   return WriteCodec(&frame_data[0], frame_data.size(), written);
 }
+#define EXTERNAL_PTS    (1)
+#define SYNC_OUTSIDE    (2)
 
 AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
                                    SbDrmSystem drm_system,
                                    SbPlayerOutputMode output_mode,
-                                   SbDecodeTargetGraphicsContextProvider
-                                       *decode_target_graphics_context_provider) {
+                                   SbDecodeTargetGraphicsContextProvider  *decode_target_graphics_context_provider,
+                                   bool bsubdecoder) {
   drm_system_ = drm_system;
   output_mode_ = output_mode;
   decode_target_graphics_context_provider_ = decode_target_graphics_context_provider;
   codec_param->has_video = 1;
+  bsubdecoder_ = bsubdecoder;
 #if defined(COBALT_WIDEVINE_OPTEE)
+#if defined(SECMEM_V2)
+  if (drm_system_) {
+    if (!LoadDrmRequiredLibraries()) {
+      CLOG(ERROR) << "can't load drm library, encrypted content will not play";
+      drm_system_ = kSbDrmSystemInvalid;
+    }
+  }
+  if (drm_system_) {
+    codec_param->drmmode = 1;
+    if (secmem_session) {
+      dlSecure_V2_MemFlush(secmem_session);
+      dlSecure_V2_MemClear(secmem_session);
+      dlSecure_V2_SessionDestroy(&secmem_session);
+      sec_drm_mem = NULL;
+    }
+    bool is_4k = true;
+    int flags = 0;
+    unsigned int phyaddr = 0;
+    if (video_codec == kSbMediaVideoCodecVp9)
+      flags = 2 | (1 << 9) | (1 << 4);//1 for 1080p and 2 for 4K
+    else
+      flags = 2 | (1 << 9);
+    int ret = dlSecure_V2_SessionCreate(&secmem_session);
+    if (ret)
+      goto out;
+    ret = dlSecure_V2_Init(secmem_session, 1, flags, 0, 0);
+    if (ret)
+      goto fail3;
+    ret = dlSecure_V2_MemCreate(secmem_session, &secmem_handle);
+    if (ret)
+      goto fail2;
+    ret = dlSecure_V2_MemAlloc(secmem_session, secmem_handle, sec_mem_size, &phyaddr);
+    if (ret == 0)
+      goto out;
+fail1:
+    dlSecure_V2_MemFree(secmem_session, secmem_handle);
+fail2:
+    dlSecure_V2_MemRelease(secmem_session, secmem_handle);
+    secmem_handle = 0;
+fail3:
+    dlSecure_V2_SessionDestroy(&secmem_session);
+    secmem_session = 0;
+out:
+    sec_drm_mem = (uint8_t *) secmem_handle;
+    sec_drm_mem_virt = NULL;
+    sec_mem_pos = 0;
+    (static_cast<::starboard::shared::widevine::DrmSystemWidevine*>(drm_system_))->AttachDecoder(this);
+    CLOG(WARNING) << "Enable TVP, sec memory " << (void*)sec_drm_mem << ", mapped address " << (void*)sec_drm_mem_virt << ", offset " << sec_drm_mem_off;
+    frame_data.resize(sizeof(drminfo_t));
+  }
+#else
   if (drm_system_) {
     if (!LoadDrmRequiredLibraries()) {
       CLOG(ERROR) << "can't load drm library, encrypted content will not play";
@@ -851,6 +1023,17 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
     frame_data.resize(sizeof(drminfo_t));
   }
 #endif
+#endif
+  if (bsubdecoder_)
+  {
+    codec_param->decoder_type  = DECODER_TYPE_FRAME_MODE;
+    codec_param->display_mode  = DISPLAY_MODE_PIPVIDEO;
+  }
+  else
+  {
+    codec_param->decoder_type  = DECODER_TYPE_STREAM_MODE;
+  }
+
   if (video_codec == kSbMediaVideoCodecVp9) {
     codec_param->video_type = VFORMAT_VP9;
     codec_param->am_sysinfo.format = VIDEO_DEC_FORMAT_VP9;
@@ -871,6 +1054,8 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
   } else if (video_codec == kSbMediaVideoCodecH264) {
     codec_param->video_type = VFORMAT_H264;
     codec_param->am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
+    if (bsubdecoder_)
+      codec_param->am_sysinfo.param = (void *)(EXTERNAL_PTS | SYNC_OUTSIDE);
   }
   if (output_mode_ == kSbPlayerOutputModeDecodeToTexture) {
     amsysfs_set_sysfs_str("/sys/class/vfm/map", "rm default");
@@ -885,7 +1070,7 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
   } else {
     amsysfs_set_sysfs_str("/sys/class/vfm/map", "rm default");
     amsysfs_set_sysfs_str("/sys/class/vfm/map", "add default decoder amvideo");
-    amsysfs_set_sysfs_int("/sys/module/amvdec_vp9/parameters/double_write_mode", 0);
+    amsysfs_set_sysfs_int("/sys/module/amvdec_vp9/parameters/double_write_mode", 0x03);
     amsysfs_set_sysfs_int("/sys/class/tsync/enable", 1);
     amsysfs_set_sysfs_int("/sys/class/tsync/mode", 1);
     amsysfs_set_sysfs_int("/sys/class/tsync/slowsync_enable", 0);
@@ -893,6 +1078,10 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
   }
   codec_param->stream_type = STREAM_TYPE_ES_VIDEO;
   AVInitCodec();
+  if (bsubdecoder_){
+    amsysfs_set_sysfs_int( "/sys/class/video/pip_global_output", 1);
+    name = "sub video: ";
+  }
   bound_x = bound_y = bound_w = bound_h = 0;
 }
 
@@ -950,7 +1139,14 @@ void AmlVideoRenderer::SetBounds(int z_index, int x, int y, int width,
     //char buf[128];
     //sprintf(buf, "%d %d %d %d", x, y, x+width, y+height);
     //amsysfs_set_sysfs_str("/sys/class/video/axis", buf);
-    codec_utils_set_video_position(x, y, width, height, 0);
+    if (bsubdecoder_){
+      char buf[128];
+      sprintf(buf, "%d %d %d %d", x, y, x+width, y+height);
+      amsysfs_set_sysfs_str("/sys/class/video/axis_pip", buf);
+    }
+    else{
+      codec_utils_set_video_position(x, y, width, height, 0);
+    }
     //CLOG(INFO) << "SetBounds z:" << z_index << " x:" << x << " y:" << y
     //           << " w:" << width << " h:" << height;
     bound_x = x;
@@ -1136,8 +1332,18 @@ bool AmlVideoRenderer::WriteVP9SampleTvp(uint8_t *buf, int dsize,
   unsigned int header_size = 0;
   frame_data.assign(buf, buf + dsize);
   drminfo_t *drminfo = (drminfo_t *)&frame_data[0];
+
+#if defined(SECMEM_V2)
+  unsigned int frames[8]={0};
+  unsigned int phyaddr = 0;
+  dlSecure_V2_MemToPhy(secmem_session, secmem_handle, &phyaddr);
+  drminfo->drm_phy = phyaddr;// cmd need hanele id ,but headersize need phy address.
+  dlSecure_V2_GetVp9HeaderSize(secmem_session,(void *)drminfo->drm_phy, drminfo->drm_pktsize,
+                          &header_size,frames);
+#else
   dlSecure_GetVp9HeaderSize((void *)drminfo->drm_phy, drminfo->drm_pktsize,
                           &header_size);
+#endif
   drminfo->drm_pktsize += header_size;
   return WriteCodec(&frame_data[0], frame_data.size(), written);
 }

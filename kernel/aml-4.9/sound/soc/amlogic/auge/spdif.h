@@ -26,7 +26,18 @@ enum SPDIF_ID {
 };
 #endif
 
+/* For spdifout mask lane register offset V1:
+ * EE_AUDIO_SPDIFOUT_CTRL0, offset: 4 - 11
+ */
+#define SPDIFOUT_LANE_MASK_V1 1
+/* For spdifout mask lane register offset V2:
+ * EE_AUDIO_SPDIFOUT_CTRL0, offset: 0 - 15
+ */
+#define SPDIFOUT_LANE_MASK_V2 2
+
 extern int spdif_set_audio_clk(int id,
 		struct clk *clk_src, int rate, int same);
+
+int spdifout_get_lane_mask_version(int id);
 
 #endif

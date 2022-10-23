@@ -707,9 +707,11 @@ void plane_md5(MD5_CTX *md5_ctx,
 #define COMPARATOR_SKIP 0xF0F0F0F0
 typedef enum {
     COMPARATOR_CONF_SET_GOLDEN_DATA_SIZE,
-    COMPARATOR_CONF_SKIP_GOLDEN_DATA,       /*!<< 2nd parameter pointer of Queue 
+    COMPARATOR_CONF_SKIP_GOLDEN_DATA,       /*!<< 2nd parameter pointer of Queue
                                                   containing skip command */
     COMPARATOR_CONF_SET_PICINFO,            //!<< This command is followed by YUVInfo structure.
+    COMPARATOR_CONF_SET_MONOCHROME,     //!<< It means a monochrome picture
+    COMPARATOR_CONF_SET_NOT_MONOCHROME,     //!<< It means a normal picture
 } ComparatorConfType;
 
 typedef void*   Comparator;
@@ -755,7 +757,7 @@ BOOL Comparator_Destroy(
 BOOL Comparator_Act(
     Comparator  comp,
     void*       data,
-    Uint32    size
+    Uint32      size
     );
 
 BOOL Comparator_CheckFrameCount(
@@ -777,6 +779,12 @@ BOOL Comparator_CheckEOF(
 
 Uint32 Comparator_GetFrameCount(
     Comparator comp
+    );
+
+BOOL Comparator_Configure(
+    Comparator              comp,
+    ComparatorConfType      cmd,
+    void*                   val
     );
 
 BOOL IsEndOfFile(
@@ -963,6 +971,7 @@ BOOL LoadYuvImageByYCbCrLine(
     size_t      picWidth,
     size_t      picHeight,
     FrameBuffer* fb,
+    void        *arg,
     Uint32      srcFbIndex
     );
 
@@ -1199,10 +1208,6 @@ extern Int32 ProductCalculateAuxBufferSize(
     Int32           width,
     Int32           height
     );
-
-#define MAX_CFG                 (183)
-
-
 #define MAX_ROI_LEVEL           (8)
 #define LOG2_CTB_SIZE           (5)
 #define CTB_SIZE                (1<<LOG2_CTB_SIZE)
@@ -1349,6 +1354,13 @@ typedef struct TestEncConfig_struct {
     int     useRot;
     int     qpReport;
     int     ringBufferEnable;
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+    int     mvHistogramEn;
+    int     mvHistoThreshold0;
+    int     mvHistoThreshold1;
+    int     mvHistoThreshold2;
+    int     mvHistoThreshold3;
+#endif
     int     rcIntraQp;
     int     outNum;
     int     skipPicNums[MAX_PIC_SKIP_NUM];
@@ -1427,7 +1439,7 @@ typedef struct TestEncConfig_struct {
     int    forceIdrPicIdx;
     Int32  lowLatencyMode;
 
-    char            optYuvPath[256];
+    char            optYuvPath[MAX_FILE_PATH];
 #ifdef SUPPORT_SOURCE_RELEASE_INTERRUPT
     int             srcReleaseIntEnable;
 #endif

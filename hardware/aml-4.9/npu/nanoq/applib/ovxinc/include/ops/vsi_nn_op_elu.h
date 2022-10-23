@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -31,52 +31,13 @@
 extern "C" {
 #endif
 
-
-enum {
-    TENSOR_ELU_INPUT,
-
-    TENSOR_ELU_INPUTS_COUNT,
-
-    TENSOR_ELU_OUTPUT = 0,
-
-    TENSOR_ELU_OUTUTS_COUNT,
-
-    TENSOR_ELU_PARAM_COUT = TENSOR_ELU_INPUTS_COUNT + TENSOR_ELU_OUTUTS_COUNT,
-};
-
-enum {
-    TENSOR_ELU_CPU_KERNEL,
-
-    TENSOR_ELU_F16TOF16_KERNEL,
-    TENSOR_ELU_F16TOI16_KERNEL,
-    TENSOR_ELU_F16TOI8_KERNEL,
-    TENSOR_ELU_F16TOU8_KERNEL,
-    TENSOR_ELU_I16TOI16_KERNEL,
-    TENSOR_ELU_I16TOF16_KERNEL,
-    TENSOR_ELU_I8TOI8_KERNEL,
-    TENSOR_ELU_I8TOF16_KERNEL,
-    TENSOR_ELU_U8TOU8_KERNEL,
-    TENSOR_ELU_U8TOF16_KERNEL,
-
-    TENSOR_ELU_F16TOF16_2D_KERNEL,
-    TENSOR_ELU_F16TOI16_2D_KERNEL,
-    TENSOR_ELU_F16TOI8_2D_KERNEL,
-    TENSOR_ELU_F16TOU8_2D_KERNEL,
-    TENSOR_ELU_I16TOI16_2D_KERNEL,
-    TENSOR_ELU_I16TOF16_2D_KERNEL,
-    TENSOR_ELU_I8TOI8_2D_KERNEL,
-    TENSOR_ELU_I8TOF16_2D_KERNEL,
-    TENSOR_ELU_U8TOU8_2D_KERNEL,
-    TENSOR_ELU_U8TOF16_2D_KERNEL,
-
-    TENSOR_ELU_KERNEL_COUNTS,
-};
-
 #define _VSI_NN_ELU_LOCAL_TENSOR_NUM 2
 
 typedef struct _vsi_nn_elu_lcl_data
 {
     vx_tensor   local_tensor[_VSI_NN_ELU_LOCAL_TENSOR_NUM];
+    uint32_t    hash_idx;
+    vsi_bool    execute_on_sw;
 } vsi_nn_elu_lcl_data;
 
 typedef struct _vsi_nn_elu_param

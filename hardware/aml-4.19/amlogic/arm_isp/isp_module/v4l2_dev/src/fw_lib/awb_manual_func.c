@@ -313,7 +313,6 @@ void awb_read_statistics( AWB_fsm_t *p_fsm )
     awb_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
     awb_flow.flow_state = MON_ALG_FLOW_STATE_INPUT_READY;
     acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_AWB_FLOW, &awb_flow, sizeof( awb_flow ) );
-    LOG( LOG_INFO, "AWB flow: INPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", awb_flow.frame_id_tracking, awb_flow.frame_id_current );
 }
 
 //    For CCM switching
@@ -456,7 +455,6 @@ void awb_set_new_param( AWB_fsm_ptr_t p_fsm, sbuf_awb_t *p_sbuf_awb )
         awb_flow.frame_id_current = acamera_fsm_util_get_cur_frame_id( &p_fsm->cmn );
         awb_flow.flow_state = MON_ALG_FLOW_STATE_OUTPUT_READY;
         acamera_fsm_mgr_set_param( p_fsm->cmn.p_fsm_mgr, FSM_PARAM_SET_MON_AWB_FLOW, &awb_flow, sizeof( awb_flow ) );
-        LOG( LOG_INFO, "AWB flow: OUTPUT_READY: frame_id_tracking: %d, cur frame_id: %u.", awb_flow.frame_id_tracking, awb_flow.frame_id_current );
     }
 
     fsm_raise_event( p_fsm, event_id_awb_result_ready );

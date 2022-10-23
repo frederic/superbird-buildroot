@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -30,9 +30,18 @@
 extern "C" {
 #endif
 
+typedef struct _vsi_nn_shufflechannel_lcl_data_t
+{
+    vx_tensor input_tensor;
+    vx_tensor output_tensor;
+    vsi_nn_tensor_t *block_size_tensor;
+} vsi_nn_shufflechannel_lcl_data_t;
+
 typedef struct _vsi_nn_shufflechannel_param
 {
     int32_t group_number;
+    int32_t axis;
+    vsi_nn_shufflechannel_lcl_data_t *local;
 } vsi_nn_shufflechannel_param;
 
 #ifdef __cplusplus

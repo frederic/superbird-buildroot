@@ -46,6 +46,7 @@ typedef struct _iic_master_t {
     void *virt_addr;
 } iic_master_t;
 
+static int detect_flag = 0;
 
 static struct arm_i2c_sensor_ctrl *g_sensor_ctrl = NULL;
 
@@ -93,7 +94,7 @@ static int arm_sensor_i2c_probe(struct i2c_client *client,
 
 	rtn = of_property_read_u32(sensor_ctrl->of_node, "slave-addr",
 								&sensor_ctrl->slave_addr);
-	pr_info("%s:arm isp slave addr 0x%x, rtn %d\n", __func__, sensor_ctrl->slave_addr, rtn);
+	//pr_info("%s:arm isp slave addr 0x%x, rtn %d\n", __func__, sensor_ctrl->slave_addr, rtn);
 
 	if (rtn != 0) {
 		pr_err("%s: failed to get isp slave addr\n", __func__);
@@ -102,21 +103,21 @@ static int arm_sensor_i2c_probe(struct i2c_client *client,
 
 	rtn = of_property_read_u32(sensor_ctrl->of_node, "reg-type",
 								&sensor_ctrl->reg_addr_type);
-	pr_info("%s:arm reg_addr_type %d, rtn %d\n", __func__, sensor_ctrl->reg_addr_type, rtn);
+	//pr_info("%s:arm reg_addr_type %d, rtn %d\n", __func__, sensor_ctrl->reg_addr_type, rtn);
 
 	rtn = of_property_read_u32(sensor_ctrl->of_node, "reg-data-type",
 									&sensor_ctrl->reg_data_type);
-	pr_info("%s:arm reg_data_type %d, rtn %d\n", __func__, sensor_ctrl->reg_data_type, rtn);
+	//pr_info("%s:arm reg_data_type %d, rtn %d\n", __func__, sensor_ctrl->reg_data_type, rtn);
 
-	sensor_ctrl->link_node =
-		of_parse_phandle(sensor_ctrl->of_node, "link-device", 0);
-	if (sensor_ctrl->link_node == NULL)
-		pr_err("%s:failed to get link device\n", __func__);
-	else
-		pr_info("%s: success get link device:%s\n", __func__, sensor_ctrl->link_node->name);
-
-	am_mipi_parse_dt(sensor_ctrl->link_node);
-
+	if (detect_flag) {
+		sensor_ctrl->link_node =
+			of_parse_phandle(sensor_ctrl->of_node, "link-device", 0);
+		if (sensor_ctrl->link_node == NULL)
+			pr_err("%s:failed to get link device\n", __func__);
+		else
+			pr_info("%s: success get link device:%s\n", __func__, sensor_ctrl->link_node->name);
+		am_mipi_parse_dt(sensor_ctrl->link_node);
+	}
 	g_sensor_ctrl = sensor_ctrl;
 
 	return rtn;
@@ -141,8 +142,8 @@ static int arm_sensor_i2c_remove(struct i2c_client *client)
 		pr_err("%s: Error client data is NULL\n", __func__);
 		return -EINVAL;
 	}
-
-	am_mipi_deinit_parse_dt();
+	if (detect_flag)
+		am_mipi_deinit_parse_dt();
 
 	kfree(s_ctrl);
 	s_ctrl = NULL;
@@ -173,6 +174,7 @@ void system_i2c_init( uint32_t bus )
 		pr_err("%s:isp i2c bus has been inited\n", __func__);
 	    return;
 	}
+	detect_flag = bus;
 
 	rtn = i2c_add_driver(&arm_sensor_i2c_driver);
 
@@ -204,7 +206,10 @@ uint8_t system_i2c_write( uint32_t bus, uint32_t phy_addr, uint8_t *data, uint32
 	addr_type = g_sensor_ctrl->reg_addr_type;
 	data_type = g_sensor_ctrl->reg_data_type;
 
-	saddr = g_sensor_ctrl->slave_addr >> 1;
+	if (phy_addr == 0)
+		saddr = g_sensor_ctrl->slave_addr >> 1;
+	else
+		saddr = phy_addr >> 1;
 	struct i2c_msg msgs[] = {
 		{
 			.addr  = saddr,
@@ -248,7 +253,10 @@ uint8_t system_i2c_read( uint32_t bus, uint32_t phy_addr, uint8_t *data, uint32_
 	addr_type = g_sensor_ctrl->reg_addr_type;
 	data_type = g_sensor_ctrl->reg_data_type;
 
-	saddr = g_sensor_ctrl->slave_addr >> 1;
+	if (phy_addr == 0)
+		saddr = g_sensor_ctrl->slave_addr >> 1;
+	else
+		saddr = phy_addr >> 1;
 	struct i2c_msg msgs[] = {
 		{
 			.addr  = saddr,

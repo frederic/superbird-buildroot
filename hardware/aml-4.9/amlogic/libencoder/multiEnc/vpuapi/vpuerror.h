@@ -50,15 +50,16 @@
 #define VP5_RESULT_NOT_READY                                          0x00000800
 #define VP5_VPU_STILL_RUNNING                                         0x00001000
 #define VP5_INSTANCE_DESTROYED                                        0x00004000
-#define VP5_SYSERR_DEC_VLC_BUF_FULL                                   0x00010000
+#define VP5_SYSERR_VLC_BUF_FULL                                       0x00010000
 #define VP5_SYSERR_WATCHDOG_TIMEOUT                                   0x00020000
 #define VP5_ERROR_FW_FATAL                                            0x00200000
+#define VP5_IRB_FRAME_DROP                                            0x10000000
+#define VP5_INPLACE_V                                                 0x20000000
 
 
 /************************************************************************/
 /* VP5 ERROR ON ENCODER (ERR_INFO)                                    */
 /************************************************************************/
-#define VP5_SYSERR_ENC_VLC_BUF_FULL                                   0x00000100
 
 /************************************************************************/
 /* VP5 ERROR ON DECODER (ERR_INFO)                                    */
@@ -154,6 +155,8 @@
 #define VP5_ETCERR_INIT_SEQ_SPS_NOT_FOUND                             0x00005000
 #define VP5_ETCERR_DEC_PIC_VCL_NOT_FOUND                              0x00005001
 #define VP5_ETCERR_NO_VALID_SLICE_IN_AU                               0x00005002
+#define VP5_ETCERR_HEADER_PARSING                                     0x00005003
+#define VP5_FATAL_VPU_HANGUP                                          0xf0000000
 
 /************************************************************************/
 /* VP5 WARNING ON DECODER (WARN_INFO)                                 */

@@ -1,0 +1,76 @@
+From 877d36b72be43723cad8a2c0ec1b31d5b0df10c9 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Fri, 23 Aug 2019 19:41:22 +0800
+Subject: [PATCH 7/7] cursor: hide cursor be for have point-motion after weston
+ startup.
+
+weston startup with cursor,because of aml_pad device has point CAPABILITY(use for remote control).
+most time we not use the cursor,so hide cursor before no motion of cursor.
+---
+ clients/window.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/clients/window.c b/clients/window.c
+index ea0af1c..96ad3e8 100644
+--- a/clients/window.c
++++ b/clients/window.c
+@@ -390,6 +390,9 @@ struct input {
+ 	uint32_t repeat_key;
+ 	uint32_t repeat_time;
+ 	int seat_version;
++
++	bool pointer_hidden;
++	uint32_t pointer_last_motion_time;
+ };
+ 
+ struct output {
+@@ -2775,6 +2778,8 @@ pointer_handle_motion(void *data, struct wl_pointer *pointer,
+ 	} else
+ 		cursor = CURSOR_LEFT_PTR;
+ 
++	input->pointer_last_motion_time = time;
++
+ 	input_set_pointer_image(input, cursor);
+ }
+ 
+@@ -3780,6 +3785,18 @@ schedule_pointer_image_update(struct input *input,
+ 
+ }
+ 
++static bool
++hide_pointer_surface_needed(struct input* input) {
++	uint32_t duration;
++	if (input->pointer_last_motion_time == 0) {
++		//For remote with mouse support but not use motion
++		input->pointer_hidden = true;
++	} else {
++		input->pointer_hidden = false;
++	}
++	return input->pointer_hidden;
++}
++
+ static void
+ pointer_surface_frame_callback(void *data, struct wl_callback *callback,
+ 			       uint32_t time)
+@@ -3805,6 +3822,9 @@ pointer_surface_frame_callback(void *data, struct wl_callback *callback,
+ 	if (input_set_pointer_special(input))
+ 		return;
+ 
++	if (hide_pointer_surface_needed(input))
++		return;
++
+ 	cursor = input->display->cursors[input->current_cursor];
+ 	if (!cursor)
+ 		return;
+@@ -5803,6 +5823,8 @@ display_add_input(struct display *d, uint32_t id, int display_seat_version)
+ 	input->pointer_focus = NULL;
+ 	input->keyboard_focus = NULL;
+ 	input->seat_version = seat_version;
++	input->pointer_hidden = true;
++	input->pointer_last_motion_time = 0;
+ 
+ 	wl_list_init(&input->touch_point_list);
+ 	wl_list_insert(d->input_list.prev, &input->link);
+-- 
+2.7.4
+

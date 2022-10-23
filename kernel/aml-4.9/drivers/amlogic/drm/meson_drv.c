@@ -15,6 +15,7 @@
  *
  */
 
+#include <linux/console.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -42,6 +43,7 @@
 #include "meson_drv.h"
 #include "meson_vpu.h"
 #include "meson_vpu_pipeline.h"
+#include "meson_crtc.h"
 
 #define DRIVER_NAME "meson"
 #define DRIVER_DESC "Amlogic Meson DRM driver"
@@ -53,6 +55,26 @@ static void am_meson_fb_output_poll_changed(struct drm_device *dev)
 
 	drm_fbdev_cma_hotplug_event(priv->fbdev);
 #endif
+}
+
+int am_meson_atomic_check(struct drm_device *dev,
+			  struct drm_atomic_state *state)
+{
+	int ret;
+
+	ret = drm_atomic_helper_check_modeset(dev, state);
+	if (ret)
+		return ret;
+
+	ret = drm_atomic_normalize_zpos(dev, state);
+	if (ret)
+		return ret;
+
+	ret = drm_atomic_helper_check_planes(dev, state);
+	if (ret)
+		return ret;
+
+	return ret;
 }
 
 static const struct drm_mode_config_funcs meson_mode_config_funcs = {
@@ -119,6 +141,7 @@ core_param(fb_width, logo.width, uint, 0644);
 core_param(fb_height, logo.height, uint, 0644);
 core_param(display_bpp, logo.bpp, uint, 0644);
 core_param(outputmode, logo.outputmode_t, charp, 0644);
+core_param(osd_reverse, logo.osd_reverse, uint, 0644);
 
 static struct drm_framebuffer *am_meson_logo_init_fb(struct drm_device *dev)
 {
@@ -128,7 +151,8 @@ static struct drm_framebuffer *am_meson_logo_init_fb(struct drm_device *dev)
 
 	DRM_INFO("width=%d,height=%d,start_addr=0x%pa,size=%d\n",
 		 logo.width, logo.height, &logo.start, logo.size);
-	DRM_INFO("bpp=%d,alloc_flag=%d\n", logo.bpp, logo.alloc_flag);
+	DRM_INFO("bpp=%d,alloc_flag=%d, osd_reverse=%d\n",
+		 logo.bpp, logo.alloc_flag, logo.osd_reverse);
 	DRM_INFO("outputmode=%s\n", logo.outputmode);
 	if (logo.bpp == 16)
 		mode_cmd.pixel_format = DRM_FORMAT_RGB565;
@@ -156,6 +180,7 @@ am_meson_drm_display_mode_init(struct drm_connector *connector)
 	struct drm_display_mode *mode;
 	struct drm_device *dev;
 	u32 found, num_modes;
+	char *name;
 
 	if (!connector || !connector->dev)
 		return NULL;
@@ -173,7 +198,8 @@ am_meson_drm_display_mode_init(struct drm_connector *connector)
 		return NULL;
 	}
 	list_for_each_entry(mode, &connector->modes, head) {
-		if (am_meson_crtc_check_mode(mode, logo.outputmode) == true) {
+		name = am_meson_crtc_get_voutmode(mode);
+		if (!strcmp(name, logo.outputmode)) {
 			found = 1;
 			break;
 		}
@@ -248,12 +274,16 @@ static int am_meson_update_output_state(struct drm_atomic_state *state,
 	return 0;
 }
 
-static int __am_meson_drm_set_config(struct drm_mode_set *set,
-				     struct drm_atomic_state *state)
+/*simaler with __drm_atomic_helper_set_config,
+ *TODO:sync with __drm_atomic_helper_set_config
+ */
+int __am_meson_drm_set_config(struct drm_mode_set *set,
+			      struct drm_atomic_state *state)
 {
 	struct drm_crtc_state *crtc_state;
 	struct drm_plane_state *primary_state;
 	struct drm_crtc *crtc = set->crtc;
+	struct meson_drm *private = crtc->dev->dev_private;
 	int hdisplay, vdisplay;
 	int ret;
 
@@ -306,12 +336,28 @@ static int __am_meson_drm_set_config(struct drm_mode_set *set,
 	primary_state->crtc_h = vdisplay;
 	primary_state->src_x = set->x << 16;
 	primary_state->src_y = set->y << 16;
+	if (logo.osd_reverse)
+		primary_state->rotation = DRM_REFLECT_MASK;
+	else
+		primary_state->rotation = DRM_ROTATE_0;
 	if (drm_rotation_90_or_270(primary_state->rotation)) {
-		primary_state->src_w = set->fb->height << 16;
-		primary_state->src_h = set->fb->width << 16;
+		if (private->ui_config.ui_h)
+			primary_state->src_w = private->ui_config.ui_h << 16;
+		else
+			primary_state->src_w = set->fb->height << 16;
+		if (private->ui_config.ui_w)
+			primary_state->src_h = private->ui_config.ui_w << 16;
+		else
+			primary_state->src_h = set->fb->width << 16;
 	} else {
-		primary_state->src_w = set->fb->width << 16;
-		primary_state->src_h = set->fb->height << 16;
+		if (private->ui_config.ui_w)
+			primary_state->src_w = private->ui_config.ui_w << 16;
+		else
+			primary_state->src_w = set->fb->width << 16;
+		if (private->ui_config.ui_h)
+			primary_state->src_h = private->ui_config.ui_h << 16;
+		else
+			primary_state->src_h = set->fb->height << 16;
 	}
 
 commit:
@@ -322,6 +368,9 @@ commit:
 	return 0;
 }
 
+/*copy from drm_atomic_helper_set_config,
+ *TODO:sync with drm_atomic_helper_set_config
+ */
 static int am_meson_drm_set_config(struct drm_mode_set *set)
 {
 	struct drm_atomic_state *state;
@@ -387,7 +436,9 @@ static void am_meson_load_logo(struct drm_device *dev)
 				      GFP_KERNEL);
 	if (!connector_set)
 		return;
+#ifdef CONFIG_DRM_MESON_HDMI
 	connector_set[0] = am_meson_hdmi_connector();
+#endif
 	if (!connector_set[0]) {
 		DRM_INFO("%s:connector is NULL!\n", __func__);
 		kfree(connector_set);
@@ -404,6 +455,7 @@ static void am_meson_load_logo(struct drm_device *dev)
 	set.x = 0;
 	set.y = 0;
 	set.mode = mode;
+	set.crtc->mode = *mode;
 	set.connectors = connector_set;
 	set.num_connectors = 1;
 	set.fb = fb;
@@ -458,10 +510,10 @@ static struct drm_driver meson_driver = {
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
 
-	.gem_prime_export	= drm_gem_prime_export,
+	.gem_prime_export	= am_meson_drm_gem_prime_export,
 	.gem_prime_get_sg_table	= am_meson_gem_prime_get_sg_table,
 
-	.gem_prime_import	= drm_gem_prime_import,
+	.gem_prime_import	= am_meson_drm_gem_prime_import,
 	/*
 	 * If gem_prime_import_sg_table is NULL,only buffer created
 	 * by meson driver can be imported ok.
@@ -518,7 +570,7 @@ static int am_meson_drm_bind(struct device *dev)
 
 	meson_driver.driver_features = DRIVER_HAVE_IRQ | DRIVER_GEM |
 		DRIVER_MODESET | DRIVER_PRIME |
-		DRIVER_ATOMIC | DRIVER_IRQ_SHARED;
+		DRIVER_ATOMIC | DRIVER_IRQ_SHARED | DRIVER_RENDER;
 
 	drm = drm_dev_alloc(&meson_driver, dev);
 	if (!drm)
@@ -623,6 +675,7 @@ static void am_meson_drm_unbind(struct device *dev)
 	drm->dev_private = NULL;
 	dev_set_drvdata(dev, NULL);
 	drm_dev_unref(drm);
+	DRM_INFO("am_meson_drm_unbind done\n");
 }
 
 static int compare_of(struct device *dev, void *data)
@@ -827,6 +880,81 @@ static const struct of_device_id am_meson_drm_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, am_meson_drm_dt_match);
 
+#ifdef CONFIG_PM_SLEEP
+static void am_meson_drm_fb_suspend(struct drm_device *drm)
+{
+	#ifdef CONFIG_DRM_MESON_EMULATE_FBDEV
+	struct meson_drm *priv = drm->dev_private;
+
+	drm_fb_helper_set_suspend(priv->fbdev_helper, 1);
+	#endif
+}
+
+static void am_meson_drm_fb_resume(struct drm_device *drm)
+{
+	#ifdef CONFIG_DRM_MESON_EMULATE_FBDEV
+	struct meson_drm *priv = drm->dev_private;
+
+	drm_fb_helper_set_suspend(priv->fbdev_helper, 0);
+	#endif
+}
+
+static int am_meson_drm_pm_suspend(struct device *dev)
+{
+	struct drm_device *drm;
+	struct meson_drm *priv;
+
+	priv = dev_get_drvdata(dev);
+	if (!priv) {
+		DRM_ERROR("%s: Failed to get meson drm!\n", __func__);
+		return 0;
+	}
+	drm = priv->drm;
+	if (!drm) {
+		DRM_ERROR("%s: Failed to get drm device!\n", __func__);
+		return 0;
+	}
+	drm_kms_helper_poll_disable(drm);
+	am_meson_drm_fb_suspend(drm);
+	priv->state = drm_atomic_helper_suspend(drm);
+	if (IS_ERR(priv->state)) {
+		am_meson_drm_fb_resume(drm);
+		drm_kms_helper_poll_enable(drm);
+		DRM_INFO("%s: drm_atomic_helper_suspend fail\n", __func__);
+		return PTR_ERR(priv->state);
+	}
+	DRM_INFO("%s: done\n", __func__);
+	return 0;
+}
+
+static int am_meson_drm_pm_resume(struct device *dev)
+{
+	struct drm_device *drm;
+	struct meson_drm *priv;
+
+	priv = dev_get_drvdata(dev);
+	if (!priv) {
+		DRM_ERROR("%s: Failed to get meson drm!\n", __func__);
+		return 0;
+	}
+	drm = priv->drm;
+	if (!drm) {
+		DRM_ERROR("%s: Failed to get drm device!\n", __func__);
+		return 0;
+	}
+	drm_atomic_helper_resume(drm, priv->state);
+	am_meson_drm_fb_resume(drm);
+	drm_kms_helper_poll_enable(drm);
+	DRM_INFO("%s: done\n", __func__);
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops am_meson_drm_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(am_meson_drm_pm_suspend,
+				am_meson_drm_pm_resume)
+};
+
 static struct platform_driver am_meson_drm_platform_driver = {
 	.probe      = am_meson_drv_probe,
 	.remove     = am_meson_drv_remove,
@@ -834,6 +962,7 @@ static struct platform_driver am_meson_drm_platform_driver = {
 		.owner  = THIS_MODULE,
 		.name   = DRIVER_NAME,
 		.of_match_table = am_meson_drm_dt_match,
+		.pm = &am_meson_drm_pm_ops,
 	},
 };
 

@@ -1,0 +1,53 @@
+[
+  {
+    type: vbpool,
+    param: {
+      pixfmt: NV12,
+      width: 320,
+      height: 240,
+      nbuf: 3
+    },
+    bind:
+    {
+      output: ge2d.ch1
+    }
+  },
+  {
+    type: isp,
+    param:
+    {
+      device: "/dev/video0",
+      fr:
+      {
+        nbuf: 4
+      }
+    }
+  },
+  {
+    type: ge2d,
+    param:
+    {
+      name: ge2d,
+      op: stretchblt-from,
+      rotate: 90
+    }
+  },
+  {
+    type: venc,
+    param:
+    {
+      codec: h264,
+      width: 320,
+      height: 240
+    }
+  },
+  {
+    type: GstBridge,
+    load: "/usr/lib/ipc_gstbridge.so",
+    param:
+    {
+      launch: "appsrc ! h264parse ! video/x-h264,stream-format=avc !amlwsssink port=8082 async=false"
+    }
+  }
+]
+

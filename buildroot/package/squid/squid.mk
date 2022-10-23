@@ -4,13 +4,11 @@
 #
 ################################################################################
 
-SQUID_VERSION = 4.4
+SQUID_VERSION = 4.10
 SQUID_SOURCE = squid-$(SQUID_VERSION).tar.xz
 SQUID_SITE = http://www.squid-cache.org/Versions/v4
 SQUID_LICENSE = GPL-2.0+
 SQUID_LICENSE_FILES = COPYING
-# We're patching configure.ac
-SQUID_AUTORECONF = YES
 SQUID_DEPENDENCIES = libcap host-libcap libxml2 host-pkgconf \
 	$(if $(BR2_PACKAGE_LIBNETFILTER_CONNTRACK),libnetfilter_conntrack)
 SQUID_CONF_ENV = \
@@ -85,9 +83,6 @@ endef
 define SQUID_INSTALL_INIT_SYSTEMD
 	$(INSTALL) -D -m 0644 $(@D)/tools/systemd/squid.service \
 		$(TARGET_DIR)/usr/lib/systemd/system/squid.service
-	mkdir -p $(TARGET_DIR)/etc/systemd/system/multi-user.target.wants
-	ln -sf ../../../..//usr/lib/systemd/system/squid.service \
-		$(TARGET_DIR)/etc/systemd/system/multi-user.target.wants/squid.service
 endef
 
 $(eval $(autotools-package))

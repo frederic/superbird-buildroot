@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,7 @@ typedef struct
 {
     vsi_nn_tensor_attr_t    attr;
     uint8_t*                data;
-    vsi_nn_size_t           data_size; /* in bytes */
+    size_t                  data_size; /* in bytes */
 } vsi_nn_rnn_internal_buffer_t;
 
 typedef struct
@@ -44,12 +44,15 @@ typedef struct
     vsi_nn_link_list_t link_list;
     vsi_nn_rnn_external_connection_t connection;
     vsi_nn_rnn_internal_buffer_t buffer;
+    uint32_t connection_inputs_count;
+    vsi_bool tensor_swappable;
 } vsi_nn_rnn_connection_t;
 
 typedef struct
 {
     vsi_nn_rnn_connection_t* external_connection_list;
     void* user_data;
+    vsi_bool is_first_run;
 } vsi_nn_rnn_wksp_t;
 
 #if defined(__cplusplus)

@@ -118,7 +118,8 @@ if [ $? -eq 0 ]; then
 	then
 		DONE=`start-stop-daemon -S -m -p $PIDFILE1 -b -x $DAEMON1 -- -Dnl80211 -iwlan0 -c/etc/wpa_supplicant.conf`
 		#iw wlan0 interface add wlan1 type managed
-		#hostapd_conf_pre wlan1
+                dhd_priv isam_init mode sta-ap
+		hostapd_conf_pre wlan1
 	elif [[ "$1" == "station" ]]
 	then
 		DONE=`start-stop-daemon -S -m -p $PIDFILE1 -b -x $DAEMON1 -- -Dnl80211 -iwlan0 -c/etc/wpa_supplicant.conf`
@@ -218,6 +219,8 @@ case "$1" in
         DONE=`start-stop-daemon -K -o -p $PIDFILE3`
         rm -f $PIDFILE1
         rm -f $PIDFILE3
+		ifconfig wlan1 down
+		ifconfig wlan0 down
 		$MULTI_WIFI station 0
         $POWERCTL 0
         ;;

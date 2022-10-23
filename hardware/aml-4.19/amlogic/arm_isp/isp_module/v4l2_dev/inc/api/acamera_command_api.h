@@ -85,7 +85,7 @@
 #define CALIBRATION_IRIDIX_REC709TORGB                    0x00000028
 #define CALIBRATION_IRIDIX_ASYMMETRY                      0x00000029
 #define CALIBRATION_AWB_SCENE_PRESETS                     0x0000002A
-#define CALIBRATION_SKIN_TONE_CCM                         0x0000002B
+#define CALIBRATION_SHADING_RADIAL_CENTRE_AND_MULT        0x0000002B
 #define CALIBRATION_GAMMA_FE_0                            0x0000002C
 #define CALIBRATION_GAMMA_FE_1                            0x0000002D
 #define CALIBRATION_WDR_NP_LUT                            0x0000002E
@@ -151,8 +151,8 @@
 #define CALIBRATION_AWB_ZONE_WGHT_VER                     0x00000065
 #define CALIBRATION_SHARPEN_FR                            0x00000066
 #define CALIBRATION_SHARPEN_DS1                           0x00000067
-#define CALIBRATION_GAMMA_BE_0                            0x00000068
-#define CALIBRATION_GAMMA_BE_1                            0x00000069
+#define CALIBRATION_CUSTOM_SETTINGS_CONTEXT               0x00000068
+#define CALIBRATION_CMOS_EXPOSURE_PARTITION_LUTS          0x00000069
 #define CALIBRATION_TEMPER_STRENGTH                       0x0000006A
 #define CALIBRATION_NP_LUT_MEAN                           0x0000006B
 #define CALIBRATION_SCALER_H_FILTER                       0x0000006C
@@ -170,12 +170,20 @@
 #define CALIBRATION_GAMMA_EV1                             0x00000078
 #define CALIBRATION_GAMMA_EV2                             0x00000079
 #define CALIBRATION_GAMMA_THRESHOLD                       0x0000007A
+#define CALIBRATION_DEFOG_CONTROL                         0x0000007B
+#define CALIBRATION_DEMOSAIC_RGB_EXT_CONTROL              0x0000007C
+#define CALIBRATION_FR_SHARPEN_EXT_CONTROL                0x0000007D
+#define CALIBRATION_DS_SHARPEN_EXT_CONTROL                0x0000007E
+#define CALIBRATION_CNR_EXT_CONTROL                       0x0000007F
+#define CALIBRATION_IRIDIX_EXT_CONTROL                    0x00000080
+#define CALIBRATION_SQRT_EXT_CONTROL                      0x00000081
+#define CALIBRATION_SQUARE_BE_EXT_CONTROL                 0x00000082
 
 // ------------------------------------------------------------------------------ //
 //		DYNAMIC STATE VALUES
 // ------------------------------------------------------------------------------ //
 
-#define CALIBRATION_TOTAL_SIZE 123
+#define CALIBRATION_TOTAL_SIZE 131
 //------------------FILE TRANSFER-------------------
 
 
@@ -325,9 +333,15 @@
 #define SENSOR_HWID                                       0x00000080
 #define HUE_THETA_ID                                      0x00000081
 #define SNR_MANUAL_ID                                     0x00000082
-#define SNR_OFFSET_ID                                     0x00000083
+#define SNR_STRENGTH_ID                                   0x00000083
 #define TNR_MANUAL_ID                                     0x00000084
 #define TNR_OFFSET_ID                                     0x00000085
+#define SENSOR_WDRMODE_ID                                 0x00000086
+#define DEFOG_MODE_ID                                     0x00000087
+#define DEFOG_RATIO_DELTA                                 0x00000088
+#define DEFOG_BLACK_PERCENTAGE                            0x00000089
+#define DEFOG_WHITE_PERCENTAGE                            0x0000008A
+#define SENSOR_ANTIFLICKER_ID                             0x0000008B
 
 // ------------------------------------------------------------------------------ //
 //		VALUE LIST
@@ -400,8 +414,9 @@
 #define LENS                                              0x00000044
 #define ISP                                               0x00000045
 #define NV12_GREY                                         0x00000046
-
-
+#define DEFOG_DISABLE                                     0x00000047
+#define DEFOG_ONLY                                        0x00000048
+#define DEFOG_BLEND                                       0x00000049
 // ------------------------------------------------------------------------------ //
 //		RETURN VALUES
 // ------------------------------------------------------------------------------ //
@@ -411,7 +426,7 @@
 #define NOT_PERMITTED                                     0x00000003
 #define NOT_EXISTS                                        0x00000004
 #define FAIL                                              0x00000005
-
+#define IMPLEMENTED                                       0x00000006
 
 
 // ------------------------------------------------------------------------------ //

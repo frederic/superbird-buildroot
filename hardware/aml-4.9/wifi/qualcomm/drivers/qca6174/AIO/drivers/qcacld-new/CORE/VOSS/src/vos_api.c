@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -93,6 +93,7 @@
 #include "wma.h"
 
 #include "vos_utils.h"
+#include<adf_os_module.h>
 
 /*---------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -235,6 +236,17 @@ static inline void vos_runtime_pm_config(struct ol_softc *scn,
 }
 #else
 static inline void vos_runtime_pm_config(struct ol_softc *scn,
+		hdd_context_t *pHddCtx) { }
+#endif
+
+#ifdef FEATURE_USB_WARM_RESET
+static inline void vos_usb_warm_reset_config(struct ol_softc *scn,
+		hdd_context_t *pHddCtx)
+{
+	scn->enable_usb_warm_reset = pHddCtx->cfg_ini->enable_usb_warm_reset;
+}
+#else
+static inline void vos_usb_warm_reset_config(struct ol_softc *scn,
 		hdd_context_t *pHddCtx) { }
 #endif
 
@@ -402,7 +414,24 @@ static void vos_set_ac_specs_params(tMacOpenParameters *param,
 	}
 }
 
-
+/**
+ * set_oob_gpio_config() - set oob gpio config
+ * @scn: pointer to scn
+ * @hdd_ctx: pointer to hdd_ctx
+ *
+ * Return NULL
+ */
+#ifdef CONFIG_GPIO_OOB
+static void set_oob_gpio_config(struct ol_softc *scn, hdd_context_t *hdd_ctx)
+{
+   scn->oob_gpio_num = hdd_ctx->cfg_ini->oob_gpio_num;
+   scn->oob_gpio_flag = hdd_ctx->cfg_ini->oob_gpio_flag;
+}
+#else
+static void set_oob_gpio_config(struct ol_softc *scn, hdd_context_t *hdd_ctx)
+{
+}
+#endif
 /*---------------------------------------------------------------------------
 
   \brief vos_open() - Open the vOSS Module
@@ -534,13 +563,16 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
    scn->enableuartprint = pHddCtx->cfg_ini->enablefwprint;
    scn->enablefwlog     = pHddCtx->cfg_ini->enablefwlog;
    scn->enableFwSelfRecovery = pHddCtx->cfg_ini->enableFwSelfRecovery;
+   scn->fastfwdump_host = pHddCtx->cfg_ini->fastfwdump;
    scn->max_no_of_peers = pHddCtx->max_peers;
+   set_oob_gpio_config(scn, pHddCtx);
 #ifdef WLAN_FEATURE_LPSS
    scn->enablelpasssupport = pHddCtx->cfg_ini->enablelpasssupport;
 #endif
    scn->enableRamdumpCollection = pHddCtx->cfg_ini->is_ramdump_enabled;
    scn->enable_self_recovery = pHddCtx->cfg_ini->enableSelfRecovery;
 
+   vos_usb_warm_reset_config(scn, pHddCtx);
    vos_fw_hash_check_config(scn, pHddCtx);
    vos_runtime_pm_config(scn, pHddCtx);
 
@@ -794,7 +826,7 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
                "%s: VOSS successfully Opened", __func__);
 
    *pVosContext = gpVosContext;
-
+   gpVosContext->is_closed = false;
    return VOS_STATUS_SUCCESS;
 
 
@@ -1155,6 +1187,12 @@ VOS_STATUS vos_stop( v_CONTEXT_t vosContext )
 {
   VOS_STATUS vosStatus;
 
+  if (gpVosContext->is_closed) {
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                "%s: vos is already closed", __func__);
+      return VOS_STATUS_SUCCESS;
+  }
+
   /* WDA_Stop is called before the SYS so that the processing of Riva
   pending responces will not be handled during uninitialization of WLAN driver */
   vos_event_reset( &(gpVosContext->wdaCompleteEvent) );
@@ -1197,6 +1235,12 @@ VOS_STATUS vos_stop( v_CONTEXT_t vosContext )
 VOS_STATUS vos_close( v_CONTEXT_t vosContext )
 {
   VOS_STATUS vosStatus;
+
+  if (gpVosContext->is_closed) {
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                "%s: already closed", __func__);
+      return VOS_STATUS_SUCCESS;
+  }
 
   vosStatus = wma_wmi_work_close( vosContext );
   if (!VOS_IS_STATUS_SUCCESS(vosStatus)) {
@@ -1303,6 +1347,7 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
 
   vos_wdthread_flush_timer_work();
 
+  gpVosContext->is_closed = true;
   return VOS_STATUS_SUCCESS;
 }
 
@@ -3205,7 +3250,7 @@ v_U64_t vos_get_monotonic_boottime_ns(void)
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0))
 v_U64_t vos_get_bootbased_boottime_ns(void)
 {
-	return ktime_to_ns(ktime_get_boottime());
+	return ktime_get_boot_ns();
 }
 
 #else
@@ -3299,3 +3344,264 @@ bool vos_is_probe_rsp_offload_enabled(void)
 
 	return pHddCtx->cfg_ini->sap_probe_resp_offload;
 }
+
+bool vos_is_mon_enable(void)
+{
+	hdd_context_t *phdd_ctx = NULL;
+
+	if (gpVosContext == NULL) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+			  "%s: global voss context is NULL", __func__);
+		return false;
+	}
+
+	phdd_ctx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD,
+						   gpVosContext);
+	if (!phdd_ctx) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+			  "%s: HDD context is Null", __func__);
+		return false;
+	}
+
+	return phdd_ctx->is_mon_enable;
+}
+#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+v_BOOL_t vos_is_ch_switch_with_csa_enabled(void)
+{
+   hdd_context_t *pHddCtx;
+
+   pHddCtx = (hdd_context_t*)(gpVosContext->pHDDContext);
+   if((NULL == pHddCtx) ||
+      (NULL == pHddCtx->cfg_ini))
+   {
+     VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+               "%s: Hdd Context is Null", __func__);
+     return FALSE;
+   }
+   return pHddCtx->cfg_ini->sap_ch_switch_with_csa;
+}
+#else
+v_BOOL_t vos_is_ch_switch_with_csa_enabled(void)
+{
+	return FALSE;
+}
+#endif//#ifdef WLAN_FEATURE_SAP_TO_FOLLOW_STA_CHAN
+
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+/**
+ * vos_is_chan_ok_for_dnbs() - check if the channel is valid for dnbs
+ *
+ * @channel: the given channel to be compared
+ *
+ * This function check if the channel is valid for dnbs. If the disable channel
+ * switch is enabled and the channel is same as SAP's channel, return true, if
+ * the channel is not same as SAP's channel or there's no SAP, return false. If
+ * the disable channel switch is not enabled, return true.
+ *
+ * Return: bool
+ */
+bool vos_is_chan_ok_for_dnbs(uint8_t channel)
+{
+	hdd_context_t *pHddCtx;
+	bool equal = false;
+
+	if (!channel) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+				"%s: Invalid parameter", __func__);
+		return false;
+	}
+
+	pHddCtx = (hdd_context_t*)(gpVosContext->pHDDContext);
+	if(NULL == pHddCtx)
+	{
+	  VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+				"%s: Hdd Context is Null", __func__);
+	  return false;
+	}
+
+	adf_os_spin_lock_bh(&pHddCtx->restrict_offchan_lock);
+	if (pHddCtx->restrict_offchan_flag) {
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+				"%s: flag is set", __func__);
+		wlansap_channel_compare(gpVosContext->pMACContext, channel, &equal);
+		adf_os_spin_unlock_bh(&pHddCtx->restrict_offchan_lock);
+		return equal;
+	}
+	else
+		VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+				"%s: flag is not set", __func__);
+	adf_os_spin_unlock_bh(&pHddCtx->restrict_offchan_lock);
+	return true;
+}
+#endif
+
+#ifdef CUSTOMIZED_FIRMWARE_PATH
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+#define GET_INODE_FROM_FILEP(filp) \
+    (filp)->f_path.dentry->d_inode
+#else
+#define GET_INODE_FROM_FILEP(filp) \
+    (filp)->f_dentry->d_inode
+#endif
+#define A_ROUND_UP(x, y)  ((((x) + ((y) - 1)) / (y)) * (y))
+char *qca_fw_path= "";
+#define DEFAULT_QCA_FW_PATH     "/system/etc/wifi/qca9379"
+static int qca_readwrite_file(const char *filename,
+			char *rbuf,
+			const char *wbuf,
+			size_t length)
+{
+    int ret = 0;
+    struct file *filp = (struct file *)-ENOENT;
+    mm_segment_t oldfs;
+    oldfs = get_fs();
+    set_fs(KERNEL_DS);
+
+    hddLog(VOS_TRACE_LEVEL_INFO, "%s: filename %s \n", __func__, filename);
+
+    do {
+        int mode = (wbuf) ? O_RDWR : O_RDONLY;
+        filp = filp_open(filename, mode, S_IRUSR);
+        if (IS_ERR(filp) || !filp->f_op) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, "%s: filename %s \n", __func__, filename);
+            ret = -ENOENT;
+            break;
+        }
+
+        if (length == 0) {
+            /* Read the length of the file only */
+            struct inode    *inode;
+
+            inode = GET_INODE_FROM_FILEP(filp);
+            if (!inode) {
+                hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Get inode from %s failed \n",
+					__func__, filename);
+                ret = -ENOENT;
+                break;
+            }
+            ret = i_size_read(inode->i_mapping->host);
+            break;
+        }
+
+        if (wbuf) {
+           if ( (ret=vfs_write(filp, wbuf, length, &filp->f_pos)) < 0) {
+                hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Write %u bytes to file %s error %d\n",
+                                __FUNCTION__,
+                                (unsigned int)length, filename, ret);
+                break;
+            }
+        } else {
+            if ( (ret=vfs_read(filp, rbuf, length, &filp->f_pos)) < 0) {
+                hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Read %u bytes from file %s error %d\n",
+                                __FUNCTION__,
+                                (unsigned int)length, filename, ret);
+                break;
+            }
+        }
+    } while (0);
+
+    if (!IS_ERR(filp)) {
+        filp_close(filp, NULL);
+    }
+    set_fs(oldfs);
+
+    return ret;
+}
+
+static int customized_request_firmware(const struct firmware **firmware_p,
+	const char *name,
+	struct device *device)
+{
+    int ret = 0;
+    struct firmware *firmware;
+    char filename[256];
+    const char *raw_filename = name;
+    int customized = 1;
+    *firmware_p = firmware = A_MALLOC(sizeof(*firmware));
+    if (!firmware)
+        return -ENOMEM;
+    A_MEMZERO(firmware, sizeof(*firmware));
+    do {
+        size_t length, bufsize, bmisize;
+
+        if (strcmp(qca_fw_path, "") == 0)
+            customized = 0;
+        if (snprintf(filename, sizeof(filename), "%s/%s",
+                                customized?qca_fw_path:DEFAULT_QCA_FW_PATH,
+                                raw_filename) >= sizeof(filename)) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, "snprintf: %s/%s\n",
+                customized?qca_fw_path:DEFAULT_QCA_FW_PATH, raw_filename);
+            ret = -1;
+            break;
+        }
+        if ( (ret=qca_readwrite_file(filename, NULL, NULL, 0)) < 0) {
+            break;
+        } else {
+            length = ret;
+        }
+
+        if (strcmp(raw_filename, "softmac") == 0) {
+            bufsize = length = 17;
+        } else {
+            bufsize = ALIGN(length, PAGE_SIZE);
+            bmisize = A_ROUND_UP(length, 4);
+            bufsize = max(bmisize, bufsize);
+        }
+        firmware->data = vmalloc(bufsize);
+        firmware->size = length;
+
+        if (!firmware->data) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Cannot allocate buffer for firmware\n",
+                             __FUNCTION__);
+            ret = -ENOMEM;
+            break;
+        }
+
+        if ( (ret=qca_readwrite_file(filename, (char*)firmware->data, NULL, length)) != length) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, "%s: file read error, ret %d request %d\n",
+                            __FUNCTION__,ret,(int)length);
+            ret = -1;
+            break;
+        }
+
+    } while (0);
+
+    if (ret<0) {
+        if (firmware) {
+        if (firmware->data)
+                vfree(firmware->data);
+            A_FREE(firmware);
+        }
+        *firmware_p = NULL;
+    } else {
+        ret = 0;
+    }
+    return ret;
+}
+
+module_param(qca_fw_path, charp, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+#endif
+
+int qca_request_firmware(const struct firmware **firmware_p,
+                const char *name,
+                struct device *device)
+{
+#ifdef CUSTOMIZED_FIRMWARE_PATH
+    return customized_request_firmware(firmware_p, name,device);
+#else
+#if 0
+    return request_firmware(firmware_p, name,device);
+#else
+	char final_name[512];
+#ifdef CONFIG_BUILDROOT
+	sprintf(final_name,"qca6174/%s",name);
+#else
+	sprintf(final_name,"../../../vendor/etc/wifi/qca6174/%s",name);
+#endif
+	return request_firmware(firmware_p, final_name, device);
+#endif
+#endif
+}
+

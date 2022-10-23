@@ -1,0 +1,17 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

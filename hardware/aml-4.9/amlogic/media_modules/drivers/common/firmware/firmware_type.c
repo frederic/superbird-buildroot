@@ -55,6 +55,7 @@ static const struct format_name_s format_name[] = {
 	{VIDEO_DEC_VP9_G12A,		"vp9_g12a"},
 	{VIDEO_DEC_AVS2,		"avs2"},
 	{VIDEO_DEC_AVS2_MMU,		"avs2_mmu"},
+	{VIDEO_DEC_AV1_MMU,		"av1_mmu"},
 	{VIDEO_ENC_H264,		"h264_enc"},
 	{VIDEO_ENC_JPEG,		"jpeg_enc"},
 	{FIRMWARE_MAX,			"unknown"},

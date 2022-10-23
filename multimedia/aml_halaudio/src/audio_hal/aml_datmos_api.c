@@ -55,7 +55,17 @@
 #define DATMOS_PCM_OUT_FILE "/tmp/datmos_pcm_out.data"
 
 #define DATMOS_RAW_IN_FILE "/tmp/datmos_raw_in.data"
+
 /*global parameters*/
+
+const char *patch_src_str[6] = {
+    "SRC_DTV",
+    "SRC_ATV",
+    "SRC_LINEIN",
+    "SRC_HDMIIN",
+    "SRC_SPDIFIN",
+    "SRC_OTHER",
+};
 
 /*static parameters*/
 typedef enum {
@@ -476,6 +486,20 @@ int datmos_set_parameters(struct audio_hw_device *dev, struct str_parms *parms)
         return 0;
     }
 
+    /*static param*/
+    ret = str_parms_get_int(parms, "iec61937_align", &val);
+    if (ret >= 0) {
+        adev->datmos_param.b_iec61937_align = val;
+        ALOGI("b_iec61937_align set to %d\n", adev->datmos_param.b_iec61937_align);
+        /*datmos parameter*/
+        if (adev->datmos_enable) {
+            if (adev->datmos_param.b_iec61937_align)
+                add_datmos_option(opts, "-iec61937_align", "1");
+            else
+                add_datmos_option(opts, "-iec61937_align", "0");
+        }
+        return 0;
+    }
 
     return -1;
 
@@ -483,6 +507,31 @@ error_exit:
     ret = -1;
     ALOGE("Error exit!");
     return ret;
+}
+
+void datmos_set_iec61937_align_param(struct audio_hw_device *dev)
+{
+    struct aml_audio_device *aml_dev = (struct aml_audio_device *) dev;
+    struct str_parms *parms_true = str_parms_create_str((const char *)"iec61937_align=1");
+    struct str_parms *parms_false = str_parms_create_str((const char *)"iec61937_align=0");
+
+    ALOGI("patch source %s\n", patch_src_str[aml_dev->patch_src]);
+    switch (aml_dev->patch_src) {
+        case SRC_HDMIIN:
+        case SRC_SPDIFIN:
+            datmos_set_parameters(dev, parms_true);
+            break;
+        case SRC_LINEIN:
+            datmos_set_parameters(dev, parms_false);
+            break;
+        /*TODO, Fixme if there is something wrong!*/
+        case SRC_DTV:
+        case SRC_ATV:
+        case SRC_OTHER:
+        default:
+            datmos_set_parameters(dev, parms_false);
+            break;
+    }
 }
 
 int datmos_get_parameters(struct audio_hw_device *dev, const char *keys, char *temp_buf, size_t temp_buf_size)
@@ -702,6 +751,7 @@ int datmos_decoder_init_patch(aml_dec_t ** ppdatmos_dec, audio_format_t format, 
     opts = get_datmos_current_options();
 
     switch (datmos_config->audio_type) {
+        case PURE_MLP:
         case TRUEHD: {
             add_datmos_option(opts, "-i", "/media/test.mat");
         }
@@ -768,7 +818,7 @@ int datmos_decoder_init_patch(aml_dec_t ** ppdatmos_dec, audio_format_t format, 
     aml_dec->outbuf_raw = NULL;
     if ((datmos_config->audio_type == AC3) || (datmos_config->audio_type == EAC3))
         aml_dec->inbuf_max_len = MAX_DECODER_DDP_FRAME_LENGTH*8;
-    else if (datmos_config->audio_type == TRUEHD)
+    else if (datmos_config->audio_type == TRUEHD || datmos_config->audio_type == PURE_MLP)
         aml_dec->inbuf_max_len = MAX_DECODER_MAT_FRAME_LENGTH*4;
     else if (datmos_config->audio_type == LPCM)
         aml_dec->inbuf_max_len = MAX_DECODER_DDP_FRAME_LENGTH*8;//Be careful about this Length!!!
@@ -988,10 +1038,10 @@ int datmos_decoder_process_patch(aml_dec_t *aml_dec, unsigned char*in_buffer, in
         if (aml_dec->format == AUDIO_FORMAT_E_AC3 || aml_dec->format == AUDIO_FORMAT_AC3) {
               /*
               *in datmos decoder, the max size in one circle determinated by
-              *datmos_ptr->procblocksize = DATMOS_HT_DDP_PROC_BLOCK_SIZE;//0x1800
+              *datmos_ptr->procblocksize = DATMOS_HT_DDP_PROC_BLOCK_SIZE;//0x8000
               */
             if (ret != 0 && bytes_consumed == 0) {
-                bytes_consumed = input_threshold > 0x1800? 0x1800:input_threshold;
+                bytes_consumed = input_threshold > 0x8000? 0x8000:input_threshold;
             }
         } else {
             bytes_consumed = input_threshold;
@@ -1022,7 +1072,7 @@ int datmos_decoder_process_patch(aml_dec_t *aml_dec, unsigned char*in_buffer, in
              *for this ret means that datmos would block this status
              *we should return -1, the decoder should be reinit again!
              */
-            if ((ret == 4) && (aml_dec->format == AUDIO_FORMAT_DOLBY_TRUEHD))  {
+            if ((ret == 4) && ((aml_dec->format == AUDIO_FORMAT_DOLBY_TRUEHD) || (aml_dec->format == AUDIO_FORMAT_MAT)))  {
                 /*pay more attention here, if flush the inbuf, should reset the raw_deficiency&inbuf_wt to zero*/
                 // memset(aml_dec->inbuf, 0, aml_dec->inbuf_max_len);
                 // aml_dec->inbuf_wt = 0;

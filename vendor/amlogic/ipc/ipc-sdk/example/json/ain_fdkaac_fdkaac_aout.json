@@ -1,0 +1,31 @@
+[
+  {
+    type: ain,
+    param:
+    {
+      source: alsa,
+      device: default
+    }
+  },
+  {
+    type: ACodecFDK,
+    param:
+    {
+      codec: aac
+    }
+  },
+  {
+    type: ACodecFDK,
+    param:
+    {
+      codec: s16le
+    }
+  },
+  {
+    type: aout,
+    param:
+    {
+      device: "dmixer_auto"
+    }
+  }
+]

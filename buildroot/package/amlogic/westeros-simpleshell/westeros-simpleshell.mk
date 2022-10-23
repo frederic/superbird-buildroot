@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-WESTEROS_SIMPLESHELL_VERSION = 5ac97229a85f2befcfde2409e268f5197dc1cf47
+WESTEROS_SIMPLESHELL_VERSION = e975b6953cffba2591ca2be61bd579ab8cfa4ffd
 WESTEROS_SIMPLESHELL_SITE_METHOD = git
 WESTEROS_SIMPLESHELL_SITE = git://github.com/rdkcmf/westeros
 WESTEROS_SIMPLESHELL_INSTALL_STAGING = YES

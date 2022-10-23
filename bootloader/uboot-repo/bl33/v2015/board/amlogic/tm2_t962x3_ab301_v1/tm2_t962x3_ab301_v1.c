@@ -596,6 +596,10 @@ int board_init(void)
 #ifdef CONFIG_SYS_I2C_MESON
 	set_i2c_ao_pinmux();
 #endif
+#ifdef CONFIG_DM_I2C
+	clrbits_le32(P_PERIPHS_PIN_MUX_9, 0xFF << 20);
+	setbits_le32(P_PERIPHS_PIN_MUX_9, 0x11 << 20);
+#endif
 	return 0;
 }
 
@@ -726,8 +730,20 @@ int checkhw(char * name)
 	char loc_name[64] = {0};
 
 	/* add your logic code here */
-
-
+	cpu_id_t cpu_id = get_cpu_id();
+	if (MESON_CPU_MAJOR_ID_TM2 == cpu_id.family_id) {
+		switch (cpu_id.chip_rev) {
+			case 0xA:
+				strcpy(loc_name, "tm2_t962x3_ab301\0");
+			break;
+			case 0xB:
+				strcpy(loc_name, "tm2-revb_t962x3_ab301\0");
+			break;
+			default:
+				strcpy(loc_name, "tm2_t962e2_unsupport");
+			break;
+		}
+	}
 	/* set aml_dt */
 	strcpy(name, loc_name);
 	setenv("aml_dt", loc_name);

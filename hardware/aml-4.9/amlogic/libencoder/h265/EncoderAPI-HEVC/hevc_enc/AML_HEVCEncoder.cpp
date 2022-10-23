@@ -70,7 +70,6 @@ static GE2DOP OP = AML_GE2D_STRETCHBLIT;
 static int do_strechblit(aml_ge2d_info_t *pge2dinfo, AMVHEVCEncFrameIO *input)
 {
     int ret = -1;
-    char code = 0;
     VLOG(DEBUG, "do_strechblit test case:\n");
     pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->dst_info.memtype = GE2D_CANVAS_ALLOC;
@@ -1700,7 +1699,7 @@ AMVEnc_Status AML_HEVCInitialize(AMVHEVCEncHandle *Handle, AMVHEVCEncParams *enc
     Handle->enc_height = encParam->height;
     Handle->bitrate = encParam->bitrate;
     Handle->frame_rate = encParam->frame_rate;
-    Handle->mPrependSPSPPSToIDRFrames = false;
+    Handle->mPrependSPSPPSToIDRFrames = true;
     Handle->mOutputBufferLen = 0;
     Handle->mUvSwap = 1;
     Handle->mGopIdx = 0;
@@ -1827,7 +1826,7 @@ AMVEnc_Status AML_HEVCSetInput(AMVHEVCEncHandle *Handle, AMVHEVCEncFrameIO *inpu
         size_src_chroma = luma_stride * (wave420l_align16(Handle->enc_height) / 2);
         y = (char *) Handle->src_vb[Handle->src_idx].virt_addr;
         if (Handle->enc_width % 32) {
-            for (int i = 0; i < Handle->enc_height; i++) {
+            for (uint32 i = 0; i < Handle->enc_height; i++) {
                 memcpy(y + i * luma_stride, (void *) ((char *) amlge2d.ge2dinfo.dst_info.vaddr[0] + i * Handle->enc_width), Handle->enc_width);
             }
         } else {

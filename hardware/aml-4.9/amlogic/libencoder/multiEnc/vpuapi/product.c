@@ -41,7 +41,6 @@ static Int32 s_ProductIds[MAX_NUM_VPU_CORE] = {
     PRODUCT_ID_NONE,
 };
 
-
 typedef struct FrameBufInfoStruct {
     Uint32 unitSizeHorLuma;
     Uint32 sizeLuma;
@@ -56,11 +55,11 @@ Uint32 ProductVpuScan(Uint32 coreIdx)
     Uint32 foundProducts = 0;
 
     /* Already scanned */
-    if (s_ProductIds[coreIdx] != PRODUCT_ID_NONE) 
+    if (s_ProductIds[coreIdx] != PRODUCT_ID_NONE)
         return 1;
 
     for (i=0; i<MAX_NUM_VPU_CORE; i++) {
-            productId = VpVpuGetProductId(i);
+        productId = VpVpuGetProductId(i);
         if (productId != PRODUCT_ID_NONE) {
             s_ProductIds[i] = productId;
             foundProducts++;
@@ -265,7 +264,7 @@ RetCode ProductVpuSleepWake(Uint32 coreIdx, int iSleepWake, const Uint16* code, 
     case PRODUCT_ID_515:
     case PRODUCT_ID_521:
     case PRODUCT_ID_511:
-        ret = Vp5VpuSleepWake(coreIdx, iSleepWake, (void*)code, size, FALSE);
+        ret = Vp5VpuSleepWake(coreIdx, iSleepWake, (void*)code, size);
         break;
     }
 
@@ -294,9 +293,8 @@ RetCode ProductVpuEncUpdateBitstreamBuffer(CodecInst* instance, Int32 size)
 {
     Int32   productId;
     Uint32  coreIdx;
-    BOOL    updateNewbsBuf = (BOOL)(size == 0);
     RetCode ret = RETCODE_SUCCESS;
-
+    BOOL    updateNewbsBuf = (BOOL)(size == 0);
     coreIdx   = instance->coreIdx;
     productId = s_ProductIds[coreIdx];
 
@@ -367,9 +365,9 @@ RetCode ProductVpuEncBuildUpOpenParam(CodecInst* pCodec, EncOpenParam* param)
  * \param   stride          stride of framebuffer in pixel.
  */
 RetCode ProductVpuAllocateFramebuffer(
-    CodecInst* inst, FrameBuffer* fbArr, TiledMapType mapType, Int32 num, 
-    Int32 stride, Int32 height, FrameBufferFormat format, 
-    BOOL cbcrInterleave, BOOL nv21, Int32 endian, 
+    CodecInst* inst, FrameBuffer* fbArr, TiledMapType mapType, Int32 num,
+    Int32 stride, Int32 height, FrameBufferFormat format,
+    BOOL cbcrInterleave, BOOL nv21, Int32 endian,
     vpu_buffer_t* vb, Int32 gdiIndex,
     FramebufferAllocType fbType)
 {
@@ -404,6 +402,15 @@ RetCode ProductVpuAllocateFramebuffer(
             fbArr[i].endian         = (mapType >= COMPRESSED_FRAME_MAP ? VDI_128BIT_LITTLE_ENDIAN : endian);
             fbArr[i].lumaBitDepth   = pDecInfo->initialInfo.lumaBitdepth;
             fbArr[i].chromaBitDepth = pDecInfo->initialInfo.chromaBitdepth;
+            fbArr[i].bufYSize       = sizeLuma;
+            if ( cbcrInterleave == TRUE ) {
+                fbArr[i].bufCbSize      = sizeChroma*2;
+                fbArr[i].bufCrSize      = 0;
+            }
+            else {
+                fbArr[i].bufCbSize      = sizeChroma;
+                fbArr[i].bufCrSize      = sizeChroma;
+            }
             fbArr[i].sourceLBurstEn = FALSE;
             if(inst->codecMode == W_HEVC_ENC || inst->codecMode == W_SVAC_ENC || inst->codecMode == W_AVC_ENC) {
                 fbArr[i].endian         = (mapType >= COMPRESSED_FRAME_MAP ? VDI_128BIT_LITTLE_ENDIAN : endian);
@@ -493,7 +500,7 @@ Int32 ProductCalculateAuxBufferSize(AUX_BUF_TYPE type, CodStd codStd, Int32 widt
             size = (size*3)/2;
             size = (size+4)/5;
             size = ((size+7)/8)*8;
-        } 
+        }
         else if (codStd == STD_HEVC) {
             size = VP5_DEC_HEVC_MVCOL_BUF_SIZE(width, height);
         }
@@ -1087,7 +1094,7 @@ RetCode ProductVpuEncGiveCommand(CodecInst* instance, CodecCommand cmd, void* pa
         ret = Vp5VpuEncGiveCommand(instance, cmd, param);
         break;
     }
-    
+
     return ret;
 }
 

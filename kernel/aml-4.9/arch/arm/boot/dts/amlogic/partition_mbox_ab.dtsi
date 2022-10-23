@@ -67,7 +67,7 @@
 		rsv:rsv{
 			pname = "rsv";
 			size = <0x0 0xE00000>;
-			mask = <1>;
+			mask = <0x11>;
 		};
 		param:param{
 			pname = "param";

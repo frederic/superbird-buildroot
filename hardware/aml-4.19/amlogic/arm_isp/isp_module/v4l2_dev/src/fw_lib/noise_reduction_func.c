@@ -478,6 +478,53 @@ void noise_reduction_initialize( noise_reduction_fsm_t *p_fsm )
     p_fsm->snr_thresh_master = p_fsm->snr_strength_target; // same as target
 }
 
+static void cnr_ext_param_update(noise_reduction_fsm_t *p_fsm)
+{
+    int32_t rtn = 0;
+    int32_t t_gain = 0;
+    struct cnr_ext_param_t p_result;
+    fsm_ext_param_ctrl_t p_ctrl;
+
+    acamera_fsm_mgr_get_param(p_fsm->cmn.p_fsm_mgr, FSM_PARAM_GET_CMOS_TOTAL_GAIN, NULL, 0, &t_gain, sizeof(t_gain));
+
+    p_ctrl.ctx = (void *)(ACAMERA_FSM2CTX_PTR(p_fsm));
+    p_ctrl.id = CALIBRATION_CNR_EXT_CONTROL;
+    p_ctrl.total_gain = t_gain;
+    p_ctrl.result = (void *)&p_result;
+
+    rtn = acamera_extern_param_calculate(&p_ctrl);
+    if (rtn != 0) {
+        LOG(LOG_CRIT, "Failed to cnr ext calculate");
+        return;
+    }
+
+    acamera_isp_cnr_delta_factor_write(p_fsm->cmn.isp_base, p_result.delta_factor);
+
+    acamera_isp_cnr_umean1_threshold_write(p_fsm->cmn.isp_base, p_result.umean1_thd);
+    acamera_isp_cnr_umean1_offset_write(p_fsm->cmn.isp_base, p_result.umean1_off);
+    acamera_isp_cnr_umean1_slope_write(p_fsm->cmn.isp_base, p_result.umean1_slope);
+
+    acamera_isp_cnr_umean2_threshold_write(p_fsm->cmn.isp_base, p_result.umean2_thd);
+    acamera_isp_cnr_umean2_offset_write(p_fsm->cmn.isp_base, p_result.umean2_off);
+    acamera_isp_cnr_umean2_slope_write(p_fsm->cmn.isp_base, p_result.umean2_slope);
+
+    acamera_isp_cnr_vmean1_threshold_write(p_fsm->cmn.isp_base, p_result.vmean1_thd);
+    acamera_isp_cnr_vmean1_offset_write(p_fsm->cmn.isp_base, p_result.vmean1_off);
+    acamera_isp_cnr_vmean1_slope_write(p_fsm->cmn.isp_base, p_result.vmean1_slope);
+
+    acamera_isp_cnr_vmean2_threshold_write(p_fsm->cmn.isp_base, p_result.vmean2_thd);
+    acamera_isp_cnr_vmean2_offset_write(p_fsm->cmn.isp_base, p_result.vmean2_off);
+    acamera_isp_cnr_vmean2_slope_write(p_fsm->cmn.isp_base, p_result.vmean2_slope);
+
+    acamera_isp_cnr_uv_delta1_threshold_write(p_fsm->cmn.isp_base, p_result.uv_delta1_thd);
+    acamera_isp_cnr_uv_delta1_offset_write(p_fsm->cmn.isp_base, p_result.uv_delta1_off);
+    acamera_isp_cnr_uv_delta1_slope_write(p_fsm->cmn.isp_base, p_result.uv_delta1_slope);
+
+    acamera_isp_cnr_uv_delta2_threshold_write(p_fsm->cmn.isp_base, p_result.uv_delta2_thd);
+    acamera_isp_cnr_uv_delta2_offset_write(p_fsm->cmn.isp_base, p_result.uv_delta2_off);
+    acamera_isp_cnr_uv_delta2_slope_write(p_fsm->cmn.isp_base, p_result.uv_delta2_slope);
+}
+
 void noise_reduction_update( noise_reduction_fsm_t *p_fsm )
 {
     int32_t total_gain = 0;
@@ -499,6 +546,8 @@ void noise_reduction_update( noise_reduction_fsm_t *p_fsm )
         uint16_t uv_delta_slope = acamera_calc_modulation_u16( log2_gain, cnr_uv_delta12_slope, cnr_uv_delta12_slope_len );
         acamera_isp_cnr_uv_delta1_slope_write( p_fsm->cmn.isp_base, uv_delta_slope );
         acamera_isp_cnr_uv_delta2_slope_write( p_fsm->cmn.isp_base, uv_delta_slope );
+
+        cnr_ext_param_update(p_fsm);
     }
 
     if ( wdr_mode == WDR_MODE_FS_LIN ) {

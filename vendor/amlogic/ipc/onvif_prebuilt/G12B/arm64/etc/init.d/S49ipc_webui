@@ -3,16 +3,38 @@
 # ipc_webui
 #
 
+START=49
+
 MKDIR=/bin/mkdir
 CHOWN=/bin/chown
 IPC_WEBUI_PATH=/var/www/ipc-webui
-DATA_DIR=/etc/ipc-webui
-OPTS="-R www-data $DATA_DIR"
+IPC_ETC_PATH=/etc/ipc
+IPC_ETC_WEBUI=$IPC_ETC_PATH/webui
+OPTS=
+
+set_log_modules() {
+  modules="";
+  if [ -f $IPC_ETC_PATH/log_modules ]; then
+    while read m; do
+      if [ -n "$modules" ]; then
+        dlm=','
+      fi
+      modules="$modules$dlm$m"
+    done << EOF
+$(cat $IPC_ETC_PATH/log_modules | sort -n)
+EOF
+  fi
+  ipc-property set /ipc/log/modules "$modules"
+}
 
 start() {
+  echo "detect sensor info ..."
+  source $IPC_ETC_PATH/isp_sensor_detect.sh
+  echo "set debug modules..."
+  set_log_modules
   echo "Start setting ipc-webui ownership ..."
-  $MKDIR -p $DATA_DIR
-  $CHOWN $OPTS
+  $MKDIR -p $IPC_ETC_WEBUI
+  $CHOWN -R www-data $IPC_ETC_WEBUI
 }
 
 stop() {

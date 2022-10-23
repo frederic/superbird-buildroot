@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -34,10 +34,9 @@ extern "C" {
 
 typedef struct _vsi_nn_split_lcl_data
 {
-    vsi_nn_link_list_t link_list;
-    vx_node            cp_node;
-    vx_tensor          src_tensor;
-    vx_tensor          dst_tensor;
+    vx_int32 *begin_dims;
+    vx_int32 *end_dims;
+    vx_int32 *stride_dims;
 } vsi_nn_split_lcl_data;
 
 typedef struct _vsi_nn_split_param

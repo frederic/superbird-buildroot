@@ -219,6 +219,7 @@ void init_reg_map(unsigned int type)
 		}
 		break;
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 		map = reg_maps_tm2;
 		for (i = 0; i < REG_IDX_END; i++) {
 			map[i].p = ioremap(map[i].phy_addr, map[i].size);
@@ -308,6 +309,7 @@ unsigned int hd_read_reg(unsigned int addr)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 	default:
 		val = readl(TO_PMAP_ADDR(addr));
 		break;
@@ -359,6 +361,7 @@ void hd_write_reg(unsigned int addr, unsigned int val)
 	case MESON_CPU_ID_G12B:
 	case MESON_CPU_ID_SM1:
 	case MESON_CPU_ID_TM2:
+	case MESON_CPU_ID_TM2B:
 	default:
 		writel(val, TO_PMAP_ADDR(addr));
 		break;
@@ -522,7 +525,7 @@ void hdmitx_poll_reg(unsigned int addr, unsigned int val, unsigned long timeout)
 }
 EXPORT_SYMBOL(hdmitx_poll_reg);
 
-void hdmitx_rd_check_reg(unsigned int addr, unsigned int exp_data,
+unsigned int hdmitx_rd_check_reg(unsigned int addr, unsigned int exp_data,
 	unsigned int mask)
 {
 	unsigned long rd_data;
@@ -533,6 +536,8 @@ void hdmitx_rd_check_reg(unsigned int addr, unsigned int exp_data,
 			(unsigned int)addr, (unsigned int)rd_data);
 		pr_info(REG "Error: HDMITX-DWC exp_data=0x%02x mask=0x%02x\n",
 			(unsigned int)exp_data, (unsigned int)mask);
+		return 1;
 	}
+	return 0;
 }
 EXPORT_SYMBOL(hdmitx_rd_check_reg);

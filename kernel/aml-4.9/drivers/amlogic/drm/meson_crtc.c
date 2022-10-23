@@ -63,8 +63,30 @@ static int meson_crtc_atomic_get_property(struct drm_crtc *crtc,
 					struct drm_property *property,
 					uint64_t *val)
 {
+	struct am_meson_crtc *amcrtc;
+	struct am_meson_crtc_state *meson_crtc_state;
+	int ret = -EINVAL;
 
-	return 0;
+	amcrtc = to_am_meson_crtc(crtc);
+	meson_crtc_state = to_am_meson_crtc_state(state);
+	if (property == amcrtc->prop_hdr_policy) {
+		#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM
+		meson_crtc_state->hdr_policy = get_hdr_policy();
+		#endif
+		*val = meson_crtc_state->hdr_policy;
+		ret = 0;
+	} else if (property == amcrtc->prop_dv_policy) {
+		#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
+		meson_crtc_state->dv_policy = get_dolby_vision_policy();
+		#endif
+		*val = meson_crtc_state->dv_policy;
+		ret = 0;
+	} else if (property == amcrtc->prop_video_out_fence_ptr) {
+		*val = 0;
+		ret = 0;
+	} else
+		DRM_INFO("unsupported crtc property\n");
+	return ret;
 }
 
 static int meson_crtc_atomic_set_property(struct drm_crtc *crtc,
@@ -72,7 +94,37 @@ static int meson_crtc_atomic_set_property(struct drm_crtc *crtc,
 					struct drm_property *property,
 					uint64_t val)
 {
-	return 0;
+	struct am_meson_crtc *amcrtc;
+	struct am_meson_crtc_state *meson_crtc_state;
+	s32 __user *fence_ptr;
+	int ret = -EINVAL;
+
+	amcrtc = to_am_meson_crtc(crtc);
+	meson_crtc_state = to_am_meson_crtc_state(state);
+	if (property == amcrtc->prop_hdr_policy) {
+		meson_crtc_state->hdr_policy = val;
+		#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM
+		set_hdr_policy(val);
+		#endif
+		ret = 0;
+	} else if (property == amcrtc->prop_dv_policy) {
+		meson_crtc_state->dv_policy = val;
+		#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
+		set_dolby_vision_policy(val);
+		#endif
+		ret = 0;
+	} else if (property == amcrtc->prop_video_out_fence_ptr) {
+		fence_ptr = u64_to_user_ptr(val);
+		if (!fence_ptr)
+			return -EFAULT;
+		if (put_user(-1, fence_ptr))
+			return -EFAULT;
+		ret = 0;
+		meson_crtc_state->fence_state.video_out_fence_ptr = fence_ptr;
+		DRM_DEBUG("set video out fence ptr done\n");
+	} else
+		DRM_INFO("unsupported crtc property\n");
+	return ret;
 }
 
 static const struct drm_crtc_funcs am_meson_crtc_funcs = {
@@ -118,7 +170,7 @@ static void am_meson_crtc_enable(struct drm_crtc *crtc)
 		DRM_ERROR("no matched vout mode\n");
 		return;
 	}
-	if (is_meson_g12b_cpu() && is_meson_rev_b())
+	if (pipeline->osd_version == OSD_V3)
 		set_reset_rdma_trigger_line();
 	set_vout_init(mode);
 	update_vout_viu();
@@ -134,6 +186,7 @@ static void am_meson_crtc_disable(struct drm_crtc *crtc)
 {
 	struct am_meson_crtc *amcrtc = to_am_meson_crtc(crtc);
 	unsigned long flags;
+	enum vmode_e mode;
 
 	DRM_INFO("%s\n", __func__);
 	if (crtc->state->event && !crtc->state->active) {
@@ -146,8 +199,16 @@ static void am_meson_crtc_disable(struct drm_crtc *crtc)
 	spin_lock_irqsave(&amcrtc->vblank_irq_lock, flags);
 	amcrtc->vblank_enable = 0;
 	spin_unlock_irqrestore(&amcrtc->vblank_irq_lock, flags);
-
 	disable_irq(amcrtc->vblank_irq);
+	/*disable output by config null
+	 *Todo: replace or delete it if have new method
+	 */
+	mode = validate_vmode("null");
+	if (mode == VMODE_MAX) {
+		DRM_ERROR("no matched vout mode\n");
+		return;
+	}
+	set_vout_init(mode);
 }
 
 static void am_meson_crtc_commit(struct drm_crtc *crtc)
@@ -169,13 +230,72 @@ static int am_meson_atomic_check(struct drm_crtc *crtc,
 
 }
 
+static int am_meson_video_fence_setup(struct video_out_fence_state *fence_state,
+				      struct fence *fence)
+{
+	fence_state->fd = get_unused_fd_flags(O_CLOEXEC);
+	if (fence_state->fd < 0)
+		return fence_state->fd;
+
+	if (put_user(fence_state->fd, fence_state->video_out_fence_ptr))
+		return -EFAULT;
+
+	fence_state->sync_file = sync_file_create(fence);
+	if (!fence_state->sync_file)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int am_meson_video_fence_create(struct drm_crtc *crtc)
+{
+	struct am_meson_crtc *amcrtc;
+	struct am_meson_crtc_state *meson_crtc_state;
+	struct fence *fence;
+	struct video_out_fence_state *fence_state;
+	int ret, i;
+
+	amcrtc = to_am_meson_crtc(crtc);
+	meson_crtc_state = to_am_meson_crtc_state(crtc->state);
+	fence_state = &meson_crtc_state->fence_state;
+	fence = drm_crtc_create_fence(crtc);
+	if (!fence)
+		return -ENOMEM;
+	/*setup out fence*/
+	ret = am_meson_video_fence_setup(fence_state, fence);
+	if (ret) {
+		fence_put(fence);
+		return ret;
+	}
+	fd_install(fence_state->fd, fence_state->sync_file->file);
+	for (i = 0; i < VIDEO_LATENCY_VSYNC; i++) {
+		if (amcrtc->video_fence[i].fence)
+			continue;
+		amcrtc->video_fence[i].fence = fence;
+		atomic_set(&amcrtc->video_fence[i].refcount,
+			   VIDEO_LATENCY_VSYNC);
+		DRM_DEBUG("video fence create done index:%d\n", i);
+		break;
+	}
+	return 0;
+}
+
 static void am_meson_crtc_atomic_begin(struct drm_crtc *crtc,
 			     struct drm_crtc_state *old_crtc_state)
 {
 	struct am_meson_crtc *amcrtc;
+	struct am_meson_crtc_state *meson_crtc_state;
 	unsigned long flags;
+	int ret = 0;
 
 	amcrtc = to_am_meson_crtc(crtc);
+	meson_crtc_state = to_am_meson_crtc_state(crtc->state);
+	if (meson_crtc_state->fence_state.video_out_fence_ptr) {
+		ret = am_meson_video_fence_create(crtc);
+		meson_crtc_state->fence_state.video_out_fence_ptr = NULL;
+	}
+	if (ret)
+		DRM_INFO("video fence create fail\n");
 
 	if (crtc->state->event) {
 		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
@@ -251,6 +371,88 @@ static const struct drm_crtc_helper_funcs am_crtc_helper_funcs = {
 	.atomic_flush		= am_meson_crtc_atomic_flush,
 };
 
+/* Optional hdr_policy properties. */
+static const struct drm_prop_enum_list drm_hdr_policy_enum_list[] = {
+	{ DRM_MODE_HDR_FOLLOW_SINK, "HDR_follow_sink" },
+	{ DRM_MODE_HDR_FOLLOW_SOURCE, "HDR_follow_source" },
+};
+
+/* Optional dv_policy properties. */
+static const struct drm_prop_enum_list drm_dv_policy_enum_list[] = {
+	{ DRM_MODE_DV_FOLLOW_SINK, "DV_follow_sink" },
+	{ DRM_MODE_DV_FOLLOW_SOURCE, "DV_follow_source" },
+};
+
+int drm_plane_create_hdr_policy_property(struct drm_crtc *crtc)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop;
+	struct am_meson_crtc *amcrtc;
+	int hdr_policy;
+
+	#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM
+	hdr_policy = get_hdr_policy();
+	#else
+	hdr_policy = DRM_MODE_HDR_FOLLOW_SINK
+	#endif
+
+	amcrtc = to_am_meson_crtc(crtc);
+	prop = drm_property_create_enum(dev, 0, "hdr_policy",
+					drm_hdr_policy_enum_list,
+					ARRAY_SIZE(drm_hdr_policy_enum_list));
+	if (!prop)
+		return -ENOMEM;
+
+	drm_object_attach_property(&crtc->base, prop, hdr_policy);
+	amcrtc->prop_hdr_policy = prop;
+
+	return 0;
+}
+
+int drm_plane_create_dv_policy_property(struct drm_crtc *crtc)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop;
+	struct am_meson_crtc *amcrtc;
+	int dv_policy;
+
+	#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
+	dv_policy = get_dolby_vision_policy();
+	#else
+	dv_policy = DRM_MODE_DV_FOLLOW_SINK
+	#endif
+
+	amcrtc = to_am_meson_crtc(crtc);
+	prop = drm_property_create_enum(dev, 0, "dv_policy",
+					drm_dv_policy_enum_list,
+					ARRAY_SIZE(drm_dv_policy_enum_list));
+	if (!prop)
+		return -ENOMEM;
+
+	drm_object_attach_property(&crtc->base, prop, dv_policy);
+	amcrtc->prop_dv_policy = prop;
+
+	return 0;
+}
+
+int am_meson_crtc_create_video_out_fence_property(struct drm_crtc *crtc)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop;
+	struct am_meson_crtc *amcrtc;
+
+	amcrtc = to_am_meson_crtc(crtc);
+	prop = drm_property_create_range(dev, DRM_MODE_PROP_ATOMIC,
+					 "VIDEO_OUT_FENCE_PTR", 0, U64_MAX);
+	if (!prop)
+		return -ENOMEM;
+
+	drm_object_attach_property(&crtc->base, prop, 0);
+	amcrtc->prop_video_out_fence_ptr = prop;
+
+	return 0;
+}
+
 int am_meson_crtc_create(struct am_meson_crtc *amcrtc)
 {
 	struct meson_drm *priv = amcrtc->priv;
@@ -270,6 +472,9 @@ int am_meson_crtc_create(struct am_meson_crtc *amcrtc)
 		return ret;
 	}
 
+	drm_plane_create_hdr_policy_property(crtc);
+	drm_plane_create_dv_policy_property(crtc);
+	am_meson_crtc_create_video_out_fence_property(crtc);
 	drm_crtc_helper_add(crtc, &am_crtc_helper_funcs);
 	osd_drm_init(&osd_meson_dev);
 

@@ -304,4 +304,6 @@ void meson_tl1_gpu_init(void);
 void meson_tl1_misc_init(void);
 
 extern int clk_numbers;
+extern int tm2_revb_pcie;
+
 #endif /* __CLKC_H */

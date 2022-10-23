@@ -38,11 +38,16 @@
 			0 78 1
 			0 88 1>;
 		interrupt-names = "vsync","vbyone","tcon";
-		pinctrl-names = "vbyone","vbyone_off","tcon","tcon_off";
+		pinctrl-names = "vbyone","vbyone_off",
+				"tcon_p2p","tcon_p2p_usit","tcon_p2p_off",
+				"tcon_mlvds","tcon_mlvds_off";
 		pinctrl-0 = <&lcd_vbyone_pins>;
 		pinctrl-1 = <&lcd_vbyone_off_pins>;
-		pinctrl-2 = <&lcd_tcon_pins>;
-		pinctrl-3 = <&lcd_tcon_off_pins>;
+		pinctrl-2 = <&lcd_tcon_p2p_pins>;
+		pinctrl-3 = <&lcd_tcon_p2p_usit_pins>;
+		pinctrl-4 = <&lcd_tcon_p2p_off_pins>;
+		pinctrl-5 = <&lcd_tcon_mlvds_pins>;
+		pinctrl-6 = <&lcd_tcon_mlvds_off_pins>;
 		pinctrl_version = <2>; /* for uboot */
 
 		/* power type:(0=cpu_gpio, 2=signal, 3=extern, 0xff=ending) */

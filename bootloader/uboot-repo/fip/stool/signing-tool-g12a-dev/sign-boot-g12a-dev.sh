@@ -14,8 +14,21 @@ TOOL_PATH=${TOOL_PATH:-$(dirname $(readlink -f $0))/../signing-tool-g12a/}
 
 #source ${TOOL_PATH}/build.sh
 
+USE_TOOL_SCRIPT_VERSION=false
+case "$(uname)" in
+    CYGWIN*|MINGW32*|MSYS*)
+        USE_TOOL_SCRIPT_VERSION=true
+        echo Detected Windows OS
+        ;;
+esac
+if $USE_TOOL_SCRIPT_VERSION; then
+    CREATE_HEADER_TOOL=${SCRIPT_PATH}/create-header.sh
+else
+    CREATE_HEADER_TOOL=${TOOL_PATH}/sign-boot-g12a
+fi
+
 # Temporary files directory
-if [ -z "$TMP" ]; then
+if [ "$TMP" == "/tmp" ] || [ -z "$TMP" ]; then
     TMP=${SCRIPT_PATH}/tmp
 fi
 
@@ -149,7 +162,7 @@ pack_bl2() {
     if [ -z "$output" ]; then echo Error: Missing output file option -o; exit 1; fi
 
     # Add header
-    ${TOOL_PATH}/sign-boot-g12a --add-aml-block-header \
+    ${CREATE_HEADER_TOOL} --add-aml-block-header \
             -i $input \
             -s $size \
             -o $TMP/bl2.img-noiv
@@ -529,6 +542,7 @@ create_fip_unsigned() {
     local bl31_info=""
     local bl32_info=""
     local bl33=""
+    local bl40=""
     local output=""
     local argv=("$@")
     local i=0
@@ -575,6 +589,8 @@ create_fip_unsigned() {
                 bl32_info="${argv[$i]}" ;;
             --bl33)
                 bl33="${argv[$i]}" ;;
+            --bl40)
+                bl40="${argv[$i]}" ;;
             --ddrfw1)
                 ddrfw1="${argv[$i]}"
                 if [ "$ddrfw1" != "" ]; then
@@ -809,6 +825,9 @@ create_fip_unsigned() {
     check_file bl31_info "$bl31_info"
     check_file bl32_info "$bl32_info"
     check_file bl33 "$bl33"
+    if [ "$bl40" != "" ]; then
+        check_file bl40 "$bl40"
+    fi
 
     if [ -z "$output" ]; then echo Error: Missing output file option -o ; exit 1; fi
 
@@ -828,6 +847,7 @@ create_fip_unsigned() {
         --bl32-aes-key $TMP/zeroaeskey --bl32-aes-iv $TMP/zeroaesiv \
         --bl33 $bl33 --bl33-key $TMP/zerorsakey  \
         --bl33-aes-key $TMP/zeroaeskey --bl33-aes-iv $TMP/zeroaesiv \
+        $( [ -n "$bl40" ] && echo -n "--bl40 $bl40" ) \
         --bl31-info $bl31_info --bl32-info $bl32_info \
         --kernel-key $TMP/zerorsakey    \
         --kernel-aes-key $TMP/zeroaeskey --kernel-aes-iv $TMP/zeroaesiv \
@@ -926,10 +946,11 @@ create_unsigned_bl() {
     local bl2=""
     local bl2size=65536
     local bl30=""
-    local bl30size=58368
+    local bl30size=""
     local bl31=""
     local bl32=""
     local bl33=""
+    local bl40=""
     local ddrfw1=""
     local ddrfw2=""
     local ddrfw3=""
@@ -965,6 +986,8 @@ create_unsigned_bl() {
                 bl32="${argv[$i]}" ;;
             --bl33)
                 bl33="${argv[$i]}" ;;
+            --bl40)
+                bl40="${argv[$i]}" ;;
             --ddrfw1)
                 ddrfw1="${argv[$i]}" ;;
             --ddrfw2)
@@ -1000,6 +1023,9 @@ create_unsigned_bl() {
         check_file bl32 "$bl32"
     fi
     check_file bl33 "$bl33"
+    if [ "$bl40" != "" ]; then
+        check_file bl40 "$bl40"
+    fi
 
     local bl2_payload_size=$(wc -c < ${bl2})
     trace "BL2 size specified $bl2size"
@@ -1069,6 +1095,7 @@ create_unsigned_bl() {
         --bl31-info     $bl31 \
         --bl32-info     $bl32 \
         --bl33     $TMP/bl33.bin.img \
+        $( [ -n "$bl40" ] && echo -n "--bl40 $bl40" ) \
         --ddrfw1   "$ddrfw1" \
         --ddrfw2   "$ddrfw2" \
         --ddrfw3   "$ddrfw3" \
@@ -1087,9 +1114,66 @@ create_unsigned_bl() {
 
     cat $TMP/bl2.bin.img $TMP/fip.hdr.out $TMP/ddr.fw.bin $TMP/bl30.bin.img $TMP/bl31.bin.img \
         $TMP/bl32.bin.img $TMP/bl33.bin.img > $output
+    if [ "$bl40" != "" ]; then
+        cat "$bl40" >> "$output"
+    fi
 
     echo
     echo Created unsigned bootloader $output successfully
+}
+
+create_unsigned_bl40() {
+    local bl40=""
+    local bl40size=0
+    local output=""
+    local argv=("$@")
+    local i=0
+
+    # Parse args
+    i=0
+    while [ $i -lt $# ]; do
+        arg="${argv[$i]}"
+        i=$((i + 1))
+        case "$arg" in
+            --bl40)
+                bl40="${argv[$i]}" ;;
+            --bl40-size)
+                bl40size="${argv[$i]}" ;;
+            -o)
+                output="${argv[$i]}" ;;
+            *)
+                echo "Unknown option $arg"; exit 1 ;;
+        esac
+        i=$((i + 1))
+    done
+    # Verify args
+    check_file bl40 "$bl40"
+
+    local bl40_payload_size=$(wc -c < ${bl40})
+    if [ $bl40_payload_size -gt 241664 ]; then
+        echo Error: payload size overflow $bl40_payload_size
+        exit 1
+    fi
+    if [ $bl40size -eq 0 ]; then
+        bl40size=$(($bl40_payload_size + 4096))
+    fi
+    trace "BL40 size specified $bl40size"
+    trace "Input BL40 payload size $bl40_payload_size"
+    if [ $bl40size -ne $(($bl40_payload_size + 4096)) ]; then
+        echo Error: invalid bl40 input file size $bl40_payload_size
+        exit 1
+    fi
+
+    pack_bl2 -i $bl40 -o $TMP/bl40.bin.img -s $bl40size
+
+    # TODO:
+    # Call fixup script to create blxx_new.bin
+    #package
+
+    cat $TMP/bl40.bin.img > $output
+
+    echo
+    echo Created unsigned bl40 $output successfully
 }
 
 parse_main() {
@@ -1109,6 +1193,9 @@ parse_main() {
                 break ;;
             --create-unsigned-bl)
                 create_unsigned_bl "${argv[@]:$((i + 1))}"
+                break ;;
+            --create-unsigned-bl40)
+                create_unsigned_bl40 "${argv[@]:$((i + 1))}"
                 break ;;
             --create-root-hash)
                 create_root_hash "${argv[@]:$((i + 1))}"
@@ -1132,15 +1219,15 @@ cleanup() {
 
     if [ ! -d "$TMP" ]; then return; fi
     local tmpfiles="bl2.bin.img bl2.img bl2.img-noiv bl2.sha
-    bl30.bin.img bl31.bin bl31.bin.img bl32.bin bl32.bin.img
+    bl30.bin.img bl31.bin bl31.bin.img bl32.bin bl32.bin.img bl32.img-info
     bl33.bin.img bl.bin bl.hdr bl.hdr.sha blpad.bin
+    bl40.bin.img padded_bl30
     bl-pl.sha chkdata fip.bin fip.hdr fip.hdr.out
     fip.hdr.sha kernel keydata mod modhex nonce.bin
     rootkey0.bin rootkey0.sha rootkey1.bin rootkey1.sha
     rootkey0.pub rootkey1.pub rootkey2.pub rootkey3.pub
     rootkey2.bin rootkey2.sha rootkey3.bin rootkey3.sha rootkeys.sha
-    zeroaesiv zeroaeskey zerorsakey fip.hdr.bin fip.payload.bin bl3x.payload.bin bl3x.bin ddrfw*.padded* ddrfw*.hdr ddr.fw.bin
-    bl32.img-info"
+    zeroaesiv zeroaeskey zerorsakey fip.hdr.bin fip.payload.bin bl3x.payload.bin bl3x.bin ddrfw*.padded* ddrfw*.hdr ddr.fw.bin"
     for i in $tmpfiles ; do
         rm -f $TMP/$i
     done

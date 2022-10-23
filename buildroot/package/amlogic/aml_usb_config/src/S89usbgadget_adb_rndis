@@ -56,7 +56,11 @@ function start_usbgadget(){
         usb_adbd_init
         echo "usb abdd start..."
         sleep 5
-        echo ff400000.dwc2_a > /sys/kernel/config/usb_gadget/amlogic/UDC
+        if [ -f /etc/adb_udc_file ]; then
+            echo $(cat /etc/adb_udc_file) > /sys/kernel/config/usb_gadget/amlogic/UDC
+        else
+            echo ff400000.dwc2_a > /sys/kernel/config/usb_gadget/amlogic/UDC
+        fi
         #As usb_monitor will write UDC file, must move usb_monitor after the script written to UDC
 	    /usr/bin/usb_monitor &
         usb_net_ipconfig

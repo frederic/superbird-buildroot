@@ -29,14 +29,21 @@ if [ -f $1/etc/init.d/S82airplay2 ] ; then
 	sed -i 's/OPTIONS=.*/OPTIONS=\"-D dmixer_avs_auto --ipc-client \/tmp\/homeapp_airplay --mfi-device \/dev\/i2c-0 --mfi-address 0x10\"/' $1/etc/init.d/S82airplay2
 fi
 
+# One image support 3.1 and 5.1.2
+echo "Start to change /etc/init.d/S90audioservice to support output 3.1 and 5.1.2"
+if [ -f $1/etc/init.d/S90audioservice ] ; then
+	textexist=$(cat $1/etc/init.d/S90audioservice | grep default_audioservice_D621)
+	if [ -z "$textexist" ] ; then
+		sed -i 's/\/usr\/bin\/audioservice/\ \t&/' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/i \\t# touch /etc/D621 for D621(tas5782m) board output audio' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/i \\t# else ab311(ad82584f) board output audio' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/i \\tif [ -f /etc/D621 ]; then' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/i \ \t \ \t/usr/bin/audioservice /etc/default_audioservice_D621.conf&' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/i \\telse' $1/etc/init.d/S90audioservice
+		sed -i '/default_audioservice.conf/a \\tfi' $1/etc/init.d/S90audioservice
+	fi
+fi
+
 # Remove some no useful files
 rm -frv $1/etc/init.d/S60input
-
-# Change the /etc/default_audioservice.conf
-# The input list should match pure soundbar project
-#sed -i 'N;/\n.*\"name\":\t\"AIRPLAY\"/!P;D' $1/etc/default_audioservice.conf
-#sed -i '/\"name\":\t\"AIRPLAY\"/,/}],/{//!d}' $1/etc/default_audioservice.conf
-#sed -i '/\"name\":\t\"AIRPLAY\"/d' $1/etc/default_audioservice.conf
-sed -i 's/\"name\":\t\"GVA\"/\"name\":\t\"BT\"/' $1/etc/default_audioservice.conf
-sed -i 's/0x10403/0x10402/' $1/etc/default_audioservice.conf
 

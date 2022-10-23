@@ -1,7 +1,7 @@
 /*
  * Fundamental constants relating to IP Protocol
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: bcmip.h 705929 2017-06-20 00:06:46Z $
+ * $Id: bcmip.h 785436 2018-10-18 17:54:25Z $
  */
 
 #ifndef _bcmip_h_
@@ -212,11 +212,11 @@ ipv6_exthdr_len(uint8 *h, uint8 *proto)
 		if (eh->nexthdr == IPV6_EXTHDR_NONE)
 			return -1;
 		else if (eh->nexthdr == IPV6_EXTHDR_FRAGMENT)
-			hlen = 8;
+			hlen = 8U;
 		else if (eh->nexthdr == IPV6_EXTHDR_AUTH)
-			hlen = (eh->hdrlen + 2) << 2;
+			hlen = (uint16)((eh->hdrlen + 2U) << 2U);
 		else
-			hlen = IPV6_EXTHDR_LEN(eh);
+			hlen = (uint16)IPV6_EXTHDR_LEN(eh);
 
 		len += hlen;
 		eh = (struct ipv6_exthdr *)(h + len);

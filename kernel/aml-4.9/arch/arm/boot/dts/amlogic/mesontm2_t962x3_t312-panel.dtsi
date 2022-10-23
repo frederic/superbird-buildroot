@@ -38,11 +38,16 @@
 			0 78 1
 			0 88 1>;
 		interrupt-names = "vsync","vbyone","tcon";
-		pinctrl-names = "vbyone","vbyone_off","tcon","tcon_off";
+		pinctrl-names = "vbyone","vbyone_off",
+				"tcon_p2p","tcon_p2p_usit","tcon_p2p_off",
+				"tcon_mlvds","tcon_mlvds_off";
 		pinctrl-0 = <&lcd_vbyone_pins>;
 		pinctrl-1 = <&lcd_vbyone_off_pins>;
-		pinctrl-2 = <&lcd_tcon_pins>;
-		pinctrl-3 = <&lcd_tcon_off_pins>;
+		pinctrl-2 = <&lcd_tcon_p2p_pins>;
+		pinctrl-3 = <&lcd_tcon_p2p_usit_pins>;
+		pinctrl-4 = <&lcd_tcon_p2p_off_pins>;
+		pinctrl-5 = <&lcd_tcon_mlvds_pins>;
+		pinctrl-6 = <&lcd_tcon_mlvds_off_pins>;
 		pinctrl_version = <2>; /* for uboot */
 		memory-region = <&lcd_tcon_reserved>;
 
@@ -55,11 +60,9 @@
 			&gpio GPIOH_3 GPIO_ACTIVE_HIGH
 			&gpio GPIOH_12 GPIO_ACTIVE_HIGH
 			&gpio GPIOH_8 GPIO_ACTIVE_HIGH
-			&gpio GPIOH_10 GPIO_ACTIVE_HIGH
-			&gpio GPIOH_11 GPIO_ACTIVE_HIGH
 			&gpio GPIOH_14 GPIO_ACTIVE_HIGH>;
 		lcd_cpu_gpio_names = "GPIOAO_4","GPIOH_2","GPIOH_3","GPIOH_12",
-			"GPIOH_8","GPIOH_10","GPIOH_11","GPIOH_14";
+			"GPIOH_8","GPIOH_14";
 
 		lvds_0{
 			model_name = "1080p-vfreq";
@@ -101,7 +104,7 @@
 				2 0 0 10  /*signal disable*/
 				0 0 0 100 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <0>;
+			backlight_index = <0xff>;
 		};
 
 		lvds_1{
@@ -144,7 +147,7 @@
 				2 0 0 10  /*signal disable*/
 				0 0 0 100 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <0>;
+			backlight_index = <0xff>;
 		};
 		lvds_2{
 			model_name = "768p-vfreq";
@@ -186,7 +189,7 @@
 				2 0 0 10  /*signal disable*/
 				0 0 0 100 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <0>;
+			backlight_index = <0xff>;
 		};
 		vbyone_0{
 			model_name = "public_2region";
@@ -220,6 +223,7 @@
 				1 /*vbyone_intr_enable */
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <0 0 1 50 /*panel power on*/
@@ -228,7 +232,7 @@
 			power_off_step = <2 0 0 10 /*signal disable*/
 					0 0 0 200  /*panel power off*/
 					0xff 0 0 0>; /*ending*/
-			backlight_index = <2>;
+			backlight_index = <1>;
 		};
 		vbyone_1{
 			model_name = "public_1region";
@@ -262,6 +266,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -272,7 +277,7 @@
 				2 0 0 10  /*signal disable*/
 				0 0 0 200 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <2>;
+			backlight_index = <1>;
 		};
 		vbyone_2{
 			model_name = "public_2region_hdmi";
@@ -306,6 +311,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -316,7 +322,7 @@
 				2 0 0 10  /*signal disable*/
 				0 0 0 200 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <2>;
+			backlight_index = <1>;
 		};
 		vbyone_3{
 			model_name = "BOE_HV550QU2";
@@ -350,6 +356,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -362,7 +369,7 @@
 				0 3 2 0  /*3d_disable*/
 				0 0 0 100 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <2>;
+			backlight_index = <1>;
 		};
 		vbyone_4{
 			model_name = "BOE_HV550QU2_1region";
@@ -396,6 +403,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -408,7 +416,7 @@
 				0 3 2 0  /*3d_disable*/
 				0 0 0 100 /*panel power off*/
 				0xff 0 0 0>; /*ending*/
-			backlight_index = <2>;
+			backlight_index = <1>;
 		};
 		p2p_0{
 			model_name = "p2p_ceds";
@@ -799,19 +807,14 @@
 		compatible = "amlogic, backlight-tm2";
 		status = "okay";
 		key_valid = <1>;
-		pinctrl-names = "pwm_on","pwm_vs_on",
-				"pwm_combo_0_1_on",
+		pinctrl-names = "pwm_vs_on",
 				"pwm_combo_0_vs_1_on",
-				"pwm_combo_0_1_vs_on",
 				"pwm_off",
 				"pwm_combo_off";
-		pinctrl-0 = </*&pwm_c_pins3*/>;
-		pinctrl-1 = <&bl_pwm_vs_on_pins>;
-		pinctrl-2 = </*&pwm_c_pins3*/ &pwm_d_pins2>;
-		pinctrl-3 = <&bl_pwm_combo_0_vs_on_pins &pwm_d_pins2>;
-		pinctrl-4 = </*&pwm_c_pins3*/ &bl_pwm_combo_1_vs_on_pins>;
-		pinctrl-5 = <&bl_pwm_off_pins>;
-		pinctrl-6 = <&bl_pwm_combo_off_pins>;
+		pinctrl-0 = <&bl_pwm_vs_on_pins>;
+		pinctrl-1 = <&bl_pwm_combo_0_vs_on_pins &pwm_c_pins2>;
+		pinctrl-2 = <&bl_pwm_off_pins>;
+		pinctrl-3 = <&bl_pwm_combo_off_pins>;
 		pinctrl_version = <2>; /* for uboot */
 		interrupts = <0 3 1>;
 		interrupt-names = "ldim_vsync";
@@ -821,31 +824,13 @@
 		/* power index:(point gpios_index, 0xff=invalid) */
 		/* power value:(0=output low, 1=output high, 2=input) */
 		/* power delay:(unit in ms) */
-		bl-gpios = <&gpio_ao GPIOAO_11 GPIO_ACTIVE_HIGH
-			&gpio GPIOZ_5 GPIO_ACTIVE_HIGH
-			&gpio GPIOZ_6 GPIO_ACTIVE_HIGH>;
-		bl_gpio_names = "GPIOAO_11","GPIOZ_5","GPIOZ_6";
+		bl-gpios = <&gpio GPIOH_11 GPIO_ACTIVE_HIGH
+			&gpio GPIOH_10 GPIO_ACTIVE_HIGH
+			&gpio GPIOH_13 GPIO_ACTIVE_HIGH>;
+		bl_gpio_names = "GPIOH_11","GPIOH_10","GPIOH_13";
 
 		backlight_0{
 			index = <0>;
-			bl_name = "backlight_pwm";
-			bl_level_default_uboot_kernel = <100 100>;
-			bl_level_attr = <255 10 /*max, min*/
-				128 128>; /*mid, mid_mapping*/
-			bl_ctrl_method = <1>; /*1=pwm,2=pwm_combo,3=ldim*/
-			bl_power_attr = <0 /*en_gpio_index*/
-				1 0 /*on_value, off_value*/
-				200 200>; /*on_delay(ms), off_delay(ms)*/
-			bl_pwm_port = "PWM_C";
-			bl_pwm_attr = <1 /*pwm_method(0=negative, 1=positvie)*/
-				180 /*pwm_freq(pwm:Hz, pwm_vs:multiple of vs)*/
-				100 25>; /*duty_max(%), duty_min(%)*/
-			bl_pwm_power = <1 0 /*pwm_gpio_index, pwm_gpio_off*/
-				10 10>; /*pwm_on_delay(ms), pwm_off_delay(ms)*/
-			bl_pwm_en_sequence_reverse = <0>; /* 1 for reverse */
-		};
-		backlight_1{
-			index = <1>;
 			bl_name = "backlight_pwm_vs";
 			bl_level_default_uboot_kernel = <100 100>;
 			bl_level_attr = <255 10 /*max, min*/
@@ -862,8 +847,8 @@
 				10 10>; /*pwm_on_delay(ms), pwm_off_delay(ms)*/
 			bl_pwm_en_sequence_reverse = <0>; /* 1 for reverse */
 		};
-		backlight_2{
-			index = <2>;
+		backlight_1{
+			index = <1>;
 			bl_name = "backlight_pwm_combo";
 			bl_level_default_uboot_kernel = <31 100>;
 			bl_level_attr = <255 10 /*max, min*/
@@ -874,9 +859,9 @@
 				410 110>; /*on_delay(ms), off_delay(ms)*/
 			bl_pwm_combo_level_mapping = <255 10 /*pwm_0 range*/
 				0 0>; /*pwm_1 range*/
-			bl_pwm_combo_port = "PWM_C","PWM_D";
+			bl_pwm_combo_port = "PWM_VS","PWM_C";
 			bl_pwm_combo_attr = <1 /*pwm0 method*/
-				180 /*pwm0 freq(pwm:Hz, pwm_vs:multiple of vs)*/
+				3 /*pwm0 freq(pwm:Hz, pwm_vs:multiple of vs)*/
 				100 25 /*pwm0 duty_max(%), duty_min(%)*/
 				1 /*pwm1 method*/
 				18000 /*pwm1 freq(pwm:Hz, pwm_vs:multi of vs)*/
@@ -885,8 +870,8 @@
 				2 0 /*pwm1 gpio_index, gpio_off*/
 				10 10>; /*pwm_on_delay(ms), pwm_off_delay(ms)*/
 		};
-		backlight_3{
-			index = <3>;
+		backlight_2{
+			index = <2>;
 			bl_name = "pwm_combo_ldim_test";
 			bl_level_default_uboot_kernel = <31 100>;
 			bl_level_attr = <255 10 /*max, min*/
@@ -897,9 +882,9 @@
 				410 110>; /*on_delay(ms), off_delay(ms)*/
 			bl_pwm_combo_level_mapping = <255 10 /*pwm_0 range*/
 				0 0>; /*pwm_1 range*/
-			bl_pwm_combo_port = "PWM_C","PWM_D";
+			bl_pwm_combo_port = "PWM_VS","PWM_C";
 			bl_pwm_combo_attr = <1 /*pwm0 method*/
-				180 /*pwm0 freq(pwm:Hz, pwm_vs:multiple of vs)*/
+				3 /*pwm0 freq(pwm:Hz, pwm_vs:multiple of vs)*/
 				100 25 /*pwm0 duty_max(%), duty_min(%)*/
 				1 /*pwm1 method*/
 				18000 /*pwm1 freq(pwm:Hz, pwm_vs:multi of vs)*/
@@ -909,8 +894,8 @@
 				10 10>; /*pwm_on_delay(ms), pwm_off_delay(ms)*/
 			bl_ldim_region_row_col = <2 10>;
 		};
-		backlight_4{
-			index = <4>;
+		backlight_3{
+			index = <3>;
 			bl_name = "ldim_global";
 			bl_level_default_uboot_kernel = <100 100>;
 			bl_level_attr = <255 10 /*max, min*/
@@ -926,8 +911,8 @@
 					     */
 			ldim_dev_index = <1>;
 		};
-		backlight_5{
-			index = <5>;
+		backlight_4{
+			index = <4>;
 			bl_name = "ldim_iw7027";
 			bl_level_default_uboot_kernel = <100 100>;
 			bl_level_attr = <255 10 /*max, min*/
@@ -959,34 +944,30 @@
 	local_dimming_device {
 		compatible = "amlogic, ldim_dev";
 		status = "okay";
-		pinctrl-names = "ldim_pwm",
-			"ldim_pwm_vs",
-			"ldim_pwm_combo",
+		pinctrl-names = "ldim_pwm_vs",
 			"ldim_pwm_vs_combo",
 			"ldim_pwm_off",
 			"ldim_pwm_combo_off";
-		pinctrl-0 = <&pwm_c_pins3>;
-		pinctrl-1 = <&bl_pwm_vs_on_pins>;
-		pinctrl-2 = <&pwm_c_pins3 &pwm_d_pins2>;
-		pinctrl-3 = <&bl_pwm_vs_on_pins &pwm_d_pins2>;
-		pinctrl-4 = <&bl_pwm_off_pins>;
-		pinctrl-5 = <&bl_pwm_combo_off_pins>;
+		pinctrl-0 = <&bl_pwm_vs_on_pins>;
+		pinctrl-1 = <&bl_pwm_combo_0_vs_on_pins &pwm_c_pins2>;
+		pinctrl-2 = <&bl_pwm_off_pins>;
+		pinctrl-3 = <&bl_pwm_combo_off_pins>;
 		pinctrl_version = <1>; /* for uboot */
 		ldim_pwm_config = <&bl_pwm_conf>;
 
 		/* pwm port: PWM_A, PWM_B, PWM_C, PWM_D, PWM_E, PWM_F, PWM_VS*/
-		ldim_dev-gpios = <&gpio_ao GPIOAO_11 GPIO_ACTIVE_HIGH
-			&gpio GPIOZ_5 GPIO_ACTIVE_HIGH
-			&gpio GPIOZ_6 GPIO_ACTIVE_HIGH>;
-		ldim_dev_gpio_names = "GPIOAO_11","GPIOZ_5","GPIOZ_6";
+		ldim_dev-gpios = <&gpio GPIOH_11 GPIO_ACTIVE_HIGH
+			&gpio GPIOH_10 GPIO_ACTIVE_HIGH
+			&gpio GPIOH_13 GPIO_ACTIVE_HIGH>;
+		ldim_dev_names = "GPIOH_11","GPIOH_10","GPIOH_13";
 
 		ldim_dev_0 {
 			index = <0>;
 			type = <0>; /*0=normal, 1=spi, 2=i2c*/
 			ldim_dev_name = "ob3350";
-			ldim_pwm_port = "PWM_C";
+			ldim_pwm_port = "PWM_VS";
 			ldim_pwm_attr = <0 /* pol */
-				200 /*freq(pwm:Hz, pwm_vs:multiple of vs)*/
+				3 /*freq(pwm:Hz, pwm_vs:multiple of vs)*/
 				50>;/*default duty(%)*/
 			en_gpio_on_off = <0 /*ldim_dev-gpios index*/
 				1 0>; /*on_level, off_level*/
@@ -996,11 +977,11 @@
 			index = <1>;
 			type = <0>; /*0=normal, 1=spi, 2=i2c*/
 			ldim_dev_name = "global";
-			ldim_pwm_port = "PWM_C";
+			ldim_pwm_port = "PWM_VS";
 			ldim_pwm_attr = <1 /* pol */
-				180 /*freq(pwm:Hz, pwm_vs:multiple of vs)*/
+				3 /*freq(pwm:Hz, pwm_vs:multiple of vs)*/
 				50>;/*default duty(%)*/
-			analog_pwm_port = "PWM_D";
+			analog_pwm_port = "PWM_C";
 			analog_pwm_attr = <1 /*pol(0=negative, 1=positvie)*/
 				18000 /*freq(pwm:Hz)*/
 				100 25 /*duty_max(%), duty_min(%)*/

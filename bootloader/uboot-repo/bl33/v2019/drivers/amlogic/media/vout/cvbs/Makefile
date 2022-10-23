@@ -1,1 +1,0 @@
-obj-$(CONFIG_AML_CVBS) += aml_cvbs.o

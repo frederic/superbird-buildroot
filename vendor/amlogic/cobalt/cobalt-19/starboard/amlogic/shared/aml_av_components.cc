@@ -4,9 +4,26 @@
 #include "third_party/starboard/amlogic/shared/decode_target_internal.h"
 #if defined(COBALT_WIDEVINE_OPTEE)
 #include "widevine/drm_system_widevine.h"
+
+#if defined(SECMEM_V2)
+static DlFuncWrapper<unsigned int (*)(void **)> dlSecure_V2_SessionCreate;
+static DlFuncWrapper<unsigned int (*)(void **)> dlSecure_V2_SessionDestroy;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int,unsigned int,unsigned int,unsigned int)> dlSecure_V2_Init;
+static DlFuncWrapper<unsigned int (*)(void *,void *)> dlSecure_V2_MemCreate;
+static DlFuncWrapper<unsigned int (*)(void *, unsigned int ,unsigned int,unsigned int *)> dlSecure_V2_MemAlloc;
+static DlFuncWrapper<unsigned int (*)(void *, unsigned int)> dlSecure_V2_MemFree;
+static DlFuncWrapper<unsigned int (*)(void * ,void *, unsigned int, unsigned int *,unsigned int *)> dlSecure_V2_GetVp9HeaderSize;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int,unsigned int *)> dlSecure_V2_MemToPhy;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemPop;
+static DlFuncWrapper<unsigned int (*)(void *,unsigned int)> dlSecure_V2_MemRelease;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemFlush;
+static DlFuncWrapper<unsigned int (*)(void *)> dlSecure_V2_MemClear;
+
+#else
 static DlFuncWrapper<unsigned int (*)(unsigned int,unsigned int)> dlSecure_AllocSecureMem;
 static DlFuncWrapper<unsigned int(*)()> dlSecure_ReleaseResource;
 static DlFuncWrapper<unsigned int (*)(void *, unsigned int, unsigned int *)> dlSecure_GetVp9HeaderSize;
+#endif
 #endif
 
 #include <fcntl.h>
@@ -29,8 +46,11 @@ uint8_t * AmlAVCodec::sec_drm_mem_virt = NULL;
 int AmlAVCodec::sec_drm_mem_off = 0;
 int AmlAVCodec::sec_mem_size = 1024*1024*2;
 int AmlAVCodec::sec_mem_pos = 0;
+#if defined(SECMEM_V2)
+void * AmlAVCodec::secmem_session =NULL;
+unsigned int  AmlAVCodec::secmem_handle=0;
 #endif
-
+#endif
 AmlAVCodec::AmlAVCodec()
     : eos_state(0), name("none: "), prerolled(false), feed_data_func(nullptr) {
   codec_param = (codec_para_t *)calloc(1, sizeof(codec_para_t));
@@ -49,6 +69,23 @@ AmlAVCodec::~AmlAVCodec() {
     codec_reset(codec_param);
     codec_close(codec_param);
 #if defined(COBALT_WIDEVINE_OPTEE)
+
+#if defined(SECMEM_V2)
+  if (codec_param->drmmode == 1) {
+    if (secmem_session) {
+      dlSecure_V2_MemFlush(secmem_session);
+      dlSecure_V2_MemClear(secmem_session);
+      dlSecure_V2_SessionDestroy(&secmem_session);
+      sec_drm_mem = NULL;
+    }
+
+    if (sec_drm_mem_virt) {
+        munmap(sec_drm_mem_virt, sec_mem_size);
+        sec_drm_mem_virt = NULL;
+    }
+    sec_mem_pos = 0;
+  }
+#else
     if (codec_param->drmmode == 1) {
       if (sec_drm_mem) {
         dlSecure_ReleaseResource();
@@ -60,6 +97,7 @@ AmlAVCodec::~AmlAVCodec() {
       }
       sec_mem_pos = 0;
     }
+#endif
 #endif
     free(codec_param);
     codec_param = NULL;
@@ -472,11 +510,29 @@ bool AmlAVCodec::LoadDrmRequiredLibraries(void) {
       }
     }
   }
+#if defined(SECMEM_V2)
+  dlSecure_V2_SessionCreate.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_SessionCreate");
+  dlSecure_V2_SessionDestroy.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_SessionDestroy");
+  dlSecure_V2_Init.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_Init");
+  dlSecure_V2_MemCreate.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemCreate");
+  dlSecure_V2_MemRelease.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemRelease");
+  dlSecure_V2_MemAlloc.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemAlloc");
+  dlSecure_V2_MemFree.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemFree");
+  dlSecure_V2_GetVp9HeaderSize.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_GetVp9HeaderSize");
+  dlSecure_V2_MemToPhy.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemToPhy");
+  dlSecure_V2_MemPop.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemPop");
+  dlSecure_V2_MemRelease.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemRelease");
+  dlSecure_V2_MemFlush.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemFlush");
+  dlSecure_V2_MemClear.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_V2_MemClear");
+  s_drm_libraries_loaded = true;
+  return true;
+#else
   dlSecure_AllocSecureMem.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_AllocSecureMem");
   dlSecure_ReleaseResource.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_ReleaseResource");
   dlSecure_GetVp9HeaderSize.Load(s_drm_libraries_dlopen[1].dlHandle, "Secure_GetVp9HeaderSize");
   s_drm_libraries_loaded = true;
   return true;
+#endif
 }
 #endif
 
@@ -569,7 +625,7 @@ bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
     return true;
   }
   pts_sb = input_buffer->timestamp();
-  if (input_buffer->drm_info()) {
+  if (input_buffer->drm_info() || (SbDrmSystemIsValid(drm_system_) && isvideo)) {
     if (!SbDrmSystemIsValid(drm_system_)) {
       return false;
     }
@@ -620,6 +676,15 @@ bool AmlAVCodec::AVWriteSample(const scoped_refptr<InputBuffer> &input_buffer,
   if (feed_data_func) {
     success = feed_data_func(data, size, written);
   } else {
+#if defined(SECMEM_V2)
+    if ((input_buffer->drm_info() || (SbDrmSystemIsValid(drm_system_) && isvideo)))//only for encrypt H264 video, same condition as enter TEE Decrypt
+    {
+      unsigned int phyaddr;
+      drminfo_t *drminfo = (drminfo_t *)data;
+      dlSecure_V2_MemToPhy(secmem_session, secmem_handle, &phyaddr);
+      drminfo->drm_phy = phyaddr;
+    }
+#endif
     success = WriteCodec(data, size, written);
   }
   if (success && *written) {
@@ -806,6 +871,57 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
   decode_target_graphics_context_provider_ = decode_target_graphics_context_provider;
   codec_param->has_video = 1;
 #if defined(COBALT_WIDEVINE_OPTEE)
+#if defined(SECMEM_V2)
+  if (drm_system_) {
+    if (!LoadDrmRequiredLibraries()) {
+      CLOG(ERROR) << "can't load drm library, encrypted content will not play";
+      drm_system_ = kSbDrmSystemInvalid;
+    }
+  }
+  if (drm_system_) {
+    codec_param->drmmode = 1;
+    if (secmem_session) {
+      dlSecure_V2_MemFlush(secmem_session);
+      dlSecure_V2_MemClear(secmem_session);
+      dlSecure_V2_SessionDestroy(&secmem_session);
+      sec_drm_mem = NULL;
+    }
+    bool is_4k = true;
+    int flags = 0;
+    unsigned int phyaddr = 0;
+    if (video_codec == kSbMediaVideoCodecVp9)
+      flags = 2 | (1 << 9) | (1 << 4);//1 for 1080p and 2 for 4K
+    else
+      flags = 2 | (1 << 9);
+    int ret = dlSecure_V2_SessionCreate(&secmem_session);
+    if (ret)
+      goto out;
+    ret = dlSecure_V2_Init(secmem_session, 1, flags, 0, 0);
+    if (ret)
+      goto fail3;
+    ret = dlSecure_V2_MemCreate(secmem_session, &secmem_handle);
+    if (ret)
+      goto fail2;
+    ret = dlSecure_V2_MemAlloc(secmem_session, secmem_handle, sec_mem_size, &phyaddr);
+    if (ret == 0)
+      goto out;
+fail1:
+    dlSecure_V2_MemFree(secmem_session, secmem_handle);
+fail2:
+    dlSecure_V2_MemRelease(secmem_session, secmem_handle);
+    secmem_handle = 0;
+fail3:
+    dlSecure_V2_SessionDestroy(&secmem_session);
+    secmem_session = 0;
+out:
+    sec_drm_mem = (uint8_t *) secmem_handle;
+    sec_drm_mem_virt = NULL;
+    sec_mem_pos = 0;
+    (static_cast<::starboard::shared::widevine::DrmSystemWidevine*>(drm_system_))->AttachDecoder(this);
+    CLOG(WARNING) << "Enable TVP, sec memory " << (void*)sec_drm_mem << ", mapped address " << (void*)sec_drm_mem_virt << ", offset " << sec_drm_mem_off;
+    frame_data.resize(sizeof(drminfo_t));
+  }
+#else
   if (drm_system_) {
     if (!LoadDrmRequiredLibraries()) {
       CLOG(ERROR) << "can't load drm library, encrypted content will not play";
@@ -839,6 +955,7 @@ AmlVideoRenderer::AmlVideoRenderer(SbMediaVideoCodec video_codec,
     CLOG(WARNING) << "Enable TVP, sec memory " << (void*)sec_drm_mem << ", mapped address " << (void*)sec_drm_mem_virt << ", offset " << sec_drm_mem_off;
     frame_data.resize(sizeof(drminfo_t));
   }
+#endif
 #endif
   if (video_codec == kSbMediaVideoCodecVp9) {
     codec_param->video_type = VFORMAT_VP9;
@@ -1125,8 +1242,18 @@ bool AmlVideoRenderer::WriteVP9SampleTvp(uint8_t *buf, int dsize,
   unsigned int header_size = 0;
   frame_data.assign(buf, buf + dsize);
   drminfo_t *drminfo = (drminfo_t *)&frame_data[0];
+
+#if defined(SECMEM_V2)
+  unsigned int frames[8]={0};
+  unsigned int phyaddr = 0;
+  dlSecure_V2_MemToPhy(secmem_session, secmem_handle, &phyaddr);
+  drminfo->drm_phy = phyaddr;// cmd need hanele id ,but headersize need phy address.
+  dlSecure_V2_GetVp9HeaderSize(secmem_session,(void *)drminfo->drm_phy, drminfo->drm_pktsize,
+                          &header_size,frames);
+#else
   dlSecure_GetVp9HeaderSize((void *)drminfo->drm_phy, drminfo->drm_pktsize,
                           &header_size);
+#endif
   drminfo->drm_pktsize += header_size;
   return WriteCodec(&frame_data[0], frame_data.size(), written);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016,2018-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -212,6 +212,10 @@ typedef struct _HTC_TARGET {
     * Besides, nodrop pkts have higher priority than normal pkts.
     */
     A_BOOL                      is_nodrop_pkt;
+#ifdef HIF_SDIO
+    /* RX: enable bundle different SDIO block frames */
+    A_BOOL                      enable_b2b;
+#endif
 } HTC_TARGET;
 
 #define HTC_ENABLE_BUNDLE(target) (target->MaxMsgsPerHTCBundle > 1)
@@ -278,7 +282,13 @@ void        HTCProcessCreditRpt(HTC_TARGET        *target,
                                 int                NumEntries,
                                 HTC_ENDPOINT_ID    FromEndpoint);
 void        HTCFwEventHandler(void *context, A_STATUS status);
-void        HTCSendCompleteCheckCleanup(void *context);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void HTCSendCompleteCheckCleanup(struct timer_list *t);
+#else
+void HTCSendCompleteCheckCleanup(void *context);
+#endif
+
 void        HTCTxResumeAllHandler(void *context);
 
 void htc_credit_record(htc_credit_exchange_type type, A_UINT32 tx_credit,
@@ -334,20 +344,6 @@ HTCSendCompleteCheck(HTC_ENDPOINT *pEndpoint, int force)
 #ifdef __cplusplus
 }
 #endif
-
-#define HTC_RECYCLE_RX_PKT(target,p,e)                           \
-{                                                                \
-    if ((p)->PktInfo.AsRx.HTCRxFlags & HTC_RX_PKT_NO_RECYCLE) {  \
-         HTC_PACKET_RESET_RX(pPacket);                           \
-         pPacket->Status = A_ECANCELED;                          \
-         (e)->EpCallBacks.EpRecv((e)->EpCallBacks.pContext,      \
-                                 (p));                           \
-    } else {                                                     \
-        HTC_PACKET_RESET_RX(pPacket);                            \
-        HTCAddReceivePkt((HTC_HANDLE)(target),(p));              \
-    }                                                            \
-}
-
 
 #ifndef DEBUG_BUNDLE
 #define DEBUG_BUNDLE 0

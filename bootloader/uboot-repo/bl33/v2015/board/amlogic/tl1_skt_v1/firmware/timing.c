@@ -61,7 +61,7 @@
 //#define DMC_TEST_SLT_ENABLE_DDR_AUTO_FAST_BOOT 1<<5
 //#define DMC_TEST_SLT_ENABLE_DDR_AUTO_WINDOW_TEST 1<<4
 
-ddr_set_t __ddr_setting[] = {
+ddr_set_t __ddr_setting[] __attribute__ ((section(".ddr_settings"))) = {
 {
 	//lpddr4
 	.board_id				= CONFIG_BOARD_ID_MASK,
@@ -148,7 +148,7 @@ ddr_set_t __ddr_setting[] = {
 	.ac_drv_ohm				= 60,
 	.soc_data_drv_ohm_p		= 40,
 	.soc_data_drv_ohm_n		= 40,
-	.soc_data_odt_ohm_p		= 60,//120, //48, ddr3 will use odt_ohm_p value
+	.soc_data_odt_ohm_p		= 80,//120, //48, ddr3 will use odt_ohm_p value
 	.soc_data_odt_ohm_n		= 0,//120,
 	.dram_data_drv_ohm		= 40, //ddr4 sdram only 34 or 48, skt board use 34 better
 	.dram_data_odt_ohm		= 40,

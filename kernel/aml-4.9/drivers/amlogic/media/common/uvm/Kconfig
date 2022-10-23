@@ -1,0 +1,13 @@
+#
+# uvm core configuration
+#
+
+
+menuconfig AMLOGIC_UVM_CORE
+	bool "Amlogic unified video memory management"
+	default n
+	help
+	  say y to enable Amlogic unified video memory management.
+	  uvm wrap the video metadata info vframe_s so that decoder
+	  and display can decouple.
+

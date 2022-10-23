@@ -1,0 +1,6 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "tm2_ab311_SBR.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesontm2_ab311_sbr/initramfs/ramfslist-32"

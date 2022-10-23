@@ -425,6 +425,11 @@ s32 optee_load_fw(enum vformat_e type, const char *fw_name)
 		vdec = OPTEE_VDEC_HEVC;
 		break;
 
+	case VFORMAT_AV1:
+		format = VIDEO_DEC_AV1_MMU;
+		vdec = OPTEE_VDEC_HEVC;
+		break;
+
 	case VFORMAT_HEVC:
 		if (!strcmp(name, "h265_mmu"))
 			format = VIDEO_DEC_HEVC_MMU;

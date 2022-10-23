@@ -26,8 +26,7 @@ define IPC_PROPERTY_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 755 $(@D)/ipc-property $(TARGET_DIR)/usr/bin/
 	$(INSTALL) -D -m 755 $(@D)/ipc-property-service $(TARGET_DIR)/usr/bin/
 	$(INSTALL) -D -m 644 $(@D)/libipc-property.so $(TARGET_DIR)/usr/lib/
-	$(INSTALL) -D -m 755 $(IPC_PROPERTY_PKGDIR)/S45ipc-property-service $(TARGET_DIR)/etc/init.d/
-	$(INSTALL) -D -m 644 $(IPC_PROPERTY_PKGDIR)/ipc.json $(TARGET_DIR)/etc/
+	$(INSTALL) -D -m 755 $(@D)/startup.sh $(TARGET_DIR)/etc/init.d/S45ipc-property
 endef
 
 $(eval $(cmake-package))

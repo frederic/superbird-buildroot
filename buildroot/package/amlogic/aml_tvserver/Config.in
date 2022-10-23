@@ -1,6 +1,7 @@
 config BR2_PACKAGE_AML_TVSERVER
         bool "aml_tvserver"
         select BR2_PACKAGE_DBUS
+        select BR2_PACKAGE_HAL_AUDIO_SERVICE
         help
           amlogic tv library and bin.
 

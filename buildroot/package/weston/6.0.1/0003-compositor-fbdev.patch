@@ -1,0 +1,140 @@
+From 5ab74245d9fbefaf70d72180e775f0f8cc1a3d3b Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Wed, 22 Jan 2020 14:30:02 +0800
+Subject: [PATCH 3/7] compositor-fbdev
+
+---
+ libweston/compositor-fbdev.c | 43 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 40 insertions(+), 3 deletions(-)
+
+diff --git a/libweston/compositor-fbdev.c b/libweston/compositor-fbdev.c
+index 6031be5..a590e2f 100644
+--- a/libweston/compositor-fbdev.c
++++ b/libweston/compositor-fbdev.c
+@@ -50,6 +50,7 @@
+ #include "launcher-util.h"
+ #include "pixman-renderer.h"
+ #include "libinput-seat.h"
++#include "gl-renderer.h"
+ #include "presentation-time-server-protocol.h"
+ 
+ struct fbdev_backend {
+@@ -101,6 +102,8 @@ struct fbdev_output {
+ 	pixman_image_t *hw_surface;
+ };
+ 
++static struct gl_renderer_interface *gl_renderer;
++
+ static const char default_seat[] = "seat0";
+ 
+ static inline struct fbdev_head *
+@@ -420,6 +423,7 @@ fbdev_frame_buffer_open(const char *fb_dev,
+ 	return fd;
+ }
+ 
++#ifdef BUILD_USE_PIXMAN
+ /* Closes the FD on success or failure. */
+ static int
+ fbdev_frame_buffer_map(struct fbdev_output *output, int fd)
+@@ -470,6 +474,7 @@ out_close:
+ 
+ 	return retval;
+ }
++#endif
+ 
+ static void
+ fbdev_frame_buffer_unmap(struct fbdev_output *output)
+@@ -535,18 +540,30 @@ fbdev_output_enable(struct weston_output *base)
+ 		weston_log("Creating frame buffer failed.\n");
+ 		return -1;
+ 	}
+-
++#ifdef BUILD_USE_PIXMAN
+ 	if (fbdev_frame_buffer_map(output, fb_fd) < 0) {
+ 		weston_log("Mapping frame buffer failed.\n");
+ 		return -1;
+ 	}
++#endif
+ 
+ 	output->base.start_repaint_loop = fbdev_output_start_repaint_loop;
+ 	output->base.repaint = fbdev_output_repaint;
+ 
++#ifdef BUILD_USE_PIXMAN
+ 	if (pixman_renderer_output_create(&output->base,
+ 					PIXMAN_RENDERER_OUTPUT_USE_SHADOW) < 0)
+ 		goto out_hw_surface;
++#else
++	setenv("HYBRIS_EGLPLATFORM", "wayland", 1);
++	if (gl_renderer->output_window_create(&output->base,
++				       (EGLNativeWindowType)NULL, NULL,
++				       gl_renderer->opaque_attribs,
++				       NULL, 0) < 0) {
++		weston_log("gl_renderer_output_create failed.\n");
++		goto out_hw_surface;
++	}
++#endif
+ 
+ 	loop = wl_display_get_event_loop(backend->compositor->wl_display);
+ 	output->finish_frame_timer =
+@@ -568,6 +585,7 @@ out_hw_surface:
+ static int
+ fbdev_output_disable(struct weston_output *base)
+ {
++#ifdef BUILD_USE_PIXMAN
+ 	struct fbdev_output *output = to_fbdev_output(base);
+ 
+ 	if (!base->enabled)
+@@ -578,7 +596,7 @@ fbdev_output_disable(struct weston_output *base)
+ 
+ 	pixman_renderer_output_destroy(&output->base);
+ 	fbdev_frame_buffer_unmap(output);
+-
++#endif
+ 	return 0;
+ }
+ 
+@@ -728,12 +746,13 @@ fbdev_output_reenable(struct fbdev_backend *backend,
+ 		fbdev_output_disable(&output->base);
+ 		return fbdev_output_enable(&output->base);
+ 	}
+-
++#ifdef BUILD_USE_PIXMAN
+ 	/* Map the device if it has the same details as before. */
+ 	if (fbdev_frame_buffer_map(output, fb_fd) < 0) {
+ 		weston_log("Mapping frame buffer failed.\n");
+ 		return -1;
+ 	}
++#endif
+ 
+ 	return 0;
+ }
+@@ -933,8 +952,26 @@ fbdev_backend_create(struct weston_compositor *compositor,
+ 
+ 	weston_setup_vt_switch_bindings(compositor);
+ 
++#ifdef BUILD_USE_PIXMAN
+ 	if (pixman_renderer_init(compositor) < 0)
+ 		goto out_launcher;
++#else
++	gl_renderer = weston_load_module("gl-renderer.so",
++					 "gl_renderer_interface");
++	if (!gl_renderer) {
++		weston_log("could not load gl renderer\n");
++		goto out_launcher;
++	}
++ 
++	if (gl_renderer->display_create(compositor, NO_EGL_PLATFORM,
++				EGL_DEFAULT_DISPLAY,
++				NULL,
++				gl_renderer->opaque_attribs,
++				NULL, 0) < 0) {
++		weston_log("gl_renderer_create failed.\n");
++		goto out_launcher;
++	}
++#endif
+ 
+ 	if (!fbdev_head_create(backend, param->device))
+ 		goto out_launcher;
+-- 
+2.7.4
+

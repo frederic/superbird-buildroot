@@ -50,6 +50,30 @@ struct _sharpening_fsm_t {
     uint32_t fullhist_cum_sum[ISP_FULL_HISTOGRAM_SIZE];
 };
 
+struct sharpen_ext_param_t {
+    uint32_t gain;
+    uint32_t alpha_undershoot;
+    uint32_t luma_thresh_low;
+    uint32_t luma_slope_low;
+    uint32_t luma_thresh_high;
+    uint32_t luma_slope_high;
+};
+
+struct demosaic_rgb_ext_param_t {
+    uint32_t gain;
+    uint32_t lum_thresh;
+    uint32_t sad_amp;
+    uint32_t uu_sh_slope;
+    uint32_t uu_sh_thresh;
+    uint32_t luma_thresh_low_d;
+    uint32_t luma_thresh_low_ud;
+    uint32_t luma_slope_low_d;
+    uint32_t luma_slope_low_ud;
+    uint32_t luma_thresh_high_d;
+    uint32_t luma_thresh_high_ud;
+    uint32_t luma_slope_high_d;
+    uint32_t luma_slope_high_ud;
+};
 
 void sharpening_fsm_clear( sharpening_fsm_ptr_t p_fsm );
 

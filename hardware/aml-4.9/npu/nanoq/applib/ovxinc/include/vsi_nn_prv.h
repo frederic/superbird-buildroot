@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -36,9 +36,27 @@ extern "C"{
 #define VSI_NN_STD_CALL __stdcall
 #endif
 
+typedef enum _vsi_nn_broad_cast_bits_e
+{
+    VSI_NN_BROAD_CAST_BITS_0 = 0x01,
+    VSI_NN_BROAD_CAST_BITS_1 = 0x02,
+    VSI_NN_BROAD_CAST_BITS_2 = 0x04,
+    VSI_NN_BROAD_CAST_BITS_4 = 0x08,
+} vsi_nn_broad_cast_bits_e;
+
 #define REQUIRED_IO( _IOPORT ) ( (_IOPORT) != NULL ? (_IOPORT)->t : \
     ( VSILOGE("Required IO port: %s", #_IOPORT), (_IOPORT)->t ) )
 #define OPTIONAL_IO( _IOPORT ) ( (_IOPORT) != NULL ? (_IOPORT)->t : NULL)
+
+#ifndef __BEGIN_DECLS
+    #if defined(__cplusplus)
+    #define __BEGIN_DECLS extern "C" {
+    #define __END_DECLS }
+    #else
+    #define __BEGIN_DECLS
+    #define __END_DECLS
+    #endif
+#endif
 
 #if defined(__cplusplus)
 }

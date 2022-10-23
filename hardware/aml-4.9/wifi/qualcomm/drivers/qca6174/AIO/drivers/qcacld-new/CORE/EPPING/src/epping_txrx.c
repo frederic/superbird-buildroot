@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -64,6 +64,21 @@
 static int epping_start_adapter(epping_adapter_t *pAdapter);
 static void epping_stop_adapter(epping_adapter_t *pAdapter);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+static void epping_timer_expire(struct timer_list *t)
+{
+	epping_adapter_t *pAdapter = from_timer(pAdapter, t, epping_timer);
+
+	if (pAdapter == NULL) {
+		EPPING_LOG(VOS_TRACE_LEVEL_FATAL,
+			   "%s: adapter = NULL", __func__);
+		return;
+	}
+
+	pAdapter->epping_timer_state = EPPING_TX_TIMER_STOPPED;
+	epping_tx_timer_expire(pAdapter);
+}
+#else
 static void epping_timer_expire(void *data)
 {
    struct net_device *dev = (struct net_device *) data;
@@ -84,6 +99,7 @@ static void epping_timer_expire(void *data)
    pAdapter->epping_timer_state = EPPING_TX_TIMER_STOPPED;
    epping_tx_timer_expire(pAdapter);
 }
+#endif
 
 static int epping_ndev_open(struct net_device *dev)
 {
@@ -246,8 +262,10 @@ static void epping_stop_adapter(epping_adapter_t *pAdapter)
       netif_carrier_off(pAdapter->dev);
       pAdapter->started = false;
       dev = pAdapter->pEpping_ctx->parent_dev;
+#ifdef FEATURE_BUS_BANDWIDTH
       if (dev)
          vos_request_bus_bandwidth(dev, CNSS_BUS_WIDTH_LOW);
+#endif
    }
 }
 
@@ -262,8 +280,10 @@ static int epping_start_adapter(epping_adapter_t *pAdapter)
    }
    if (!pAdapter->started) {
       dev = pAdapter->pEpping_ctx->parent_dev;
+#ifdef FEATURE_BUS_BANDWIDTH
       if (dev)
          vos_request_bus_bandwidth(dev, CNSS_BUS_WIDTH_HIGH);
+#endif
       netif_carrier_on(pAdapter->dev);
       EPPING_LOG(LOG1, FL("Enabling queues"));
       netif_tx_start_all_queues(pAdapter->dev);

@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-WESTEROS_SINK_VERSION = 5ac97229a85f2befcfde2409e268f5197dc1cf47 
+WESTEROS_SINK_VERSION = e975b6953cffba2591ca2be61bd579ab8cfa4ffd
 WESTEROS_SINK_SITE_METHOD = git
 WESTEROS_SINK_SITE = git://github.com/rdkcmf/westeros
 WESTEROS_SINK_INSTALL_STAGING = YES
@@ -12,6 +12,8 @@ WESTEROS_SINK_AUTORECONF = YES
 WESTEROS_SINK_AUTORECONF_OPTS = "-Icfg"
 
 WESTEROS_SINK_DEPENDENCIES = host-pkgconf host-autoconf westeros libegl libdrm
+# Add dependency to linux, because we need some header files installed by linux
+WESTEROS_SINK_DEPENDENCIES += linux
 
 WESTEROS_SINK_CONF_OPTS += \
 	--prefix=/usr/ \

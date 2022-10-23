@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2018 Vivante Corporation
+*    Copyright (c) 2020 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
 #include "vsi_nn_types.h"
 #include "vsi_nn_tensor.h"
+#include "vsi_nn_internal_node.h"
 
 #if defined(__cplusplus)
 extern "C"{

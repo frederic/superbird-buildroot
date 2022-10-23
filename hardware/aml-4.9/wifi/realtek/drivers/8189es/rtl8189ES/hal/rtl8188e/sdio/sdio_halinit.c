@@ -60,7 +60,7 @@ void EnableGpio5ClockReq(PADAPTER Adapter, u8 in_interrupt, u32 Enable)
 } /* end of EnableGpio5ClockReq() */
 
 void _InitClockTo26MHz(
-	IN	PADAPTER Adapter
+		PADAPTER Adapter
 )
 {
 	u8 u1temp = 0;
@@ -342,27 +342,6 @@ static void hal_poweroff_8188es(PADAPTER padapter)
 	RTW_INFO("<=%s\n", __FUNCTION__);
 
 }
-
-/* Tx Page FIFO threshold */
-static void _init_available_page_threshold(PADAPTER padapter, u8 numHQ, u8 numNQ, u8 numLQ, u8 numPubQ)
-{
-	u16	HQ_threshold, NQ_threshold, LQ_threshold;
-
-	HQ_threshold = (numPubQ + numHQ + 1) >> 1;
-	HQ_threshold |= (HQ_threshold << 8);
-
-	NQ_threshold = (numPubQ + numNQ + 1) >> 1;
-	NQ_threshold |= (NQ_threshold << 8);
-
-	LQ_threshold = (numPubQ + numLQ + 1) >> 1;
-	LQ_threshold |= (LQ_threshold << 8);
-
-	rtw_write16(padapter, 0x218, HQ_threshold);
-	rtw_write16(padapter, 0x21A, NQ_threshold);
-	rtw_write16(padapter, 0x21C, LQ_threshold);
-	RTW_INFO("%s(): Enable Tx FIFO Page Threshold H:0x%x,N:0x%x,L:0x%x\n", __FUNCTION__, HQ_threshold, NQ_threshold, LQ_threshold);
-}
-
 static void _InitQueueReservedPage(PADAPTER padapter)
 {
 #ifdef RTL8188ES_MAC_LOOPBACK
@@ -418,10 +397,10 @@ static void _InitQueueReservedPage(PADAPTER padapter)
 	value32 = _HPQ(numHQ) | _LPQ(numLQ) | _PUBQ(numPubQ) | LD_RQPN;
 	rtw_write32(padapter, REG_RQPN, value32);
 
-	rtw_hal_set_sdio_tx_max_length(padapter, numHQ, numNQ, numLQ, numPubQ);
+	rtw_hal_set_sdio_tx_max_length(padapter, numHQ, numNQ, numLQ, numPubQ, SDIO_TX_DIV_NUM);
 
 #ifdef CONFIG_SDIO_TX_ENABLE_AVAL_INT
-	_init_available_page_threshold(padapter, numHQ, numNQ, numLQ, numPubQ);
+	rtw_hal_sdio_avail_page_threshold_init(padapter);
 #endif
 #endif
 	return;
@@ -442,15 +421,15 @@ static void _InitTxBufferBoundary(PADAPTER padapter, u8 txpktbuf_bndy)
 
 }
 
-static VOID
+static void
 _InitNormalChipRegPriority(
-	IN	PADAPTER	Adapter,
-	IN	u16		beQ,
-	IN	u16		bkQ,
-	IN	u16		viQ,
-	IN	u16		voQ,
-	IN	u16		mgtQ,
-	IN	u16		hiQ
+		PADAPTER	Adapter,
+		u16		beQ,
+		u16		bkQ,
+		u16		viQ,
+		u16		voQ,
+		u16		mgtQ,
+		u16		hiQ
 )
 {
 	u16 value16	= (rtw_read16(Adapter, REG_TRXDMA_CTRL) & 0x7);
@@ -462,9 +441,9 @@ _InitNormalChipRegPriority(
 	rtw_write16(Adapter, REG_TRXDMA_CTRL, value16);
 }
 
-static VOID
+static void
 _InitNormalChipOneOutEpPriority(
-	IN	PADAPTER Adapter
+		PADAPTER Adapter
 )
 {
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
@@ -496,9 +475,9 @@ _InitNormalChipOneOutEpPriority(
 
 }
 
-static VOID
+static void
 _InitNormalChipTwoOutEpPriority(
-	IN	PADAPTER Adapter
+		PADAPTER Adapter
 )
 {
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
@@ -547,9 +526,9 @@ _InitNormalChipTwoOutEpPriority(
 
 }
 
-static VOID
+static void
 _InitNormalChipThreeOutEpPriority(
-	IN	PADAPTER padapter
+		PADAPTER padapter
 )
 {
 	struct registry_priv *pregistrypriv = &padapter->registrypriv;
@@ -573,9 +552,9 @@ _InitNormalChipThreeOutEpPriority(
 	_InitNormalChipRegPriority(padapter, beQ, bkQ, viQ, voQ, mgtQ, hiQ);
 }
 
-static VOID
+static void
 _InitNormalChipQueuePriority(
-	IN	PADAPTER Adapter
+		PADAPTER Adapter
 )
 {
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(Adapter);
@@ -669,7 +648,9 @@ void _InitAdaptiveCtrl(PADAPTER padapter)
 	value32 = rtw_read32(padapter, REG_RRSR);
 	value32 &= ~RATE_BITMAP_ALL;
 	value32 |= RATE_RRSR_CCK_ONLY_1M;
-	rtw_write32(padapter, REG_RRSR, value32);
+
+	rtw_phydm_set_rrsr(padapter, value32, TRUE);
+
 
 	/* CF-END Threshold */
 	/* m_spIoBase->rtw_write8(REG_CFEND_TH, 0x1); */
@@ -679,8 +660,8 @@ void _InitAdaptiveCtrl(PADAPTER padapter)
 	rtw_write16(padapter, REG_SPEC_SIFS, value16);
 
 	/* Retry Limit */
-	value16 = _LRL(RL_VAL_STA) | _SRL(RL_VAL_STA);
-	rtw_write16(padapter, REG_RL, value16);
+	value16 = BIT_LRL(RL_VAL_STA) | BIT_SRL(RL_VAL_STA);
+	rtw_write16(padapter, REG_RETRY_LIMIT, value16);
 }
 
 void _InitEDCA(PADAPTER padapter)
@@ -858,13 +839,6 @@ static void _BBTurnOnBlock(PADAPTER padapter)
 	phy_set_bb_reg(padapter, rFPGA0_RFMOD, bOFDMEn, 0x1);
 }
 
-#if 0
-static void _InitAntenna_Selection(PADAPTER padapter)
-{
-	rtw_write8(padapter, REG_LEDCFG2, 0x82);
-}
-#endif
-
 static void _InitPABias(PADAPTER padapter)
 {
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(padapter);
@@ -890,9 +864,9 @@ static void _InitPABias(PADAPTER padapter)
 }
 
 #if 0
-VOID
+void
 _InitRDGSetting_8188E(
-	IN	PADAPTER Adapter
+		PADAPTER Adapter
 )
 {
 	PlatformEFIOWrite1Byte(Adapter, REG_RD_CTRL, 0xFF);
@@ -1225,25 +1199,6 @@ static u32 rtl8188es_hal_init(PADAPTER padapter)
 	rtw_write32(padapter, REG_MACID_NO_LINK_0, 0xFFFFFFFF);
 	rtw_write32(padapter, REG_MACID_NO_LINK_1, 0xFFFFFFFF);
 
-#if defined(CONFIG_CONCURRENT_MODE) || defined(CONFIG_TX_MCAST2UNI)
-
-#ifdef CONFIG_CHECK_AC_LIFETIME
-	/* Enable lifetime check for the four ACs */
-	rtw_write8(padapter, REG_LIFETIME_CTRL, rtw_read8(padapter, REG_LIFETIME_CTRL) | 0x0f);
-#endif /* CONFIG_CHECK_AC_LIFETIME	 */
-
-#ifdef CONFIG_TX_MCAST2UNI
-	rtw_write16(padapter, REG_PKT_VO_VI_LIFE_TIME, 0x0400);	/* unit: 256us. 256ms */
-	rtw_write16(padapter, REG_PKT_BE_BK_LIFE_TIME, 0x0400);	/* unit: 256us. 256ms */
-#else	/* CONFIG_TX_MCAST2UNI */
-	rtw_write16(padapter, REG_PKT_VO_VI_LIFE_TIME, 0x3000);	/* unit: 256us. 3s */
-	rtw_write16(padapter, REG_PKT_BE_BK_LIFE_TIME, 0x3000);	/* unit: 256us. 3s */
-#endif /* CONFIG_TX_MCAST2UNI */
-#endif /* CONFIG_CONCURRENT_MODE || CONFIG_TX_MCAST2UNI */
-
-
-
-
 #endif /* HAL_RF_ENABLE == 1 */
 
 
@@ -1260,10 +1215,7 @@ static u32 rtl8188es_hal_init(PADAPTER padapter)
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_MISC11);
 	/* 2010/12/17 MH We need to set TX power according to EFUSE content at first. */
-	PHY_SetTxPowerLevel8188E(padapter, pHalData->current_channel);
-
-	/* Move by Neo for USB SS to below setp
-	 * _RfPowerSave(padapter); */
+	rtw_hal_set_tx_power_level(padapter, pHalData->current_channel);
 
 	/*  */
 	/* Disable BAR, suggested by Scott */
@@ -1310,7 +1262,6 @@ static u32 rtl8188es_hal_init(PADAPTER padapter)
 		/* is the same as eRfOff, we should change it to eRfOn after we config RF parameters. */
 		/* Added by tynli. 2010.03.30. */
 		pwrctrlpriv->rf_pwrstate = rf_on;
-		RT_CLEAR_PS_LEVEL(pwrctrlpriv, RT_RF_OFF_LEVL_HALT_NIC);
 
 		/* 20100326 Joseph: Copy from GPIOChangeRFWorkItemCallBack() function to check HW radio on/off. */
 		/* 20100329 Joseph: Revise and integrate the HW/SW radio off code in initialization.
@@ -1339,17 +1290,7 @@ static u32 rtl8188es_hal_init(PADAPTER padapter)
 		if (pwrctrlpriv->rf_pwrstate == rf_on) {
 
 			HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_IQK);
-			if (pHalData->bIQKInitialized) {
-				/*			PHY_IQCalibrate(padapter, _TRUE); */
-				/*phy_iq_calibrate_8188e(padapter, _TRUE);*/
-				halrf_iqk_trigger(&pHalData->odmpriv, _TRUE);
-			} else {
-				/*			PHY_IQCalibrate(padapter, _FALSE); */
-				/*phy_iq_calibrate_8188e(padapter, _FALSE);*/
-				halrf_iqk_trigger(&pHalData->odmpriv,  _FALSE);
-				pHalData->bIQKInitialized = _TRUE;
-			}
-
+			pHalData->neediqk_24g = _TRUE;
 			/*		dm_check_txpowertracking(padapter);
 			 *		phy_lc_calibrate(padapter); */
 
@@ -1381,10 +1322,6 @@ static u32 rtl8188es_hal_init(PADAPTER padapter)
 		GpioDetectTimerStart(padapter);	/* Disable temporarily */
 	}
 #endif
-
-	/* 2010/08/23 MH According to Alfred's suggestion, we need to to prevent HW enter */
-	/* suspend mode automatically. */
-	/* HwSuspendModeEnable92Cu(padapter, FALSE); */
 
 	/* 2010/12/17 MH For TX power level OID modification from UI.
 	*	padapter->hal_func.GetTxPowerLevelHandler( padapter, &pHalData->DefaultTxPwrDbm ); */
@@ -1505,7 +1442,6 @@ static void rtl8188es_init_default_value(PADAPTER padapter)
 	pHalData = GET_HAL_DATA(padapter);
 	pwrctrlpriv = adapter_to_pwrctl(padapter);
 
-	rtl8188e_init_default_value(padapter);
 
 	/* init default value */
 	pHalData->fw_ractrl = _FALSE;
@@ -1534,8 +1470,9 @@ static void rtl8188es_init_default_value(PADAPTER padapter)
  *
  *	Added by Roger, 2010.11.23.
  *   */
+#if 0
 static void _EfuseCellSel(
-	IN	PADAPTER	padapter
+		PADAPTER	padapter
 )
 {
 	/* HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter); */
@@ -1549,10 +1486,11 @@ static void _EfuseCellSel(
 		rtw_write32(padapter, EFUSE_TEST, value32);
 	}
 }
+#endif
 
-static VOID
+static void
 _ReadRFType(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
@@ -1566,9 +1504,9 @@ _ReadRFType(
 
 static void
 Hal_EfuseParsePIDVID_8188ES(
-	IN	PADAPTER		pAdapter,
-	IN	u8			*hwinfo,
-	IN	BOOLEAN			AutoLoadFail
+		PADAPTER		pAdapter,
+		u8			*hwinfo,
+		BOOLEAN			AutoLoadFail
 )
 {
 	/*	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter); */
@@ -1581,9 +1519,9 @@ Hal_EfuseParsePIDVID_8188ES(
 
 }
 
-static VOID
+static void
 readAdapterInfo_8188ES(
-	IN PADAPTER			padapter
+	PADAPTER			padapter
 )
 {
 	PHAL_DATA_TYPE pHalData = GET_HAL_DATA(padapter);
@@ -1616,7 +1554,7 @@ readAdapterInfo_8188ES(
 }
 
 static void _ReadPROMContent(
-	IN PADAPTER		padapter
+	PADAPTER		padapter
 )
 {
 	PHAL_DATA_TYPE pHalData = GET_HAL_DATA(padapter);
@@ -1653,8 +1591,7 @@ static u8 ReadAdapterInfo8188ES(PADAPTER padapter)
 	/* Read EEPROM size before call any EEPROM function */
 	padapter->EepromAddressSize = GetEEPROMSize8188E(padapter);
 
-	/*	Efuse_InitSomeVar(Adapter);
-	 *	_EfuseCellSel(padapter); */
+	/*_EfuseCellSel(padapter); */
 
 	_ReadRFType(padapter);/* rf_chip->_InitRFType() */
 	_ReadPROMContent(padapter);
@@ -1725,9 +1662,9 @@ static void GetHwReg8188ES(PADAPTER padapter, u8 variable, u8 *val)
  *   */
 u8
 GetHalDefVar8188ESDIO(
-	IN	PADAPTER				Adapter,
-	IN	HAL_DEF_VARIABLE		eVariable,
-	IN	PVOID					pValue
+		PADAPTER				Adapter,
+		HAL_DEF_VARIABLE		eVariable,
+		void						*pValue
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
@@ -1741,9 +1678,6 @@ GetHalDefVar8188ESDIO(
 	case HAL_DEF_TX_LDPC:
 	case HAL_DEF_RX_LDPC:
 		*((u8 *)pValue) = _FALSE;
-		break;
-	case HAL_DEF_TX_STBC:
-		*((u8 *)pValue) = 0;
 		break;
 	case HAL_DEF_RX_STBC:
 		*((u8 *)pValue) = 1;
@@ -1765,9 +1699,9 @@ GetHalDefVar8188ESDIO(
  *   */
 u8
 SetHalDefVar8188ESDIO(
-	IN	PADAPTER				Adapter,
-	IN	HAL_DEF_VARIABLE		eVariable,
-	IN	PVOID					pValue
+		PADAPTER				Adapter,
+		HAL_DEF_VARIABLE		eVariable,
+		void						*pValue
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);

@@ -88,6 +88,7 @@ extern u8 tsdemux_pcrvideo_valid(void);
 extern u32 tsdemux_first_pcrscr_get(void);
 extern void timestamp_pcrscr_enable(u32 enable);
 extern void timestamp_pcrscr_set(u32 pts);
+int get_discontinue_counter(void);
 
 int tsdemux_class_register(void);
 void tsdemux_class_unregister(void);

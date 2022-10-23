@@ -85,7 +85,9 @@ extern "C" {
     /* set system logic ui rect, current not work well */
     void drm_help_client_set_ui_rect(drm_client_ctx* client, drm_output_rect* rect, int connection_id);
 
-    /* set connector display mode */
+    /* set connector display mode
+     * support mode string like: "%dx%m[^@]@%d %u:%u": "1920x1080i@60 16:9"
+     */
     void drm_help_client_switch_mode_s(drm_client_ctx* client, const char* mode_s, int connection_id);
 
     /* set connector's drm properties*/

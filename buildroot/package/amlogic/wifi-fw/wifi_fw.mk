@@ -9,7 +9,7 @@ WIFI_FW_SITE = $(call qstrip,$(BR2_PACKAGE_WIFI_FW_CUSTOM_GIT_REPO_URL))
 WIFI_MODULE = $(call qstrip,$(BR2_PACKAGE_WIFI_FW_WIFI_MODULE))
 
 # AP6242 AP6269 AP62x8 not set
-BCM_MODULES := bcm40181 bcm40183 bcm43458 bcm4354 bcm4356 bcm4358 AP6212 \
+BCM_MODULES := bcm40181 bcm40183 bcm43458 bcm4354 bcm4356 bcm4358 AP6212 AP6214 \
 	AP6234 AP6255 AP6256 AP62x2 AP6335 AP6441 AP6181 AP6210 AP6330 AP6476 AP6493
 
 ifeq ($(BR2_PACKAGE_WIFI_FW_LOCAL),y)
@@ -446,16 +446,30 @@ define INSTALL_WIFI_MODULE
 $(Q) case "$(1)" in \
 	AP6236) \
 		mkdir -p $(TARGET_DIR)/etc/wifi/6212; \
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/Wi-Fi/*.bin $(TARGET_DIR)/etc/wifi/6212/; \
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/Wi-Fi/nvram*.txt $(TARGET_DIR)/etc/wifi/6212/nvram_ap6236.txt; \
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/BT/*.hcd $(TARGET_DIR)/etc/bluetooth/BCM43430B0.hcd; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/Wi-Fi/*.bin                    $(TARGET_DIR)/etc/wifi/6212/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/Wi-Fi/nvram*.txt               $(TARGET_DIR)/etc/wifi/6212/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/Wi-Fi/config.txt               $(TARGET_DIR)/etc/wifi/6212/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6236/BT/*.hcd                       $(TARGET_DIR)/etc/bluetooth/BCM43430B0.hcd; \
+		;; \
+	AP6214) \
+		mkdir -p $(TARGET_DIR)/etc/wifi/6212; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6214/Wi-Fi/*.bin                    $(TARGET_DIR)/etc/wifi/6212/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6214/Wi-Fi/nvram*.txt               $(TARGET_DIR)/etc/wifi/6212/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6214/BT/*.hcd                       $(TARGET_DIR)/etc/bluetooth/;   \
+		;; \
+	AP6256) \
+		mkdir -p $(TARGET_DIR)/etc/wifi/6255; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6256/Wi-Fi/*.bin                    $(TARGET_DIR)/etc/wifi/6255/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6256/Wi-Fi/*.txt                    $(TARGET_DIR)/etc/wifi/6255/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/config.txt                            $(TARGET_DIR)/etc/wifi/6255/;   \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6256/BT/*.hcd                       $(TARGET_DIR)/etc/bluetooth/;   \
 		;; \
 	AP6398) \
 		mkdir -p $(TARGET_DIR)/etc/wifi/AP6398;\
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/Wi-Fi/*.bin $(TARGET_DIR)/etc/wifi/AP6398/;\
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/Wi-Fi/nvram_ap6398s.txt $(TARGET_DIR)/etc/wifi/AP6398/nvram_ap6398s.txt;\
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/BT/BCM4359C0SR2.hcd $(TARGET_DIR)/etc/bluetooth/; \
-		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/config.txt $(TARGET_DIR)/etc/wifi/AP6398/; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/Wi-Fi/*.bin                    $(TARGET_DIR)/etc/wifi/AP6398/; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/Wi-Fi/nvram_ap6398s.txt        $(TARGET_DIR)/etc/wifi/AP6398/; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/config.txt                            $(TARGET_DIR)/etc/wifi/AP6398/; \
+		$(INSTALL) -D -m 0644 $(@D)/bcm_ampak/config/AP6398/BT/BCM4359C0SR2.hcd            $(TARGET_DIR)/etc/bluetooth/;   \
 		;; \
 	AP6201) \
 		mkdir -p $(TARGET_DIR)/etc/wifi/AP6201; \

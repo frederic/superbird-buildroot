@@ -1,0 +1,80 @@
+From 869c73c2f83024cd1801f897e1101195b66bed92 Mon Sep 17 00:00:00 2001
+From: lingjie li <lingjie.li@amlogic.com>
+Date: Sun, 26 Apr 2020 21:09:42 +0800
+Subject: [PATCH] Add interlaced display mode support
+
+---
+ libweston/compositor-drm.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/libweston/compositor-drm.c b/libweston/compositor-drm.c
+index 3971a03..4dd1a5d 100644
+--- a/libweston/compositor-drm.c
++++ b/libweston/compositor-drm.c
+@@ -3262,7 +3262,12 @@ atomic_flip_handler(int fd, unsigned int frame, unsigned int sec,
+ 
+ 	drm_debug(b, "[atomic][CRTC:%u] flip processing started\n", crtc_id);
+ 	assert(b->atomic_modeset);
+-	assert(output->atomic_complete_pending);
++	//Work around for avoid change mode crash.
++	//After change mode the the pending_status's output is empty when
++	//drm_pending_state_apply_atomic,
++	//atomic_complete_pending will no set befor next flip event.
++	//TODO: Fix the pending_status mess after switch mode use meson-display framework
++	//assert(output->atomic_complete_pending);
+ 	output->atomic_complete_pending = 0;
+ 
+ 	drm_output_update_complete(output, flags, sec, usec);
+@@ -4060,10 +4065,12 @@ choose_mode (struct drm_output *output, struct weston_mode *target_mode)
+ 	b = to_drm_backend(output->base.compositor);
+ 	target_aspect = target_mode->aspect_ratio;
+ 	src_aspect = output->base.current_mode->aspect_ratio;
++	uint32_t current_flags = to_drm_mode(output->base.current_mode)->mode_info.flags;
+ 
+ #ifdef FIX_UI_SIZE_FOR_4K
+ 	if (b->display_size.width == target_mode->width &&
+ 	    b->display_size.height == target_mode->height &&
++	    target_mode->flags == (target_mode->flags & current_flags) &&
+ 	    (output->base.current_mode->refresh == target_mode->refresh ||
+ 	     target_mode->refresh == 0)) {
+ 		if (!b->aspect_ratio_supported || src_aspect == target_aspect)
+@@ -4072,6 +4079,7 @@ choose_mode (struct drm_output *output, struct weston_mode *target_mode)
+ #else
+ 	if (output->base.current_mode->width == target_mode->width &&
+ 	    output->base.current_mode->height == target_mode->height &&
++	    target_mode->flags == (target_mode->flags & current_flags) &&
+ 	    (output->base.current_mode->refresh == target_mode->refresh ||
+ 	     target_mode->refresh == 0)) {
+ 		if (!b->aspect_ratio_supported || src_aspect == target_aspect)
+@@ -4083,6 +4091,7 @@ choose_mode (struct drm_output *output, struct weston_mode *target_mode)
+ 
+ 		src_aspect = mode->base.aspect_ratio;
+ 		if (mode->mode_info.hdisplay == target_mode->width &&
++		    target_mode->flags == (target_mode->flags & mode->mode_info.flags) &&
+ 		    mode->mode_info.vdisplay == target_mode->height) {
+ 			if (mode->base.refresh == target_mode->refresh ||
+ 			    target_mode->refresh == 0) {
+@@ -6271,9 +6280,19 @@ drm_output_print_modes(struct drm_output *output)
+ #ifdef ENABLE_DRM_HELP
+ static int drm_output_switch_mode_helper(output_ctx ctx, drm_helper_mode* mode) {
+ 	struct weston_mode m;
++	int ratio = 0;
+ 	m.width = mode->width;
+ 	m.height = mode->height;
+-	m.refresh = mode->refresh;
++	m.refresh = mode->refresh * 1000;
++	//hack: use weston_mode's flags as drm_mode's flags.
++	m.flags = mode->flags;
++	m.aspect_ratio = 0;
++	for (ratio = 0;  ratio >= ARRAY_LENGTH(aspect_ratio_as_string); ratio++) {
++		if (0 == strcmp(mode->aspect_ratio, aspect_ratio_as_string[ratio])) {
++			m.aspect_ratio = ratio;
++			break;
++		}
++	}
+ 	return weston_output_mode_set_native((struct weston_output *)ctx, &m, ((struct weston_output *)ctx)->current_scale);
+ }
+ #endif
+-- 
+2.26.1
+

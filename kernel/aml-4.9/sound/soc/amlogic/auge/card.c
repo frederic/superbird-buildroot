@@ -35,6 +35,9 @@
 
 #include "effects.h"
 
+#include <linux/amlogic/media/sound/misc.h>
+#include <linux/amlogic/media/sound/debug.h>
+
 struct aml_jack {
 	struct snd_soc_jack jack;
 	struct snd_soc_jack_pin pin;
@@ -915,6 +918,13 @@ static int card_resume_post(struct snd_soc_card *card)
 
 }
 
+static const struct snd_kcontrol_new snd_controls[] = {
+	SOC_SINGLE_BOOL_EXT("Audio Debug",
+			    0,
+			    audio_debug_get,
+			    audio_debug_put),
+};
+
 static int aml_card_probe(struct platform_device *pdev)
 {
 	struct aml_card_data *priv;
@@ -957,6 +967,8 @@ static int aml_card_probe(struct platform_device *pdev)
 	priv->snd_card.num_links	= num;
 	priv->snd_card.suspend_pre	= card_suspend_pre;
 	priv->snd_card.resume_post	= card_resume_post;
+	priv->snd_card.controls		= snd_controls;
+	priv->snd_card.num_controls	= ARRAY_SIZE(snd_controls);
 
 	if (np && of_device_is_available(np)) {
 

@@ -228,14 +228,12 @@ enum {
 
 #define VP5_BS_OPTION                            (VP5_REG_BASE + 0x0120)
 
-#define VP5_CMD_CREATE_INST_SUB_FRAME_SYNC        (VP5_REG_BASE + 0x0128)
-
+#define VP5_RET_CORE_IDC                         (VP5_REG_BASE + 0x019C)      // return info when QUERY (GET_RESULT) for en/decoder
 #define VP5_RET_VLC_BUF_SIZE                     (VP5_REG_BASE + 0x01B0)      // return info when QUERY (GET_RESULT) for en/decoder
 #define VP5_RET_PARAM_BUF_SIZE                   (VP5_REG_BASE + 0x01B4)      // return info when QUERY (GET_RESULT) for en/decoder
 
 #define VP5_CMD_SET_FB_ADDR_TASK_BUF             (VP5_REG_BASE + 0x01D4)      // set when SET_FB for en/decoder
 #define VP5_CMD_SET_FB_TASK_BUF_SIZE             (VP5_REG_BASE + 0x01D8)
-
 /************************************************************************/
 /* INIT_VPU - COMMON                                                    */
 /************************************************************************/
@@ -279,6 +277,7 @@ enum {
 #define VP5_COMMON_PIC_INFO                      (VP5_REG_BASE + 0x0118)
 #define VP5_PIC_SIZE                             (VP5_REG_BASE + 0x011C)
 #define VP5_SET_FB_NUM                           (VP5_REG_BASE + 0x0120)
+#define VP5_EXTRA_PIC_INFO                       (VP5_REG_BASE + 0x0124)
 
 #define VP5_ADDR_LUMA_BASE0                      (VP5_REG_BASE + 0x0134)
 #define VP5_ADDR_CB_BASE0                        (VP5_REG_BASE + 0x0138)
@@ -410,6 +409,7 @@ enum {
 #define VP5_RET_DEC_REALLOC_INDEX            (VP5_REG_BASE + 0x0178)
 #define VP5_RET_DEC_DISP_IDC                 (VP5_REG_BASE + 0x017C)
 #define VP5_RET_DEC_ERR_CTB_NUM              (VP5_REG_BASE + 0x0180)
+#define VP5_RET_DEC_PIC_PARAM                (VP5_REG_BASE + 0x01A0)
 
 #define VP5_RET_DEC_HOST_CMD_TICK            (VP5_REG_BASE + 0x01B8)
 #define VP5_RET_DEC_SEEK_START_TICK          (VP5_REG_BASE + 0x01BC)
@@ -543,7 +543,6 @@ enum {
 #define VP5_CMD_ENC_SEQ_CUSTOM_LAMBDA_ADDR       (VP5_REG_BASE + 0x1AC)
 #define VP5_CMD_ENC_SEQ_USER_SCALING_LIST_ADDR   (VP5_REG_BASE + 0x1B0)
 
-
 /************************************************************************/
 /* ENCODER - ENC_SET_PARAM (CUSTOM_GOP)                                 */
 /************************************************************************/
@@ -556,6 +555,14 @@ enum {
 #define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_5       (VP5_REG_BASE + 0x134)
 #define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_6       (VP5_REG_BASE + 0x138)
 #define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_7       (VP5_REG_BASE + 0x13C)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_8       (VP5_REG_BASE + 0x140)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_9       (VP5_REG_BASE + 0x144)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_10      (VP5_REG_BASE + 0x148)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_11      (VP5_REG_BASE + 0x14C)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_12      (VP5_REG_BASE + 0x150)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_13      (VP5_REG_BASE + 0x154)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_14      (VP5_REG_BASE + 0x158)
+#define VP5_CMD_ENC_CUSTOM_GOP_PIC_PARAM_15      (VP5_REG_BASE + 0x15C)
 
 /************************************************************************/
 /* ENCODER - ENC_PIC                                                    */
@@ -565,6 +572,10 @@ enum {
 #define VP5_CMD_ENC_PIC_USE_SEC_AXI              (VP5_REG_BASE + 0x124)
 #define VP5_CMD_ENC_PIC_REPORT_PARAM             (VP5_REG_BASE + 0x128)
 #define VP5_CMD_ENC_PIC_REPORT_ENDIAN            (VP5_REG_BASE + 0x12C)
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+#define VP5_CMD_ENC_PIC_REPORT_MV_HISTO_CLASS0   (VP5_REG_BASE + 0x130)
+#define VP5_CMD_ENC_PIC_REPORT_MV_HISTO_CLASS1   (VP5_REG_BASE + 0x134)
+#endif
 
 #define VP5_CMD_ENC_PIC_CUSTOM_MAP_OPTION_PARAM  (VP5_REG_BASE + 0x138)
 #define VP5_CMD_ENC_PIC_CUSTOM_MAP_OPTION_ADDR   (VP5_REG_BASE + 0x13C)
@@ -585,14 +596,13 @@ enum {
 #define VP5_CMD_ENC_PIC_WP_PIXEL_MEAN_C          (VP5_REG_BASE + 0x17C)
 #define VP5_CMD_ENC_PIC_LF_PARAM_0               (VP5_REG_BASE + 0x180)
 #define VP5_CMD_ENC_PIC_LF_PARAM_1               (VP5_REG_BASE + 0x184)
-#define VP5_CMD_ENC_PIC_CF50_Y_OFFSET_TABLE_ADDR  (VP5_REG_BASE + 0x188)
-#define VP5_CMD_ENC_PIC_CF50_CB_OFFSET_TABLE_ADDR (VP5_REG_BASE + 0x18C)
-#define VP5_CMD_ENC_PIC_CF50_CR_OFFSET_TABLE_ADDR (VP5_REG_BASE + 0x190)
-#define VP5_CMD_ENC_QOS_PARAM                     (VP5_REG_BASE + 0x198)
+#define VP5_CMD_ENC_PIC_CF50_Y_OFFSET_TABLE_ADDR  (VP5_REG_BASE + 0x190)
+#define VP5_CMD_ENC_PIC_CF50_CB_OFFSET_TABLE_ADDR (VP5_REG_BASE + 0x194)
+#define VP5_CMD_ENC_PIC_CF50_CR_OFFSET_TABLE_ADDR (VP5_REG_BASE + 0x198)
+
 /************************************************************************/
 /* ENCODER - QUERY (GET_RESULT)                                         */
 /************************************************************************/
-
 #define VP5_RET_ENC_NUM_REQUIRED_FB              (VP5_REG_BASE + 0x11C)
 #define VP5_RET_ENC_MIN_SRC_BUF_NUM              (VP5_REG_BASE + 0x120)
 #define VP5_RET_ENC_PIC_TYPE                     (VP5_REG_BASE + 0x124)
@@ -618,26 +628,26 @@ enum {
 #define VP5_RET_ENC_SVC_LAYER                    (VP5_REG_BASE + 0x170)
 
 
-#define VP5_RET_QUERY_CORE_IDC                   (VP5_REG_BASE + 0x19C)
-
-//#define VP5_RET_ENC_PREPARE_CYCLE                (VP5_REG_BASE + 0x1C0)
-//#define VP5_RET_ENC_PROCESSING_CYCLE             (VP5_REG_BASE + 0x1C4)
-//#define VP5_RET_ENC_ENCODING_CYCLE               (VP5_REG_BASE + 0x1C8)
-#define RET_ENC_HOST_CMD_TICK                   (VP5_REG_BASE + 0x1B8)
-#define RET_ENC_PREPARE_START_TICK              (VP5_REG_BASE + 0x1BC)
-#define RET_ENC_PREPARE_END_TICK                (VP5_REG_BASE + 0x1C0)
-#define RET_ENC_PROCESSING_START_TICK           (VP5_REG_BASE + 0x1C4)
-#define RET_ENC_PROCESSING_END_TICK             (VP5_REG_BASE + 0x1C8)
-#define RET_ENC_ENCODING_START_TICK             (VP5_REG_BASE + 0x1CC)
-#define RET_ENC_ENCODING_END_TICK               (VP5_REG_BASE + 0x1D0)
+#define VP5_RET_ENC_HOST_CMD_TICK                (VP5_REG_BASE + 0x1B8)
+#define VP5_RET_ENC_PREPARE_START_TICK           (VP5_REG_BASE + 0x1BC)
+#define VP5_RET_ENC_PREPARE_END_TICK             (VP5_REG_BASE + 0x1C0)
+#define VP5_RET_ENC_PROCESSING_START_TICK        (VP5_REG_BASE + 0x1C4)
+#define VP5_RET_ENC_PROCESSING_END_TICK          (VP5_REG_BASE + 0x1C8)
+#define VP5_RET_ENC_ENCODING_START_TICK          (VP5_REG_BASE + 0x1CC)
+#define VP5_RET_ENC_ENCODING_END_TICK            (VP5_REG_BASE + 0x1D0)
 
 
 #define VP5_RET_ENC_WARN_INFO                    (VP5_REG_BASE + 0x1D4)
 #define VP5_RET_ENC_ERR_INFO                     (VP5_REG_BASE + 0x1D8)
 #define VP5_RET_ENC_ENCODING_SUCCESS             (VP5_REG_BASE + 0x1DC)
 
-#define VP5_RET_QUERY_REPORT_PARAM               (VP5_REG_BASE + 0x178)
-#define VP5_CMD_QUERY_REPORT_BASE                (VP5_REG_BASE + 0x17C)
+#ifdef SUPPORT_VP5ENC_REPORT_MV_HISTO
+#define VP5_RET_ENC_REPORT_MV_HISTO_CNT0         (VP5_REG_BASE + 0x190)
+#define VP5_RET_ENC_REPORT_MV_HISTO_CNT1         (VP5_REG_BASE + 0x194)
+#define VP5_RET_ENC_REPORT_MV_HISTO_CNT2         (VP5_REG_BASE + 0x198)
+#define VP5_RET_ENC_REPORT_MV_HISTO_CNT3         (VP5_REG_BASE + 0x1A0)
+#define VP5_RET_ENC_REPORT_MV_HISTO_CNT4         (VP5_REG_BASE + 0x1A4)
+#endif
 
 /************************************************************************/
 /* ENCODER - QUERY (GET_BW_REPORT)                                      */
@@ -660,6 +670,7 @@ enum {
 #define RET_QUERY_BW_SEC_AXI_WRITE              (VP5_REG_BASE + 0x13C)
 #define RET_QUERY_BW_PROC_AXI_READ              (VP5_REG_BASE + 0x140)
 #define RET_QUERY_BW_PROC_AXI_WRITE             (VP5_REG_BASE + 0x144)
+#define RET_QUERY_BW_BWB_AXI_WRITE              (VP5_REG_BASE + 0x148)
 
 /************************************************************************/
 /* ENCODER - QUERY (GET_SRC_FLAG)                                       */

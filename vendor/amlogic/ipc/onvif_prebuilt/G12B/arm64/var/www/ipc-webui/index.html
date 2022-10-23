@@ -1,0 +1,81 @@
+<?php
+//index页面，先检查是否已通过ipc-property工具设置了database path
+include "check_database.php";
+check_session("login/login.html");
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="/scripts/jquery.min.js" type="application/javascript"></script>
+    <script src="/scripts/ipc-webui.js" type="application/javascript"></script>
+    <script src="/locale/locale.js" type="application/javascript"></script>
+    <title>IPC WebUI</title>
+    <style type="text/css">
+    </style>
+    <style>
+        .footer {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            color: white;
+            text-align: center;
+        }
+    </style>
+    <link rel="stylesheet" href="layui/css/layui.css" media="all">
+    <link rel="shortcut icon" href="amlogic.ico" type="image/x-icon">
+</head>
+<body>
+
+<div class="layui-layout layui-layout-admin">
+    <div class="layui-header">
+        <div class="layui-logo"><img src="logo-amlogic.png"/></div>
+        <ul class="layui-nav layui-layout-left" lay-filter="treenav">
+            <li class="layui-nav-item">
+                <a id="face" href="javascript:" class="site-url locale" data-url="recognition/recognition.html">Face Recognition</a>
+            </li>
+            <li class="layui-nav-item">
+                <a id="settings" href="javascript:" class="site-url locale" data-url="settings/settings.html">Settings</a>
+            </li>
+            <li class="layui-nav-item">
+                <a id="log" href="javascript:" class="site-url locale" data-url="log/log.html">Log View</a>
+            </li>
+        </ul>
+        <ul class="layui-nav layui-layout-right">
+            <li class="layui-nav-item" style="margin-right: 20px">
+                <div>
+                    <button id="captureScreen" lay-event="download" class="layui-btn locale">Screen Capture</button>
+                </div>
+            </li>
+            <li class="layui-nav-item" style="margin-right: 20px">
+                <div>
+                    <button id="showPreview" data-method="showPreview" class="layui-btn locale">Video Preview</button>
+                </div>
+            </li>
+            <li class="layui-nav-item">
+                <a href="javascript:"><img src="login/user.png" class="layui-nav-img"><?php echo $_SESSION['user']; ?>
+                </a>
+                <dl class="layui-nav-child">
+                    <dd><a href="login/logout.php" style="text-align: center;" class="locale">Logout</a></dd>
+                </dl>
+            </li>
+            <li class="layui-nav-item">
+                <div>
+                    <select id="lang" name="lang" style="margin-left: 20px; width:100px;height:27px">
+                        <option value="zh_CN">简体中文</option>
+                        <option value="en_US">English</option>
+                    </select>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script> translate_html(); </script>
+<iframe id="iframe_main" src="" name="iframe" frameborder="0" onload="adaptIFrame('iframe_main', null, 64)"></iframe>
+
+<script src="/layui/layui.js" type="text/javascript"></script>
+<script src="index.js" type="text/javascript"></script>
+
+</body>
+</html>

@@ -36,7 +36,6 @@
 
 void metadata_initialize( metadata_fsm_t *p_fsm )
 {
-    LOG( LOG_INFO, "Initializing metadata FSM" );
     memset( &p_fsm->cur_metadata, 0x0, sizeof( firmware_metadata_t ) );
     p_fsm->callback_meta = NULL;
 

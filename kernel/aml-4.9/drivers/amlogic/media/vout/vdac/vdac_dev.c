@@ -274,6 +274,10 @@ static void vdac_enable_cvbs_out(bool on)
 	unsigned int reg_cntl1 = s_vdac_data->reg_cntl1;
 
 	if (on) {
+		if (s_vdac_data->cpu_id <= VDAC_CPU_GXLX)
+			vdac_hiu_reg_setb(reg_cntl0, 0, 12, 4);
+		else
+			vdac_hiu_reg_setb(reg_cntl0, 0x6, 12, 4);
 		vdac_ctrl_config(1, reg_cntl1, 3);
 		vdac_ctrl_config(1, reg_cntl0, 0);
 		vdac_ctrl_config(1, reg_cntl0, 9);
@@ -418,8 +422,8 @@ void vdac_enable(bool on, unsigned int module_sel)
 		}
 		break;
 	default:
-		pr_err("%s:module_sel: 0x%x wrong module index !! "
-					, __func__, module_sel);
+		pr_err("%s:module_sel: 0x%x wrong module index !! ",
+		       __func__, module_sel);
 		break;
 	}
 
@@ -438,27 +442,91 @@ void vdac_enable(bool on, unsigned int module_sel)
 }
 EXPORT_SYMBOL(vdac_enable);
 
-void vdac_set_ctrl0_ctrl1(unsigned int ctrl0, unsigned int ctrl1)
+int vdac_vref_adj(unsigned int value)
 {
-	unsigned int reg_cntl0;
-	unsigned int reg_cntl1;
+	struct meson_vdac_ctrl_s *table;
+	unsigned int reg;
+	unsigned int bit = 16;
+	int i = 0;
+	int ret = -1;
 
 	if (!s_vdac_data) {
 		pr_err("\n%s: s_vdac_data NULL\n", __func__);
-		return;
+		return ret;
 	}
 
-	reg_cntl0 = s_vdac_data->reg_cntl0;
-	reg_cntl1 = s_vdac_data->reg_cntl1;
+	table = s_vdac_data->ctrl_table;
+	reg = s_vdac_data->reg_cntl0;
 
-	vdac_hiu_reg_write(reg_cntl0, ctrl0);
-	vdac_hiu_reg_write(reg_cntl1, ctrl1);
-	if (vdac_debug_print) {
-		pr_info("vdac: set reg 0x%02x=0x%08x, readback=0x%08x\n",
-			reg_cntl0, ctrl0, vdac_hiu_reg_read(reg_cntl0));
-		pr_info("vdac: set reg 0x%02x=0x%08x, readback=0x%08x\n",
-			reg_cntl1, ctrl1, vdac_hiu_reg_read(reg_cntl1));
+	while (i < VDAC_CTRL_MAX) {
+		if (table[i].reg == VDAC_REG_MAX)
+			break;
+		if ((table[i].reg == reg) && (table[i].bit == bit)) {
+			vdac_hiu_reg_setb(reg, value, bit, table[i].len);
+			if (vdac_debug_print) {
+				pr_info("vdac: %s: reg=0x%x set bit%d=0x%x, readback=0x%08x\n",
+					__func__, reg, bit, value,
+					vdac_hiu_reg_read(reg));
+			}
+			ret = 0;
+			break;
+		}
+		i++;
 	}
+
+	return ret;
+}
+
+int vdac_gsw_adj(unsigned int value)
+{
+	struct meson_vdac_ctrl_s *table;
+	unsigned int reg;
+	unsigned int bit = 0;
+	int i = 0;
+	int ret = -1;
+
+	if (!s_vdac_data) {
+		pr_err("\n%s: s_vdac_data NULL\n", __func__);
+		return ret;
+	}
+
+	table = s_vdac_data->ctrl_table;
+	reg = s_vdac_data->reg_cntl1;
+
+	while (i < VDAC_CTRL_MAX) {
+		if (table[i].reg == VDAC_REG_MAX)
+			break;
+		if ((table[i].reg == reg) && (table[i].bit == bit)) {
+			vdac_hiu_reg_setb(reg, value, bit, table[i].len);
+			if (vdac_debug_print) {
+				pr_info("vdac: %s: reg=0x%x set bit%d=0x%x, readback=0x%08x\n",
+					__func__, reg, bit, value,
+					vdac_hiu_reg_read(reg));
+			}
+			ret = 0;
+			break;
+		}
+		i++;
+	}
+
+	return ret;
+}
+
+unsigned int vdac_get_reg_addr(unsigned int index)
+{
+	unsigned int reg;
+
+	if (!s_vdac_data) {
+		pr_err("\n%s: s_vdac_data NULL\n", __func__);
+		return 0xffffffff;
+	}
+
+	if (index)
+		reg = s_vdac_data->reg_cntl1;
+	else
+		reg = s_vdac_data->reg_cntl0;
+
+	return reg;
 }
 
 int vdac_enable_check_dtv(void)
@@ -469,6 +537,59 @@ int vdac_enable_check_dtv(void)
 int vdac_enable_check_cvbs(void)
 {
 	return (pri_flag & VDAC_MODULE_CVBS_OUT) ? 1 : 0;
+}
+
+static void vdac_dev_disable(void)
+{
+	if (!s_vdac_data)
+		return;
+
+	mutex_lock(&vdac_mutex);
+	if ((pri_flag & VDAC_MODULE_MASK) == 0) {
+		mutex_unlock(&vdac_mutex);
+		return;
+	}
+
+	if (pri_flag & VDAC_MODULE_CVBS_OUT)
+		vdac_enable_cvbs_out(0);
+	if (pri_flag & VDAC_MODULE_AVOUT_ATV)
+		vdac_enable_avout_atv(0);
+	if (pri_flag & VDAC_MODULE_AVOUT_AV)
+		vdac_enable_avout_av(0);
+	if (pri_flag & VDAC_MODULE_DTV_DEMOD)
+		vdac_enable_dtv_demod(0);
+
+	mutex_unlock(&vdac_mutex);
+
+	if (vdac_debug_print) {
+		pr_info("private_flag:             0x%02x\n"
+			"reg_cntl0:                0x%02x=0x%08x\n"
+			"reg_cntl1:                0x%02x=0x%08x\n",
+			pri_flag,
+			s_vdac_data->reg_cntl0,
+			vdac_hiu_reg_read(s_vdac_data->reg_cntl0),
+			s_vdac_data->reg_cntl1,
+			vdac_hiu_reg_read(s_vdac_data->reg_cntl1));
+	}
+}
+
+static void vdac_dev_enable(void)
+{
+	if (!s_vdac_data)
+		return;
+	if ((pri_flag & VDAC_MODULE_MASK) == 0)
+		return;
+
+	if (vdac_debug_print) {
+		pr_info("private_flag:             0x%02x\n"
+			"reg_cntl0:                0x%02x=0x%08x\n"
+			"reg_cntl1:                0x%02x=0x%08x\n",
+			pri_flag,
+			s_vdac_data->reg_cntl0,
+			vdac_hiu_reg_read(s_vdac_data->reg_cntl0),
+			s_vdac_data->reg_cntl1,
+			vdac_hiu_reg_read(s_vdac_data->reg_cntl1));
+	}
 }
 
 /* ********************************************************* */
@@ -705,43 +826,23 @@ static int __exit aml_vdac_remove(struct platform_device *pdev)
 static int amvdac_drv_suspend(struct platform_device *pdev,
 		pm_message_t state)
 {
-	if (s_vdac_data->cpu_id == VDAC_CPU_TXL ||
-		s_vdac_data->cpu_id == VDAC_CPU_TXLX)
-		vdac_hiu_reg_write(s_vdac_data->reg_cntl0, 0);
-	else if (s_vdac_data->cpu_id == VDAC_CPU_TL1 ||
-		s_vdac_data->cpu_id == VDAC_CPU_TM2)
-		vdac_ctrl_config(0, s_vdac_data->reg_cntl1, 7);
-	pr_info("%s: suspend module\n", __func__);
+	vdac_dev_disable();
+	pr_info("%s: private_flag:0x%x\n", __func__, pri_flag);
 	return 0;
 }
 
 static int amvdac_drv_resume(struct platform_device *pdev)
 {
-	/*0xbc[7] for bandgap enable: 0:enable,1:disable*/
-	if (s_vdac_data->cpu_id == VDAC_CPU_TL1 ||
-		s_vdac_data->cpu_id == VDAC_CPU_TM2) {
-		vdac_ctrl_config(1, s_vdac_data->reg_cntl1, 7);
-	}
-	pr_info("%s: resume module\n", __func__);
+	vdac_dev_enable();
+	pr_info("%s: private_flag:0x%x\n", __func__, pri_flag);
 	return 0;
 }
 #endif
 
 static void amvdac_drv_shutdown(struct platform_device *pdev)
 {
-	unsigned int cntl0, cntl1;
-
-	pr_info("%s: shutdown module, private_flag:0x%x\n",
-		__func__, pri_flag);
-	cntl0 = 0x0;
-	if (s_vdac_data->cpu_id == VDAC_CPU_TXL ||
-		s_vdac_data->cpu_id == VDAC_CPU_TXLX)
-		cntl1 = 0x0;
-	else if (s_vdac_data->cpu_id >= VDAC_CPU_TL1)
-		cntl1 = 0x80;
-	else
-		cntl1 = 0x8;
-	vdac_set_ctrl0_ctrl1(cntl0, cntl1);
+	vdac_dev_disable();
+	pr_info("%s: private_flag:0x%x\n", __func__, pri_flag);
 }
 
 static struct platform_driver aml_vdac_driver = {

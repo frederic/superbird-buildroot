@@ -18,6 +18,8 @@
 
 #define SRC1_GB_ALPHA_ENABLE 0x80000000
 
+#define __DEBUG 1
+
 #ifdef __DEBUG
 #define D_GE2D(fmt, args...) printf(fmt, ## args)
 #else
@@ -82,6 +84,9 @@ typedef enum  {
     PIXEL_FORMAT_YCbCr_420_SP_NV12,                // NV12 YCbCr YYYY.....UV....
 } pixel_format_t;
 
+/* if customized matrix is used, set this flag in format */
+#define MATRIX_CUSTOM               (0x80000000)
+
 typedef enum {
     GE2D_ROTATION_0,
     GE2D_ROTATION_90,
@@ -122,6 +127,26 @@ typedef struct buffer_info {
     int plane_number;
 } buffer_info_t;
 
+struct ge2d_matrix_s {
+	unsigned int pre_offset0;
+	unsigned int pre_offset1;
+	unsigned int pre_offset2;
+	unsigned int coef0;
+	unsigned int coef1;
+	unsigned int coef2;
+	unsigned int coef3;
+	unsigned int coef4;
+	unsigned int coef5;
+	unsigned int coef6;
+	unsigned int coef7;
+	unsigned int coef8;
+	unsigned int offset0;
+	unsigned int offset1;
+	unsigned int offset2;
+	/* input y/cb/cr saturation enable */
+	unsigned char sat_in_en;
+};
+
 typedef struct aml_ge2d_info {
     int ge2d_fd;     /* ge2d_fd */
     int ion_fd; /* ion_fd */
@@ -137,6 +162,7 @@ typedef struct aml_ge2d_info {
     unsigned int dst_op_cnt;
     int cap_attr;
     int b_src_swap;
+    struct ge2d_matrix_s matrix_custom;
     unsigned int reserved;
 } aml_ge2d_info_t;
 

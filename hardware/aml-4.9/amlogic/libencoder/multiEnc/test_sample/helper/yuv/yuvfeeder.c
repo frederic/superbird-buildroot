@@ -166,7 +166,7 @@ static BOOL yuvYuvFeeder_Feed(
 
     // Load source one picture image to encode to SDRAM frame buffer.
     if (!osal_fread(pYuv, 1, frameSize, ctx->fp)) {
-        if (osal_feof(ctx->fp) == 0) 
+        if (osal_feof(ctx->fp) == 0)
             VLOG(ERR, "Yuv Data osal_fread failed file handle is 0x%p\n", ctx->fp);
         return FALSE;
     }
@@ -182,7 +182,7 @@ static BOOL yuvYuvFeeder_Feed(
             if (bitdepth != 0)      // 10bit packed
                 outWidth *= 2;
         }
-        LoadYuvImageByYCbCrLine(impl->handle, coreIdx, pYuv, outWidth, outHeight, fb, srcFbIndex);
+        LoadYuvImageByYCbCrLine(impl->handle, coreIdx, pYuv, outWidth, outHeight, fb, arg, srcFbIndex);
         //LoadYuvImageBurstFormat(coreIdx, pYuv, outWidth, outHeight, fb, ctx->srcPlanar);
     }
 #if 0
@@ -194,7 +194,7 @@ static BOOL yuvYuvFeeder_Feed(
             osal_memcpy((void*)&mapConfig, arg, sizeof(TiledMapConfig));
         }
 
-        LoadTiledImageYuvBurst(coreIdx, pYuv, picWidth, picHeight, fb, mapConfig);
+        LoadTiledImageYuvBurst(impl->handle, coreIdx, pYuv, picWidth, picHeight, fb, mapConfig);
     }
 #endif
     return TRUE;
@@ -251,7 +251,7 @@ YuvFeeder YuvFeeder_Create(
         if ((success=impl->Create(impl, srcFilePath, yuvInfo.packedFormat, yuvInfo.srcStride, yuvInfo.srcHeight)) == TRUE) {
             impl->Configure(impl, 0, yuvInfo);
         }
-        break;       
+        break;
     case SOURCE_YUV_WITH_LOADER:
         impl = osal_malloc(sizeof(YuvFeederImpl));
         impl->Create    = loaderYuvFeeder_Create;

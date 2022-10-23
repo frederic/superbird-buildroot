@@ -8,7 +8,7 @@
  */
 
 #include "drm-help-client.h"
-#include "ipc.h"
+#include "ipc/ipc.h"
 
 bool json_format_to_drm_output_mode(json_object* j_mode, drm_output_mode* mode) {
     const char* name = NULL;

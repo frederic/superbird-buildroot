@@ -26,8 +26,12 @@ Description:
 #include <asm/arch/bl31_apis.h>
 #include <asm/arch/secure_apb.h>
 #include <libfdt.h>
+#include <partition_table.h>
 
 #include <amlogic/aml_efuse.h>
+#if defined(CONFIG_AML_NAND) || defined (CONFIG_AML_MTD)
+#include <nand.h>
+#endif
 
 typedef struct andr_img_hdr boot_img_hdr;
 
@@ -89,6 +93,7 @@ typedef struct{
 #define COMPILE_TYPE_ASSERT(expr, t)       typedef char t[(expr) ? 1 : -1]
 COMPILE_TYPE_ASSERT(2048 >= sizeof(AmlSecureBootImgHeader), _cc);
 
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
 static int is_andr_9_image(void* pBuffer)
 {
     int nReturn = 0;
@@ -106,6 +111,7 @@ exit:
 
     return nReturn;
 }
+#endif
 
 typedef struct {
 uint32_t magic;
@@ -119,6 +125,7 @@ uint8_t reserved[200];
 uint8_t rsa_sig[256];
 } aml_boot_header_t;
 
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
 static int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTotalEncKernelSz)
 {
     const AmlEncryptBootImgInfo*  amlEncrypteBootimgInfo = 0;
@@ -196,7 +203,7 @@ static int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTo
     *pTotalEncKernelSz = secureKernelImgSz;
     return 0;
 }
-
+#endif
 
 static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -233,11 +240,13 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         return __LINE__;
     }
 
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
     nReturn = _aml_get_secure_boot_kernel_size(loadaddr, &secureKernelImgSz);
     if (nReturn) {
         errorP("Fail in _aml_get_secure_boot_kernel_size, rc=%d\n", nReturn);
         return __LINE__;
     }
+#endif
 
     const int pageSz = hdr_addr->page_size;
     /*lflashReadOff += secureKernelImgSz ? sizeof(AmlSecureBootImgHeader) : pageSz;*/
@@ -252,12 +261,28 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         errorP("NO second part in kernel image\n");
         return __LINE__;
     }
-    unsigned char* dtImgAddr = (unsigned char*)loadaddr + lflashReadOff;
-    nReturn = store_read_ops((unsigned char*)partName, dtImgAddr, lflashReadOff, nFlashLoadLen);
+    unsigned long rdOffAlign = lflashReadOff;
+    unsigned char* dtImgAddr = (unsigned char*)loadaddr + rdOffAlign;
+#ifdef CONFIG_AML_MTD
+    if (NAND_BOOT_FLAG == device_boot_flag) {
+        const nand_info_t * mtdPartInf = get_mtd_device_nm(partName);
+        if (IS_ERR(mtdPartInf)) {
+            errorP("device(%s) is err\n", partName);
+            return CMD_RET_FAILURE;
+        }
+        const unsigned pageShift = mtdPartInf->writesize_shift;
+        const unsigned writesz   = mtdPartInf->writesize;
+        MsgP("MTD pageShift %d, writesz 0x%x\n", pageShift, writesz);
+        rdOffAlign = (lflashReadOff >> pageShift) << pageShift;//align page for mtd nand
+        nFlashLoadLen += writesz;
+    }
+#endif//#ifdef CONFIG_AML_MTD
+    nReturn = store_read_ops((unsigned char*)partName, dtImgAddr, rdOffAlign, nFlashLoadLen);
     if (nReturn) {
         errorP("Fail to read 0x%xB from part[%s] at offset 0x%x\n", nFlashLoadLen, partName, (unsigned int)lflashReadOff);
         return __LINE__;
     }
+    dtImgAddr += lflashReadOff - rdOffAlign;
 
     if (secureKernelImgSz) {
         //because secure boot will use DMA which need disable MMU temp

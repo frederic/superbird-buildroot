@@ -329,7 +329,6 @@ BR2_PACKAGE_AML_SOC_USE_MULTIENC=y
 #-------------------------IPC-------------------------------#
 ##
 BR2_PACKAGE_PTZ_CONTROL=y
-BR2_LINUX_KERNEL_IRCUT=y
 BR2_TARGET_TZ_INFO=y
 BR2_TARGET_LOCALTIME="Asia/Shanghai"
 BR2_PACKAGE_NTP=y

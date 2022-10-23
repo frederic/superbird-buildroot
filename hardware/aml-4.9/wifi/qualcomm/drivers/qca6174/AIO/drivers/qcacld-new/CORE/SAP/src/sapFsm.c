@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2139,7 +2139,8 @@ uint8_t sap_select_default_oper_chan_ini(tHalHandle hal, uint32_t acs_11a)
 				(operating_band == RF_SUBBAND_5_MID_GHZ) ?
 				(channel = SAP_DEFAULT_MID_5GHZ_CHANNEL) :
 				(operating_band == RF_SUBBAND_5_HIGH_GHZ) ?
-				(channel = SAP_DEFAULT_HIGH_5GHZ_CHANNEL) : 0;
+				(channel = SAP_DEFAULT_HIGH_5GHZ_CHANNEL) :
+				(channel = SAP_DEFAULT_LOW_5GHZ_CHANNEL);
 		else
 			channel = SAP_DEFAULT_LOW_5GHZ_CHANNEL;
 
@@ -2357,20 +2358,32 @@ static VOS_STATUS sap_check_mcc_valid(
 	/*
 	 * 3. Don't support MCC on DFS channel.
 	 */
-	if (chan_cnt > 1) {
-		for (j = 0; j < chan_cnt; j++) {
-			if (channels[j] != 0
-			    && vos_nv_getChannelEnabledState(channels[j])
-			    == NV_CHANNEL_DFS) {
-				VOS_TRACE( VOS_MODULE_ID_SAP,
-				    VOS_TRACE_LEVEL_ERROR,
-				    "%s: dfs not support in MCC dfs chan %d"
-				    "(chan %d band %d)",
-				    __func__, channels[j], chan, band);
+	for (i = 0; i < session_count; i++) {
+		info = &sessions[i];
+		if (info->och != 0 &&
+		    vos_nv_getChannelEnabledState(info->och) ==
+		    NV_CHANNEL_DFS) {
+			if ((info->con_mode == VOS_STA_SAP_MODE ||
+			    info->con_mode == VOS_P2P_GO_MODE) &&
+			    info->och != chan) {
+				VOS_TRACE(VOS_MODULE_ID_SAP,
+					  VOS_TRACE_LEVEL_ERROR,
+					  "SAP+SAP MCC DFS not support");
+				return VOS_STATUS_E_FAILURE;
+			}
+			if ((info->con_mode == VOS_STA_MODE ||
+			    info->con_mode == VOS_P2P_CLIENT_MODE) &&
+			    vos_nv_getChannelEnabledState(chan) ==
+			    NV_CHANNEL_DFS
+			    ) {
+				VOS_TRACE(VOS_MODULE_ID_SAP,
+					  VOS_TRACE_LEVEL_ERROR,
+					  "STA+SAP SAP can't start in DFS ch");
 				return VOS_STATUS_E_FAILURE;
 			}
 		}
 	}
+
 	return VOS_STATUS_SUCCESS;
 }
 
@@ -2386,6 +2399,9 @@ static VOS_STATUS sap_check_mcc_valid(
 * gWlanMccToSccSwitchMode = 1: override to SCC if channel overlap in
 *    same band.
 * gWlanMccToSccSwitchMode = 2: force to SCC in same band.
+*
+* gWlanBandSwitchEnable = false: disabled.
+* gWlanBandSwitchEnable = true:  enable band switch for MCC to SCC
 *
 * Return: VOS_STATUS_SUCCESS: Success
 *             other value will fail the sap start request
@@ -2448,8 +2464,19 @@ sap_concurrency_chan_override(
 		    "%s: mode %d band %d och %d lf %d hf %d cf %d hbw %d",
 		    __func__, info->con_mode, info->band, info->och,
 		    info->lfreq, info->hfreq, info->cfreq, info->hbw);
-		if (info->band != target_band)
-			continue;
+		if (info->band != target_band) {
+			if (sap_context->band_switch_enable) {
+				if (info->band == eCSR_BAND_5G) {
+					sap_context->ch_width_orig =
+						sap_context->ch_width_5g_orig;
+				} else {
+					sap_context->ch_width_orig =
+						sap_context->ch_width_24g_orig;
+				}
+			} else {
+				continue;
+			}
+		}
 		if (cc_switch_mode == VOS_MCC_TO_SCC_SWITCH_ENABLE
 			&& target_chan != 0
 			&& sap_overlap_check(&target_info, info))
@@ -2468,8 +2495,19 @@ sap_concurrency_chan_override(
 			    __func__, info->con_mode, info->band,
 			    info->och, info->lfreq, info->hfreq,
 			    info->cfreq, info->hbw);
-			if (info->band != target_band)
-				continue;
+			if (info->band != target_band) {
+				if (sap_context->band_switch_enable) {
+					if (info->band == eCSR_BAND_5G) {
+						sap_context->ch_width_orig =
+							sap_context->ch_width_5g_orig;
+					} else {
+						sap_context->ch_width_orig =
+							sap_context->ch_width_24g_orig;
+					}
+				} else {
+					continue;
+				}
+			}
 			candidate[candidate_count++] = info->och;
 		}
 	}
@@ -2733,6 +2771,31 @@ sapGotoChannelSel
         }
 #endif
     }
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+    else if (sapContext->ap_p2pclient_concur_enable &&
+             vos_get_concurrency_mode() == (VOS_SAP|VOS_P2P_CLIENT)) {
+#ifdef FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
+        if (sapContext->channel == AUTO_CHANNEL_SELECT)
+            sapContext->dfs_ch_disable = VOS_TRUE;
+        else if (VOS_IS_DFS_CH(sapContext->channel)) {
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_WARN,
+                       "In %s, DFS not supported in STA_AP Mode, chan=%d",
+                       __func__, sapContext->channel);
+            return VOS_STATUS_E_ABORTED;
+        }
+#endif
+        vosStatus = sap_concurrency_chan_override(
+                sapContext,
+                sapContext->cc_switch_mode,
+                &con_ch);
+        if (vosStatus != VOS_STATUS_SUCCESS) {
+            VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                "%s: invalid SAP channel(%d) configuration",
+                __func__,sapContext->channel);
+            return VOS_STATUS_E_ABORTED;
+        }
+    }
+#endif
 
     if (sapContext->channel == AUTO_CHANNEL_SELECT)
     {
@@ -3202,6 +3265,206 @@ static void sap_handle_acs_scan_event(ptSapContext sap_context,
 {
 }
 #endif
+/**
+ * get_ext_ie_ptr_from_ext_id() - Find out ext ie
+ * @eid: element id
+ * @oui: oui buffer
+ * @oui_size: oui size
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * This function find out ext ie from ext id (passed oui)
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ie_ptr_from_eid_n_oui(uint8_t eid,
+					        const uint8_t *oui,
+						uint8_t oui_size,
+						const uint8_t *ie,
+						uint16_t ie_len)
+{
+	int32_t left = ie_len;
+	const uint8_t *ptr = ie;
+	uint8_t elem_id, elem_len;
+
+	while (left >= 2) {
+		elem_id  = ptr[0];
+		elem_len = ptr[1];
+		left -= 2;
+
+		if (elem_len > left)
+			return NULL;
+
+		if (eid == elem_id) {
+			/* if oui is not provide eid match is enough */
+			if (!oui)
+				return ptr;
+
+			/*
+			 * if oui is provided and oui_size is more than left
+			 * bytes, then we cannot have match
+			 */
+			if (oui_size > left)
+				return NULL;
+
+			if (vos_mem_compare(&ptr[2], oui, oui_size))
+				return ptr;
+		}
+
+		left -= elem_len;
+		ptr += (elem_len + 2);
+	}
+
+	return NULL;
+}
+/**
+ * get_ie_ptr_from_eid() - Find out ie from eid
+ * @eid: element id
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ie_ptr_from_eid(uint8_t eid,
+				   const uint8_t *ie,
+				   int ie_len)
+{
+	return get_ie_ptr_from_eid_n_oui(eid, NULL, 0, ie, ie_len);
+}
+
+/**
+ * get_ext_ie_ptr_from_ext_id() - Find out ext ie
+ * @oui: oui buffer
+ * @oui_size: oui size
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * This function find out ext ie from ext id (passed oui)
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ext_ie_ptr_from_ext_id(const uint8_t *oui,
+					  uint8_t oui_size,
+					  const uint8_t *ie,
+					  uint16_t ie_len)
+{
+	return get_ie_ptr_from_eid_n_oui(SIR_MAC_EID_EXT,
+					 oui, oui_size, ie, ie_len);
+}
+
+
+#define DH_OUI_TYPE      "\x20"
+#define DH_OUI_TYPE_SIZE (1)
+/**
+ * sap_fill_owe_ie_in_assoc_ind() - Fill OWE IE in assoc indication
+ * Function to fill OWE IE in assoc indication
+ * @assoc_ind: SAP STA association indication
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to get OWE IEs (RSN IE, DH IE etc) from assoc request
+ * and fill them in association indication.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_fill_owe_ie_in_assoc_ind(tSap_StationAssocIndication *assoc_ind,
+					 struct sSirSmeAssocInd *sme_assoc_ind)
+{
+	uint32_t owe_ie_len, rsn_ie_len, dh_ie_len;
+	const uint8_t *rsn_ie, *dh_ie;
+
+	if (assoc_ind->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid assoc req");
+		return false;
+	}
+
+	rsn_ie = get_ie_ptr_from_eid(
+			DOT11F_EID_RSN,
+			assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+			assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET);
+	if (!rsn_ie) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "RSN IE is not present");
+		return false;
+	}
+	rsn_ie_len = rsn_ie[1] + 2;
+	if (rsn_ie_len < DOT11F_IE_RSN_MIN_LEN ||
+	    rsn_ie_len > DOT11F_IE_RSN_MAX_LEN) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid RSN IE len %d",
+			  rsn_ie_len);
+		return false;
+	}
+
+	dh_ie = get_ext_ie_ptr_from_ext_id(
+		   DH_OUI_TYPE, DH_OUI_TYPE_SIZE,
+		   assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+		   (uint16_t)(assoc_ind->assocReqLength -
+		   ASSOC_REQ_IE_OFFSET));
+	if (!dh_ie) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "DH IE is not present");
+		return false;
+	}
+	dh_ie_len = dh_ie[1] + 2;
+	if (dh_ie_len < DOT11F_IE_DH_PARAMETER_ELEMENT_MIN_LEN ||
+	    dh_ie_len > DOT11F_IE_DH_PARAMETER_ELEMENT_MAX_LEN) {
+		VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+			  "Invalid DH IE len %d",
+			  dh_ie_len);
+		return false;
+	}
+
+	VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+		  FL("rsn_ie_len = %d, dh_ie_len = %d"), rsn_ie_len, dh_ie_len);
+
+	owe_ie_len = rsn_ie_len + dh_ie_len;
+	assoc_ind->owe_ie = vos_mem_malloc(owe_ie_len);
+	if (!assoc_ind->owe_ie)
+		return false;
+
+	vos_mem_copy(assoc_ind->owe_ie, rsn_ie, rsn_ie_len);
+	vos_mem_copy(assoc_ind->owe_ie + rsn_ie_len, dh_ie, dh_ie_len);
+	assoc_ind->owe_ie_len = owe_ie_len;
+
+	return true;
+}
+
+/**
+ * sap_save_owe_pending_assoc_ind() - Save pending assoc indication
+ * Function to save pending assoc indication in SAP context
+ * @sap_ctx: SAP context
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to save pending assoc indication in linked list
+ * in SAP context.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_save_owe_pending_assoc_ind(
+					ptSapContext sap_ctx,
+					struct sSirSmeAssocInd *sme_assoc_ind)
+{
+	struct owe_assoc_ind *assoc_ind;
+	VOS_STATUS status;
+
+	assoc_ind = vos_mem_malloc(sizeof(*assoc_ind));
+	if (!assoc_ind)
+		return false;
+	assoc_ind->assoc_ind = sme_assoc_ind;
+	status = vos_list_insert_back(&sap_ctx->owe_pending_assoc_ind_list,
+				      &assoc_ind->node);
+	if (VOS_STATUS_SUCCESS != status) {
+		vos_mem_free(assoc_ind);
+		return false;
+	}
+
+	return true;
+}
+
 /*==========================================================================
   FUNCTION    sapSignalHDDevent
 
@@ -3236,7 +3499,7 @@ sapSignalHDDevent
 )
 {
     VOS_STATUS  vosStatus = VOS_STATUS_SUCCESS;
-    tSap_Event sapApAppEvent; /* This now encodes ALL event types */
+    tSap_Event sapApAppEvent = {0}; /* This now encodes ALL event types */
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
     tpAniSirGlobal pMac;
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -3278,6 +3541,26 @@ sapSignalHDDevent
                sapApAppEvent.sapevt.sapAssocIndication.negotiatedUCEncryptionType = pCsrRoamInfo->u.pConnectedProfile->EncryptionType;
                sapApAppEvent.sapevt.sapAssocIndication.negotiatedMCEncryptionType = pCsrRoamInfo->u.pConnectedProfile->mcEncryptionType;
                sapApAppEvent.sapevt.sapAssocIndication.fAuthRequired = pCsrRoamInfo->fAuthRequired;
+            }
+            if (pCsrRoamInfo->owe_pending_assoc_ind) {
+                if (!sap_fill_owe_ie_in_assoc_ind(
+                         &sapApAppEvent.sapevt.sapAssocIndication,
+                         pCsrRoamInfo->owe_pending_assoc_ind)) {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                              FL("Failed to fill OWE IE"));
+                    vos_mem_free(pCsrRoamInfo->owe_pending_assoc_ind);
+                    pCsrRoamInfo->owe_pending_assoc_ind = NULL;
+                    return VOS_STATUS_E_FAILURE;
+                }
+                if (!sap_save_owe_pending_assoc_ind(sapContext,
+                           pCsrRoamInfo->owe_pending_assoc_ind)) {
+                    VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                              FL("Failed to save assoc ind"));
+                    vos_mem_free(pCsrRoamInfo->owe_pending_assoc_ind);
+                    pCsrRoamInfo->owe_pending_assoc_ind = NULL;
+                    return VOS_STATUS_E_FAILURE;
+                }
+                pCsrRoamInfo->owe_pending_assoc_ind = NULL;
             }
             break;
        case eSAP_START_BSS_EVENT:
@@ -3373,9 +3656,6 @@ sapSignalHDDevent
                          pCsrRoamInfo->peerMac,sizeof(tSirMacAddr));
             sta_event_ptr->staId = pCsrRoamInfo->staId;
             sta_event_ptr->statusCode = pCsrRoamInfo->statusCode;
-            sta_event_ptr->iesLen = pCsrRoamInfo->rsnIELen;
-            vos_mem_copy(sta_event_ptr->ies, pCsrRoamInfo->prsnIE,
-                         pCsrRoamInfo->rsnIELen);
             sta_event_ptr->ampdu = pCsrRoamInfo->ampdu;
             sta_event_ptr->sgi_enable = pCsrRoamInfo->sgi_enable;
             sta_event_ptr->tx_stbc = pCsrRoamInfo->tx_stbc;
@@ -3388,27 +3668,16 @@ sapSignalHDDevent
             sta_event_ptr->rx_mcs_map = pCsrRoamInfo->rx_mcs_map;
             sta_event_ptr->tx_mcs_map = pCsrRoamInfo->tx_mcs_map;
 
-#ifdef FEATURE_WLAN_WAPI
-            if(pCsrRoamInfo->wapiIELen)
-            {
-                v_U8_t  len = sta_event_ptr->iesLen;
-                sta_event_ptr->iesLen
-                                                        += pCsrRoamInfo->wapiIELen;
-                vos_mem_copy(&sta_event_ptr->ies[len],
-                        pCsrRoamInfo->pwapiIE,
-                            pCsrRoamInfo->wapiIELen);
+            if (pCsrRoamInfo->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+                VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                          FL("Invalid assoc request length:%d"),
+                          pCsrRoamInfo->assocReqLength);
+                return VOS_STATUS_E_FAILURE;
             }
-#endif
-
-            if(pCsrRoamInfo->addIELen)
-            {
-                v_U8_t  len = sta_event_ptr->iesLen;
-                sta_event_ptr->iesLen
-                                                        += pCsrRoamInfo->addIELen;
-                vos_mem_copy(&sta_event_ptr->ies[len], pCsrRoamInfo->paddIE,
-                            pCsrRoamInfo->addIELen);
-            }
-
+            sta_event_ptr->iesLen = (pCsrRoamInfo->assocReqLength -
+                                     ASSOC_REQ_IE_OFFSET);
+            sta_event_ptr->ies = (pCsrRoamInfo->assocReqPtr +
+                                     ASSOC_REQ_IE_OFFSET);
             /* also fill up the channel info from the csrRoamInfo */
             pChanInfo =
             &sta_event_ptr->chan_info;
@@ -4144,7 +4413,15 @@ sapFsm
                      v_U8_t ch;
 
                      /* find a new available channel */
-                     ch = sapRandomChannelSel(sapContext);
+                     if (sapContext->candidate_ch &&
+                         !VOS_IS_DFS_CH(sapContext->candidate_ch) &&
+                         sapContext->candidate_ch != sapContext->channel) {
+                         ch = sapContext->candidate_ch;
+                         VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_DEBUG,
+                                   FL("Candidate channel exist, ch= %d"), ch);
+                     } else {
+                         ch = sapRandomChannelSel(sapContext);
+                     }
                      if (ch == 0) {
                          /* No available channel found */
                          VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
@@ -4662,6 +4939,7 @@ sapconvertToCsrProfile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType, t
 
     profile->AuthType.numEntries = 1;
     profile->AuthType.authType[0] = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+    profile->akm_list = pconfig_params->akm_list;
 
     //Always set the Encryption Type
     profile->EncryptionType.numEntries = 1;
@@ -5347,7 +5625,16 @@ v_U8_t sapIndicateRadar(ptSapContext sapContext, tSirSmeDfsEventInd *dfs_event)
      * (5) Create the available channel list with the above rules
      */
 
-    target_channel = sapRandomChannelSel(sapContext);
+    if (sapContext->candidate_ch &&
+        !VOS_IS_DFS_CH(sapContext->candidate_ch) &&
+        sapContext->candidate_ch != sapContext->channel) {
+        target_channel = sapContext->candidate_ch;
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_DEBUG,
+                  FL("Candidate channel exist, ch= %d"), target_channel);
+    } else {
+        target_channel = sapRandomChannelSel(sapContext);
+    }
+
     if (0 == target_channel)
     {
         sapSignalHDDevent(sapContext, NULL, eSAP_DFS_NO_AVAILABLE_CHANNEL,
