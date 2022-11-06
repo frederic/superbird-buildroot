@@ -15,9 +15,7 @@ cd superbird-buildroot/
 git checkout buildroot-openlinux
 wget https://releases.linaro.org/components/toolchain/binaries/7.3-2018.05/aarch64-linux-gnu/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz -O vendor/amlogic/external/packages/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
 wget https://releases.linaro.org/components/toolchain/binaries/7.3-2018.05/arm-linux-gnueabihf/gcc-linaro-7.3.1-2018.05-x86_64_arm-linux-gnueabihf.tar.xz -O vendor/amlogic/external/packages/gcc-linaro-7.3.1-2018.05-x86_64_arm-linux-gnueabihf.tar.xz
-git clone https://cobalt.googlesource.com/cobalt
-cd cobalt
-git archive --format=tar.gz -o ../vendor/amlogic/external/packages/cobalt-20.lts.3.244012.tar.gz -v 20.lts.3
+wget https://cobalt.googlesource.com/cobalt/+archive/refs/tags/20.lts.3.tar.gz -O vendor/amlogic/external/packages/cobalt-20.lts.3.244012.tar.gz
 cd ..
 ```
 
