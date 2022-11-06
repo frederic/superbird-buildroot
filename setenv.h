@@ -1,1 +1,0 @@
-buildroot/build/setenv.sh
